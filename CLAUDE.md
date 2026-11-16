@@ -58,6 +58,14 @@ Commit und Push nur, wenn es ausdrücklich verlangt wird. Nie `--force`, nie die
   Testaudio erzeugt `TestAudio.sineWave(seconds:)`, temporäre Bibliotheken `Library(directory:)` mit `TestAudio.temporaryDirectory()`.
   Tests berühren nie die echte Bibliothek unter Application Support.
   Nach dem Flutter-Umbau: `flutter test` in `app/`, `ctest` im C++-Kern `core/`.
+- Prototyp Flutter/C++ (Branch `gen-5-prototyp`, GEN-5):
+  ```
+  cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release && cmake --build core/build && ctest --test-dir core/build --output-on-failure
+  cd app && flutter analyze && flutter test && flutter build macos --debug && flutter build ios --simulator --debug
+  tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitTimePitch
+  ```
+  Der Kern liegt in `core/` (C-API `core/include/wp_core.h`), die Dart-Anbindung als FFI-Plugin in `app/packages/wp_core/`.
+  Bibliotheken in `core/third_party/` (Versionen in `core/third_party/README.md`).
 - Nach einem Commit mit Code-Änderungen startet der Hook den Agenten `test-agent` im Schnellmodus.
 - Tests, die ein Abnahmekriterium belegen, nennen Issue und Kriterium (`FEA-22/AK2` im Namen oder Kommentar, `AK2` = zweites Häkchen).
 - Audio-Logik (Tempo, Loop-Grenzen, Seek, Zeitformat `mm:ss`) und Bibliothek (`library.json`, Sortierung, Ordner) brauchen Unit-Tests. Oberfläche nur, wo sinnvoll.

@@ -1,0 +1,26 @@
+name: wp_core
+description: "Dart-Anbindung des Woodshed-Player-Audio-Kerns (core/) über dart:ffi."
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.14.0
+  flutter: '>=3.3.0'
+
+dependencies:
+  ffi: ^2.1.3
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      ios:
+        ffiPlugin: true
+      macos:
+        ffiPlugin: true

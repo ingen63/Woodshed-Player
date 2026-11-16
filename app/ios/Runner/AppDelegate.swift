@@ -1,0 +1,60 @@
+import Flutter
+import UIKit
+import UniformTypeIdentifiers
+
+@main
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  private var picker: AudioPicker?
+
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WoodshedFiles") else { return }
+    let channel = FlutterMethodChannel(name: "woodshed/files", binaryMessenger: registrar.messenger())
+    channel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "pickAudio":
+        self?.pickAudio(result)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  /// Dateiauswahl über den Dokumenten-Dialog; die Datei wird in die App kopiert.
+  private func pickAudio(_ result: @escaping FlutterResult) {
+    let root = UIApplication.shared.connectedScenes
+      .compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }
+      .first
+    guard let root else { return result(nil) }
+    let picker = AudioPicker(result: result)
+    self.picker = picker
+    root.present(picker.controller, animated: true)
+  }
+}
+
+private final class AudioPicker: NSObject, UIDocumentPickerDelegate {
+  let controller: UIDocumentPickerViewController
+  private let result: FlutterResult
+
+  init(result: @escaping FlutterResult) {
+    self.result = result
+    controller = UIDocumentPickerViewController(forOpeningContentTypes: [.audio], asCopy: true)
+    super.init()
+    controller.delegate = self
+  }
+
+  func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    result(urls.first?.path)
+  }
+
+  func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    result(nil)
+  }
+}
