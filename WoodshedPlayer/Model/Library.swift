@@ -20,10 +20,13 @@ final class Library {
     private let indexURL: URL
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
 
-    init() {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        folder = support.appendingPathComponent("WoodshedPlayer/Tracks", isDirectory: true)
-        indexURL = support.appendingPathComponent("WoodshedPlayer/library.json")
+    /// - Parameter directory: Folder holding `library.json` and `Tracks/`. Defaults to
+    ///   *Application Support/WoodshedPlayer*; tests pass a temporary folder.
+    init(directory: URL? = nil) {
+        let base = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("WoodshedPlayer", isDirectory: true)
+        folder = base.appendingPathComponent("Tracks", isDirectory: true)
+        indexURL = base.appendingPathComponent("library.json")
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
         let stored = UserDefaults.standard.string(forKey: Self.sortOrderKey)

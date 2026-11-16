@@ -33,6 +33,8 @@ Geschwindigkeit und Loop werden **pro Datei** gespeichert und beim nächsten Öf
   Metadaten und Einstellungen liegen in `library.json`.
 - `Views/PlayerKeyboardShortcuts.swift`: Tastatursteuerung. Beim Tippen in Textfeldern ist sie aus.
 - `Views/`: SwiftUI-Oberfläche, angelehnt an die macOS-Schnellansicht.
+- `WoodshedPlayerTests/`: Tests (Swift Testing) für Zeitformat, Loop-Grenzen und `library.json`. Testaudio wird im Test erzeugt.
+  Ausführen mit ⌘U in Xcode oder `xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' test`.
 - Auf iOS läuft die Wiedergabe auch im Hintergrund weiter (Background Mode *Audio*).
 
 ## Datenschutz

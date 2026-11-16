@@ -50,7 +50,13 @@ Commit und Push nur, wenn es ausdrücklich verlangt wird. Nie `--force`, nie die
   xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
   xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
   ```
-- Tests: Swift Testing / XCTest im Testziel `WoodshedPlayerTests` (noch anzulegen, eigenes Issue), Aufruf mit `xcodebuild … test`.
+- Tests: Swift Testing im Testziel `WoodshedPlayerTests` (Ordner `WoodshedPlayerTests/`, neue Dateien werden automatisch aufgenommen):
+  ```
+  xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' test
+  xcodebuild … test -only-testing:WoodshedPlayerTests/LoopBoundsTests   # einzelne Suite
+  ```
+  Testaudio erzeugt `TestAudio.sineWave(seconds:)`, temporäre Bibliotheken `Library(directory:)` mit `TestAudio.temporaryDirectory()`.
+  Tests berühren nie die echte Bibliothek unter Application Support.
   Nach dem Flutter-Umbau: `flutter test` in `app/`, `ctest` im C++-Kern `core/`.
 - Nach einem Commit mit Code-Änderungen startet der Hook den Agenten `test-agent` im Schnellmodus.
 - Tests, die ein Abnahmekriterium belegen, nennen Issue und Kriterium (`FEA-22/AK2` im Namen oder Kommentar, `AK2` = zweites Häkchen).

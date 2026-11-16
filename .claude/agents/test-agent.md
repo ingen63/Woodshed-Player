@@ -19,10 +19,17 @@ Ein Test, der Code ausführt, ohne das Ergebnis zu prüfen, zählt nicht.
 - **Vollmodus (auf Anweisung, z. B. vor einem Release):** alle Tests, alle Plattformen, Abdeckung mit
   `xcodebuild … test -enableCodeCoverage YES` und `xcrun xccov view --report`.
 
-## Solange es kein Testziel gibt
+## Testziel
 
-Existiert `WoodshedPlayerTests` noch nicht, nur den Build prüfen und im Bericht vermerken:
-«Kein Testziel vorhanden, Issue für das Anlegen vorschlagen.» Das Testziel nicht selbst anlegen (ändert die Projektdatei, braucht ein eigenes Issue).
+- Swift Testing (`import Testing`, `@Test`, `#expect`) im Testziel `WoodshedPlayerTests`, Ordner `WoodshedPlayerTests/`.
+  Neue Testdateien dort ablegen; die Projektdatei muss dafür nicht geändert werden (synchronisierter Ordner).
+- Aufruf: `xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' test`,
+  gezielt mit `-only-testing:WoodshedPlayerTests/<Suite>`. Für iOS genügt `build-for-testing` mit
+  `-destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO`.
+- Ergebnis zählen: `-resultBundlePath <Pfad>` und `xcrun xcresulttool get test-results summary --path <Pfad> --compact`.
+- Hilfen: `TestAudio.sineWave(seconds:)` erzeugt Testaudio, `TestAudio.temporaryDirectory()` + `Library(directory:)`
+  ergeben eine Bibliothek im temporären Ordner. Nie die echte Bibliothek unter Application Support verwenden.
+- `AudioPlayer` und `Library` sind `@MainActor`: Test-Suites dafür mit `@MainActor` markieren.
 
 ## Arbeitsbaum sauber halten (verbindlich)
 
