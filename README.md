@@ -27,7 +27,7 @@ Geschwindigkeit und Loop werden **pro Datei** gespeichert und beim nächsten Öf
 
 ### Flutter-App (im Umbau, `app/`)
 
-Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) hat zusätzlich:
+Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) sieht aus wie die bisherige App (Karten für Wiedergabe, Geschwindigkeit und Loop, Zeiten als mm:ss); die Bibliothek fehlt noch. Sie hat zusätzlich:
 
 | Funktion | Bedienung |
 | --- | --- |

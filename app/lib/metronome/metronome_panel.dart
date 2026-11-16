@@ -2,9 +2,10 @@ import 'package:material_ui/material_ui.dart';
 
 import 'metronome_controller.dart';
 import 'metronome_settings.dart';
+import '../ui/style.dart';
 import 'repeat_button.dart';
 
-/// Bedienfeld des Metronoms (ohne eigene Gestaltung des Metronom-Projekts).
+/// Bedienfeld des Metronoms in Karten wie der Player-Reiter (FEA-19).
 class MetronomePanel extends StatelessWidget {
   const MetronomePanel({super.key, required this.controller});
 
@@ -25,105 +26,140 @@ class MetronomePanel extends StatelessWidget {
         final s = controller.settings;
         final theme = Theme.of(context);
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 16,
           children: [
-            Row(
+            WsCard(
+              key: const Key('card:metronome'),
               children: [
-                Text('Metronom', style: theme.textTheme.titleMedium),
-                const Spacer(),
-                FilledButton.icon(
-                  key: const Key('metronomeToggle'),
-                  onPressed: controller.toggle,
-                  icon: Icon(
-                    controller.running ? Icons.stop : Icons.play_arrow,
+                CardHeader(
+                  icon: WsIcons.metronome,
+                  title: 'Metronom',
+                  trailing: ExcludeFocus(
+                    child: FilledButton.icon(
+                      key: const Key('metronomeToggle'),
+                      onPressed: controller.toggle,
+                      icon: Icon(
+                        controller.running ? WsIcons.stop : WsIcons.play,
+                        size: 16,
+                      ),
+                      label: Text(
+                        controller.running ? 'Stopp (M)' : 'Start (M)',
+                      ),
+                    ),
                   ),
-                  label: Text(controller.running ? 'Stopp (M)' : 'Start (M)'),
+                ),
+                Row(
+                  children: [
+                    RepeatButton(
+                      icon: Icons.remove,
+                      tooltip: 'Langsamer (↓)',
+                      onStep: () => controller.changeBpm(-1),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '${s.bpm} BPM',
+                        key: const Key('metronomeBpm'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                    RepeatButton(
+                      icon: Icons.add,
+                      tooltip: 'Schneller (↑)',
+                      onStep: () => controller.changeBpm(1),
+                    ),
+                    const SizedBox(width: 8),
+                    BorderedButton(label: 'Tap (T)', onPressed: controller.tap),
+                  ],
+                ),
+                Slider(
+                  value: s.bpm.toDouble(),
+                  min: MetronomeSettings.minBpm.toDouble(),
+                  max: MetronomeSettings.maxBpm.toDouble(),
+                  divisions:
+                      MetronomeSettings.maxBpm - MetronomeSettings.minBpm,
+                  label: '${s.bpm}',
+                  onChanged: (v) => controller.setBpm(v.round()),
+                ),
+                const HintText(
+                  'Tasten: M = Start/Stopp, ↑ / ↓ = Tempo ±1 (mit Shift ±10), T = Tap-Tempo. '
+                  'Titel und Metronom laufen nie gleichzeitig.',
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
+            WsCard(
+              key: const Key('card:meter'),
               children: [
-                RepeatButton(
-                  icon: Icons.remove,
-                  tooltip: 'Langsamer (↓)',
-                  onStep: () => controller.changeBpm(-1),
+                const CardHeader(icon: WsIcons.timer, title: 'Takt und Klang'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final m in MetronomeSettings.meters)
+                      BorderedButton(
+                        label: MetronomeSettings.meterLabel(m),
+                        selected: s.meter == m,
+                        onPressed: () => controller.setMeter(m),
+                      ),
+                  ],
                 ),
-                Expanded(
-                  child: Text(
-                    '${s.bpm} BPM',
-                    key: const Key('metronomeBpm'),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineSmall,
-                  ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final e in _subdivisions.entries)
+                      BorderedButton(
+                        label: e.value,
+                        selected: s.subdivision == e.key,
+                        onPressed: () => controller.setSubdivision(e.key),
+                      ),
+                  ],
                 ),
-                RepeatButton(
-                  icon: Icons.add,
-                  tooltip: 'Schneller (↑)',
-                  onStep: () => controller.changeBpm(1),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: controller.tap,
-                  child: const Text('Tap (T)'),
+                Row(
+                  children: [
+                    const Icon(WsIcons.speaker2, size: 18),
+                    Expanded(
+                      child: Slider(
+                        value: s.volume,
+                        onChanged: controller.setVolume,
+                        label: '${(s.volume * 100).round()} %',
+                        divisions: 100,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 48,
+                      child: Text(
+                        '${(s.volume * 100).round()} %',
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            Slider(
-              value: s.bpm.toDouble(),
-              min: MetronomeSettings.minBpm.toDouble(),
-              max: MetronomeSettings.maxBpm.toDouble(),
-              divisions: MetronomeSettings.maxBpm - MetronomeSettings.minBpm,
-              label: '${s.bpm}',
-              onChanged: (v) => controller.setBpm(v.round()),
-            ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
+            WsCard(
+              key: const Key('card:ramp'),
               children: [
-                for (final m in MetronomeSettings.meters)
-                  ChoiceChip(
-                    label: Text(MetronomeSettings.meterLabel(m)),
-                    selected: s.meter == m,
-                    onSelected: (_) => controller.setMeter(m),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (final e in _subdivisions.entries)
-                  ChoiceChip(
-                    label: Text(e.value),
-                    selected: s.subdivision == e.key,
-                    onSelected: (_) => controller.setSubdivision(e.key),
-                  ),
-              ],
-            ),
-            Row(
-              children: [
-                const Icon(Icons.volume_down),
-                Expanded(
-                  child: Slider(
-                    value: s.volume,
-                    onChanged: controller.setVolume,
-                    label: '${(s.volume * 100).round()} %',
-                    divisions: 100,
-                  ),
+                CardHeader(
+                  icon: WsIcons.speedometer,
+                  title: 'Automatische Tempo-Steigerung',
+                  value: s.rampEnabled,
+                  onChanged: (v) => controller.setRamp(enabled: v),
                 ),
-                Text('${(s.volume * 100).round()} %'),
+                Dimmed(
+                  enabled: s.rampEnabled,
+                  child: _RampSettings(controller: controller, settings: s),
+                ),
+                const HintText(
+                  'Das Tempo steigt jeweils am Taktanfang. Ist das Ziel erreicht, '
+                  'bleibt es gleich viele Takte und beginnt dann wieder beim Start-BPM.',
+                ),
               ],
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Automatische Tempo-Steigerung'),
-              value: s.rampEnabled,
-              onChanged: (v) => controller.setRamp(enabled: v),
-            ),
-            if (s.rampEnabled)
-              _RampSettings(controller: controller, settings: s),
           ],
         );
       },

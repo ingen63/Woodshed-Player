@@ -1,4 +1,5 @@
-// Prototyp GEN-5 / FEA-4: Wiedergabe mit Tempo und Loop über den C++-Kern, Aufnahme des Systemtons (macOS).
+// Woodshed Player (Flutter): Wiedergabe mit Tempo und Loop über den C++-Kern, Metronom (FEA-3),
+// Aufnahme des Systemtons (macOS, FEA-4). Erscheinungsbild wie die alte App (FEA-19).
 import 'dart:async';
 import 'dart:io';
 
@@ -11,6 +12,8 @@ import 'metronome/metronome_panel.dart';
 import 'metronome/practice_session.dart';
 import 'metronome/practice_shortcuts.dart';
 import 'time_format.dart';
+import 'ui/player_view.dart';
+import 'ui/style.dart';
 
 void main() => runApp(const WoodshedApp());
 
@@ -21,15 +24,8 @@ class WoodshedApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Woodshed Player',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.brown),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.brown,
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: woodshedTheme(Brightness.light),
+      darkTheme: woodshedTheme(Brightness.dark),
       home: const PlayerPage(),
     );
   }
@@ -44,7 +40,6 @@ class PlayerPage extends StatefulWidget {
 
 class _PlayerPageState extends State<PlayerPage> {
   static const _files = MethodChannel('woodshed/files');
-  static const _quickRates = [0.25, 0.5, 0.7, 0.8, 0.9, 1.0];
 
   final WpPlayer _player = WpPlayer();
   late final MetronomeController _metronome = MetronomeController(
@@ -63,9 +58,11 @@ class _PlayerPageState extends State<PlayerPage> {
   double _position = 0;
   double _duration = 0;
   bool _playing = false;
+  double _volume = 1.0;
+  bool _speedOn = false;
   double _rate = 1.0;
-  double? _loopA;
-  double? _loopB;
+  double _loopStart = 0;
+  double _loopEnd = 0;
   bool _loopOn = false;
 
   // Aufnahme
@@ -125,12 +122,14 @@ class _PlayerPageState extends State<PlayerPage> {
   void _load(String path, String title) {
     try {
       _player.load(path);
-      _player.rate = _rate;
+      _player.rate = _speedOn ? _rate : 1.0;
+      _player.volume = _volume;
       setState(() {
         _title = title;
         _duration = _player.duration;
         _error = null;
-        _loopA = _loopB = null;
+        _loopStart = 0;
+        _loopEnd = _duration;
         _loopOn = false;
       });
       _session.playTitle();
@@ -140,15 +139,29 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   void _setRate(double r) {
-    final rounded = (r * 20).round() / 20; // 0,05er-Schritte
-    _player.rate = rounded;
+    final rounded = ((r * 20).round() / 20).clamp(0.1, 2.0); // 0,05er-Schritte
     setState(() => _rate = rounded);
+    _player.rate = _speedOn ? rounded : 1.0;
   }
 
-  void _applyLoop() {
-    final a = _loopA, b = _loopB;
-    if (_loopOn && a != null && b != null && b >= a + 1) {
-      _player.setLoop(a, b);
+  void _setSpeedOn(bool on) {
+    setState(() => _speedOn = on);
+    _player.rate = on ? _rate : 1.0;
+  }
+
+  void _setVolume(double v) {
+    setState(() => _volume = v);
+    _player.volume = v;
+  }
+
+  void _setLoop({bool? on, double? start, double? end}) {
+    setState(() {
+      _loopOn = on ?? _loopOn;
+      _loopStart = (start ?? _loopStart).clamp(0, _duration);
+      _loopEnd = (end ?? _loopEnd).clamp(0, _duration);
+    });
+    if (_loopOn && _loopEnd >= _loopStart + 1) {
+      _player.setLoop(_loopStart, _loopEnd);
     } else {
       _player.clearLoop();
     }
@@ -186,8 +199,6 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loaded = _duration > 0;
     return PracticeShortcuts(
       metronome: _metronome,
       onPlayPause: () {
@@ -197,223 +208,111 @@ class _PlayerPageState extends State<PlayerPage> {
         length: 2,
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Woodshed Player · Prototyp'),
+            title: Text(_title ?? 'Woodshed Player'),
             bottom: const TabBar(
               tabs: [
-                Tab(icon: Icon(Icons.music_note), text: 'Player'),
-                Tab(icon: Icon(Icons.av_timer), text: 'Metronom'),
+                Tab(icon: Icon(WsIcons.musicNote), text: 'Player'),
+                Tab(icon: Icon(WsIcons.metronome), text: 'Metronom'),
               ],
             ),
             actions: [
-              IconButton(
-                onPressed: _open,
-                icon: const Icon(Icons.folder_open),
-                tooltip: 'Datei öffnen',
+              ExcludeFocus(
+                child: IconButton(
+                  onPressed: _open,
+                  icon: const Icon(WsIcons.folder),
+                  tooltip: 'Datei öffnen',
+                ),
               ),
             ],
           ),
-          // Knöpfe und Regler nehmen keinen Tastaturfokus, damit Leertaste und Pfeile immer die Kürzel auslösen.
-          body: ExcludeFocus(
-            child: TabBarView(
-              children: [
-                ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _title ?? 'Keine Datei geladen',
-                            style: theme.textTheme.titleLarge,
-                          ),
-                        ),
-                        FilledButton.icon(
-                          onPressed: _open,
-                          icon: const Icon(Icons.audio_file),
-                          label: Text(loaded ? 'Andere Datei' : 'MP3 öffnen'),
-                        ),
-                      ],
-                    ),
-                    if (!loaded)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          Platform.isMacOS
-                              ? 'MP3, WAV oder FLAC wählen oder einfach ins Fenster ziehen.'
-                              : 'MP3, WAV oder FLAC aus «Dateien» wählen.',
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ),
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          _error!,
-                          style: TextStyle(color: theme.colorScheme.error),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    Slider(
-                      value: _position.clamp(0, loaded ? _duration : 1),
-                      max: loaded ? _duration : 1,
-                      onChanged: loaded ? (v) => _player.seek(v) : null,
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(formatTime(_position)),
-                        Text(formatTime(_duration)),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          onPressed: loaded
-                              ? () => _player.seek(
-                                  (_position - 15).clamp(0, _duration),
-                                )
-                              : null,
-                          icon: const Icon(Icons.replay_10),
-                          tooltip: '15 s zurück',
-                        ),
-                        IconButton.filled(
-                          iconSize: 40,
-                          onPressed: loaded ? _session.toggleTitle : null,
-                          icon: Icon(_playing ? Icons.pause : Icons.play_arrow),
-                        ),
-                        IconButton(
-                          onPressed: loaded
-                              ? () => _player.seek(
-                                  (_position + 15).clamp(0, _duration),
-                                )
-                              : null,
-                          icon: const Icon(Icons.forward_10),
-                          tooltip: '15 s vor',
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 32),
-                    Text(
-                      'Tempo ${_rate.toStringAsFixed(2)}×',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    Slider(
-                      value: _rate,
-                      min: 0.1,
-                      max: 2.0,
-                      divisions: 38,
-                      onChanged: _setRate,
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final r in _quickRates)
-                          ChoiceChip(
-                            label: Text('$r×'),
-                            selected: _rate == r,
-                            onSelected: (_) => _setRate(r),
-                          ),
-                      ],
-                    ),
-                    const Divider(height: 32),
-                    Row(
-                      children: [
-                        Text('Loop', style: theme.textTheme.titleMedium),
-                        const Spacer(),
-                        Switch(
-                          value: _loopOn,
-                          onChanged: loaded
-                              ? (v) {
-                                  setState(() => _loopOn = v);
-                                  _applyLoop();
-                                }
-                              : null,
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        OutlinedButton(
-                          onPressed: loaded
-                              ? () {
-                                  setState(() => _loopA = _position);
-                                  _applyLoop();
-                                }
-                              : null,
-                          child: Text(
-                            'A ${_loopA == null ? '–' : formatTime(_loopA!)}',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: loaded
-                              ? () {
-                                  setState(() => _loopB = _position);
-                                  _applyLoop();
-                                }
-                              : null,
-                          child: Text(
-                            'B ${_loopB == null ? '–' : formatTime(_loopB!)}',
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        if (_loopA != null &&
-                            _loopB != null &&
-                            _loopB! < _loopA! + 1)
-                          const Expanded(
-                            child: Text('B muss mindestens 1 s nach A liegen'),
-                          ),
-                      ],
-                    ),
-                    if (WpRecorder.available) ...[
-                      const Divider(height: 32),
-                      Text(
-                        'Aufnahme (Systemton, ohne Mikrofon)',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          FilledButton.icon(
-                            onPressed: _toggleRecording,
-                            icon: Icon(
-                              _recording
-                                  ? Icons.stop
-                                  : Icons.fiber_manual_record,
-                            ),
-                            label: Text(
-                              _recording ? 'Stopp' : 'Aufnahme starten',
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          if (_recording) Text(formatTime(_recSeconds)),
-                        ],
-                      ),
-                      if (_recording) ...[
-                        const SizedBox(height: 8),
-                        LinearProgressIndicator(value: _recLevel.clamp(0, 1)),
-                      ],
-                      if (_recSilent)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            'Es kommt nur Stille an. Läuft gerade Musik? Sonst die Berechtigung erteilen: '
-                            'Systemeinstellungen › Datenschutz & Sicherheit › Bildschirm- & Systemaudioaufnahme.',
-                            style: TextStyle(color: theme.colorScheme.error),
-                          ),
-                        ),
-                    ],
-                  ],
+          body: TabBarView(
+            children: [
+              PlayerView(
+                state: PlayerViewState(
+                  title: _title,
+                  position: _position,
+                  duration: _duration,
+                  playing: _playing,
+                  volume: _volume,
+                  speedOn: _speedOn,
+                  speed: _rate,
+                  loopOn: _loopOn,
+                  loopStart: _loopStart,
+                  loopEnd: _loopEnd,
+                  error: _error,
                 ),
-                ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [MetronomePanel(controller: _metronome)],
+                actions: PlayerViewActions(
+                  open: _open,
+                  playPause: _session.toggleTitle,
+                  seek: _player.seek,
+                  volume: _setVolume,
+                  speedOn: _setSpeedOn,
+                  speed: _setRate,
+                  loopOn: (v) => _setLoop(on: v),
+                  loopStart: (v) => _setLoop(start: v),
+                  loopEnd: (v) => _setLoop(end: v),
+                ),
+                extraCards: [if (WpRecorder.available) _recordingCard()],
+              ),
+              // Keine Textfelder: Knöpfe und Regler nehmen keinen Tastaturfokus.
+              ExcludeFocus(
+                child: AccentBackground(
+                  child: CardColumn(
+                    children: [MetronomePanel(controller: _metronome)],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _recordingCard() {
+    final theme = Theme.of(context);
+    return ExcludeFocus(
+      child: WsCard(
+        key: const Key('card:recording'),
+        children: [
+          CardHeader(
+            icon: WsIcons.record,
+            title: 'Aufnahme',
+            trailing: FilledButton.icon(
+              onPressed: _toggleRecording,
+              style: FilledButton.styleFrom(
+                backgroundColor: _recording ? Colors.red : null,
+              ),
+              icon: Icon(_recording ? WsIcons.stop : WsIcons.record, size: 14),
+              label: Text(_recording ? 'Stopp' : 'Aufnahme starten'),
+            ),
+          ),
+          if (_recording)
+            Row(
+              children: [
+                Text(
+                  formatTime(_recSeconds),
+                  style: const TextStyle(
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: LinearProgressIndicator(value: _recLevel.clamp(0, 1)),
                 ),
               ],
             ),
+          if (_recSilent)
+            Text(
+              'Es kommt nur Stille an. Läuft gerade Musik? Sonst die Berechtigung erteilen: '
+              'Systemeinstellungen › Datenschutz & Sicherheit › Bildschirm- & Systemaudioaufnahme.',
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+          const HintText(
+            'Nimmt den Systemton auf (ohne Mikrofon). Die Aufnahme wird nur lokal gespeichert '
+            'und danach im Player geöffnet.',
           ),
-        ),
+        ],
       ),
     );
   }
