@@ -11,7 +11,7 @@ endif()
 set(WP_THIRD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
 # Wiedergabe-Logik ohne Audiogerät (für Tests und Offline-Rendering)
-add_library(wp_engine STATIC src/engine.cpp)
+add_library(wp_engine STATIC src/engine.cpp src/metronome.cpp)
 target_include_directories(wp_engine PUBLIC src
   ${WP_THIRD_PARTY}/signalsmith-stretch/include
   ${WP_THIRD_PARTY}/signalsmith-linear/include)
@@ -48,3 +48,7 @@ enable_testing()
 add_executable(engine_tests tests/engine_tests.cpp)
 target_link_libraries(engine_tests PRIVATE wp_engine)
 add_test(NAME engine_tests COMMAND engine_tests)
+
+add_executable(metronome_tests tests/metronome_tests.cpp)
+target_link_libraries(metronome_tests PRIVATE wp_engine)
+add_test(NAME metronome_tests COMMAND metronome_tests)

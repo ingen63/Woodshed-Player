@@ -25,6 +25,16 @@ Native SwiftUI-App für **macOS 14+** und **iOS/iPadOS 17+** aus einer gemeinsam
 
 Geschwindigkeit und Loop werden **pro Datei** gespeichert und beim nächsten Öffnen wiederhergestellt.
 
+### Flutter-App (im Umbau, `app/`)
+
+Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) hat zusätzlich:
+
+| Funktion | Bedienung |
+| --- | --- |
+| Metronom | Start/Stopp mit **M**, Tempo 20–300 BPM mit −/+ (gedrückt halten wiederholt), Regler oder **↑** / **↓** (mit Shift ±10), Tap-Tempo mit **T**. Taktarten 4/4, 3/4, 2/4, 6/8, Unterteilungen Viertel bis Sechzehntel, eigene Lautstärke. Eigener Reiter «Metronom»; Titel und Metronom laufen nie gleichzeitig (Start des einen pausiert den anderen). Nach einem Neustart gilt 120 BPM, die übrigen Einstellungen bleiben erhalten |
+| Automatische Tempo-Steigerung | Start- und Ziel-BPM, Schritt und alle wie viele Takte. Ist das Ziel erreicht, geht es nach gleich vielen Takten wieder beim Start-BPM los |
+| Aufnahme (nur Mac, ab macOS 14.2) | Nimmt den Systemton auf, ohne Mikrofon und ohne den eigenen Player-Ton. Beim ersten Mal fragt macOS nach der Berechtigung |
+
 ## Technik
 
 - `Audio/AudioPlayer.swift`: `AVAudioEngine` → `AVAudioPlayerNode` → `AVAudioUnitTimePitch`.
@@ -45,6 +55,7 @@ Woodshed Player arbeitet **vollständig lokal**:
 - Keine Analyse- oder Tracking-Dienste, keine Weitergabe von Daten an Dritte.
 - Importierte MP3-Dateien werden in den privaten App-Ordner kopiert. Titel, Künstler, Album, Cover sowie Tempo- und Loop-Einstellungen werden nur dort (`library.json`) und in den lokalen App-Einstellungen gespeichert.
 - Die App läuft in der macOS-App-Sandbox und liest nur Dateien, die du selbst auswählst.
+- Flutter-App: Die Metronom-Einstellungen liegen in `metronome.json` im App-Ordner. Aufnahmen des Systemtons (Mac) werden nur lokal im App-Ordner gespeichert; die Aufnahme startet nur auf Knopfdruck.
 - Löschst du die App (und ihren Datenordner), sind alle gespeicherten Daten weg.
 
 ## Lizenz

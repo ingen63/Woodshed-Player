@@ -9,7 +9,10 @@ void main() {
       expect(formatTime(61), '1:01');
       expect(formatTime(3599), '59:59');
     });
-    test('ab einer Stunde mit Stunden', () => expect(formatTime(3661), '1:01:01'));
+    test(
+      'ab einer Stunde mit Stunden',
+      () => expect(formatTime(3661), '1:01:01'),
+    );
     test('ungültige Werte ergeben 0:00', () {
       expect(formatTime(-3), '0:00');
       expect(formatTime(double.nan), '0:00');

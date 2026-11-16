@@ -38,6 +38,22 @@ final _position =
 final _duration =
     _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_duration');
 
+final _mStart = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_metro_start');
+final _mStop = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_metro_stop');
+final _mIsRunning =
+    _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_metro_is_running');
+final _mSetBpm = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32), void Function(Pointer<_Player>, int)>(
+    'wp_metro_set_bpm');
+final _mBpm = _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_metro_bpm');
+final _mSetMeter = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32), void Function(Pointer<_Player>, int)>(
+    'wp_metro_set_meter');
+final _mSetSub = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32), void Function(Pointer<_Player>, int)>(
+    'wp_metro_set_subdivision');
+final _mSetVolume = _lib.lookupFunction<Void Function(Pointer<_Player>, Float),
+    void Function(Pointer<_Player>, double)>('wp_metro_set_volume');
+final _mSetRamp = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32, Int32, Int32, Int32, Int32),
+    void Function(Pointer<_Player>, int, int, int, int, int)>('wp_metro_set_ramp');
+
 final _recAvailable = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_available');
 final _recStart = _lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('wp_rec_start');
 final _recStop = _lib.lookupFunction<Void Function(), void Function()>('wp_rec_stop');
@@ -49,7 +65,9 @@ final _recError = _lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Fu
 
 /// Ein Player mit eigenem Audiogerät.
 class WpPlayer {
-  WpPlayer() : _p = _create();
+  WpPlayer() : _p = _create() {
+    if (_p == nullptr) throw WpException('Audiogerät konnte nicht gestartet werden');
+  }
 
   final Pointer<_Player> _p;
 
@@ -80,6 +98,25 @@ class WpPlayer {
   double get duration => _duration(_p);
 
   void dispose() => _destroy(_p);
+
+  // ---- Metronom (läuft mit und ohne Titel) ----
+  void metronomeStart() => _mStart(_p);
+  void metronomeStop() => _mStop(_p);
+  bool get metronomeRunning => _mIsRunning(_p) != 0;
+  set metronomeBpm(int bpm) => _mSetBpm(_p, bpm);
+
+  /// Aktuelles Tempo; ändert sich bei automatischer Steigerung.
+  int get metronomeBpm => _mBpm(_p);
+
+  /// Schläge pro Takt: 2, 3, 4 oder 6 (6/8).
+  set metronomeMeter(int beats) => _mSetMeter(_p, beats);
+
+  /// Klicks pro Schlag 1–4.
+  set metronomeSubdivision(int clicks) => _mSetSub(_p, clicks);
+  set metronomeVolume(double v) => _mSetVolume(_p, v);
+  void metronomeRamp({required bool enabled, required int start, required int target, required int step,
+          required int everyBars}) =>
+      _mSetRamp(_p, enabled ? 1 : 0, start, target, step, everyBars);
 }
 
 /// Aufnahme des Systemtons (nur macOS 14.2+).

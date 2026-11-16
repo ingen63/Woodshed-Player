@@ -21,6 +21,14 @@ import UniformTypeIdentifiers
       switch call.method {
       case "pickAudio":
         self?.pickAudio(result)
+      case "supportDir":
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        result(dir.path)
+      case "keepAwake":
+        // Bildschirm bleibt an, solange das Metronom läuft (FEA-3).
+        UIApplication.shared.isIdleTimerDisabled = (call.arguments as? Bool) ?? false
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }

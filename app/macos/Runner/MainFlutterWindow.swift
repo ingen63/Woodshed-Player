@@ -52,6 +52,12 @@ class MainFlutterWindow: NSWindow {
         panel.begin { response in
           result(response == .OK ? panel.url?.path : nil)
         }
+      case "supportDir":
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        result(dir.path)
+      case "keepAwake":
+        result(nil)  // auf dem Mac nicht nötig
       case "recordingsDir":
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
           .appendingPathComponent("Recordings", isDirectory: true)

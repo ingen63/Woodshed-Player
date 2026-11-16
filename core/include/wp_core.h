@@ -33,6 +33,18 @@ WP_API void wp_set_volume(wp_player* p, float volume);
 WP_API double wp_position(wp_player* p);
 WP_API double wp_duration(wp_player* p);
 
+/* ---- Metronom (FEA-3), läuft mit und ohne Titel ---- */
+WP_API void wp_metro_start(wp_player* p);  /* beginnt immer mit Takt 1, Schlag 1 */
+WP_API void wp_metro_stop(wp_player* p);
+WP_API int wp_metro_is_running(wp_player* p);
+WP_API void wp_metro_set_bpm(wp_player* p, int bpm);  /* 20–300, wird begrenzt */
+WP_API int wp_metro_bpm(wp_player* p);                /* aktuelles Tempo (ändert sich mit der Steigerung) */
+WP_API void wp_metro_set_meter(wp_player* p, int beats_per_bar);    /* 2, 3, 4 oder 6 (6/8) */
+WP_API void wp_metro_set_subdivision(wp_player* p, int clicks);     /* 1–4 Klicks pro Schlag */
+WP_API void wp_metro_set_volume(wp_player* p, float volume);        /* 0–1 */
+WP_API void wp_metro_set_ramp(wp_player* p, int enabled, int start_bpm, int target_bpm, int step_bpm,
+                              int every_bars);
+
 /* ---- Aufnahme des Systemtons (nur macOS 14.2+, sonst Rückgabe < 0) ---- */
 /* 1 = auf dieser Plattform verfügbar, 0 = nicht verfügbar. */
 WP_API int wp_rec_available(void);
