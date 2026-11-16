@@ -58,7 +58,7 @@ Commit und Push nur, wenn es ausdrücklich verlangt wird. Nie `--force`, nie die
   Testaudio erzeugt `TestAudio.sineWave(seconds:)`, temporäre Bibliotheken `Library(directory:)` mit `TestAudio.temporaryDirectory()`.
   Tests berühren nie die echte Bibliothek unter Application Support.
   Nach dem Flutter-Umbau: `flutter test` in `app/`, `ctest` im C++-Kern `core/`.
-- Prototyp Flutter/C++ (Branch `gen-5-prototyp`, GEN-5):
+- Flutter-App und C++-Kern (Umbau, aus dem Prototyp GEN-5):
   ```
   cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release && cmake --build core/build && ctest --test-dir core/build --output-on-failure
   cd app && flutter analyze && flutter test && flutter build macos --debug && flutter build ios --simulator --debug
