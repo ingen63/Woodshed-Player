@@ -18,9 +18,9 @@ Die ID im Titel hat **dieselbe Nummer wie das Issue auf GitHub**: Issue #22 heis
 
 | Präfix | Art | Label |
 |---|---|---|
-| `FEA` | Funktion, Änderung | `feature` |
+| `FEA` | Funktion, Änderung | `enhancement` |
 | `ISS` | Fehler | `bug` |
-| `GEN` | Allgemeines, Repo, Werkzeuge, Doku | `allgemein` |
+| `GEN` | Allgemeines, Repo, Werkzeuge, Doku | `general` (Doku zusätzlich `documentation`) |
 
 Weil die Nummer erst beim Anlegen feststeht, werden Issues mit dem Skill **`issue`** angelegt (`tools/issue-id.sh new`): Er legt das Issue an und setzt danach das Präfix mit der richtigen Nummer. Issues, die im Browser angelegt wurden, korrigiert `tools/issue-id.sh sync` (Trockenlauf, mit `--apply` umbenennen).
 
@@ -33,8 +33,8 @@ Weil die Nummer erst beim Anlegen feststeht, werden Issues mit dem Skill **`issu
 5. **Commit** mit ID und Issue-Nummer, Imperativ oder Substantiv, ohne Punkt:
    `FEA-22 Ziehbare Loop-Marker (#22)`. ID-Nummer und `(#…)` sind immer gleich.
    Eine Anforderung pro Commit (oder wenige Commits). Kein `Fixes #22` in der Commit-Nachricht, denn das schliesst das Issue beim Push von selbst.
-   Nach dem Commit, der die Anforderung vollständig umsetzt, bekommt das Issue das Label `umgesetzt` und den Kommentar
-   «Umgesetzt in <Commit>. Abnahme ausstehend.» (`gh issue edit <Nr> --add-label umgesetzt`, `gh issue comment`).
+   Nach dem Commit, der die Anforderung vollständig umsetzt, bekommt das Issue das Label `implemented` und den Kommentar
+   «Umgesetzt in <Commit>. Abnahme ausstehend.» (`gh issue edit <Nr> --add-label implemented`, `gh issue comment`).
    Teilschritte bekommen das Label nicht. Wird das Issue wieder geöffnet, kommt das Label weg, bis die Nacharbeit committet ist.
 6. **Abnahme** machst Du. Claude hakt die Kriterien im Issue **nicht** selbst ab und schliesst es nicht.
    **Ausnahme «Prüfe FEA-xx»:** Dann prüft Claude die Kriterien (vorhandene Tests laufen lassen, sonst von Hand), kommentiert
@@ -68,6 +68,11 @@ Commit und Push nur, wenn es ausdrücklich verlangt wird. Nie `--force`, nie die
 
 ## Issues anlegen und pflegen
 
-- Vorlagen in `.github/ISSUE_TEMPLATE/` (Fehler, Funktion). Labels: `bug`, `feature`, `allgemein`, `audio`, `ui`, `repo`, `false-positive`, `umgesetzt`; bei Fehlern zusätzlich der Fundort `gefunden:test`, `gefunden:abnahme` oder `gefunden:nutzung`. Meilensteine: «Nächste Version», «Später».
+- Vorlagen in `.github/ISSUE_TEMPLATE/` (Fehler, Funktion). Labels sind englisch und folgen den GitHub-Standardlabels:
+  - Art: `enhancement` (FEA), `bug` (ISS), `general` (GEN), dazu `documentation` für Doku-Änderungen.
+  - Bereich: `audio`, `ui`, `repo`.
+  - Status: `implemented` (umgesetzt, Abnahme ausstehend), `wontfix` (wird nicht umgesetzt), `false-positive` (Fehlalarm).
+  - Fundort bei Fehlern: `found:test`, `found:acceptance` oder `found:usage`.
+  - Meilensteine: «Nächste Version», «Später».
 - Eine Anforderung pro Issue. Die Abnahmekriterien nach dem Start nicht stillschweigend ändern: Änderungen als Kommentar mit Begründung.
-- Fehlalarme mit `false-positive` als «not planned» schliessen, mit Begründung.
+- Fehlalarme mit `false-positive`, abgelehnte Anforderungen mit `wontfix` als «not planned» schliessen, jeweils mit Begründung.

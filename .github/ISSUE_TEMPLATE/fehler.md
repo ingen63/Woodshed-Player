@@ -16,7 +16,7 @@ labels: bug
 **Audiodatei**
 Bitte keine urheberrechtlich geschützten Songs anhängen. Format, Länge und Bitrate genügen, oder eine selbst erzeugte Testdatei.
 
-**Gefunden bei** (Label `gefunden:test`, `gefunden:abnahme` oder `gefunden:nutzung`)
+**Gefunden bei** (Label `found:test`, `found:acceptance` oder `found:usage`)
 
 **Welcher Test hätte ihn fangen müssen?** (nach der Analyse)
 

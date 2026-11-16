@@ -10,8 +10,8 @@ Anlegen immer über `tools/issue-id.sh`.
 
 ## Neues Issue
 
-1. **Art bestimmen:** `FEA` (Funktion/Änderung, Label `feature`), `ISS` (Fehler, Label `bug`), `GEN` (Allgemeines, Repo, Werkzeuge, Label `allgemein`).
-   Zusätzliche Labels nach Bereich: `audio`, `ui`, `repo`; bei Fehlern der Fundort `gefunden:test|abnahme|nutzung`.
+1. **Art bestimmen:** `FEA` (Funktion/Änderung, Label `enhancement`), `ISS` (Fehler, Label `bug`), `GEN` (Allgemeines, Repo, Werkzeuge, Label `general`).
+   Zusätzliche Labels nach Bereich: `audio`, `ui`, `repo`, bei Doku `documentation`; bei Fehlern der Fundort `found:test|acceptance|usage`.
 2. **Text nach Vorlage** aus `.github/ISSUE_TEMPLATE/funktion.md` bzw. `fehler.md` entwerfen:
    Anforderung (ohne Lösung vorzuschreiben) und **Abnahmekriterien als Häkchen-Liste**, jedes eindeutig und prüfbar.
    Keine privaten Daten (echte Titel, Künstler, Namen, E-Mail).

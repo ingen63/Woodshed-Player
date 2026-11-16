@@ -5,14 +5,14 @@
 #       legt das Issue an und setzt danach die ID mit der richtigen Nummer in den Titel.
 #   tools/issue-id.sh sync [--apply]
 #       zeigt Issues, deren ID fehlt oder nicht zur Nummer passt; mit --apply werden sie umbenannt.
-#       Ohne Präfix im Titel entscheidet das Label: bug → ISS, feature → FEA, sonst GEN.
+#       Ohne Präfix im Titel entscheidet das Label: bug → ISS, enhancement → FEA, sonst GEN.
 set -euo pipefail
 
 label_for() {
   case "$1" in
-    FEA) echo feature ;;
+    FEA) echo enhancement ;;
     ISS) echo bug ;;
-    GEN) echo allgemein ;;
+    GEN) echo general ;;
     *) echo "Unbekanntes Präfix: $1 (erlaubt: FEA, ISS, GEN)" >&2; exit 2 ;;
   esac
 }
@@ -36,7 +36,7 @@ cmd_sync() {
     if [[ "$title" =~ ^(FEA|ISS|GEN)-[^[:space:]]*[[:space:]]+(.*)$ ]]; then
       prefix="${BASH_REMATCH[1]}"; rest="${BASH_REMATCH[2]}"
     elif [[ ",$labels," == *",bug,"* ]]; then prefix=ISS
-    elif [[ ",$labels," == *",feature,"* ]]; then prefix=FEA
+    elif [[ ",$labels," == *",enhancement,"* ]]; then prefix=FEA
     else prefix=GEN
     fi
     local want="$prefix-$num $rest"

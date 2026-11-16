@@ -2,7 +2,7 @@
 name: Funktion vorschlagen
 about: Eine neue Funktion oder eine Änderung
 title: "FEA-? "
-labels: feature
+labels: enhancement
 ---
 
 <!-- Die ID im Titel wird nach dem Anlegen auf die Issue-Nummer gesetzt (tools/issue-id.sh sync). -->
