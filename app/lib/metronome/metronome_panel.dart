@@ -5,7 +5,7 @@ import 'metronome_settings.dart';
 import '../ui/style.dart';
 import 'repeat_button.dart';
 
-/// Bedienfeld des Metronoms in Karten wie der Player-Reiter (FEA-19).
+/// Bedienfeld des Metronoms in Karten wie der Player-Reiter (#19).
 class MetronomePanel extends StatelessWidget {
   const MetronomePanel({super.key, required this.controller});
 

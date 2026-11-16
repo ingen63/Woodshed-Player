@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'metronome_controller.dart';
 
-/// Tastenkürzel (FEA-3): M Metronom an/aus, T Tap-Tempo, ↑/↓ Tempo ±1 (mit Shift ±10),
+/// Tastenkürzel (#3): M Metronom an/aus, T Tap-Tempo, ↑/↓ Tempo ±1 (mit Shift ±10),
 /// Leertaste Play/Pause des Titels. In Textfeldern sind die Kürzel aus.
 class PracticeShortcuts extends StatelessWidget {
   const PracticeShortcuts({

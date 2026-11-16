@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/time_format.dart';
 
 void main() {
-  group('formatTime (mm:ss wie die alte App, FEA-19)', () {
+  group('formatTime (mm:ss wie die alte App, #19)', () {
     test('Minuten und Sekunden zweistellig', () {
       expect(formatTime(0), '00:00');
       expect(formatTime(59.9), '00:59');
@@ -39,7 +39,7 @@ void main() {
     });
   });
 
-  test('FEA-19 Geschwindigkeit mit Dezimalkomma', () {
+  test('#19 Geschwindigkeit mit Dezimalkomma', () {
     expect(formatRate(0.75), '0,75×');
     expect(formatRate(1), '1,00×');
   });

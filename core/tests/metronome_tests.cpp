@@ -1,4 +1,4 @@
-// Tests des Metronoms (FEA-3) im Offline-Rendering. AKn = n-tes Abnahmekriterium im Issue #3.
+// Tests des Metronoms (#3) im Offline-Rendering. AKn = n-tes Abnahmekriterium im Issue #3.
 #include <cmath>
 #include <cstdio>
 #include <functional>
@@ -58,7 +58,7 @@ int bpmOfBar(const Ticks& t, int bar) {
 
 // ---------------------------------------------------------------------------
 
-void defaults() {  // FEA-3/AK1
+void defaults() {  // #3/AK1
     Metronome m(44100);
     CHECK(m.bpm() == 120);
     CHECK(m.meter() == 4);
@@ -68,7 +68,7 @@ void defaults() {  // FEA-3/AK1
     CHECK(run(m, 44100).empty());  // gestoppt: keine Klicks
 }
 
-void bpmRangeIsClamped() {  // FEA-3/AK2
+void bpmRangeIsClamped() {  // #3/AK2
     Metronome m;
     m.setBpm(10);
     CHECK(m.bpm() == 20);
@@ -78,7 +78,7 @@ void bpmRangeIsClamped() {  // FEA-3/AK2
     CHECK(m.bpm() == 73);
 }
 
-void startBeginsWithBarOneBeatOne() {  // FEA-3/AK11
+void startBeginsWithBarOneBeatOne() {  // #3/AK11
     Metronome m(44100);
     m.start();
     auto t = run(m, 44100 * 3, 333);
@@ -89,7 +89,7 @@ void startBeginsWithBarOneBeatOne() {  // FEA-3/AK11
     CHECK(!t.empty() && t[0].frame == 0 && t[0].bar == 1 && t[0].beat == 0);
 }
 
-void beatsAreSampleExactWithoutDrift() {  // FEA-3/AK9
+void beatsAreSampleExactWithoutDrift() {  // #3/AK9
     for (int sub : {1, 3, 4}) {
         Metronome m(44100);
         m.setSubdivision(sub);
@@ -110,7 +110,7 @@ void beatsAreSampleExactWithoutDrift() {  // FEA-3/AK9
     }
 }
 
-void accentsPerMeter() {  // FEA-3/AK6, AK7
+void accentsPerMeter() {  // #3/AK6, AK7
     struct Case {
         int meter;
         std::vector<int> kinds;
@@ -132,7 +132,7 @@ void accentsPerMeter() {  // FEA-3/AK6, AK7
     CHECK(m.meter() == 4);
 }
 
-void subdivisionsAndQuieterSubClicks() {  // FEA-3/AK8
+void subdivisionsAndQuieterSubClicks() {  // #3/AK8
     for (int sub = 1; sub <= 4; ++sub) {
         Metronome m(44100);
         m.setSubdivision(sub);
@@ -157,7 +157,7 @@ void subdivisionsAndQuieterSubClicks() {  // FEA-3/AK8
     CHECK(beat > 0.1f);
 }
 
-void meterChangeWhilePlaying() {  // FEA-3/AK10
+void meterChangeWhilePlaying() {  // #3/AK10
     Metronome m(44100);
     m.start();
     auto t = run(m, 22050 * 3 + 100);  // Schläge 1–3 gespielt, nächster wäre Schlag 4
@@ -171,7 +171,7 @@ void meterChangeWhilePlaying() {  // FEA-3/AK10
     CHECK(t.size() == 4);
 }
 
-void volumeChangeWithoutCrackle() {  // FEA-3/AK12
+void volumeChangeWithoutCrackle() {  // #3/AK12
     Metronome m(44100);
     m.start();
     std::vector<float> out(44100 * 2, 0.0f);
@@ -190,7 +190,7 @@ void volumeChangeWithoutCrackle() {  // FEA-3/AK12
     CHECK(m.volume() == 1.0f);
 }
 
-void rampExampleFromIssue() {  // FEA-3/AK16
+void rampExampleFromIssue() {  // #3/AK16
     Metronome m(44100);
     m.setRamp(true, 145, 150, 5, 4);
     CHECK(m.bpm() == 145);  // AK14: Einschalten im Stand setzt Start-BPM
@@ -204,7 +204,7 @@ void rampExampleFromIssue() {  // FEA-3/AK16
     CHECK(bpmOfBar(t, 13) == 150);
 }
 
-void rampDoesNotOvershootAndLoops() {  // FEA-3/AK15, AK16
+void rampDoesNotOvershootAndLoops() {  // #3/AK15, AK16
     Metronome m(44100);
     m.setRamp(true, 100, 150, 20, 1);
     m.start();
@@ -213,7 +213,7 @@ void rampDoesNotOvershootAndLoops() {  // FEA-3/AK15, AK16
     for (int bar = 1; bar <= 6; ++bar) CHECK(bpmOfBar(t, bar) == expected[bar - 1]);
 }
 
-void rampDescendingAndHold() {  // FEA-3/AK17
+void rampDescendingAndHold() {  // #3/AK17
     Metronome m(44100);
     m.setRamp(true, 150, 140, 5, 2);
     m.start();
@@ -230,7 +230,7 @@ void rampDescendingAndHold() {  // FEA-3/AK17
     CHECK(ok);
 }
 
-void rampStartResetsAndOffKeepsTempo() {  // FEA-3/AK14, AK18
+void rampStartResetsAndOffKeepsTempo() {  // #3/AK14, AK18
     Metronome m(44100);
     m.setRamp(true, 100, 200, 10, 1);
     m.start();
@@ -247,7 +247,7 @@ void rampStartResetsAndOffKeepsTempo() {  // FEA-3/AK14, AK18
     CHECK(!t.empty() && t[0].bpm == 100);
 }
 
-void rampWithSixEightAndSubdivision() {  // FEA-3/AK19
+void rampWithSixEightAndSubdivision() {  // #3/AK19
     Metronome m(44100);
     m.setMeter(6);
     m.setSubdivision(3);

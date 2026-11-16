@@ -1,4 +1,4 @@
-/* C-API des Woodshed-Player-Audio-Kerns (Prototyp GEN-5).
+/* C-API des Woodshed-Player-Audio-Kerns (Prototyp #5).
  * Alle Funktionen sind von beliebigen Threads aufrufbar, ausser wp_create/wp_destroy.
  * Zeiten in Sekunden der Originaldatei, Tempo als Faktor (1.0 = Originaltempo). */
 #ifndef WP_CORE_H
@@ -33,7 +33,7 @@ WP_API void wp_set_volume(wp_player* p, float volume);
 WP_API double wp_position(wp_player* p);
 WP_API double wp_duration(wp_player* p);
 
-/* ---- Metronom (FEA-3), läuft mit und ohne Titel ---- */
+/* ---- Metronom (#3), läuft mit und ohne Titel ---- */
 WP_API void wp_metro_start(wp_player* p);  /* beginnt immer mit Takt 1, Schlag 1 */
 WP_API void wp_metro_stop(wp_player* p);
 WP_API int wp_metro_is_running(wp_player* p);

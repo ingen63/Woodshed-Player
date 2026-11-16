@@ -52,7 +52,7 @@ Ein Test, der Code ausführt, ohne das Ergebnis zu prüfen, zählt nicht.
    - Zeitformat `mm:ss`: Parsen, Formatieren, ungültige Eingaben.
    - Bibliothek: `library.json` lesen/schreiben, altes Format `[Track]`, Sortierungen, Ordner, Einstellungen pro Datei.
    - Normalfall, Grenzwerte, Fehlerfälle. Jeder Test prüft konkrete, nachgerechnete Werte.
-   - Tests zu Abnahmekriterien heissen bzw. kommentieren `FEA-22/AK2`.
+   - Tests zu Abnahmekriterien heissen bzw. kommentieren `#22/AK2`.
    - **Testaudio** nur erzeugen (Sinus, Stille, Klicks per Code) oder CC0 mit Quelle. Nie Dateien aus der eigenen Bibliothek.
    - Keine neuen Abhängigkeiten ohne Rückfrage.
 4. **Abschluss:** Nur die Testdateien einzeln stagen (`git add <Datei>`, nie `git add -A` oder `git add .`) und committen:

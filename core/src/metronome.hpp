@@ -1,4 +1,4 @@
-// Metronom (FEA-3): sample-genau geplante Klicks, Taktarten, Unterteilungen, automatische Tempo-Steigerung.
+// Metronom (#3): sample-genau geplante Klicks, Taktarten, Unterteilungen, automatische Tempo-Steigerung.
 // Steuerung von jedem Thread aus (atomare Werte), renderAdd() läuft im Audio-Thread und mischt die Klicks dazu.
 #pragma once
 

@@ -1,4 +1,4 @@
-/// Einstellungen des Metronoms (FEA-3), werden als JSON gespeichert. Nicht gespeichert werden das Tempo
+/// Einstellungen des Metronoms (#3), werden als JSON gespeichert. Nicht gespeichert werden das Tempo
 /// (nach einem Neustart gilt 120 BPM) und «läuft» (nach einem Neustart ist das Metronom gestoppt).
 class MetronomeSettings {
   const MetronomeSettings({

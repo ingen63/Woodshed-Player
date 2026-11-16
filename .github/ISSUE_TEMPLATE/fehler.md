@@ -1,11 +1,9 @@
 ---
 name: Fehler melden
 about: Etwas funktioniert nicht wie beschrieben
-title: "ISS-? "
+title: ""
 labels: bug
 ---
-
-<!-- Die ID im Titel wird nach dem Anlegen auf die Issue-Nummer gesetzt (tools/issue-id.sh sync). -->
 
 **Was ist passiert?** (erwartet / tatsächlich)
 

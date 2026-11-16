@@ -66,7 +66,7 @@ double zeroCrossingFreq(const std::vector<float>& v, long long from, long long c
 
 // ---------------------------------------------------------------------------
 
-void loopSeamDirectIsSampleExact() {  // GEN-5/AK4
+void loopSeamDirectIsSampleExact() {  // #5/AK4
     const int sr = 1000;
     wp::Engine e;
     e.setSource(ramp(5000), 2, sr);
@@ -162,7 +162,7 @@ void rateIsClamped() {
     CHECK(e.rate() == 0.75);
 }
 
-void stretchKeepsPitchAndChangesLength() {  // GEN-5/AK3
+void stretchKeepsPitchAndChangesLength() {  // #5/AK3
     const int sr = 44100;
     for (double rate : {0.25, 0.5, 1.5, 2.0}) {
         wp::Engine e;
@@ -188,7 +188,7 @@ void stretchKeepsPitchAndChangesLength() {  // GEN-5/AK3
     }
 }
 
-void stretchLoopHasNoGap() {  // GEN-5/AK4 (gedehnter Pfad)
+void stretchLoopHasNoGap() {  // #5/AK4 (gedehnter Pfad)
     const int sr = 44100;
     wp::Engine e;
     e.setSource(sine(441, 4.0, sr), 2, sr);  // 441 Hz: 100 Samples pro Periode, Loop ganzzahlig

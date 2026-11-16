@@ -1,10 +1,10 @@
-// Eingaben der Oberfläche (FEA-19): Zeitfeld und Wiedergabeleiste.
+// Eingaben der Oberfläche (#19): Zeitfeld und Wiedergabeleiste.
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/ui/player_view.dart';
 
 void main() {
-  testWidgets('FEA-19/AK9 Zeitfeld: ungültige Eingabe wird verworfen', (
+  testWidgets('#19/AK9 Zeitfeld: ungültige Eingabe wird verworfen', (
     tester,
   ) async {
     final commits = <double>[];
@@ -31,7 +31,7 @@ void main() {
     expect(commits, isEmpty);
   });
 
-  testWidgets('FEA-19/AK6 Wiedergabeleiste: Tippen springt proportional', (
+  testWidgets('#19/AK6 Wiedergabeleiste: Tippen springt proportional', (
     tester,
   ) async {
     final seeks = <double>[];

@@ -12,17 +12,19 @@ Jede Änderung hat ein Issue. Der Text enthält die Anforderung und die **Abnahm
 
 Gibt es zur Aufgabe kein Issue, zuerst fragen oder eines vorschlagen. Nichts umsetzen, was keine Anforderung hat.
 
-### Issue-ID = GitHub-Nummer
+### Titel und Verweise (GitHub-Konvention)
 
-Die ID im Titel hat **dieselbe Nummer wie das Issue auf GitHub**: Issue #22 heisst `FEA-22 …` oder `ISS-22 …`, nie eine eigene Zählung.
+Issues werden über ihre GitHub-Nummer angesprochen (`#22`), es gibt keine eigene ID im Titel. Der Titel ist kurz und sagt, worum es geht:
+bei einer Funktion das Ziel («Ziehbare Loop-Marker»), bei einem Fehler das Symptom («Absturz beim Öffnen einer leeren MP3»).
+Die Art steht nur im Label:
 
-| Präfix | Art | Label |
-|---|---|---|
-| `FEA` | Funktion, Änderung | `enhancement` |
-| `ISS` | Fehler | `bug` |
-| `GEN` | Allgemeines, Repo, Werkzeuge, Doku | `general` (Doku zusätzlich `documentation`) |
+| Art | Label |
+|---|---|
+| Funktion, Änderung | `enhancement` |
+| Fehler | `bug` |
+| Allgemeines, Repo, Werkzeuge, Doku | `general` (Doku zusätzlich `documentation`) |
 
-Weil die Nummer erst beim Anlegen feststeht, werden Issues mit dem Skill **`issue`** angelegt (`tools/issue-id.sh new`): Er legt das Issue an und setzt danach das Präfix mit der richtigen Nummer. Issues, die im Browser angelegt wurden, korrigiert `tools/issue-id.sh sync` (Trockenlauf, mit `--apply` umbenennen).
+Issues legt der Skill **`issue`** an (Vorlage, Labels, Bestätigung, dann `gh issue create`).
 
 ## Ablauf pro Issue
 
@@ -30,14 +32,14 @@ Weil die Nummer erst beim Anlegen feststeht, werden Issues mit dem Skill **`issu
 2. **Direkt auf `main` arbeiten.** Eine Person, deshalb keine Feature-Branches und keine Pull Requests. Ein Branch ist die Ausnahme für grosse oder riskante Arbeiten (z. B. der Flutter-Umbau) und braucht Deine Zustimmung.
 3. **Umsetzen**, klein und gezielt. Keine Änderungen ausserhalb des Issues. Gefundene Nebenbaustellen als neues Issue vorschlagen, nicht mitmachen.
 4. **Testen** (siehe unten). Jedes Abnahmekriterium prüfen und im Bericht nennen, was geprüft ist und was nicht.
-5. **Commit** mit ID und Issue-Nummer, Imperativ oder Substantiv, ohne Punkt:
-   `FEA-22 Ziehbare Loop-Marker (#22)`. ID-Nummer und `(#…)` sind immer gleich.
+5. **Commit** im Imperativ oder als Substantiv, ohne Punkt, mit Verweis auf das Issue am Ende:
+   `Ziehbare Loop-Marker (#22)`.
    Eine Anforderung pro Commit (oder wenige Commits). Kein `Fixes #22` in der Commit-Nachricht, denn das schliesst das Issue beim Push von selbst.
    Nach dem Commit, der die Anforderung vollständig umsetzt, bekommt das Issue das Label `implemented` und den Kommentar
    «Umgesetzt in <Commit>. Abnahme ausstehend.» (`gh issue edit <Nr> --add-label implemented`, `gh issue comment`).
    Teilschritte bekommen das Label nicht. Wird das Issue wieder geöffnet, kommt das Label weg, bis die Nacharbeit committet ist.
 6. **Abnahme** machst Du. Claude hakt die Kriterien im Issue **nicht** selbst ab und schliesst es nicht.
-   **Ausnahme «Prüfe FEA-xx»:** Dann prüft Claude die Kriterien (vorhandene Tests laufen lassen, sonst von Hand), kommentiert
+   **Ausnahme «Prüfe #22»:** Dann prüft Claude die Kriterien (vorhandene Tests laufen lassen, sonst von Hand), kommentiert
    das Ergebnis je Kriterium, hakt erfüllte Kriterien ab und schliesst das Issue, wenn alle erfüllt sind (sonst offen lassen und den Fehler nennen).
 7. **Push und Version** (Tag) nur auf ausdrückliches Wort.
 
@@ -58,7 +60,7 @@ Commit und Push nur, wenn es ausdrücklich verlangt wird. Nie `--force`, nie die
   Testaudio erzeugt `TestAudio.sineWave(seconds:)`, temporäre Bibliotheken `Library(directory:)` mit `TestAudio.temporaryDirectory()`.
   Tests berühren nie die echte Bibliothek unter Application Support.
   Nach dem Flutter-Umbau: `flutter test` in `app/`, `ctest` im C++-Kern `core/`.
-- Flutter-App und C++-Kern (Umbau, aus dem Prototyp GEN-5):
+- Flutter-App und C++-Kern (Umbau, aus dem Prototyp #5):
   ```
   cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release && cmake --build core/build && ctest --test-dir core/build --output-on-failure
   cd app && flutter analyze && flutter test && flutter build macos --debug && flutter build ios --simulator --debug
@@ -67,7 +69,7 @@ Commit und Push nur, wenn es ausdrücklich verlangt wird. Nie `--force`, nie die
   Der Kern liegt in `core/` (C-API `core/include/wp_core.h`), die Dart-Anbindung als FFI-Plugin in `app/packages/wp_core/`.
   Bibliotheken in `core/third_party/` (Versionen in `core/third_party/README.md`).
 - Nach einem Commit mit Code-Änderungen startet der Hook den Agenten `test-agent` im Schnellmodus.
-- Tests, die ein Abnahmekriterium belegen, nennen Issue und Kriterium (`FEA-22/AK2` im Namen oder Kommentar, `AK2` = zweites Häkchen).
+- Tests, die ein Abnahmekriterium belegen, nennen Issue und Kriterium (`#22/AK2` im Namen oder Kommentar, `AK2` = zweites Häkchen).
 - Audio-Logik (Tempo, Loop-Grenzen, Seek, Zeitformat `mm:ss`) und Bibliothek (`library.json`, Sortierung, Ordner) brauchen Unit-Tests. Oberfläche nur, wo sinnvoll.
 
 ## Regeln
@@ -83,7 +85,7 @@ Commit und Push nur, wenn es ausdrücklich verlangt wird. Nie `--force`, nie die
 ## Issues anlegen und pflegen
 
 - Vorlagen in `.github/ISSUE_TEMPLATE/` (Fehler, Funktion). Labels sind englisch und folgen den GitHub-Standardlabels:
-  - Art: `enhancement` (FEA), `bug` (ISS), `general` (GEN), dazu `documentation` für Doku-Änderungen.
+  - Art: `enhancement` (Funktion), `bug` (Fehler), `general` (Allgemeines), dazu `documentation` für Doku-Änderungen.
   - Bereich: `audio`, `ui`, `repo`.
   - Status: `implemented` (umgesetzt, Abnahme ausstehend), `wontfix` (wird nicht umgesetzt), `false-positive` (Fehlalarm).
   - Fundort bei Fehlern: `found:test`, `found:acceptance` oder `found:usage`.

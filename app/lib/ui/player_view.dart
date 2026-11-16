@@ -1,4 +1,4 @@
-// Reiter «Player» im Stil der alten App (FEA-19, Vorlage WoodshedPlayer/Views/PlayerView.swift).
+// Reiter «Player» im Stil der alten App (#19, Vorlage WoodshedPlayer/Views/PlayerView.swift).
 import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Hörvergleich GEN-5: dieselbe Datei mit dem neuen C++-Kern (signalsmith-stretch) und mit
+# Hörvergleich #5: dieselbe Datei mit dem neuen C++-Kern (signalsmith-stretch) und mit
 # AVAudioUnitTimePitch (heutige Swift-App) bei 0,5x und 0,25x rendern.
 # Aufruf: tools/hoervergleich.sh <datei.mp3> [ausgabeordner] [sekunden]
 # Die Ergebnisse landen ausserhalb des Repos (Standard: ~/Desktop/Woodshed-Hoervergleich).

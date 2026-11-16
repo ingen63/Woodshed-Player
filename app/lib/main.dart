@@ -1,5 +1,5 @@
-// Woodshed Player (Flutter): Wiedergabe mit Tempo und Loop über den C++-Kern, Metronom (FEA-3),
-// Aufnahme des Systemtons (macOS, FEA-4). Erscheinungsbild wie die alte App (FEA-19).
+// Woodshed Player (Flutter): Wiedergabe mit Tempo und Loop über den C++-Kern, Metronom (#3),
+// Aufnahme des Systemtons (macOS, #4). Erscheinungsbild wie die alte App (#19).
 import 'dart:async';
 import 'dart:io';
 

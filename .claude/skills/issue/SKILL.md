@@ -1,33 +1,29 @@
 ---
 name: issue
-description: Legt ein GitHub-Issue für Woodshed Player an, dessen ID zur GitHub-Nummer passt (Issue #22 → «FEA-22 …»), oder gleicht bestehende Issue-Titel ab. Verwenden bei «Issue anlegen», «neue Anforderung», «Fehler erfassen», «Issue-IDs prüfen».
+description: Legt ein GitHub-Issue für Woodshed Player an (kurzer Titel ohne Präfix, Art über Labels, Abnahmekriterien als Häkchen-Liste). Verwenden bei «Issue anlegen», «neue Anforderung», «Fehler erfassen».
 ---
 
-# Issue anlegen (ID = GitHub-Nummer)
+# Issue anlegen (GitHub-Konvention)
 
-Die ID im Titel hat dieselbe Nummer wie das Issue auf GitHub. Da die Nummer erst beim Anlegen feststeht, läuft das
-Anlegen immer über `tools/issue-id.sh`.
+Issues werden über ihre GitHub-Nummer angesprochen (`#22`). Der Titel hat kein Präfix; die Art steht im Label.
 
 ## Neues Issue
 
-1. **Art bestimmen:** `FEA` (Funktion/Änderung, Label `enhancement`), `ISS` (Fehler, Label `bug`), `GEN` (Allgemeines, Repo, Werkzeuge, Label `general`).
+1. **Art bestimmen** und als Label setzen: Funktion/Änderung `enhancement`, Fehler `bug`, Allgemeines/Repo/Werkzeuge `general`.
    Zusätzliche Labels nach Bereich: `audio`, `ui`, `repo`, bei Doku `documentation`; bei Fehlern der Fundort `found:test|acceptance|usage`.
-2. **Text nach Vorlage** aus `.github/ISSUE_TEMPLATE/funktion.md` bzw. `fehler.md` entwerfen:
+   Meilenstein «Nächste Version» oder «Später», wenn klar.
+2. **Titel:** kurz (höchstens etwa 60 Zeichen), Deutsch, ohne Punkt. Bei Funktionen das Ziel («Ziehbare Loop-Marker»),
+   bei Fehlern das Symptom («Absturz beim Öffnen einer leeren MP3»).
+3. **Text nach Vorlage** aus `.github/ISSUE_TEMPLATE/funktion.md` bzw. `fehler.md` entwerfen:
    Anforderung (ohne Lösung vorzuschreiben) und **Abnahmekriterien als Häkchen-Liste**, jedes eindeutig und prüfbar.
    Keine privaten Daten (echte Titel, Künstler, Namen, E-Mail).
-3. **Entwurf zeigen** (Titel ohne ID, Labels, Text) und mit `AskUserQuestion` bestätigen lassen
+4. **Entwurf zeigen** (Titel, Labels, Text) und mit `AskUserQuestion` bestätigen lassen
    (Optionen «Anlegen» und «Abbrechen»). Ohne Bestätigung nichts anlegen.
-4. Text in eine Datei im Scratchpad schreiben, dann:
-   `tools/issue-id.sh new <FEA|ISS|GEN> "<Titel ohne ID>" <Datei> [weitere,Labels]`
-5. Ergebnis melden: Nummer, vollständiger Titel, Link.
+5. Text in eine Datei im Scratchpad schreiben, dann:
+   `gh issue create --title "<Titel>" --body-file <Datei> --label <labels> [--milestone "<Meilenstein>"]`
+6. Ergebnis melden: Nummer, Titel, Link.
 
 Mehrere Issues: alle Entwürfe zusammen zeigen, einmal bestätigen lassen, dann einzeln anlegen.
-
-## Bestehende Titel abgleichen
-
-1. Trockenlauf: `tools/issue-id.sh sync` (Issues aus dem Browser haben oft noch keine oder eine falsche ID).
-2. Liste zeigen und bestätigen lassen (Optionen «Umbenennen» und «Abbrechen»).
-3. Nur nach Bestätigung: `tools/issue-id.sh sync --apply`.
 
 ## Regeln
 

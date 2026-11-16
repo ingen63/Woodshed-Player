@@ -1,6 +1,6 @@
 import 'metronome_settings.dart';
 
-/// Tap-Tempo (FEA-3): ab 2 Taps Tempo aus dem Mittel der Abstände der letzten bis zu 5 Taps;
+/// Tap-Tempo (#3): ab 2 Taps Tempo aus dem Mittel der Abstände der letzten bis zu 5 Taps;
 /// nach mehr als 2 s Pause beginnt die Messung neu.
 class TapTempo {
   TapTempo({DateTime Function()? clock}) : _clock = clock ?? DateTime.now;

@@ -1,4 +1,4 @@
-// Erscheinungsbild wie in der alten SwiftUI-App (FEA-19).
+// Erscheinungsbild wie in der alten SwiftUI-App (#19).
 import 'package:material_ui/material_ui.dart';
 
 /// Akzentfarbe der alten App (sRGB 0 / 0,478 / 0,870).

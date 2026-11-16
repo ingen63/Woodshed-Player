@@ -1,4 +1,4 @@
-// Oberfläche des Player-Reiters (FEA-19). AKn = n-tes Abnahmekriterium im Issue #19.
+// Oberfläche des Player-Reiters (#19). AKn = n-tes Abnahmekriterium im Issue #19.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/ui/player_view.dart';
@@ -51,7 +51,7 @@ void main() {
       t.getTopLeft(find.byKey(Key(key))).dy;
 
   testWidgets(
-    'FEA-19/AK4 Reihenfolge der Karten: Titel, Geschwindigkeit, Loop, Aufnahme',
+    '#19/AK4 Reihenfolge der Karten: Titel, Geschwindigkeit, Loop, Aufnahme',
     (tester) async {
       await pump(
         tester,
@@ -76,7 +76,7 @@ void main() {
     },
   );
 
-  testWidgets('FEA-19/AK3 Karten höchstens 760 breit und zentriert', (
+  testWidgets('#19/AK3 Karten höchstens 760 breit und zentriert', (
     tester,
   ) async {
     await pump(tester, loaded, width: 1200);
@@ -85,9 +85,7 @@ void main() {
     expect(rect.center.dx, closeTo(600, 0.5));
   });
 
-  testWidgets('FEA-19/AK5 Titel fett, Dauer als «Dauer: mm:ss»', (
-    tester,
-  ) async {
+  testWidgets('#19/AK5 Titel fett, Dauer als «Dauer: mm:ss»', (tester) async {
     await pump(tester, loaded);
     final title = tester.widget<Text>(find.byKey(const Key('trackTitle')));
     expect(title.style?.fontWeight, FontWeight.bold);
@@ -95,26 +93,25 @@ void main() {
     expect(find.byKey(const Key('volume')), findsOneWidget);
   });
 
-  testWidgets(
-    'FEA-19/AK6 Wiedergabeleiste: einzeilig breit, zweizeilig schmal',
-    (tester) async {
-      await pump(tester, loaded, width: 900);
-      final play = tester.getCenter(find.byKey(const Key('playPause'))).dy;
-      final bar = tester.getCenter(find.byType(ProgressScrubber)).dy;
-      expect((play - bar).abs(), lessThan(4));
-      await tester.tap(find.byKey(const Key('playPause')));
-      expect(calls, ['playPause']);
+  testWidgets('#19/AK6 Wiedergabeleiste: einzeilig breit, zweizeilig schmal', (
+    tester,
+  ) async {
+    await pump(tester, loaded, width: 900);
+    final play = tester.getCenter(find.byKey(const Key('playPause'))).dy;
+    final bar = tester.getCenter(find.byType(ProgressScrubber)).dy;
+    expect((play - bar).abs(), lessThan(4));
+    await tester.tap(find.byKey(const Key('playPause')));
+    expect(calls, ['playPause']);
 
-      await pump(tester, loaded, width: 390);
-      final play2 = tester.getCenter(find.byKey(const Key('playPause'))).dy;
-      final bar2 = tester.getCenter(find.byType(ProgressScrubber)).dy;
-      expect(play2, greaterThan(bar2 + 10)); // Knöpfe unter der Zeitleiste
-      expect(find.text('00:30'), findsOneWidget);
-      expect(find.text('02:05'), findsOneWidget);
-    },
-  );
+    await pump(tester, loaded, width: 390);
+    final play2 = tester.getCenter(find.byKey(const Key('playPause'))).dy;
+    final bar2 = tester.getCenter(find.byType(ProgressScrubber)).dy;
+    expect(play2, greaterThan(bar2 + 10)); // Knöpfe unter der Zeitleiste
+    expect(find.text('00:30'), findsOneWidget);
+    expect(find.text('02:05'), findsOneWidget);
+  });
 
-  testWidgets('FEA-19/AK7 Loop-Bereich und Marker nur bei aktivem Loop', (
+  testWidgets('#19/AK7 Loop-Bereich und Marker nur bei aktivem Loop', (
     tester,
   ) async {
     await pump(tester, loaded);
@@ -135,7 +132,7 @@ void main() {
   });
 
   testWidgets(
-    'FEA-19/AK8 Geschwindigkeit: Wert, Vorwahl, ausgeschaltet abgeblendet',
+    '#19/AK8 Geschwindigkeit: Wert, Vorwahl, ausgeschaltet abgeblendet',
     (tester) async {
       await pump(tester, loaded);
       final dim = tester.widget<Opacity>(
@@ -176,7 +173,7 @@ void main() {
     },
   );
 
-  testWidgets('FEA-19/AK9 Loop: Zeitfelder, Aktuelle Position, Ganzer Titel', (
+  testWidgets('#19/AK9 Loop: Zeitfelder, Aktuelle Position, Ganzer Titel', (
     tester,
   ) async {
     await pump(
@@ -202,7 +199,7 @@ void main() {
     expect(calls, ['loopEnd 83.5']);
   });
 
-  testWidgets('FEA-19/AK10 ohne Titel: Hinweis und Knopf zum Öffnen', (
+  testWidgets('#19/AK10 ohne Titel: Hinweis und Knopf zum Öffnen', (
     tester,
   ) async {
     await pump(tester, const PlayerViewState());
@@ -212,7 +209,7 @@ void main() {
     expect(calls, ['open']);
   });
 
-  testWidgets('FEA-19/AK12 Dunkelmodus baut ohne Fehler', (tester) async {
+  testWidgets('#19/AK12 Dunkelmodus baut ohne Fehler', (tester) async {
     calls = [];
     await tester.pumpWidget(
       MaterialApp(

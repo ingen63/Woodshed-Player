@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Claude-Code-Hook (PostToolUse auf Bash):
 # Erkennt einen erfolgreichen `git commit`,
-#  1. prüft das Format der Commit-Nachricht (FEA-22 … (#22), gleiche Nummer),
+#  1. prüft das Format der Commit-Nachricht (Titel (#22), ohne eigenes Präfix),
 #  2. weist Claude an, bei Code-Änderungen den test-agent im Schnellmodus zu starten.
 set -euo pipefail
 
@@ -26,13 +26,11 @@ esac
 
 reasons=()
 
-# 1. Format: PRÄFIX-<n> Text (#<n>) mit gleicher Nummer
-if [[ "$subject" =~ ^(FEA|ISS|GEN)-([0-9]+)\ .+\ \(#([0-9]+)\)$ ]]; then
-  if [ "${BASH_REMATCH[2]}" != "${BASH_REMATCH[3]}" ]; then
-    reasons+=("Commit $sha: ID-Nummer ${BASH_REMATCH[2]} und Issue-Nummer #${BASH_REMATCH[3]} stimmen nicht überein. Nicht amenden, sondern melden und fragen, was zu tun ist.")
-  fi
-else
-  reasons+=("Commit $sha hat nicht das Format «FEA-22 Text (#22)» (siehe CLAUDE.md, Ablauf Schritt 5). Melde das und frage, ob es so bleiben soll; Historie nicht umschreiben.")
+# 1. Format: Titel (#<n>), ohne Präfix wie «FEA-22» (GitHub-Konvention, siehe CLAUDE.md)
+if [[ ! "$subject" =~ ^.+\ \(#[0-9]+\)$ ]]; then
+  reasons+=("Commit $sha hat nicht das Format «Titel (#22)» (siehe CLAUDE.md, Ablauf Schritt 5). Melde das und frage, ob es so bleiben soll; Historie nicht umschreiben.")
+elif [[ "$subject" =~ ^(FEA|ISS|GEN)-[0-9]+\  ]]; then
+  reasons+=("Commit $sha beginnt mit einem alten Präfix (FEA/ISS/GEN). Neu nur «Titel (#22)». Melde das; Historie nicht umschreiben.")
 fi
 
 # 2. Code-Änderungen? (Swift, später Dart/C++)

@@ -7,7 +7,7 @@ abstract class TitleTransport {
   void pause();
 }
 
-/// FEA-3/AK20: Titel und Metronom laufen nie gleichzeitig. Startet das Metronom, pausiert der Titel;
+/// #3/AK20: Titel und Metronom laufen nie gleichzeitig. Startet das Metronom, pausiert der Titel;
 /// startet der Titel, stoppt das Metronom.
 class PracticeSession {
   PracticeSession(this.title, this.metronome) {

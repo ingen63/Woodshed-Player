@@ -22,7 +22,6 @@
       "Bash(git commit:*)",
       "Bash(gh issue view:*)",
       "Bash(gh issue list:*)",
-      "Bash(tools/issue-id.sh sync)",
       "Bash(python3 .claude/skills/clean-up/clean_up.py runs)",
       "Bash(python3 .claude/skills/clean-up/clean_up.py local)"
     ],

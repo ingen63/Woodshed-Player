@@ -1,4 +1,4 @@
-// Tests der Metronom-Logik in Dart (FEA-3). AKn = n-tes Abnahmekriterium im Issue #3.
+// Tests der Metronom-Logik in Dart (#3). AKn = n-tes Abnahmekriterium im Issue #3.
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -72,7 +72,7 @@ class MemoryStore implements SettingsStore {
 
 void main() {
   group('MetronomeSettings', () {
-    test('FEA-3/AK1 Startwerte', () {
+    test('#3/AK1 Startwerte', () {
       const s = MetronomeSettings();
       expect([s.bpm, s.meter, s.subdivision, s.volume], [120, 4, 1, 0.7]);
       expect(
@@ -81,13 +81,13 @@ void main() {
       );
     });
 
-    test('FEA-3/AK2 Tempo wird auf 20–300 begrenzt', () {
+    test('#3/AK2 Tempo wird auf 20–300 begrenzt', () {
       expect(const MetronomeSettings().copyWith(bpm: 5).bpm, 20);
       expect(const MetronomeSettings().copyWith(bpm: 999).bpm, 300);
     });
 
     test(
-      'FEA-3/AK13 Steigerung: Start und Ziel 20–300, Schritte, Intervall 1–20',
+      '#3/AK13 Steigerung: Start und Ziel 20–300, Schritte, Intervall 1–20',
       () {
         const base = MetronomeSettings();
         // Start und Ziel werden wie das Tempo begrenzt.
@@ -107,7 +107,7 @@ void main() {
     );
 
     test(
-      'FEA-3/AK23 JSON hin und zurück ohne Tempo, ungültige Werte begrenzt',
+      '#3/AK23 JSON hin und zurück ohne Tempo, ungültige Werte begrenzt',
       () {
         const s = MetronomeSettings(
           bpm: 87,
@@ -150,7 +150,7 @@ void main() {
       tap = TapTempo(clock: () => now);
     });
 
-    test('FEA-3/AK5 Abstand 500 ms ergibt 120 BPM, erst ab 2 Taps', () {
+    test('#3/AK5 Abstand 500 ms ergibt 120 BPM, erst ab 2 Taps', () {
       expect(tap.tap(), isNull);
       now = now.add(const Duration(milliseconds: 500));
       expect(tap.tap(), 120);
@@ -194,7 +194,7 @@ void main() {
       c = MetronomeController(backend, store: store);
     });
 
-    test('FEA-3/AK23 Einstellungen ausser Tempo bleiben, nach Neustart 120 BPM und gestoppt', () async {
+    test('#3/AK23 Einstellungen ausser Tempo bleiben, nach Neustart 120 BPM und gestoppt', () async {
       c.setBpm(90);
       c.setMeter(3);
       c.setSubdivision(2);
@@ -226,7 +226,7 @@ void main() {
       expect(c2.running, isFalse);
     });
 
-    test('FEA-3/AK3 Tempo ±1 und begrenzt', () {
+    test('#3/AK3 Tempo ±1 und begrenzt', () {
       c.changeBpm(1);
       expect(c.settings.bpm, 121);
       c.setBpm(299);
@@ -234,14 +234,17 @@ void main() {
       expect(c.settings.bpm, 300);
     });
 
-    test('FEA-3/AK14 Steigerung einschalten im Stand setzt Start-BPM, Start ebenso', () {
-      c.setRamp(start: 110);
-      c.setRamp(enabled: true);
-      expect(c.settings.bpm, 110);
-      c.setBpm(130);
-      c.start();
-      expect(c.settings.bpm, 110);
-    });
+    test(
+      '#3/AK14 Steigerung einschalten im Stand setzt Start-BPM, Start ebenso',
+      () {
+        c.setRamp(start: 110);
+        c.setRamp(enabled: true);
+        expect(c.settings.bpm, 110);
+        c.setBpm(130);
+        c.start();
+        expect(c.settings.bpm, 110);
+      },
+    );
 
     test('sync übernimmt das Tempo der Steigerung aus dem Kern', () {
       backend.bpm = 135;
@@ -275,7 +278,7 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('FEA-3/AK4 M, T, Pfeile (mit Shift ±10) und Leertaste', (
+    testWidgets('#3/AK4 M, T, Pfeile (mit Shift ±10) und Leertaste', (
       tester,
     ) async {
       await pump(tester);
@@ -301,7 +304,7 @@ void main() {
       expect(c.settings.bpm, 111);
     });
 
-    testWidgets('FEA-3/AK4 beim Tippen in Textfeldern sind die Tasten aus', (
+    testWidgets('#3/AK4 beim Tippen in Textfeldern sind die Tasten aus', (
       tester,
     ) async {
       await pump(tester, withTextField: true);
@@ -314,7 +317,7 @@ void main() {
     });
   });
 
-  testWidgets('FEA-3/AK3 gedrückt halten wiederholt den Schritt nach 0,4 s', (
+  testWidgets('#3/AK3 gedrückt halten wiederholt den Schritt nach 0,4 s', (
     tester,
   ) async {
     var steps = 0;
@@ -342,7 +345,7 @@ void main() {
     expect(steps, after); // nach dem Loslassen Schluss
   });
 
-  group('FEA-3/AK20 Titel und Metronom nie gleichzeitig', () {
+  group('#3/AK20 Titel und Metronom nie gleichzeitig', () {
     late FakeBackend backend;
     late FakeTitle title;
     late MetronomeController c;
