@@ -229,6 +229,66 @@ void stretchIsDeterministic() {
     CHECK(run() == run());
 }
 
+void volumeScalesDirectOutput() {
+    const int sr = 1000;
+    wp::Engine e;
+    e.setSource(ramp(2000), 2, sr);
+    e.setVolume(0.5f);
+    e.play();
+    auto out = renderFrames(e, 100, 64);
+    bool ok = true;
+    for (int i = 0; i < 100 && ok; ++i) ok = out[2 * i] == 0.5f * float(i) && out[2 * i + 1] == 0.5f * float(i);
+    CHECK(ok);
+    e.setVolume(0.0f);
+    auto silent = renderFrames(e, 50);
+    bool allZero = true;
+    for (float v : silent) allZero = allZero && v == 0.0f;
+    CHECK(allZero);
+    CHECK(e.playing());
+}
+
+void rateChangeKeepsPositionAndSignal() {
+    const int sr = 44100;
+    wp::Engine e;
+    e.setSource(sine(440, 6.0, sr), 2, sr);
+    e.play();
+    auto a = renderFrames(e, sr);  // 1 s bei 1,0x -> Position 1,0 s
+    CHECK_NEAR(e.position(), 1.0, 0.001);
+    e.setRate(0.5);
+    auto b = renderFrames(e, sr);  // 1 s Ausgabe bei 0,5x -> 0,5 s Quelle
+    CHECK_NEAR(e.position(), 1.5, 0.02);
+    e.setRate(1.0);
+    auto c = renderFrames(e, sr);  // zurück bei 1,0x -> 1 s Quelle, kein Sprung
+    CHECK_NEAR(e.position(), 2.5, 0.02);
+    // Kein Aussetzer an den Übergängen: Pegel bleibt nahe dem Sinus-Effektivwert.
+    const double ref = 0.5 / std::sqrt(2.0);
+    CHECK_NEAR(rms(b, sr / 4, sr / 2), ref, ref * 0.15);
+    CHECK_NEAR(rms(c, sr / 4, sr / 2), ref, ref * 0.15);
+    // Steilheit: grösster Sprung zwischen Samples nahe der Sinus-Steigung (0,5*2*pi*440/44100 = 0,0313).
+    double maxStep = 0;
+    for (auto* v : {&b, &c})
+        for (long long i = sr / 20; i + 1 < sr; ++i) maxStep = std::max(maxStep, double(std::fabs((*v)[2 * (i + 1)] - (*v)[2 * i])));
+    std::printf("  grösster Sprung: %.4f\n", maxStep);
+    CHECK(maxStep < 0.1);
+}
+
+void seekDuringStretchedPlayback() {
+    const int sr = 44100;
+    wp::Engine e;
+    e.setSource(sine(440, 6.0, sr), 2, sr);
+    e.setRate(0.5);
+    e.play();
+    renderFrames(e, sr);
+    CHECK_NEAR(e.position(), 0.5, 0.02);
+    e.seek(3.0);
+    renderFrames(e, sr / 2);  // 0,5 s Ausgabe = 0,25 s Quelle
+    CHECK_NEAR(e.position(), 3.25, 0.02);
+    e.seek(0.0);
+    renderFrames(e, sr / 2);
+    CHECK_NEAR(e.position(), 0.25, 0.02);
+    CHECK(e.playing());
+}
+
 }  // namespace
 
 int main() {
@@ -244,6 +304,9 @@ int main() {
         {"stretchLoopHasNoGap", stretchLoopHasNoGap},
         {"positionFollowsRate", positionFollowsRate},
         {"stretchIsDeterministic", stretchIsDeterministic},
+        {"volumeScalesDirectOutput", volumeScalesDirectOutput},
+        {"rateChangeKeepsPositionAndSignal", rateChangeKeepsPositionAndSignal},
+        {"seekDuringStretchedPlayback", seekDuringStretchedPlayback},
     };
     for (auto& [name, fn] : tests) {
         const int before = failures;
