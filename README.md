@@ -34,3 +34,17 @@ Geschwindigkeit und Loop werden **pro Datei** gespeichert und beim nächsten Öf
 - `Views/PlayerKeyboardShortcuts.swift`: Tastatursteuerung. Beim Tippen in Textfeldern ist sie aus.
 - `Views/`: SwiftUI-Oberfläche, angelehnt an die macOS-Schnellansicht.
 - Auf iOS läuft die Wiedergabe auch im Hintergrund weiter (Background Mode *Audio*).
+
+## Datenschutz
+
+Woodshed Player arbeitet **vollständig lokal**:
+
+- Keine Netzwerkverbindungen, kein Konto, keine Werbung.
+- Keine Analyse- oder Tracking-Dienste, keine Weitergabe von Daten an Dritte.
+- Importierte MP3-Dateien werden in den privaten App-Ordner kopiert. Titel, Künstler, Album, Cover sowie Tempo- und Loop-Einstellungen werden nur dort (`library.json`) und in den lokalen App-Einstellungen gespeichert.
+- Die App läuft in der macOS-App-Sandbox und liest nur Dateien, die du selbst auswählst.
+- Löschst du die App (und ihren Datenordner), sind alle gespeicherten Daten weg.
+
+## Lizenz
+
+Der Quellcode steht unter der [MIT-Lizenz](LICENSE). Der Name „Woodshed Player“ und das App-Icon sind davon nicht umfasst.
