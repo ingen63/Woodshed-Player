@@ -87,6 +87,26 @@ void main() {
     });
 
     test(
+      'FEA-3/AK13 Steigerung: Start und Ziel 20–300, Schritte, Intervall 1–20',
+      () {
+        const base = MetronomeSettings();
+        // Start und Ziel werden wie das Tempo begrenzt.
+        expect(base.copyWith(rampStart: 5).rampStart, 20);
+        expect(base.copyWith(rampTarget: 999).rampTarget, 300);
+        // Nur die Schritte +1/+2/+5/+10/+20 sind erlaubt; andere Werte bleiben beim bisherigen Schritt.
+        expect(MetronomeSettings.rampSteps, [1, 2, 5, 10, 20]);
+        for (final st in MetronomeSettings.rampSteps) {
+          expect(base.copyWith(rampStep: st).rampStep, st);
+        }
+        expect(base.copyWith(rampStep: 3).rampStep, base.rampStep);
+        // Intervall in Takten: 1–20.
+        expect(base.copyWith(rampEveryBars: 0).rampEveryBars, 1);
+        expect(base.copyWith(rampEveryBars: 25).rampEveryBars, 20);
+        expect(base.copyWith(rampEveryBars: 7).rampEveryBars, 7);
+      },
+    );
+
+    test(
       'FEA-3/AK23 JSON hin und zurück ohne Tempo, ungültige Werte begrenzt',
       () {
         const s = MetronomeSettings(
