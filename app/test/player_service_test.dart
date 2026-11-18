@@ -1,101 +1,11 @@
 // #15: PlayerService ohne Audiogerät, mit Attrappen für Kern und Timer.
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/library/playback_settings.dart';
 import 'package:woodshed_player/player/audio_core.dart';
 import 'package:woodshed_player/player/player_service.dart';
 import 'package:wp_core/wp_core.dart';
 
-/// Kern-Attrappe: Laden bleibt «läuft», bis der Test es mit [finishLoad] oder [failLoad] beendet.
-class FakeCore implements AudioCore {
-  final immediateErrors = <String, int>{};
-  int _state = WpCode.loadIdle;
-  double _progress = 0;
-  double _duration = 0;
-  bool playing = false;
-  bool applyPlayImmediately =
-      true; // false: Audio-Thread übernimmt «play» erst später
-  double pos = 0;
-  double rateValue = 1;
-  double volumeValue = 1;
-  (double, double)? loop;
-  final calls = <String>[];
-
-  void finishLoad(double duration) {
-    _state = WpCode.loadReady;
-    _progress = 1;
-    _duration = duration;
-    playing = false;
-    pos = 0;
-  }
-
-  void failLoad(int code) => _state = code;
-  set progress(double p) => _progress = p;
-
-  @override
-  int loadAsync(String path) {
-    calls.add('load $path');
-    final err = immediateErrors[path];
-    if (err != null) {
-      _state = err;
-      return err;
-    }
-    _state = WpCode.loadRunning;
-    _progress = 0;
-    return WpCode.ok;
-  }
-
-  @override
-  int get loadState => _state;
-  @override
-  double get loadProgress => _progress;
-  @override
-  void play() {
-    calls.add('play');
-    if (applyPlayImmediately) playing = true;
-  }
-
-  @override
-  void pause() {
-    calls.add('pause');
-    playing = false;
-  }
-
-  @override
-  bool get isPlaying => playing;
-  @override
-  void seek(double seconds) {
-    calls.add('seek $seconds');
-    pos = seconds;
-  }
-
-  @override
-  set rate(double r) => rateValue = r;
-  @override
-  void setLoop(double a, double b) => loop = (a, b);
-  @override
-  void clearLoop() => loop = null;
-  @override
-  set volume(double v) => volumeValue = v;
-  @override
-  double get position => pos;
-  @override
-  double get duration => _duration;
-}
-
-class FakeTimer implements Timer {
-  FakeTimer(this.interval, this.onTick);
-  final Duration interval;
-  final void Function(Timer) onTick;
-  bool active = true;
-  @override
-  void cancel() => active = false;
-  @override
-  bool get isActive => active;
-  @override
-  int get tick => 0;
-}
+import 'fakes.dart';
 
 class Harness {
   Harness() {

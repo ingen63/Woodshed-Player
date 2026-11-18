@@ -19,7 +19,7 @@ import UniformTypeIdentifiers
     let channel = FlutterMethodChannel(name: "woodshed/files", binaryMessenger: registrar.messenger())
     channel.setMethodCallHandler { [weak self] call, result in
       switch call.method {
-      case "pickAudio":
+      case "pickAudioFiles":
         self?.pickAudio(result)
       case "supportDir":
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -54,15 +54,16 @@ private final class AudioPicker: NSObject, UIDocumentPickerDelegate {
   init(result: @escaping FlutterResult) {
     self.result = result
     controller = UIDocumentPickerViewController(forOpeningContentTypes: [.audio], asCopy: true)
+    controller.allowsMultipleSelection = true
     super.init()
     controller.delegate = self
   }
 
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-    result(urls.first?.path)
+    result(urls.map(\.path))
   }
 
   func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-    result(nil)
+    result([String]())
   }
 }

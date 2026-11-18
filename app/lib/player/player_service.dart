@@ -156,6 +156,16 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
     return parts.isEmpty ? path : parts.last;
   }
 
+  /// Titel entladen (z. B. gelöscht). Der Kern behält die Daten, spielt aber nicht mehr.
+  void unload() {
+    if (_playing) core.pause();
+    _path = _title = _trackId = null;
+    _playing = false;
+    _position = _duration = 0;
+    _settings = const PlaybackSettings();
+    notifyListeners();
+  }
+
   void clearError() {
     if (_error == null) return;
     _error = null;

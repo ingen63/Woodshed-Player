@@ -159,6 +159,7 @@ class Library extends ChangeNotifier {
 
   /// Fasst häufige Änderungen zusammen (z. B. beim Ziehen des Tempo-Reglers).
   void _scheduleSave() {
+    if (saveDelay == Duration.zero) return save();
     _pendingSave?.cancel();
     _pendingSave = Timer(saveDelay, save);
   }
@@ -408,6 +409,20 @@ class Library extends ChangeNotifier {
     }
     save();
     notifyListeners();
+  }
+
+  /// Ziehen und Ablegen in der Liste: vor [beforeId] (eigene Reihenfolge) oder ohne [beforeId]
+  /// ans Ende des Ordners [folderId] (Position bleibt, wie beim Ablegen auf einen Ordner in Swift).
+  void placeTrack(String id, String? folderId, {String? beforeId}) {
+    if (beforeId == id) return;
+    if (beforeId == null) {
+      moveTracks({id}, folderId);
+      return;
+    }
+    final others = sortedTracksIn(folderId).where((t) => t.id != id).toList();
+    final at = others.indexWhere((t) => t.id == beforeId);
+    moveTracks({id}, folderId, at: at < 0 ? others.length : at);
+    sortOrder = TrackSortOrder.custom;
   }
 
   static String _cleanName(String name) {

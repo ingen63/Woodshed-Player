@@ -27,6 +27,29 @@ abstract final class WsIcons {
   static const stop = IconData(0xf82b, fontFamily: _f, fontPackage: _p);
   static const record = IconData(0xf400, fontFamily: _f, fontPackage: _p);
   static const warning = IconData(0xf661, fontFamily: _f, fontPackage: _p);
+  static const tray = IconData(0xf871, fontFamily: _f, fontPackage: _p);
+  static const add = IconData(0xf489, fontFamily: _f, fontPackage: _p);
+  static const pencil = IconData(0xf37e, fontFamily: _f, fontPackage: _p);
+  static const trash = IconData(0xf4c4, fontFamily: _f, fontPackage: _p);
+  static const chevronDown = IconData(0xf5d5, fontFamily: _f, fontPackage: _p);
+  static const chevronRight = IconData(0xf3d3, fontFamily: _f, fontPackage: _p);
+  static const ellipsis = IconData(0xf46a, fontFamily: _f, fontPackage: _p);
+  static const ellipsisCircle = IconData(
+    0xf647,
+    fontFamily: _f,
+    fontPackage: _p,
+  );
+  static const folderBadgePlus = IconData(
+    0xf678,
+    fontFamily: _f,
+    fontPackage: _p,
+  );
+  static const sort = IconData(0xf51f, fontFamily: _f, fontPackage: _p);
+  static const musicNoteList = IconData(
+    0xf726,
+    fontFamily: _f,
+    fontPackage: _p,
+  );
 }
 
 ThemeData woodshedTheme(Brightness brightness) {

@@ -27,10 +27,11 @@ Geschwindigkeit und Loop werden **pro Datei** gespeichert und beim nächsten Öf
 
 ### Flutter-App (im Umbau, `app/`)
 
-Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) sieht aus wie die bisherige App (Karten für Wiedergabe, Geschwindigkeit und Loop, Zeiten als mm:ss); die Bibliothek fehlt noch. Sie hat zusätzlich:
+Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) sieht aus wie die bisherige App (Karten für Wiedergabe, Geschwindigkeit und Loop, Zeiten als mm:ss) und hat dieselbe Bibliothek. Dazu:
 
 | Funktion | Bedienung |
 | --- | --- |
+| Bibliothek | Titel per **⌘O** / «+» wählen (mehrere) oder ins Fenster ziehen; Ordner (**⇧⌘N**), Sortierung, Titel per Ziehen (am iPhone: lange drücken) in Ordner verschieben, Kontextmenü (Rechtsklick oder «⋯») zum Umbenennen und Löschen mit Rückfrage. Der erste importierte Titel wird geladen. Fertige Aufnahmen landen ebenfalls hier. Auf dem Mac lässt sich die Bibliothek der alten Swift-App über das Menü «⋯» übernehmen (Ordnerwahl). Breites Fenster: zwei Spalten, schmal: drei Reiter |
 | Metronom | Start/Stopp mit **M**, Tempo 20–300 BPM mit −/+ (gedrückt halten wiederholt), Regler oder **↑** / **↓** (mit Shift ±10), Tap-Tempo mit **T**. Taktarten 4/4, 3/4, 2/4, 6/8, Unterteilungen Viertel bis Sechzehntel, eigene Lautstärke. Eigener Reiter «Metronom»; Titel und Metronom laufen nie gleichzeitig (Start des einen pausiert den anderen). Nach einem Neustart gilt 120 BPM, die übrigen Einstellungen bleiben erhalten |
 | Automatische Tempo-Steigerung | Start- und Ziel-BPM, Schritt und alle wie viele Takte. Ist das Ziel erreicht, geht es nach gleich vielen Takten wieder beim Start-BPM los |
 | Gerätewechsel | Wird die Ausgabe gewechselt (z. B. Kopfhörer ab) oder kommt ein Anruf dazwischen, pausieren Titel und Metronom; die Position bleibt. Weiter geht es mit Play |
@@ -50,6 +51,7 @@ Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) sieht aus
 - `core/` (Flutter-App): Audio-Kern in C++ mit C-API `core/include/wp_core.h` (miniaudio, Signalsmith Stretch).
   Steuerbefehle erreichen den Audio-Thread über eine Lock-free-Queue, Titel werden im Hintergrund dekodiert,
   Ladefehler kommen mit Code und Text (`wp_error_message`). Tests mit `ctest`, Testaudio aus `core/tools/make_test_audio.sh`.
+- `app/` (Flutter-App): `lib/library/` (`library.json` byte-gleich zur Swift-App, eigener Metadaten-Leser für ID3/FLAC/WAV), `lib/player/` (Player-Service über FFI), `lib/app/` (Zusammenspiel, Dateiauswahl), `lib/ui/`. Rauchtest mit echtem Kern: `cd app && flutter test integration_test -d macos`.
 
 ## Datenschutz
 

@@ -4,12 +4,15 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 
 import '../time_format.dart';
+import 'library_view.dart' show TrackArtwork;
 import 'style.dart';
 
 /// Zustand, den der Player-Reiter anzeigt.
 class PlayerViewState {
   const PlayerViewState({
     this.title,
+    this.artist,
+    this.artwork,
     this.position = 0,
     this.duration = 0,
     this.playing = false,
@@ -23,6 +26,10 @@ class PlayerViewState {
   });
 
   final String? title;
+  final String? artist;
+
+  /// Pfad zum Cover oder null.
+  final String? artwork;
   final double position, duration, volume, speed, loopStart, loopEnd;
   final bool playing, speedOn, loopOn;
   final String? error;
@@ -45,11 +52,28 @@ class PlayerViewActions {
     required this.loopOn,
     required this.loopStart,
     required this.loopEnd,
-  });
+    ValueChanged<double>? loopStartField,
+    ValueChanged<double>? loopEndField,
+    this._wholeTrack,
+  }) : loopStartField = loopStartField ?? loopStart,
+       loopEndField = loopEndField ?? loopEnd;
 
   final VoidCallback open, playPause;
-  final ValueChanged<double> seek, volume, speed, loopStart, loopEnd;
+  final ValueChanged<double> seek, volume, speed;
+
+  /// Grenze setzen und Loop einschalten (Marker, «Aktuelle Position», Tasten S/E).
+  final ValueChanged<double> loopStart, loopEnd;
+
+  /// Grenze aus dem Zeitfeld; schaltet den Loop nicht ein (wie in der Swift-App).
+  final ValueChanged<double> loopStartField, loopEndField;
+  final VoidCallback? _wholeTrack;
   final ValueChanged<bool> speedOn, loopOn;
+
+  void wholeTrack(double duration) {
+    if (_wholeTrack != null) return _wholeTrack();
+    loopStartField(0);
+    loopEndField(duration);
+  }
 }
 
 class PlayerView extends StatelessWidget {
@@ -165,7 +189,11 @@ class _NowPlayingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final info = _TrackInfo(title: state.title!, duration: state.duration);
+    final info = _TrackInfo(
+      title: state.title!,
+      artist: state.artist,
+      duration: state.duration,
+    );
     return WsCard(
       key: const Key('card:nowPlaying'),
       children: [
@@ -177,7 +205,7 @@ class _NowPlayingCard extends StatelessWidget {
           builder: (context, c) => c.maxWidth >= 520
               ? Row(
                   children: [
-                    const _Artwork(size: 150),
+                    TrackArtwork(path: state.artwork, size: 150),
                     const SizedBox(width: 24),
                     Expanded(child: info),
                   ],
@@ -185,7 +213,7 @@ class _NowPlayingCard extends StatelessWidget {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Center(child: _Artwork(size: 180)),
+                    Center(child: TrackArtwork(path: state.artwork, size: 180)),
                     const SizedBox(height: 16),
                     info,
                   ],
@@ -197,30 +225,10 @@ class _NowPlayingCard extends StatelessWidget {
   }
 }
 
-/// Platzhalter für das Cover (die Flutter-App liest noch keine Cover).
-class _Artwork extends StatelessWidget {
-  const _Artwork({required this.size});
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(4),
-    child: Container(
-      width: size,
-      height: size,
-      color: Colors.grey.withValues(alpha: 0.15),
-      child: Icon(
-        WsIcons.musicNote,
-        size: size * 0.5,
-        color: Colors.grey.withValues(alpha: 0.6),
-      ),
-    ),
-  );
-}
-
 class _TrackInfo extends StatelessWidget {
-  const _TrackInfo({required this.title, required this.duration});
+  const _TrackInfo({required this.title, this.artist, required this.duration});
   final String title;
+  final String? artist;
   final double duration;
 
   @override
@@ -238,6 +246,18 @@ class _TrackInfo extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
+        if (artist != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            artist!,
+            key: const Key('trackArtist'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         Text.rich(
           TextSpan(
@@ -357,6 +377,8 @@ class _TransportBar extends StatelessWidget {
                 ? (state.loopStart, state.loopEnd)
                 : null,
             onSeek: actions.seek,
+            onLoopStart: actions.loopStart,
+            onLoopEnd: actions.loopEnd,
           ),
         ),
         const SizedBox(width: 12),
@@ -421,11 +443,16 @@ class ProgressScrubber extends StatefulWidget {
     required this.duration,
     required this.onSeek,
     this.loop,
+    this.onLoopStart,
+    this.onLoopEnd,
   });
 
   final double position, duration;
   final (double, double)? loop;
   final ValueChanged<double> onSeek;
+
+  /// Ziehen der Loop-Marker; wird laufend gerufen, damit die Zeitfelder live mitgehen.
+  final ValueChanged<double>? onLoopStart, onLoopEnd;
 
   @override
   State<ProgressScrubber> createState() => _ProgressScrubberState();
@@ -490,8 +517,13 @@ class _ProgressScrubberState extends State<ProgressScrubber> {
                   ),
                 ),
                 if (loop != null && d > 0) ...[
-                  _marker(xOf(loop.$1), 'loopStartMarker'),
-                  _marker(xOf(loop.$2), 'loopEndMarker'),
+                  _marker(
+                    xOf(loop.$1),
+                    'loopStartMarker',
+                    w,
+                    widget.onLoopStart,
+                  ),
+                  _marker(xOf(loop.$2), 'loopEndMarker', w, widget.onLoopEnd),
                 ],
               ],
             ),
@@ -510,19 +542,52 @@ class _ProgressScrubberState extends State<ProgressScrubber> {
     ),
   );
 
-  Widget _marker(double x, String key) => Positioned(
-    key: Key(key),
-    left: x - 2,
-    child: Container(
-      width: 4,
-      height: 22,
-      decoration: BoxDecoration(
-        color: Colors.orange,
-        borderRadius: BorderRadius.circular(1.5),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.85)),
+  /// Orange Marke; mit [onDrag] ziehbar (breitere, unsichtbare Griff-Fläche).
+  Widget _marker(
+    double x,
+    String key,
+    double width,
+    ValueChanged<double>? onDrag,
+  ) {
+    double timeOf(DragUpdateDetails e) {
+      final box = context.findRenderObject() as RenderBox?;
+      final local = box?.globalToLocal(e.globalPosition).dx ?? 0;
+      return _timeAt(local, width);
+    }
+
+    return Positioned(
+      key: Key(key),
+      left: x - 9,
+      child: MouseRegion(
+        cursor: onDrag == null
+            ? MouseCursor.defer
+            : SystemMouseCursors.resizeLeftRight,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: onDrag == null
+              ? null
+              : (e) => onDrag(timeOf(e)),
+          child: SizedBox(
+            width: 18,
+            height: 24,
+            child: Center(
+              child: Container(
+                width: 4,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(1.5),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 // MARK: Geschwindigkeit
@@ -622,19 +687,21 @@ class _LoopCard extends StatelessWidget {
     Widget row(
       String name,
       double value,
+      ValueChanged<double> field,
       ValueChanged<double> set,
       String help,
     ) => LayoutBuilder(
       builder: (context, c) => Row(
         children: [
           SizedBox(width: 64, child: Text(name, style: label)),
-          TimeField(key: Key('time:$name'), value: value, onCommit: set),
+          TimeField(key: Key('time:$name'), value: value, onCommit: field),
           const SizedBox(width: 12),
           BorderedButton(
             label: 'Aktuelle Position',
             icon: WsIcons.location,
             tooltip: help,
             iconOnly: c.maxWidth < 360, // schmal: nur das Symbol
+            key: Key('here:$name'),
             onPressed: () => set(state.position),
           ),
         ],
@@ -658,6 +725,7 @@ class _LoopCard extends StatelessWidget {
               row(
                 'Anfang',
                 state.loopStart,
+                actions.loopStartField,
                 actions.loopStart,
                 'Aktuelle Wiedergabeposition als Anfang übernehmen',
               ),
@@ -665,6 +733,7 @@ class _LoopCard extends StatelessWidget {
               row(
                 'Ende',
                 state.loopEnd,
+                actions.loopEndField,
                 actions.loopEnd,
                 'Aktuelle Wiedergabeposition als Ende übernehmen',
               ),
@@ -681,10 +750,7 @@ class _LoopCard extends StatelessWidget {
                   BorderedButton(
                     label: 'Ganzer Titel',
                     icon: WsIcons.leftRight,
-                    onPressed: () {
-                      actions.loopStart(0);
-                      actions.loopEnd(state.duration);
-                    },
+                    onPressed: () => actions.wholeTrack(state.duration),
                   ),
                 ],
               ),
@@ -710,7 +776,8 @@ class _LoopCard extends StatelessWidget {
         ),
         const HintText(
           'Format: mm:ss, z. B. 01:23 – Zehntelsekunden mit Punkt, z. B. 01:23.5. '
-          'Leertaste = Play/Pause.',
+          'Die orangen Marker lassen sich ziehen. Tasten: Leertaste Play/Pause, S Anfang, E Ende, '
+          '← / → Geschwindigkeit.',
         ),
       ],
     );

@@ -1,0 +1,665 @@
+// Bibliotheksliste (#17), Vorlage TrackListView.swift: Ordner als Abschnitte, Ziehen zum Sortieren und
+// in Ordner, Kontextmenüs (Rechtsklick bzw. «⋯»), Bestätigung vor dem Löschen.
+import 'dart:io';
+
+import 'package:material_ui/material_ui.dart';
+
+import '../app/app_controller.dart';
+import '../library/library.dart';
+import '../time_format.dart';
+import 'style.dart';
+
+class LibraryView extends StatefulWidget {
+  LibraryView({
+    super.key,
+    required this.controller,
+    this.onSelected,
+    bool? touch,
+  }) : touch =
+           touch ??
+           !(Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
+  final AppController controller;
+
+  /// Nach dem Wählen eines Titels (einspaltig: zum Player wechseln).
+  final VoidCallback? onSelected;
+
+  /// Touch: Ziehen nach langem Drücken; sonst sofort mit der Maus.
+  final bool touch;
+
+  @override
+  State<LibraryView> createState() => _LibraryViewState();
+}
+
+class _LibraryViewState extends State<LibraryView> {
+  final _collapsed = <String>{};
+
+  AppController get c => widget.controller;
+  Library get lib => c.library;
+
+  void _select(Track t) {
+    c.select(t);
+    widget.onSelected?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([lib, c.player]),
+      builder: (context, _) {
+        final folders = lib.sortedFolders;
+        final loose = lib.sortedTracksIn(null);
+        final empty = lib.tracks.isEmpty && folders.isEmpty;
+        return Column(
+          children: [
+            _Header(controller: c),
+            if (lib.isImporting) const LinearProgressIndicator(minHeight: 2),
+            const Divider(height: 1),
+            Expanded(
+              child: empty
+                  ? _EmptyLibrary(onAdd: () => c.pickAndImport())
+                  : ListView(
+                      key: const Key('libraryList'),
+                      padding: const EdgeInsets.only(bottom: 24),
+                      children: [
+                        if (folders.isNotEmpty)
+                          _SectionHeader(
+                            key: const Key('section:none'),
+                            label: 'Ohne Ordner',
+                            icon: WsIcons.tray,
+                            onDrop: (id) => lib.placeTrack(id, null),
+                          ),
+                        for (final t in loose) _row(t),
+                        if (loose.isEmpty && folders.isNotEmpty)
+                          _Placeholder(
+                            'Keine Titel ohne Ordner',
+                            onDrop: (id) => lib.placeTrack(id, null),
+                          ),
+                        for (final f in folders) ..._folder(f),
+                      ],
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<Widget> _folder(TrackFolder f) {
+    final open = !_collapsed.contains(f.id);
+    final tracks = lib.sortedTracksIn(f.id);
+    return [
+      _SectionHeader(
+        key: Key('folder:${f.name}'),
+        label: f.name,
+        icon: WsIcons.folder,
+        expanded: open,
+        onToggle: () => setState(
+          () => open ? _collapsed.add(f.id) : _collapsed.remove(f.id),
+        ),
+        onDrop: (id) => lib.placeTrack(id, f.id),
+        menu: (context) => [
+          MenuItemButton(
+            leadingIcon: const Icon(WsIcons.add, size: 16),
+            onPressed: () => c.pickAndImport(folderId: f.id),
+            child: const Text('MP3 hinzufügen …'),
+          ),
+          MenuItemButton(
+            leadingIcon: const Icon(WsIcons.pencil, size: 16),
+            onPressed: () async {
+              final name = await askName(
+                context,
+                'Ordner umbenennen',
+                initial: f.name,
+              );
+              if (name != null) lib.renameFolder(f.id, name);
+            },
+            child: const Text('Umbenennen …'),
+          ),
+          MenuItemButton(
+            leadingIcon: const Icon(WsIcons.trash, size: 16),
+            onPressed: () async {
+              if (await confirm(
+                context,
+                title: '«${f.name}» löschen?',
+                text: 'Die Titel bleiben in der Bibliothek und erscheinen unter «Ohne Ordner».',
+                action: 'Ordner löschen',
+              )) {
+                lib.deleteFolder(f.id);
+              }
+            },
+            child: const Text('Ordner löschen'),
+          ),
+        ],
+      ),
+      if (open) ...[
+        for (final t in tracks) _row(t, indent: true),
+        if (tracks.isEmpty)
+          _Placeholder(
+            'Leer – Titel hierher ziehen',
+            onDrop: (id) => lib.placeTrack(id, f.id),
+          ),
+      ],
+    ];
+  }
+
+  Widget _row(Track t, {bool indent = false}) => _TrackRow(
+    key: Key('track:${t.title}'),
+    track: t,
+    artwork: lib.artworkPath(t),
+    selected: c.player.trackId == t.id,
+    indent: indent,
+    touch: widget.touch,
+    onTap: () => _select(t),
+    onDrop: (id) => lib.placeTrack(id, t.folderId, beforeId: t.id),
+    menu: (context) => [
+      SubmenuButton(
+        leadingIcon: const Icon(WsIcons.folder, size: 16),
+        menuChildren: [
+          MenuItemButton(
+            onPressed: t.folderId == null
+                ? null
+                : () => lib.moveTracks({t.id}, null),
+            child: const Text('Ohne Ordner'),
+          ),
+          for (final f in lib.sortedFolders)
+            MenuItemButton(
+              onPressed: t.folderId == f.id
+                  ? null
+                  : () => lib.moveTracks({t.id}, f.id),
+              child: Text(f.name),
+            ),
+          const Divider(height: 1),
+          MenuItemButton(
+            onPressed: () async {
+              final name = await askName(context, 'Neuer Ordner');
+              if (name != null) {
+                lib.moveTracks({t.id}, lib.createFolder(name).id);
+              }
+            },
+            child: const Text('Neuer Ordner …'),
+          ),
+        ],
+        child: const Text('In Ordner verschieben'),
+      ),
+      MenuItemButton(
+        leadingIcon: const Icon(WsIcons.trash, size: 16),
+        onPressed: () => confirmDeleteTrack(context, c, t),
+        child: const Text('Löschen'),
+      ),
+    ],
+  );
+}
+
+/// Löschen mit Rückfrage (Kontextmenü, Entf-Taste).
+Future<void> confirmDeleteTrack(
+  BuildContext context,
+  AppController c,
+  Track t,
+) async {
+  if (await confirm(
+    context,
+    title: '«${t.title}» löschen?',
+    text: 'Der Titel wird aus der App entfernt. Die Originaldatei bleibt unverändert.',
+    action: 'Löschen',
+  )) {
+    c.deleteTracks({t.id});
+  }
+}
+
+Future<bool> confirm(
+  BuildContext context, {
+  required String title,
+  required String text,
+  required String action,
+}) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(text),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            key: const Key('confirm'),
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: Text(action),
+          ),
+        ],
+      ),
+    ) ??
+    false;
+
+/// Name für einen Ordner abfragen; null bei Abbruch.
+Future<String?> askName(
+  BuildContext context,
+  String title, {
+  String initial = '',
+}) {
+  final text = TextEditingController(text: initial);
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: TextField(
+        key: const Key('nameField'),
+        controller: text,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: 'Name'),
+        onSubmitted: (v) => Navigator.pop(context, v),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Abbrechen'),
+        ),
+        TextButton(
+          key: const Key('nameOk'),
+          onPressed: () => Navigator.pop(context, text.text),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _Header extends StatelessWidget {
+  const _Header({required this.controller});
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final lib = controller.library;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Bibliothek',
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          IconButton(
+            key: const Key('addFiles'),
+            tooltip: 'MP3 hinzufügen (⌘O)',
+            icon: const Icon(WsIcons.add),
+            onPressed: () => controller.pickAndImport(),
+          ),
+          IconButton(
+            key: const Key('newFolder'),
+            tooltip: 'Neuer Ordner (⇧⌘N)',
+            icon: const Icon(WsIcons.folderBadgePlus),
+            onPressed: () => newFolder(context, lib),
+          ),
+          PopupMenuButton<TrackSortOrder>(
+            key: const Key('sortMenu'),
+            tooltip: 'Sortieren',
+            icon: const Icon(WsIcons.sort),
+            onSelected: (o) => lib.sortOrder = o,
+            itemBuilder: (_) => [
+              for (final o in TrackSortOrder.values)
+                CheckedPopupMenuItem(
+                  value: o,
+                  checked: lib.sortOrder == o,
+                  child: Text(o.label),
+                ),
+            ],
+          ),
+          if (controller.files.canImportLegacyLibrary)
+            PopupMenuButton<int>(
+              key: const Key('moreMenu'),
+              tooltip: 'Weitere',
+              icon: const Icon(WsIcons.ellipsisCircle),
+              onSelected: (_) => controller.importLegacyLibrary(),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 0,
+                  child: Text(
+                    lib.legacyImported
+                        ? 'Alte Bibliothek erneut übernehmen …'
+                        : 'Alte Bibliothek übernehmen …',
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> newFolder(BuildContext context, Library lib) async {
+  final name = await askName(context, 'Neuer Ordner');
+  if (name != null) lib.createFolder(name);
+}
+
+class _EmptyLibrary extends StatelessWidget {
+  const _EmptyLibrary({required this.onAdd});
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final grey = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(WsIcons.musicNoteList, size: 40, color: grey),
+            const SizedBox(height: 10),
+            Text('Keine Titel', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(
+              Platform.isMacOS
+                  ? 'Füge MP3-, WAV- oder FLAC-Dateien mit + hinzu oder zieh sie hierher.'
+                  : 'Füge MP3-, WAV- oder FLAC-Dateien mit + hinzu.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: grey),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              key: const Key('addFirst'),
+              onPressed: onAdd,
+              child: const Text('MP3 hinzufügen'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Abschnittskopf (Ordner bzw. «Ohne Ordner»); Titel lassen sich darauf ablegen.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.onDrop,
+    this.expanded,
+    this.onToggle,
+    this.menu,
+  });
+
+  final String label;
+  final IconData icon;
+  final void Function(String trackId) onDrop;
+  final bool? expanded;
+  final VoidCallback? onToggle;
+  final List<Widget> Function(BuildContext context)? menu;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DragTarget<String>(
+      onAcceptWithDetails: (d) => onDrop(d.data),
+      builder: (context, candidates, _) => _WithMenu(
+        menu: menu,
+        builder: (context, openMenu) => Material(
+          color: candidates.isNotEmpty
+              ? theme.colorScheme.primary.withValues(alpha: 0.15)
+              : Colors.transparent,
+          child: InkWell(
+            onTap: onToggle,
+            onSecondaryTapUp: openMenu == null
+                ? null
+                : (e) => openMenu(e.localPosition),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 4, 4),
+              child: Row(
+                children: [
+                  if (expanded != null)
+                    Icon(
+                      expanded! ? WsIcons.chevronDown : WsIcons.chevronRight,
+                      size: 12,
+                    ),
+                  const SizedBox(width: 6),
+                  Icon(icon, size: 16, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  if (openMenu != null)
+                    IconButton(
+                      tooltip: 'Ordner-Aktionen',
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 16,
+                      icon: const Icon(WsIcons.ellipsis),
+                      onPressed: () => openMenu(null),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Placeholder extends StatelessWidget {
+  const _Placeholder(this.text, {required this.onDrop});
+  final String text;
+  final void Function(String trackId) onDrop;
+
+  @override
+  Widget build(BuildContext context) => DragTarget<String>(
+    onAcceptWithDetails: (d) => onDrop(d.data),
+    builder: (context, candidates, _) => Container(
+      color: candidates.isNotEmpty
+          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
+          : null,
+      padding: const EdgeInsets.fromLTRB(44, 8, 16, 8),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          fontSize: 13,
+        ),
+      ),
+    ),
+  );
+}
+
+class _TrackRow extends StatelessWidget {
+  const _TrackRow({
+    super.key,
+    required this.track,
+    required this.artwork,
+    required this.selected,
+    required this.indent,
+    required this.touch,
+    required this.onTap,
+    required this.onDrop,
+    required this.menu,
+  });
+
+  final Track track;
+  final String? artwork;
+  final bool selected, indent, touch;
+  final VoidCallback onTap;
+  final void Function(String trackId) onDrop;
+  final List<Widget> Function(BuildContext context) menu;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final subtitle = [
+      if (track.artist != null) track.artist!,
+      formatTime(track.duration),
+    ].join(' · ');
+    Widget tile(
+      String? openMenuHint,
+      void Function(Offset?)? openMenu, {
+      bool dropHint = false,
+    }) => Material(
+      color: selected
+          ? theme.colorScheme.primary.withValues(alpha: 0.18)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        onSecondaryTapUp: openMenu == null
+            ? null
+            : (e) => openMenu(e.localPosition),
+        child: Container(
+          decoration: dropHint
+              ? BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: theme.colorScheme.primary, width: 2),
+                  ),
+                )
+              : null,
+          padding: EdgeInsets.fromLTRB(indent ? 28 : 12, 6, 4, 6),
+          child: Row(
+            children: [
+              TrackArtwork(path: artwork, size: 36),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      track.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (openMenu != null)
+                IconButton(
+                  key: Key('menu:${track.title}'),
+                  tooltip: 'Aktionen',
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 16,
+                  icon: const Icon(WsIcons.ellipsis),
+                  onPressed: () => openMenu(null),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (d) => d.data != track.id,
+      onAcceptWithDetails: (d) => onDrop(d.data),
+      builder: (context, candidates, _) => _WithMenu(
+        menu: menu,
+        builder: (context, openMenu) {
+          final feedback = Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(track.title),
+            ),
+          );
+          final child = tile(null, openMenu, dropHint: candidates.isNotEmpty);
+          final dimmed = Opacity(opacity: 0.4, child: tile(null, null));
+          return touch
+              ? LongPressDraggable<String>(
+                  data: track.id,
+                  feedback: feedback,
+                  childWhenDragging: dimmed,
+                  child: child,
+                )
+              : Draggable<String>(
+                  data: track.id,
+                  feedback: feedback,
+                  childWhenDragging: dimmed,
+                  child: child,
+                );
+        },
+      ),
+    );
+  }
+}
+
+/// Kontextmenü an einer Stelle (Rechtsklick) oder unter dem «⋯»-Knopf öffnen.
+class _WithMenu extends StatefulWidget {
+  const _WithMenu({required this.menu, required this.builder});
+  final List<Widget> Function(BuildContext context)? menu;
+  final Widget Function(
+    BuildContext context,
+    void Function(Offset? at)? openMenu,
+  )
+  builder;
+
+  @override
+  State<_WithMenu> createState() => _WithMenuState();
+}
+
+class _WithMenuState extends State<_WithMenu> {
+  final _menu = MenuController();
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.menu;
+    if (items == null) return widget.builder(context, null);
+    return MenuAnchor(
+      controller: _menu,
+      menuChildren: items(context),
+      builder: (context, _, _) =>
+          widget.builder(context, (at) => _menu.open(position: at)),
+    );
+  }
+}
+
+/// Cover aus der Bibliothek oder Notensymbol.
+class TrackArtwork extends StatelessWidget {
+  const TrackArtwork({super.key, required this.path, required this.size});
+  final String? path;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = path;
+    final placeholder = Container(
+      width: size,
+      height: size,
+      color: Colors.grey.withValues(alpha: 0.15),
+      child: Icon(
+        WsIcons.musicNote,
+        size: size * 0.5,
+        color: Colors.grey.withValues(alpha: 0.6),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size > 60 ? 4 : 3),
+      child: p == null
+          ? placeholder
+          : Image.file(
+              File(p),
+              key: Key('artwork:$p'),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              cacheWidth: (size * 2).round(),
+              errorBuilder: (_, _, _) => placeholder,
+            ),
+    );
+  }
+}
