@@ -68,6 +68,12 @@ WP_API void wp_set_loop(wp_player* p, double a, double b);
 WP_API void wp_set_volume(wp_player* p, float volume);
 WP_API double wp_position(wp_player* p);
 WP_API double wp_duration(wp_player* p);
+/* Wellenform des geladenen Titels (#28): teilt [start, end] Sekunden in genau count gleich lange Abschnitte
+ * und schreibt je Abschnitt Minimum nach mins[i] und Maximum nach maxs[i] (−1…1, über alle Kanäle).
+ * Die Spitzenwerte werden beim Laden einmal berechnet; der Aufruf ist auch für die Übersicht des ganzen
+ * Titels schnell. Abschnitte kürzer als 32 Frames zeigen den ganzen 32-Frame-Block.
+ * WP_OK oder WP_ERR_INVALID_ARGUMENT (kein Titel, count < 1, start >= end, Bereich ausserhalb des Titels). */
+WP_API int wp_waveform(wp_player* p, double start, double end, int count, float* mins, float* maxs);
 
 /* ---- Metronom (#3), läuft mit und ohne Titel ---- */
 WP_API void wp_metro_start(wp_player* p);  /* beginnt immer mit Takt 1, Schlag 1 */

@@ -300,6 +300,45 @@ void fileDurationWithoutLoading() {  // #16/AK4 (Dauer beim Import)
     CHECK(wp::fileDuration("") == wp::kErrInvalidArgument);
 }
 
+// 16-Bit-Stereo-WAV mit Sinus (440 Hz) der Amplitude amp.
+fs::path writeSineWav(const std::string& name, double seconds, double amp) {
+    const fs::path p = tempDir() / name;
+    const long long frames = std::llround(seconds * kSr);
+    std::ofstream f(p, std::ios::binary);
+    const unsigned bytes = static_cast<unsigned>(frames * 4);
+    f.write("RIFF", 4); put32(f, 36 + bytes); f.write("WAVE", 4);
+    f.write("fmt ", 4); put32(f, 16); put16(f, 1); put16(f, 2); put32(f, kSr); put32(f, kSr * 4); put16(f, 4); put16(f, 16);
+    f.write("data", 4); put32(f, bytes);
+    for (long long i = 0; i < frames; ++i) {
+        const auto s = static_cast<unsigned>(static_cast<int>(std::lround(amp * 32767 * std::sin(2 * M_PI * 440 * i / kSr))) & 0xffff);
+        put16(f, s);
+        put16(f, s);
+    }
+    return p;
+}
+
+void waveformOfLoadedFile() {  // #28/AK1–AK4 über den Player
+    wp::Player p(kSr);
+    float mins[100], maxs[100];
+    CHECK(p.waveform(0.0, 1.0, 100, mins, maxs) == wp::kErrInvalidArgument);  // noch kein Titel
+    CHECK(p.load(writeSineWav("sine_half.wav", 2.0, 0.5).string()) == wp::kOk);
+    CHECK(p.waveform(0.0, p.engine().duration(), 100, mins, maxs) == wp::kOk);
+    int bad = 0;
+    for (int i = 0; i < 100; ++i)
+        if (std::fabs(mins[i] + 0.5f) > 0.01f || std::fabs(maxs[i] - 0.5f) > 0.01f) ++bad;
+    CHECK(bad == 0);
+    CHECK(p.waveform(1.0, 0.5, 10, mins, maxs) == wp::kErrInvalidArgument);
+    CHECK(p.waveform(1.0, 3.0, 10, mins, maxs) == wp::kErrInvalidArgument);
+    // Ein fehlgeschlagenes Laden behält die Wellenform des bisherigen Titels.
+    CHECK(p.load((tempDir() / "fehlt.wav").string()) == wp::kErrFileNotFound);
+    CHECK(p.waveform(0.0, 2.0, 10, mins, maxs) == wp::kOk);
+    // Ein neuer Titel ersetzt sie.
+    CHECK(p.load(writeSineWav("silence.wav", 1.0, 0.0).string()) == wp::kOk);
+    CHECK(p.waveform(0.0, 2.0, 10, mins, maxs) == wp::kErrInvalidArgument);
+    CHECK(p.waveform(0.0, 1.0, 10, mins, maxs) == wp::kOk);
+    CHECK(mins[0] == 0.0f && maxs[9] == 0.0f);
+}
+
 void devicePolicy() {  // #14/AK4
     CHECK(wp::pausesPlayback(wp::DeviceEvent::Rerouted));
     CHECK(wp::pausesPlayback(wp::DeviceEvent::InterruptionBegan));
@@ -357,6 +396,7 @@ int main() {
         {"loadRunsInBackground", loadRunsInBackground},
         {"newerLoadReplacesRunningLoad", newerLoadReplacesRunningLoad},
         {"fileDurationWithoutLoading", fileDurationWithoutLoading},
+        {"waveformOfLoadedFile", waveformOfLoadedFile},
         {"devicePolicy", devicePolicy},
         {"deviceChangePausesAndKeepsPosition", deviceChangePausesAndKeepsPosition},
     };

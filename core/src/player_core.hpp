@@ -3,12 +3,14 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
 
 #include "engine.hpp"
 #include "metronome.hpp"
+#include "waveform.hpp"
 
 namespace wp {
 
@@ -75,6 +77,11 @@ public:
     int loadState() const { return loadState_.load(); }
     double loadProgress() const { return loadProgress_.load(); }  // 0–1 des laufenden bzw. letzten Ladens
 
+    // Wellenform des zuletzt erfolgreich geladenen Titels (#28): `count` Abschnitte über [start, end] Sekunden,
+    // Minimum und Maximum je Abschnitt (−1…1). Nicht im Audio-Thread aufrufen.
+    // kOk oder kErrInvalidArgument (kein Titel, count < 1, start >= end, Bereich ausserhalb des Titels).
+    int waveform(double start, double end, int count, float* mins, float* maxs) const;
+
     // Von jedem Thread aus, auch aus Callbacks des Audiogeräts.
     void onDeviceEvent(DeviceEvent e);
 
@@ -92,6 +99,9 @@ private:
     std::atomic<bool> cancel_{false};
     std::atomic<int> loadState_{kLoadIdle};
     std::atomic<double> loadProgress_{0.0};
+
+    mutable std::mutex peaksMutex_;       // nur Steuer- und Lade-Threads
+    std::shared_ptr<const Peaks> peaks_;  // beim Laden berechnet, ersetzt mit dem Titel
 };
 
 }  // namespace wp

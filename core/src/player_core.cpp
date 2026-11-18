@@ -185,7 +185,14 @@ void Player::runLoad(std::string path) {
     try {
         auto source = std::make_unique<Source>();
         result = decodeFile(path, sampleRate_, cancel_, loadProgress_, *source);
+        std::shared_ptr<const Peaks> peaks;
+        if (result == kOk)  // Übersicht einmal hier im Lade-Thread, nicht im Audio-Thread (#28)
+            peaks = std::make_shared<const Peaks>(source->data.data(), source->frames, kChannels, sampleRate_);
         if (result == kOk && !engine_.submitSource(std::move(source))) result = kErrBusy;
+        if (result == kOk) {
+            std::lock_guard<std::mutex> lock(peaksMutex_);
+            peaks_ = std::move(peaks);
+        }
     } catch (const std::bad_alloc&) {
         result = kErrOutOfMemory;
     }
@@ -198,6 +205,15 @@ int Player::waitForLoad() {
     if (loader_.joinable()) loader_.join();
     const int s = loadState_.load();
     return s < 0 ? s : kOk;
+}
+
+int Player::waveform(double start, double end, int count, float* mins, float* maxs) const {
+    std::shared_ptr<const Peaks> peaks;
+    {
+        std::lock_guard<std::mutex> lock(peaksMutex_);
+        peaks = peaks_;
+    }
+    return peaks && peaks->query(start, end, count, mins, maxs) ? kOk : kErrInvalidArgument;
 }
 
 int Player::load(const std::string& path) {

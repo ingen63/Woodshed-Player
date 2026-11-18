@@ -6,10 +6,17 @@ library;
 
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+String? _libraryPath;
+
+/// Nur für Tests: Pfad der Kern-Bibliothek (z. B. `core/build/libwp_core.dylib`), vor dem ersten Aufruf setzen.
+set wpCoreLibraryPath(String path) => _libraryPath = path;
+
 final DynamicLibrary _lib = () {
+  if (_libraryPath != null) return DynamicLibrary.open(_libraryPath!);
   if (Platform.isMacOS || Platform.isIOS) return DynamicLibrary.open('wp_core.framework/wp_core');
   if (Platform.isAndroid || Platform.isLinux) return DynamicLibrary.open('libwp_core.so');
   if (Platform.isWindows) return DynamicLibrary.open('wp_core.dll');
@@ -50,6 +57,9 @@ final _position =
     _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_position');
 final _duration =
     _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_duration');
+final _waveform = _lib.lookupFunction<
+    Int32 Function(Pointer<_Player>, Double, Double, Int32, Pointer<Float>, Pointer<Float>),
+    int Function(Pointer<_Player>, double, double, int, Pointer<Float>, Pointer<Float>)>('wp_waveform');
 
 final _mStart = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_metro_start');
 final _mStop = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_metro_stop');
@@ -151,6 +161,25 @@ class WpPlayer {
   double get position => _position(_p);
   double get duration => _duration(_p);
 
+  /// Wellenform des geladenen Titels (#28): [count] gleich lange Abschnitte über [start]–[end] Sekunden,
+  /// je Abschnitt Minimum und Maximum (−1…1). Schnell, auch für die Übersicht des ganzen Titels.
+  /// `null`, wenn kein Titel geladen ist, `count < 1`, `start >= end` oder der Bereich ausserhalb liegt.
+  WpWaveform? waveform(double start, double end, int count) {
+    if (count < 1) return null;
+    final mins = malloc<Float>(count);
+    final maxs = malloc<Float>(count);
+    try {
+      if (_waveform(_p, start, end, count, mins, maxs) != WpCode.ok) return null;
+      return WpWaveform(
+        Float32List.fromList(mins.asTypedList(count)),
+        Float32List.fromList(maxs.asTypedList(count)),
+      );
+    } finally {
+      malloc.free(mins);
+      malloc.free(maxs);
+    }
+  }
+
   void dispose() => _destroy(_p);
 
   // ---- Metronom (läuft mit und ohne Titel) ----
@@ -175,6 +204,14 @@ class WpPlayer {
   /// Steigerung nach Zeit (#23): 1-BPM-Stufen gleichmässig über [seconds], Wechsel am Taktanfang.
   void metronomeTimedRamp({required bool enabled, required int start, required int target, required int seconds}) =>
       _mSetRampTimed(_p, enabled ? 1 : 0, start, target, seconds);
+}
+
+/// Minimum und Maximum je Abschnitt einer Wellenform, gleich lang, Werte −1…1.
+class WpWaveform {
+  WpWaveform(this.min, this.max);
+  final Float32List min;
+  final Float32List max;
+  int get length => min.length;
 }
 
 /// Dauer einer Datei in Sekunden, ohne sie zu laden. Negativ = Fehlercode ([WpCode]).
