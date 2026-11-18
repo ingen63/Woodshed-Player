@@ -119,6 +119,22 @@ int decodeFile(const std::string& path, int sampleRate, const std::atomic<bool>&
 
 }  // namespace
 
+double fileDuration(const std::string& path) {
+    if (path.empty()) return kErrInvalidArgument;
+    if (int err = checkReadable(path); err != kOk) return err;
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 0, 0);  // ohne Umwandlung
+    ma_decoder dec;
+    if (ma_result r = ma_decoder_init_file(path.c_str(), &cfg, &dec); r != MA_SUCCESS) {
+        return r == MA_DOES_NOT_EXIST || r == MA_ACCESS_DENIED ? mapOpenError(r) : kErrUnsupportedFormat;
+    }
+    ma_uint64 frames = 0;
+    const ma_result r = ma_decoder_get_length_in_pcm_frames(&dec, &frames);
+    const double rate = dec.outputSampleRate;
+    ma_decoder_uninit(&dec);
+    if (r != MA_SUCCESS || frames == 0 || rate <= 0) return kErrUnsupportedFormat;
+    return static_cast<double>(frames) / rate;
+}
+
 Player::Player(int sampleRate) : sampleRate_(std::max(1, sampleRate)) {
     engine_.configure(kChannels, sampleRate_);
     metronome_.setSampleRate(sampleRate_);

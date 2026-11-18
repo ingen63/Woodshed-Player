@@ -111,6 +111,8 @@ int wp_load_async(wp_player* p, const char* path) {
     return p->core->loadAsync(path);
 }
 
+double wp_file_duration(const char* path) { return path ? wp::fileDuration(path) : WP_ERR_INVALID_ARGUMENT; }
+
 int wp_load_wait(wp_player* p) { return p ? p->core->waitForLoad() : WP_ERR_INVALID_ARGUMENT; }
 int wp_load_state(wp_player* p) { return p ? p->core->loadState() : WP_ERR_INVALID_ARGUMENT; }
 double wp_load_progress(wp_player* p) { return p ? p->core->loadProgress() : 0.0; }

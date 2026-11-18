@@ -53,6 +53,8 @@ WP_API double wp_load_progress(wp_player* p);
 WP_API int wp_load_wait(wp_player* p);
 /* Lädt und wartet (blockiert den Aufrufer). WP_OK oder Fehlercode. */
 WP_API int wp_load(wp_player* p, const char* path);
+/* Dauer einer Datei in Sekunden, ohne sie zu laden (für die Bibliothek). < 0 = Fehlercode. */
+WP_API double wp_file_duration(const char* path);
 WP_API void wp_play(wp_player* p);
 WP_API void wp_pause(wp_player* p);
 /* Gerätewechsel (z. B. Kopfhörer ab), Unterbrechung oder Geräteausfall pausieren Wiedergabe und

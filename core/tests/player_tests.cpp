@@ -291,6 +291,15 @@ void newerLoadReplacesRunningLoad() {  // #14/AK3
     CHECK_NEAR(p.engine().duration(), 1.0, 1e-9);
 }
 
+void fileDurationWithoutLoading() {  // #16/AK4 (Dauer beim Import)
+    CHECK_NEAR(wp::fileDuration(writeIndexWav("dur.wav", 3 * kSr / 2).string()), 1.5, 1e-9);
+    CHECK_NEAR(wp::fileDuration((kAudio / "sine440.flac").string()), 1.0, 1e-6);
+    CHECK_NEAR(wp::fileDuration((kAudio / "sine440.mp3").string()), 1.0, 0.06);
+    CHECK(wp::fileDuration((tempDir() / "fehlt.mp3").string()) == wp::kErrFileNotFound);
+    CHECK(wp::fileDuration(writeBytes("nix.mp3", std::string(512, 'x')).string()) == wp::kErrUnsupportedFormat);
+    CHECK(wp::fileDuration("") == wp::kErrInvalidArgument);
+}
+
 void devicePolicy() {  // #14/AK4
     CHECK(wp::pausesPlayback(wp::DeviceEvent::Rerouted));
     CHECK(wp::pausesPlayback(wp::DeviceEvent::InterruptionBegan));
@@ -347,6 +356,7 @@ int main() {
         {"errorDuringPlaybackKeepsPlaying", errorDuringPlaybackKeepsPlaying},
         {"loadRunsInBackground", loadRunsInBackground},
         {"newerLoadReplacesRunningLoad", newerLoadReplacesRunningLoad},
+        {"fileDurationWithoutLoading", fileDurationWithoutLoading},
         {"devicePolicy", devicePolicy},
         {"deviceChangePausesAndKeepsPosition", deviceChangePausesAndKeepsPosition},
     };

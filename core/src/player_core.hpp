@@ -28,6 +28,10 @@ enum ErrorCode {
 // Deutscher Text zu einem Fehlercode (statisch, nie nullptr).
 const char* errorMessage(int code);
 
+// Dauer einer Audiodatei in Sekunden ohne vollständiges Dekodieren (Bibliothek, #16).
+// < 0 = Fehlercode. MP3 ohne Längenangabe wird dafür einmal durchgelesen.
+double fileDuration(const std::string& path);
+
 // Ladezustand, gleich wie WP_LOAD_* in wp_core.h; Werte < 0 sind Fehlercodes des letzten Ladevorgangs.
 enum LoadState { kLoadIdle = 0, kLoadRunning = 1, kLoadReady = 2 };
 

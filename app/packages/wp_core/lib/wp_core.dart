@@ -30,6 +30,8 @@ final _loadProgress =
     _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_load_progress');
 final _loadWait =
     _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_load_wait');
+final _fileDuration =
+    _lib.lookupFunction<Double Function(Pointer<Utf8>), double Function(Pointer<Utf8>)>('wp_file_duration');
 final _errorMessage =
     _lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('wp_error_message');
 final _play = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_play');
@@ -167,6 +169,16 @@ class WpPlayer {
   void metronomeRamp({required bool enabled, required int start, required int target, required int step,
           required int everyBars}) =>
       _mSetRamp(_p, enabled ? 1 : 0, start, target, step, everyBars);
+}
+
+/// Dauer einer Datei in Sekunden, ohne sie zu laden. Negativ = Fehlercode ([WpCode]).
+double wpFileDuration(String path) {
+  final c = path.toNativeUtf8();
+  try {
+    return _fileDuration(c);
+  } finally {
+    malloc.free(c);
+  }
 }
 
 /// Aufnahme des Systemtons (nur macOS 14.2+).

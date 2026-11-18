@@ -1,0 +1,51 @@
+{
+  "folders" : [
+    {
+      "id" : "11111111-2222-3333-4444-555555555555",
+      "name" : "Etüden"
+    },
+    {
+      "id" : "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+      "name" : "Swing 2"
+    }
+  ],
+  "tracks" : [
+    {
+      "album" : "Testalbum",
+      "artist" : "Testband",
+      "customOrder" : 2,
+      "dateAdded" : 784123456.789,
+      "duration" : 183.456,
+      "fileName" : "0F0E0D0C-0B0A-0908-0706-050403020100.mp3",
+      "folderID" : "11111111-2222-3333-4444-555555555555",
+      "hasArtwork" : true,
+      "id" : "0F0E0D0C-0B0A-0908-0706-050403020100",
+      "originalFileName" : "Übung in C.mp3",
+      "settings" : {
+        "loopEnabled" : true,
+        "loopEnd" : 47,
+        "loopStart" : 12.5,
+        "speed" : 0.75,
+        "speedEnabled" : true
+      },
+      "title" : "Übung in C"
+    },
+    {
+      "customOrder" : 0,
+      "dateAdded" : 700000000,
+      "duration" : 1,
+      "fileName" : "99999999-8888-7777-6666-555555555555.flac",
+      "hasArtwork" : false,
+      "id" : "99999999-8888-7777-6666-555555555555",
+      "originalFileName" : "sinus.flac",
+      "settings" : {
+        "loopEnabled" : false,
+        "loopEnd" : 0,
+        "loopStart" : 0,
+        "speed" : 1,
+        "speedEnabled" : false
+      },
+      "title" : "sinus"
+    }
+  ]
+}
