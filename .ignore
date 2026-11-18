@@ -1,0 +1,6 @@
+# Von ripgrep (Grep-Suche) ausgeschlossen, damit grosse Fremdbibliotheken und Builds den Kontext nicht füllen.
+# Git betrifft das nicht.
+core/third_party/
+core/build/
+app/build/
+app/.dart_tool/

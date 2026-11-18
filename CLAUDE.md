@@ -1,94 +1,50 @@
 # Arbeitsanleitung für Claude Code
 
-Woodshed Player ist ein Übe-Player für Musiker: Bibliothek mit Ordnern, Tempo ohne Tonhöhenänderung, Loops, später Metronom, Aufnahme und Cloud-Sync. Heute eine SwiftUI-App für macOS 14+ und iOS/iPadOS 17+ (`WoodshedPlayer/`), geplant ist der Umbau auf Flutter mit C++-Audio-Kern (`docs/UMBAUPLAN-FLUTTER.md`). Überblick und Bedienung in `README.md`. Open Source unter MIT (`LICENSE`).
+Woodshed Player ist ein Übe-Player für Musiker (Bibliothek, Tempo ohne Tonhöhenänderung, Loops, Metronom, später Aufnahme und Cloud-Sync). Umbau von SwiftUI (`WoodshedPlayer/`, macOS 14+/iOS 17+) auf Flutter (`app/`) mit C++-Audio-Kern (`core/`), Plan in `docs/UMBAUPLAN-FLUTTER.md`. Überblick in `README.md`, Lizenz MIT.
 
 ## Sprache
 
-Deutsch mit «ss» statt «ß» (Schweizer Rechtschreibung), Anrede **«Du»**. Oberfläche, Hilfe, Commits und Issues sind deutsch.
+Deutsch mit «ss» statt «ß», Anrede **«Du»**. Oberfläche, Hilfe, Commits und Issues sind deutsch.
 
 ## Anforderungen kommen aus GitHub Issues
 
-Jede Änderung hat ein Issue. Der Text enthält die Anforderung und die **Abnahmekriterien als Häkchen-Liste**. Die Abnahmekriterien sind die Prüfliste: Jedes Kriterium bekommt, wo möglich, einen Test.
-
-Gibt es zur Aufgabe kein Issue, zuerst fragen oder eines vorschlagen. Nichts umsetzen, was keine Anforderung hat.
-
-### Titel und Verweise (GitHub-Konvention)
-
-Issues werden über ihre GitHub-Nummer angesprochen (`#22`), es gibt keine eigene ID im Titel. Der Titel ist kurz und sagt, worum es geht:
-bei einer Funktion das Ziel («Ziehbare Loop-Marker»), bei einem Fehler das Symptom («Absturz beim Öffnen einer leeren MP3»).
-Die Art steht nur im Label:
-
-| Art | Label |
-|---|---|
-| Funktion, Änderung | `enhancement` |
-| Fehler | `bug` |
-| Allgemeines, Repo, Werkzeuge, Doku | `general` (Doku zusätzlich `documentation`) |
-
-Issues legt der Skill **`issue`** an (Vorlage, Labels, Bestätigung, dann `gh issue create`).
+Jede Änderung hat ein Issue mit **Abnahmekriterien als Häkchen-Liste**; jedes Kriterium bekommt, wo möglich, einen Test. Gibt es kein Issue, zuerst fragen oder eines vorschlagen. Issues werden über die Nummer angesprochen (`#22`). Anlegen, Titel, Labels und Meilensteine: Skill **`issue`**. Abnahmekriterien nach dem Start nicht stillschweigend ändern, sondern kommentieren. Fehlalarme (`false-positive`) und Abgelehntes (`wontfix`) als «not planned» mit Begründung schliessen.
 
 ## Ablauf pro Issue
 
-1. **Issue lesen** (`gh issue view <Nr>`). Ist etwas unklar oder widersprüchlich, nachfragen. Nicht still annehmen.
-2. **Direkt auf `main` arbeiten.** Eine Person, deshalb keine Feature-Branches und keine Pull Requests. Ein Branch ist die Ausnahme für grosse oder riskante Arbeiten (z. B. der Flutter-Umbau) und braucht Deine Zustimmung.
-3. **Umsetzen**, klein und gezielt. Keine Änderungen ausserhalb des Issues. Gefundene Nebenbaustellen als neues Issue vorschlagen, nicht mitmachen.
-4. **Testen** (siehe unten). Jedes Abnahmekriterium prüfen und im Bericht nennen, was geprüft ist und was nicht.
-5. **Commit** im Imperativ oder als Substantiv, ohne Punkt, mit Verweis auf das Issue am Ende:
-   `Ziehbare Loop-Marker (#22)`.
-   Eine Anforderung pro Commit (oder wenige Commits). Kein `Fixes #22` in der Commit-Nachricht, denn das schliesst das Issue beim Push von selbst.
-   Nach dem Commit, der die Anforderung vollständig umsetzt, bekommt das Issue das Label `implemented` und den Kommentar
-   «Umgesetzt in <Commit>. Abnahme ausstehend.» (`gh issue edit <Nr> --add-label implemented`, `gh issue comment`).
-   Teilschritte bekommen das Label nicht. Wird das Issue wieder geöffnet, kommt das Label weg, bis die Nacharbeit committet ist.
-6. **Abnahme** machst Du. Claude hakt die Kriterien im Issue **nicht** selbst ab und schliesst es nicht.
-   **Ausnahme «Prüfe #22»:** Dann prüft Claude die Kriterien (vorhandene Tests laufen lassen, sonst von Hand), kommentiert
-   das Ergebnis je Kriterium, hakt erfüllte Kriterien ab und schliesst das Issue, wenn alle erfüllt sind (sonst offen lassen und den Fehler nennen).
-7. **Push und Version** (Tag) nur auf ausdrückliches Wort.
-
-Commit und Push nur, wenn es ausdrücklich verlangt wird. Nie `--force`, nie die Git-Historie umschreiben. Der Hook nach dem Commit (`test-agent`) und später die GitHub-Workflows sind die Kontrolle anstelle eines Pull Requests.
+1. **Lesen** (`gh issue view <Nr>`). Unklares nachfragen, nicht still annehmen.
+2. **Direkt auf `main`**, keine Feature-Branches, keine Pull Requests. Ein Branch nur für grosse oder riskante Arbeiten und nur mit Deiner Zustimmung.
+3. **Umsetzen**, klein und gezielt, nur was im Issue steht. Nebenbaustellen als neues Issue vorschlagen.
+4. **Testen**, jedes Abnahmekriterium prüfen und im Bericht nennen, was geprüft ist und was nicht.
+5. **Commit** im Imperativ oder als Substantiv, ohne Punkt, mit Issue am Ende: `Ziehbare Loop-Marker (#22)`. Kein `Fixes #22`.
+   Nach dem Commit, der die Anforderung vollständig umsetzt: `gh issue edit <Nr> --add-label implemented` und Kommentar «Umgesetzt in <Commit>. Abnahme ausstehend.». Teilschritte bekommen das Label nicht. Wird das Issue wieder geöffnet, kommt das Label weg, bis die Nacharbeit committet ist.
+6. **Abnahme** machst Du. Claude hakt nichts ab und schliesst nichts.
+   **Ausnahme «Prüfe #22»:** Kriterien prüfen (Tests, sonst von Hand), Ergebnis je Kriterium kommentieren, Erfülltes abhaken, schliessen, wenn alles erfüllt ist (sonst offen lassen und den Fehler nennen).
+7. **Commit, Push und Version** (Tag) nur auf ausdrückliches Wort. Nie `--force`, nie die Historie umschreiben.
 
 ## Bauen und Testen
 
-- Build-Prüfung, beide Plattformen:
-  ```
-  xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
-  xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
-  ```
-- Tests: Swift Testing im Testziel `WoodshedPlayerTests` (Ordner `WoodshedPlayerTests/`, neue Dateien werden automatisch aufgenommen):
-  ```
-  xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' test
-  xcodebuild … test -only-testing:WoodshedPlayerTests/LoopBoundsTests   # einzelne Suite
-  ```
-  Testaudio erzeugt `TestAudio.sineWave(seconds:)`, temporäre Bibliotheken `Library(directory:)` mit `TestAudio.temporaryDirectory()`.
-  Tests berühren nie die echte Bibliothek unter Application Support.
-  Nach dem Flutter-Umbau: `flutter test` in `app/`, `ctest` im C++-Kern `core/`.
-- Flutter-App und C++-Kern (Umbau, aus dem Prototyp #5):
-  ```
-  cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release && cmake --build core/build && ctest --test-dir core/build --output-on-failure
-  cd app && flutter analyze && flutter test && flutter build macos --debug && flutter build ios --simulator --debug
-  tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitTimePitch
-  ```
-  Der Kern liegt in `core/` (C-API `core/include/wp_core.h`), die Dart-Anbindung als FFI-Plugin in `app/packages/wp_core/`.
-  Bibliotheken in `core/third_party/` (Versionen in `core/third_party/README.md`).
-- Nach einem Commit mit Code-Änderungen startet der Hook den Agenten `test-agent` im Schnellmodus.
-- Tests, die ein Abnahmekriterium belegen, nennen Issue und Kriterium (`#22/AK2` im Namen oder Kommentar, `AK2` = zweites Häkchen).
-- Audio-Logik (Tempo, Loop-Grenzen, Seek, Zeitformat `mm:ss`) und Bibliothek (`library.json`, Sortierung, Ordner) brauchen Unit-Tests. Oberfläche nur, wo sinnvoll.
+Ausgaben immer kurz halten (`-quiet`, `--reporter failures-only`, `| tail -30`). Nichts aus `core/third_party/` lesen (u. a. `miniaudio.h`, 4 MB).
+
+```
+cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release && cmake --build core/build 2>&1 | tail -20 && ctest --test-dir core/build --output-on-failure
+cd app && flutter analyze --no-pub && flutter test --reporter failures-only
+cd app && flutter build macos --debug && flutter build ios --simulator --debug
+xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' -quiet test        # Swift-Altprojekt
+xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO -quiet build
+tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitTimePitch
+```
+
+- Kern: C-API `core/include/wp_core.h`, Dart-Anbindung als FFI-Plugin `app/packages/wp_core/`, Bibliotheken in `core/third_party/` (Versionen dort im README).
+- **Hook nach dem Commit** baut und testet die betroffenen Teile selbst. Nur bei Fehlern oder geänderter Logik ohne Tests meldet er sich; dann Fehler beheben bzw. den `test-agent` (Schnellmodus) starten. Testdetails stehen im Agenten.
+- Tests zu Abnahmekriterien nennen Issue und Kriterium (`#22/AK2`). Audio-Logik (Tempo, Loop-Grenzen, Seek, `mm:ss`) und Bibliothek (`library.json`, Sortierung, Ordner) brauchen Unit-Tests, Oberfläche nur, wo sinnvoll. Tests berühren nie die echte Bibliothek.
 
 ## Regeln
 
-- **Keine Netzwerkzugriffe** in der App, ausser für ausdrücklich beschlossene Funktionen (z. B. Cloud-Sync mit eigenem Issue). Keine Analyse- oder Tracking-Dienste.
-- **Keine privaten Daten** in Code, Tests, Issues, Commits oder Screenshots: keine echten Namen, E-Mail-Adressen, Titel- oder Künstlernamen aus der eigenen Bibliothek. Commits laufen mit der GitHub-noreply-Adresse.
-- **Keine fremden Audiodateien** im Repo. Testaudio wird erzeugt (Sinustöne, Klicks) oder ist nachweislich gemeinfrei (CC0), mit Quelle.
-- **Lizenzen:** Nur Abhängigkeiten, die mit MIT verträglich sind (MIT, BSD, Apache-2.0, Public Domain/MIT-0). Keine GPL/AGPL (z. B. JUCE, Rubber Band) ohne Rückfrage. Neue Abhängigkeiten nur nach Rückfrage.
-- Audio und Oberfläche getrennt halten: Audio in `WoodshedPlayer/Audio/` (später `core/`), Daten in `Model/`, Darstellung in `Views/`.
+- **Kein Netzwerk** in der App ausser für beschlossene Funktionen mit eigenem Issue (z. B. Cloud-Sync). Kein Tracking.
+- **Keine privaten Daten** in Code, Tests, Issues, Commits, Screenshots (keine echten Namen, E-Mails, Titel oder Künstler). Commits mit der GitHub-noreply-Adresse.
+- **Keine fremden Audiodateien.** Testaudio erzeugen (Sinus, Klicks) oder CC0 mit Quelle.
+- **Lizenzen:** nur MIT-verträglich (MIT, BSD, Apache-2.0, Public Domain/MIT-0), keine GPL/AGPL. Neue Abhängigkeiten nur nach Rückfrage.
+- Audio und Oberfläche trennen: Audio in `core/` (Swift: `Audio/`), Daten in `Model/`, Darstellung in `Views/`.
 - `README.md` (Funktionstabelle, Datenschutz) im selben Zug nachführen, wenn sich Verhalten oder Begriffe ändern.
-- Plattformen beachten: Jede Änderung muss auf macOS und iOS bauen. Aufnahme gibt es auf iPhone/iPad nicht.
-
-## Issues anlegen und pflegen
-
-- Vorlagen in `.github/ISSUE_TEMPLATE/` (Fehler, Funktion). Labels sind englisch und folgen den GitHub-Standardlabels:
-  - Art: `enhancement` (Funktion), `bug` (Fehler), `general` (Allgemeines), dazu `documentation` für Doku-Änderungen.
-  - Bereich: `audio`, `ui`, `repo`.
-  - Status: `implemented` (umgesetzt, Abnahme ausstehend), `wontfix` (wird nicht umgesetzt), `false-positive` (Fehlalarm).
-  - Fundort bei Fehlern: `found:test`, `found:acceptance` oder `found:usage`.
-  - Meilensteine: «Nächste Version», «Später».
-- Eine Anforderung pro Issue. Die Abnahmekriterien nach dem Start nicht stillschweigend ändern: Änderungen als Kommentar mit Begründung.
-- Fehlalarme mit `false-positive`, abgelehnte Anforderungen mit `wontfix` als «not planned» schliessen, jeweils mit Begründung.
+- Jede Änderung muss auf macOS und iOS bauen. Aufnahme gibt es auf iPhone/iPad nicht.

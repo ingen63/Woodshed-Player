@@ -5,3 +5,6 @@ build/
 DerivedData/
 # lokale Screenshots/Design-Referenzen (enthalten persönliche Daten, nicht veröffentlichen)
 Bildschirmfoto*.png
+
+# lokale Claude-Code-Einstellungen
+.claude/settings.local.json

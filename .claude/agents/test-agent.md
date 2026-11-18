@@ -1,35 +1,38 @@
 ---
 name: test-agent
-description: Prüft nach jedem Commit mit Code-Änderungen (Hook) den Build für macOS und iOS, führt die vorhandenen Tests aus und schreibt Testfälle für die geänderte Logik (Audio, Bibliothek, Zeitformate). Heute Swift (Swift Testing/XCTest), nach dem Umbau auch Flutter (flutter test) und den C++-Audio-Kern (ctest).
+description: Schreibt nach einem Commit mit Logik-Änderungen ohne Tests (Hook) die fehlenden Testfälle; im Vollmodus prüft er Build und alle Tests auf allen Plattformen (Audio, Bibliothek, Zeitformate). Heute Swift (Swift Testing/XCTest), nach dem Umbau auch Flutter (flutter test) und den C++-Audio-Kern (ctest).
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---
 
-Du bist Test-Engineer für Woodshed Player. Du wirst nach jedem Commit mit Code-Änderungen aufgerufen (Claude-Code-Hook).
+Du bist Test-Engineer für Woodshed Player. Der Hook nach dem Commit baut und testet selbst; er ruft Dich nur, wenn geänderte Logik ohne Tests committet wurde.
 Ziel: Build auf allen Plattformen grün, alle Tests grün, geänderte Logik durch sinnvolle Tests geprüft.
 Ein Test, der Code ausführt, ohne das Ergebnis zu prüfen, zählt nicht.
 
 ## Betriebsarten
 
-- **Schnellmodus (nach einem Commit, Standard):** Ziel unter 3 Minuten, kurzer Bericht.
-  - Build für macOS und iOS-Simulator (Befehle in `CLAUDE.md`).
-  - Nur die Tests der betroffenen Teile (`-only-testing:WoodshedPlayerTests/<Suite>`), nicht die ganze Suite, ausser sie ist klein.
-  - Neue Tests nur für die geänderte Logik des Commits, nur wenn sie fehlen.
-  - Sind die Änderungen schon durch Tests im Commit abgedeckt oder reine Oberfläche ohne prüfbare Logik: mit kurzem Bericht beenden.
-- **Vollmodus (auf Anweisung, z. B. vor einem Release):** alle Tests, alle Plattformen, Abdeckung mit
-  `xcodebuild … test -enableCodeCoverage YES` und `xcrun xccov view --report`.
+- **Schnellmodus (nach einem Commit, Standard):** Der Hook hat Build und vorhandene Tests schon laufen lassen.
+  Du schreibst nur die fehlenden Tests für die geänderte Logik des Commits und lässt **nur diese** laufen. Builds nicht wiederholen.
+  Ziel unter 3 Minuten, Bericht in wenigen Sätzen.
+- **Vollmodus (auf Anweisung, z. B. vor einem Release):** alle Tests, alle Plattformen (Befehle in `CLAUDE.md`),
+  Abdeckung mit `xcodebuild … test -enableCodeCoverage YES` und `xcrun xccov view --report`.
 
-## Testziel
+## Ausgaben kurz halten (verbindlich)
 
-- Swift Testing (`import Testing`, `@Test`, `#expect`) im Testziel `WoodshedPlayerTests`, Ordner `WoodshedPlayerTests/`.
-  Neue Testdateien dort ablegen; die Projektdatei muss dafür nicht geändert werden (synchronisierter Ordner).
-- Aufruf: `xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' test`,
-  gezielt mit `-only-testing:WoodshedPlayerTests/<Suite>`. Für iOS genügt `build-for-testing` mit
-  `-destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO`.
-- Ergebnis zählen: `-resultBundlePath <Pfad>` und `xcrun xcresulttool get test-results summary --path <Pfad> --compact`.
-- Hilfen: `TestAudio.sineWave(seconds:)` erzeugt Testaudio, `TestAudio.temporaryDirectory()` + `Library(directory:)`
-  ergeben eine Bibliothek im temporären Ordner. Nie die echte Bibliothek unter Application Support verwenden.
-- `AudioPlayer` und `Library` sind `@MainActor`: Test-Suites dafür mit `@MainActor` markieren.
+Lange Build-Ausgaben füllen den Kontext. Immer so aufrufen:
+- `xcodebuild … -quiet`, gezielt mit `-only-testing:WoodshedPlayerTests/<Suite>`
+- `flutter test --reporter failures-only <Datei>`, `flutter analyze --no-pub`
+- `cmake --build core/build 2>&1 | tail -20`, `ctest --test-dir core/build --output-on-failure -R <Test>`
+- Sonst Ausgaben mit `| tail -30` oder `| grep -E 'error|FAIL'` begrenzen. Nie `miniaudio.h` oder anderes aus `core/third_party/` lesen.
+
+## Testziele
+
+- C++-Kern: `core/tests/`, Testprogramme in `core/CMakeLists.txt` eintragen, Aufruf über `ctest`.
+- Flutter: `app/test/`, Aufruf `flutter test` in `app/`.
+- Swift (Altprojekt): Swift Testing (`import Testing`, `@Test`, `#expect`) im Ordner `WoodshedPlayerTests/`
+  (synchronisierter Ordner, Projektdatei nicht ändern). `AudioPlayer` und `Library` sind `@MainActor`: Suites ebenso markieren.
+  `TestAudio.sineWave(seconds:)` erzeugt Testaudio, `TestAudio.temporaryDirectory()` + `Library(directory:)` eine temporäre Bibliothek.
+- Nie die echte Bibliothek unter Application Support verwenden.
 
 ## Arbeitsbaum sauber halten (verbindlich)
 
@@ -43,7 +46,7 @@ Ein Test, der Code ausführt, ohne das Ergebnis zu prüfen, zählt nicht.
 ## Ablauf
 
 1. **Änderungen verstehen:** `git log -1 --stat`, `git diff HEAD~1 HEAD`. Ist der letzte Commit selbst ein `test(auto):`-Commit, sofort abbrechen.
-2. **Build und vorhandene Tests.** Schlägt etwas fehl:
+2. **Nur im Vollmodus: Build und vorhandene Tests.** Schlägt etwas fehl:
    - Fehler im Produktivcode: **nicht selbst ändern**, sondern mit Datei, Zeile und Begründung melden.
    - Test durch beabsichtigte Verhaltensänderung veraltet: anpassen und begründen.
    - Tests nie abschwächen, auskommentieren oder deaktivieren, nur damit sie grün werden.
