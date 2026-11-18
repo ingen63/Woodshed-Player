@@ -27,16 +27,31 @@ Geschwindigkeit und Loop werden **pro Datei** gespeichert und beim nächsten Öf
 
 ### Flutter-App (im Umbau, `app/`)
 
-Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) sieht aus wie die bisherige App (Karten für Wiedergabe, Geschwindigkeit und Loop, Zeiten als mm:ss) und hat dieselbe Bibliothek. Dazu:
+Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) hat dieselbe Bibliothek wie die bisherige App und das Design «Studio» (Mockups in `docs/design/`): Wellenform mit Loop-Bereich im Zentrum, Loop und Tempo grösser als Play/Pause, Zahlen in JetBrains Mono mit gleich breiten Ziffern, Text in Inter. Hell und Dunkel folgen der Systemeinstellung.
+
+| Desktop (> 1000 px) | Tablet (600–1000 px) | Phone (< 600 px) |
+| --- | --- | --- |
+| ![Desktop, dunkel](docs/screenshots/studio-desktop-dark.png) | ![Tablet, dunkel](docs/screenshots/studio-tablet-dark.png) | ![Phone, dunkel](docs/screenshots/studio-phone-dark.png) |
+| ![Desktop, hell](docs/screenshots/studio-desktop-light.png) | ![Tablet, hell](docs/screenshots/studio-tablet-light.png) | ![Phone, hell](docs/screenshots/studio-phone-light.png) |
+
+Die Screenshots zeigen erfundene Titel und eine erzeugte Wellenform (`cd app && flutter test tool/screenshots_test.dart --update-goldens`).
 
 | Funktion | Bedienung |
 | --- | --- |
-| Bibliothek | Titel per **⌘O** / «+» wählen (mehrere) oder ins Fenster ziehen; Ordner (**⇧⌘N**), Sortierung, Titel per Ziehen (am iPhone: lange drücken) in Ordner verschieben, Kontextmenü (Rechtsklick oder «⋯») zum Umbenennen und Löschen mit Rückfrage. Der erste importierte Titel wird geladen. Fertige Aufnahmen landen ebenfalls hier. Breites Fenster: zwei Spalten, schmal: drei Reiter |
-| Metronom | Start/Stopp mit **M**, Tempo 20–300 BPM mit −/+ (gedrückt halten wiederholt), Regler oder **↑** / **↓** (mit Shift ±10), Tap-Tempo mit **T**. Taktarten 4/4, 3/4, 2/4, 6/8, Unterteilungen Viertel bis Sechzehntel, eigene Lautstärke. Eigener Reiter «Metronom»; Titel und Metronom laufen nie gleichzeitig (Start des einen pausiert den anderen). Nach einem Neustart gilt 120 BPM, die übrigen Einstellungen bleiben erhalten |
+| Grössen | Das Layout richtet sich nach der Fensterbreite und wechselt ohne Unterbruch von Wiedergabe oder Loop. **Desktop:** Bibliothek fest links, darunter Wellenform, Loop-Leiste und die Module Tempo, Steigerung und Metronom nebeneinander. **Tablet:** Bibliothek über den Knopf «Bibliothek» einblendbar, Module zweispaltig. **Phone:** Bibliothek als eigene Seite (Leiste unten öffnet den Übe-Bildschirm, «‹» führt zurück), einspaltig, *S hier* / Play / *E hier* unten in Daumenreichweite. Auf Tablet und Phone sind alle Bedienelemente mindestens 44 × 44 pt (iOS) bzw. 48 × 48 dp (Android) gross |
+| Wellenform | Oben die Übersicht des ganzen Titels (Tippen springt, der Rahmen zeigt den Ausschnitt), darunter der Ausschnitt um den Loop bzw. die 30 Sekunden um die Wiedergabeposition, mit Zeitachse und Playhead. Solange keine Wellenform da ist, erscheint ein schlichter Fortschrittsbalken |
+| Loop | Leiste «LOOP» mit «Anfang → Ende» als `mm:ss.d` (beide Zeiten lassen sich eintippen), Länge und Durchgangszähler, *S hier* / *E hier* (Tasten **S** / **E**), *Zum Loop-Anfang*, *Ganzer Titel* und *Loop an/aus*. Die Marker **S** und **E** in der Wellenform lassen sich ziehen |
+| Tempo | Grösste Zahl auf dem Bildschirm, Schalter, Regler 0,1× – 2× und Schnellwahl 0,5 / 0,75 / 0,8 / 1,0; Pfeiltasten **←** / **→**. Die Tonhöhe bleibt gleich |
+| Kürzel-Badges | Neben den Knöpfen stehen die Tastenkürzel, aber nur, wenn eine Tastatur da ist (am iPad, sobald eine Taste gedrückt wurde): ⌘ auf macOS und iPad, Ctrl auf Windows und Linux |
+
+| Funktion | Bedienung |
+| --- | --- |
+| Bibliothek | Titel per **⌘O** / «+» wählen (mehrere) oder ins Fenster ziehen; Ordner (**⇧⌘N**), Sortierung, Titel per Ziehen (am iPhone: lange drücken) in Ordner verschieben, Kontextmenü (Rechtsklick oder «⋯») zum Umbenennen und Löschen mit Rückfrage. Der erste importierte Titel wird geladen. Fertige Aufnahmen landen ebenfalls hier. Jede Zeile zeigt Dauer, gespeicherten Loop als Balken und das Tempo |
+| Metronom | Start/Stopp mit **M**, Tempo 20–300 BPM mit −/+ (gedrückt halten wiederholt), Regler oder **↑** / **↓** (mit Shift ±10), Tap-Tempo mit **T**. Taktarten 4/4, 3/4, 2/4, 6/8, Unterteilungen Viertel bis Sechzehntel, eigene Lautstärke. Modul «Metronom» mit BPM in Blau, −/+, Tap und Start/Stopp; alle Einstellungen über das Regler-Symbol (Dialog, am Phone von unten). Titel und Metronom laufen nie gleichzeitig (Start des einen pausiert den anderen). Nach einem Neustart gilt 120 BPM, die übrigen Einstellungen bleiben erhalten |
 | Automatische Tempo-Steigerung | Wahlweise nach «Takte» oder «Zeit». Takte: Start- und Ziel-BPM, Schritt und alle wie viele Takte; ist das Ziel erreicht, geht es nach gleich vielen Takten wieder beim Start-BPM los. Zeit: Start- und Ziel-BPM und Dauer (1–60 Minuten, Standard 4); das Tempo ändert sich in 1-BPM-Schritten gleichmässig über die Dauer, jeweils am Taktanfang, bleibt nach Erreichen des Ziels einen Schritt lang und beginnt dann wieder beim Start-BPM |
-| Steigerung nach Durchgängen | Eigene Karte unter dem Loop: Die Geschwindigkeit des Titels steigt stufenweise mit der Zahl der Loop-Durchgänge, einstellbar sind Start- und Zielstufe, Schrittweite (+1 bis +20 %) und Durchgänge pro Stufe (Standard 60 % → 100 %, +5 % alle 10 Durchgänge). Ein Durchgang zählt, wenn die Wiedergabe vom Loop-Ende zum Anfang springt, Springen von Hand nicht. Angezeigt werden Stufe und Durchgänge, z. B. «75 % · 7 von 10»; am Ziel bleibt die Geschwindigkeit, der Zähler läuft weiter. Loop-Grenzen oder Geschwindigkeit von Hand ändern setzt den Zähler auf 0. Gespeichert pro Titel |
+| Steigerung nach Durchgängen | Modul «Steigerung» mit Stufenleiter (erreichte Stufen gedämpft, aktuelle umrandet), die Einstellungen öffnet das Regler-Symbol. Die Geschwindigkeit des Titels steigt stufenweise mit der Zahl der Loop-Durchgänge, einstellbar sind Start- und Zielstufe, Schrittweite (+1 bis +20 %) und Durchgänge pro Stufe (Standard 60 % → 100 %, +5 % alle 10 Durchgänge). Ein Durchgang zählt, wenn die Wiedergabe vom Loop-Ende zum Anfang springt, Springen von Hand nicht. Angezeigt werden Stufe und Durchgänge, z. B. «75 % · 7 von 10»; am Ziel bleibt die Geschwindigkeit, der Zähler läuft weiter. Loop-Grenzen oder Geschwindigkeit von Hand ändern setzt den Zähler auf 0. Gespeichert pro Titel |
 | Gerätewechsel | Wird die Ausgabe gewechselt (z. B. Kopfhörer ab) oder kommt ein Anruf dazwischen, pausieren Titel und Metronom; die Position bleibt. Weiter geht es mit Play |
-| Aufnahme (nur Mac, ab macOS 14.2) | Nimmt den Systemton auf, ohne Mikrofon und ohne den eigenen Player-Ton. Beim ersten Mal fragt macOS nach der Berechtigung |
+| Aufnahme (nur Mac, ab macOS 14.2) | Knopf «Aufnahme» oben rechts (auf iPhone/iPad und Android nie sichtbar). Nimmt den Systemton auf, ohne Mikrofon und ohne den eigenen Player-Ton. Beim ersten Mal fragt macOS nach der Berechtigung |
 
 ## Technik
 

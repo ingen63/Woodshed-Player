@@ -58,6 +58,10 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
   PlaybackSettings get settings => _settings;
   String? get error => _error;
 
+  /// Wellenform des geladenen Titels (#28, #30); null ohne Titel oder solange sie fehlt.
+  WpWaveform? waveform(double start, double end, int count) =>
+      hasTrack && _duration > 0 ? core.waveform(start, end, count) : null;
+
   /// Aktiver Loop (start, ende) oder null, wenn aus bzw. Grenzen ungültig.
   (double, double)? get activeLoop =>
       _settings.loopEnabled &&

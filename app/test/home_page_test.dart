@@ -74,10 +74,10 @@ Future<void> dragTo(WidgetTester tester, Finder from, Finder to) async {
 }
 
 void main() {
-  group('#17/AK6 Layout', () {
-    testWidgets('Desktop und iPad: zwei Spalten', (tester) async {
+  group('#17/AK6 Layout (seit #30: Desktop, Tablet, Phone)', () {
+    testWidgets('Desktop: Bibliothek links, Player daneben', (tester) async {
       await pumpApp(tester);
-      expect(find.byKey(const Key('layout:wide')), findsOneWidget);
+      expect(find.byKey(const Key('layout:desktop')), findsOneWidget);
       expect(find.text('Bibliothek'), findsOneWidget);
       expect(find.byKey(const Key('track:Bossa')), findsOneWidget);
       expect(
@@ -88,23 +88,21 @@ void main() {
     });
 
     testWidgets(
-      'iPhone: eine Spalte mit Navigation; Titel wählen öffnet den Player',
+      'iPhone: Bibliothek als eigene Seite; Titel wählen öffnet den Player',
       (tester) async {
         final app = await pumpApp(tester, size: phone);
-        expect(find.byKey(const Key('layout:narrow')), findsOneWidget);
-        expect(find.byType(NavigationBar), findsOneWidget);
+        expect(find.byKey(const Key('layout:phone')), findsOneWidget);
         expect(
           find.byKey(const Key('card:empty')),
           findsNothing,
         ); // Player nicht sichtbar
         await select(tester, app, 'Bossa');
-        expect(find.byKey(const Key('card:nowPlaying')), findsOneWidget);
+        expect(find.byKey(const Key('trackTitle')), findsOneWidget);
+        expect(find.byKey(const Key('card:loop')), findsOneWidget);
         expect(find.byKey(const Key('track:Bossa')), findsNothing);
-        await tester.tap(find.text('Metronom').last);
+        await tester.tap(find.byKey(const Key('backToLibrary')));
         await tester.pump();
-        expect(find.byKey(const Key('card:nowPlaying')), findsNothing);
-        await tester.tap(find.text('Bibliothek').last);
-        await tester.pump();
+        expect(find.byKey(const Key('card:loop')), findsNothing);
         expect(find.byKey(const Key('track:Bossa')), findsOneWidget);
       },
     );
@@ -289,7 +287,7 @@ void main() {
     testWidgets('Schalter und Schnellwahl', (tester) async {
       final app = await pumpApp(tester);
       await select(tester, app, 'Bossa');
-      for (final p in [0.5, 0.7, 0.8, 0.9, 1.0, 1.1]) {
+      for (final p in [0.5, 0.75, 0.8, 1.0]) {
         expect(find.byKey(Key('preset:$p')), findsOneWidget);
       }
       final toggle = find.descendant(
@@ -300,14 +298,14 @@ void main() {
       await tester.tap(toggle);
       await tester.pump();
       expect(app.player.settings.speedEnabled, isTrue);
-      await tester.tap(find.byKey(const Key('preset:0.7')));
+      await tester.tap(find.byKey(const Key('preset:0.75')));
       await tester.pump();
-      expect(app.player.settings.speed, closeTo(0.7, 1e-9));
-      expect(app.core.rateValue, closeTo(0.7, 1e-9));
+      expect(app.player.settings.speed, closeTo(0.75, 1e-9));
+      expect(app.core.rateValue, closeTo(0.75, 1e-9));
       await tester.tap(toggle); // aus: Originaltempo, Wert bleibt
       await tester.pump();
       expect(app.core.rateValue, 1.0);
-      expect(app.player.settings.speed, closeTo(0.7, 1e-9));
+      expect(app.player.settings.speed, closeTo(0.75, 1e-9));
     });
   });
 
@@ -315,10 +313,7 @@ void main() {
     testWidgets('Schalter und mm:ss-Felder', (tester) async {
       final app = await pumpApp(tester);
       await select(tester, app, 'Bossa');
-      final toggle = find.descendant(
-        of: find.byKey(const Key('card:loop')),
-        matching: find.byType(Switch),
-      );
+      final toggle = find.byKey(const Key('loopToggle'));
       await tester.ensureVisible(toggle);
       await tester.tap(toggle);
       await tester.pump();
@@ -336,9 +331,7 @@ void main() {
       expect(app.player.settings.loopStart, 5); // Grenzen bleiben
     });
 
-    testWidgets('«Aktuelle Position» übernimmt die Wiedergabeposition', (
-      tester,
-    ) async {
+    testWidgets('«S hier» übernimmt die Wiedergabeposition', (tester) async {
       final app = await pumpApp(tester);
       await select(tester, app, 'Bossa');
       app.player.setLoopEnabled(true);
@@ -382,7 +375,7 @@ void main() {
       );
       expect(
         field.controller!.text,
-        formatTimeField(mid),
+        formatTimePrecise(mid),
       ); // live, noch während des Ziehens
       await g.up();
       await tester.pump();

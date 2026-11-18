@@ -156,6 +156,10 @@ void main() {
       );
       expect(find.byKey(const Key('card:ramp')), findsOneWidget);
       expect(find.text('75 % · 7 von 10'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('rampSettings')),
+      ); // #30: eingeklappt
+      await tester.pump();
       expect(find.text('60 %'), findsOneWidget);
       expect(find.text('100 %'), findsOneWidget);
       expect(find.text('+5 %'), findsOneWidget);

@@ -289,13 +289,15 @@ class _Header extends StatelessWidget {
           ),
           IconButton(
             key: const Key('addFiles'),
-            tooltip: 'MP3 hinzufügen (⌘O)',
+            tooltip:
+                'MP3 hinzufügen (${shortcutLabel(Theme.of(context).platform, 'O', command: true)})',
             icon: const Icon(WsIcons.add),
             onPressed: () => controller.pickAndImport(),
           ),
           IconButton(
             key: const Key('newFolder'),
-            tooltip: 'Neuer Ordner (⇧⌘N)',
+            tooltip:
+                'Neuer Ordner (${shortcutLabel(Theme.of(context).platform, 'N', command: true, shift: true)})',
             icon: const Icon(WsIcons.folderBadgePlus),
             onPressed: () => newFolder(context, lib),
           ),
@@ -388,9 +390,10 @@ class _SectionHeader extends StatelessWidget {
       builder: (context, candidates, _) => _WithMenu(
         menu: menu,
         builder: (context, openMenu) => Material(
-          color: candidates.isNotEmpty
-              ? theme.colorScheme.primary.withValues(alpha: 0.15)
-              : Colors.transparent,
+          type: candidates.isNotEmpty
+              ? MaterialType.canvas
+              : MaterialType.transparency,
+          color: WsTheme.of(context).amberSoft,
           child: InkWell(
             onTap: onToggle,
             onSecondaryTapUp: openMenu == null
@@ -481,31 +484,34 @@ class _TrackRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final subtitle = [
-      if (track.artist != null) track.artist!,
-      formatTime(track.duration),
-    ].join(' · ');
+    final ws = WsTheme.of(context);
+    final st = track.settings;
+    final speed = st.speedEnabled ? st.speed : 1.0;
+    final loop =
+        st.loopEnabled && track.duration > 0 && st.loopEnd > st.loopStart
+        ? (st.loopStart / track.duration, st.loopEnd / track.duration)
+        : null;
     Widget tile(
       String? openMenuHint,
       void Function(Offset?)? openMenu, {
       bool dropHint = false,
     }) => Material(
-      color: selected
-          ? theme.colorScheme.primary.withValues(alpha: 0.18)
-          : Colors.transparent,
+      type: selected ? MaterialType.canvas : MaterialType.transparency,
+      color: ws.panel2,
       child: InkWell(
         onTap: onTap,
         onSecondaryTapUp: openMenu == null
             ? null
             : (e) => openMenu(e.localPosition),
         child: Container(
-          decoration: dropHint
-              ? BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: theme.colorScheme.primary, width: 2),
-                  ),
-                )
-              : null,
+          decoration: BoxDecoration(
+            border: dropHint
+                ? Border(top: BorderSide(color: ws.amber, width: 2))
+                : selected
+                ? Border.all(color: ws.border)
+                : null,
+          ),
+          constraints: BoxConstraints(minHeight: touch ? 48 : 0),
           padding: EdgeInsets.fromLTRB(indent ? 28 : 12, 6, 4, 6),
           child: Row(
             children: [
@@ -514,19 +520,53 @@ class _TrackRow extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 3,
                   children: [
-                    Text(
-                      track.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      spacing: WsSpace.s,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            track.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        Text(
+                          formatTime(track.duration),
+                          style: ws.number(
+                            12,
+                            color: ws.muted,
+                            weight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    if (track.artist != null)
+                      Text(
+                        track.artist!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: ws.muted,
+                        ),
                       ),
+                    Row(
+                      spacing: WsSpace.s,
+                      children: [
+                        Expanded(child: _LoopStrip(loop: loop)),
+                        Text(
+                          formatRate(speed),
+                          style: ws.number(
+                            11,
+                            color: (speed - 1).abs() < 0.001
+                                ? ws.muted
+                                : ws.amber,
+                            weight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -535,7 +575,7 @@ class _TrackRow extends StatelessWidget {
                 IconButton(
                   key: Key('menu:${track.title}'),
                   tooltip: 'Aktionen',
-                  visualDensity: VisualDensity.compact,
+                  visualDensity: touch ? null : VisualDensity.compact,
                   iconSize: 16,
                   icon: const Icon(WsIcons.ellipsis),
                   onPressed: () => openMenu(null),
@@ -576,6 +616,48 @@ class _TrackRow extends StatelessWidget {
                   child: child,
                 );
         },
+      ),
+    );
+  }
+}
+
+/// Gespeicherter Loop eines Titels als dünner Balken (Anteile 0–1).
+class _LoopStrip extends StatelessWidget {
+  const _LoopStrip({required this.loop});
+  final (double, double)? loop;
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    final l = loop;
+    return SizedBox(
+      height: 4,
+      child: LayoutBuilder(
+        builder: (context, c) => Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: ws.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            if (l != null)
+              Positioned(
+                left: c.maxWidth * l.$1.clamp(0.0, 1.0),
+                width: c.maxWidth * (l.$2 - l.$1).clamp(0.02, 1.0),
+                top: 0,
+                bottom: 0,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: ws.amber,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -623,11 +705,11 @@ class TrackArtwork extends StatelessWidget {
     final placeholder = Container(
       width: size,
       height: size,
-      color: Colors.grey.withValues(alpha: 0.15),
+      color: WsTheme.of(context).panel2,
       child: Icon(
         WsIcons.musicNote,
         size: size * 0.5,
-        color: Colors.grey.withValues(alpha: 0.6),
+        color: WsTheme.of(context).muted,
       ),
     );
     return ClipRRect(

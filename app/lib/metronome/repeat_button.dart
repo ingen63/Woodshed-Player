@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../ui/style.dart';
+
 /// Knopf, der beim Gedrückthalten den Schritt wiederholt: nach [delay], dann alle [interval].
 class RepeatButton extends StatefulWidget {
   const RepeatButton({
@@ -53,7 +55,24 @@ class _RepeatButtonState extends State<RepeatButton> {
         onPointerDown: _down,
         onPointerUp: _up,
         onPointerCancel: _up,
-        child: IconButton.outlined(onPressed: () {}, icon: Icon(widget.icon)),
+        child: Builder(
+          builder: (context) {
+            final t = WsLayout.of(context).target;
+            final ws = WsTheme.of(context);
+            return IconButton.outlined(
+              onPressed: () {},
+              icon: Icon(widget.icon, size: 18),
+              color: ws.text,
+              constraints: BoxConstraints.tightFor(width: t, height: t),
+              padding: EdgeInsets.zero,
+              style: IconButton.styleFrom(
+                side: BorderSide(color: ws.border),
+                backgroundColor: ws.panel2,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            );
+          },
+        ),
       ),
     );
   }

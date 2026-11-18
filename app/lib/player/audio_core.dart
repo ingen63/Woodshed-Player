@@ -25,6 +25,9 @@ abstract class AudioCore {
 
   /// Loop-Durchgänge seit dem Start (#29): Sprünge vom Loop-Ende zum Anfang, ohne Seek. Zählt nur hoch.
   int get loopPasses;
+
+  /// Wellenform (#28) von [start] bis [end] Sekunden in [count] Abschnitten; null, solange keine da ist.
+  WpWaveform? waveform(double start, double end, int count);
 }
 
 /// Der echte Kern.
@@ -60,6 +63,9 @@ class WpAudioCore implements AudioCore {
   double get duration => player.duration;
   @override
   int get loopPasses => player.loopPasses;
+  @override
+  WpWaveform? waveform(double start, double end, int count) =>
+      player.waveform(start, end, count);
 }
 
 /// #15/AK3: verständliche deutsche Meldung zu einem Fehlercode des Kerns.

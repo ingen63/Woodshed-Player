@@ -1,4 +1,4 @@
-// Oberfläche des Player-Reiters (#19). AKn = n-tes Abnahmekriterium im Issue #19.
+// Übe-Bildschirm (#19, seit #30 im Design «Studio»). AKn = n-tes Abnahmekriterium im jeweiligen Issue.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/ui/player_view.dart';
@@ -51,11 +51,12 @@ void main() {
       t.getTopLeft(find.byKey(Key(key))).dy;
 
   testWidgets(
-    '#19/AK4 Reihenfolge der Karten: Titel, Geschwindigkeit, Loop, Aufnahme',
+    '#19/AK4, #30/AK4 Reihenfolge Desktop: Zeitleiste, Loop, Module, Aufnahme am Ende',
     (tester) async {
       await pump(
         tester,
         loaded,
+        width: 1200,
         extra: [
           const WsCard(
             key: Key('card:recording'),
@@ -64,51 +65,38 @@ void main() {
         ],
       );
       final order = [
-        'card:nowPlaying',
-        'card:speed',
+        'card:timeline',
         'card:loop',
+        'card:speed',
+        'transportBar',
         'card:recording',
       ];
       for (var i = 1; i < order.length; i++) {
         expect(top(tester, order[i - 1]), lessThan(top(tester, order[i])));
       }
-      expect(find.byKey(const Key('accentBackground')), findsOneWidget);
     },
   );
 
-  testWidgets('#19/AK3 Karten höchstens 760 breit und zentriert', (
+  testWidgets('#19/AK5 Titel, darunter Künstler und Dauer mm:ss', (
     tester,
   ) async {
-    await pump(tester, loaded, width: 1200);
-    final rect = tester.getRect(find.byKey(const Key('card:speed')));
-    expect(rect.width, 760);
-    expect(rect.center.dx, closeTo(600, 0.5));
-  });
-
-  testWidgets('#19/AK5 Titel fett, Dauer als «Dauer: mm:ss»', (tester) async {
-    await pump(tester, loaded);
+    await pump(
+      tester,
+      const PlayerViewState(title: 'Testton', artist: 'Band', duration: 125),
+    );
     final title = tester.widget<Text>(find.byKey(const Key('trackTitle')));
-    expect(title.style?.fontWeight, FontWeight.bold);
-    expect(find.text('Dauer: 02:05', findRichText: true), findsOneWidget);
+    expect(title.style?.fontWeight, FontWeight.w600);
+    expect(find.text('Band · 02:05'), findsOneWidget);
     expect(find.byKey(const Key('volume')), findsOneWidget);
   });
 
-  testWidgets('#19/AK6 Wiedergabeleiste: einzeilig breit, zweizeilig schmal', (
+  testWidgets('#19/AK6 Wiedergabe: Play/Pause und Zeit mm:ss.d im Kopf', (
     tester,
   ) async {
-    await pump(tester, loaded, width: 900);
-    final play = tester.getCenter(find.byKey(const Key('playPause'))).dy;
-    final bar = tester.getCenter(find.byType(ProgressScrubber)).dy;
-    expect((play - bar).abs(), lessThan(4));
+    await pump(tester, loaded, width: 1200);
     await tester.tap(find.byKey(const Key('playPause')));
     expect(calls, ['playPause']);
-
-    await pump(tester, loaded, width: 390);
-    final play2 = tester.getCenter(find.byKey(const Key('playPause'))).dy;
-    final bar2 = tester.getCenter(find.byType(ProgressScrubber)).dy;
-    expect(play2, greaterThan(bar2 + 10)); // Knöpfe unter der Zeitleiste
-    expect(find.text('00:30'), findsOneWidget);
-    expect(find.text('02:05'), findsOneWidget);
+    expect(find.text('00:30.0 / 02:05.0', findRichText: true), findsOneWidget);
   });
 
   testWidgets('#19/AK7 Loop-Bereich und Marker nur bei aktivem Loop', (
@@ -160,11 +148,10 @@ void main() {
       expect(find.text('0,80×'), findsWidgets);
       expect(
         [
-          '0,50×',
-          '0,70×',
-          '0,90×',
-          '1,00×',
-          '1,10×',
+          '0,5',
+          '0,75',
+          '0,8',
+          '1,0',
         ].every((t) => find.text(t).evaluate().isNotEmpty),
         isTrue,
       );
@@ -173,9 +160,7 @@ void main() {
     },
   );
 
-  testWidgets('#19/AK9 Loop: Zeitfelder, Aktuelle Position, Ganzer Titel', (
-    tester,
-  ) async {
+  testWidgets('#19/AK9 Loop: Zeitfelder, S hier, Ganzer Titel', (tester) async {
     await pump(
       tester,
       const PlayerViewState(
@@ -187,9 +172,9 @@ void main() {
         loopEnd: 20,
       ),
     );
-    expect(find.text('00:10'), findsOneWidget);
-    expect(find.text('00:20'), findsOneWidget);
-    await tester.tap(find.text('Aktuelle Position').first);
+    expect(find.text('00:10.0'), findsOneWidget);
+    expect(find.text('00:20.0'), findsOneWidget);
+    await tester.tap(find.text('S hier'));
     await tester.tap(find.text('Ganzer Titel'));
     expect(calls, ['loopStart 30.0', 'loopStart 0.0', 'loopEnd 125.0']);
 
@@ -220,6 +205,6 @@ void main() {
       ),
     );
     expect(tester.takeException(), isNull);
-    expect(find.byKey(const Key('card:nowPlaying')), findsOneWidget);
+    expect(find.byKey(const Key('card:speed')), findsOneWidget);
   });
 }

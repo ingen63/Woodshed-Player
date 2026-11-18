@@ -265,3 +265,153 @@ class _RampSettings extends StatelessWidget {
     );
   }
 }
+
+/// Modul «Metronom» im Übe-Bildschirm (#30): BPM in Blau, Start/Stopp, −/+, Tap; alle Einstellungen
+/// öffnen sich als Dialog (Desktop/Tablet) bzw. als Blatt von unten (Phone).
+class MetronomeModule extends StatelessWidget {
+  const MetronomeModule({super.key, required this.controller});
+
+  final MetronomeController controller;
+
+  void _openSettings(BuildContext context) {
+    final m = WsLayout.of(context);
+    Widget panel(BuildContext context) => WsLayout(
+      metrics: m,
+      child: ExcludeFocus(child: MetronomePanel(controller: controller)),
+    );
+    if (m.size == WsSize.phone) {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (context) => DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.85,
+          builder: (context, scroll) => SingleChildScrollView(
+            controller: scroll,
+            padding: const EdgeInsets.all(WsSpace.l),
+            child: panel(context),
+          ),
+        ),
+      );
+    } else {
+      showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(WsSpace.l),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: WsSpace.m,
+                children: [
+                  panel(context),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: BorderedButton(
+                      key: const Key('metronomeSettingsClose'),
+                      label: 'Fertig',
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final ws = WsTheme.of(context);
+        final m = WsLayout.of(context);
+        final s = controller.settings;
+        final sub = MetronomePanel._subdivisions[s.subdivision] ?? '';
+        final ramp = s.rampEnabled
+            ? s.rampByTime
+                  ? 'Auto ${s.rampStart}→${s.rampTarget} BPM in ${s.rampMinutes} min'
+                  : 'Auto +${s.rampStep} BPM / ${s.rampEveryBars} Takte'
+            : null;
+        final bpm = Text(
+          '${s.bpm}',
+          key: const Key('moduleBpm'),
+          style: ws.number(m.bpm, color: ws.blue),
+        );
+        final details = Text(
+          'BPM · ${MetronomeSettings.meterLabel(s.meter)} · $sub',
+          style: TextStyle(color: ws.muted, fontSize: m.body),
+        );
+        final toggle = BorderedButton(
+          key: const Key('moduleMetronomeToggle'),
+          label: controller.running ? 'Stopp' : 'Start',
+          icon: controller.running ? WsIcons.stop : WsIcons.play,
+          iconOnly: true,
+          selected: controller.running,
+          onPressed: controller.toggle,
+        );
+        final controls = Row(
+          spacing: WsSpace.s,
+          children: [
+            RepeatButton(
+              icon: Icons.remove,
+              tooltip: 'Langsamer (↓)',
+              onStep: () => controller.changeBpm(-1),
+            ),
+            RepeatButton(
+              icon: Icons.add,
+              tooltip: 'Schneller (↑)',
+              onStep: () => controller.changeBpm(1),
+            ),
+            Expanded(
+              child: BorderedButton(
+                key: const Key('moduleTap'),
+                label: 'Tap',
+                expand: true,
+                onPressed: controller.tap,
+              ),
+            ),
+            toggle,
+            BorderedButton(
+              key: const Key('metronomeSettings'),
+              label: 'Einstellungen',
+              icon: WsIcons.slider,
+              iconOnly: true,
+              onPressed: () => _openSettings(context),
+            ),
+          ],
+        );
+        return WsCard(
+          key: const Key('module:metronome'),
+          children: [
+            CardHeader(
+              title: 'Metronom',
+              trailing: const ShortcutBadge('M · T · ↑↓'),
+            ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              spacing: WsSpace.m,
+              children: [
+                bpm,
+                Expanded(child: details),
+              ],
+            ),
+            controls,
+            if (ramp != null)
+              Text(
+                ramp,
+                key: const Key('moduleRamp'),
+                style: TextStyle(color: ws.blue, fontSize: 12),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}

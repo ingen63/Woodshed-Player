@@ -1,5 +1,6 @@
-// Hauptfenster (#17): Desktop und iPad zweispaltig (Bibliothek | Player/Metronom), iPhone und
-// Android-Telefon einspaltig mit Navigationsleiste. Tastenkürzel für Player, Metronom und Bibliothek.
+// Hauptfenster im Design «Studio» (#30). Nach Fensterbreite: Desktop (> 1000) mit fester Bibliothek
+// links, Tablet (600–1000) mit einblendbarer Bibliothek, Phone (< 600) mit Bibliothek als eigener Seite.
+// Alle Zustände liegen in den Controllern; ein Wechsel der Grösse verliert weder Wiedergabe noch Loop.
 import 'dart:async';
 
 import 'package:flutter/services.dart';
@@ -12,29 +13,31 @@ import 'library_view.dart';
 import 'player_view.dart';
 import 'style.dart';
 
-/// Ab dieser Breite zwei Spalten.
-const wideLayoutWidth = 700.0;
-
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, required this.controller, this.recordingCard});
+  const HomePage({super.key, required this.controller, this.recordingButton});
   final AppController controller;
 
-  /// Aufnahme-Karte (nur macOS), am Ende des Player-Reiters.
-  final Widget? recordingCard;
+  /// Aufnahme-Knopf (#4); sichtbar nur auf macOS, Windows und Linux (#30/AK10).
+  final Widget? recordingButton;
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int _tab = 0; // einspaltig: 0 Bibliothek, 1 Player, 2 Metronom
+  bool _phonePlayer = false; // Phone: Übe-Seite statt Bibliothek
   Timer? _metronomeTicker;
+  final _scaffold = GlobalKey<ScaffoldState>();
+
+  /// Hält den Aufnahme-Knopf (und eine laufende Aufnahme) über Layout-Wechsel hinweg.
+  final _recordingKey = GlobalKey();
 
   AppController get c => widget.controller;
 
   @override
   void initState() {
     super.initState();
+    KeyboardPresence.instance.attach();
     c.addListener(_showMessage);
     c.metronome.addListener(_updateTicker);
   }
@@ -95,7 +98,8 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final p = c.player;
-    final meta = Theme.of(context).platform == TargetPlatform.macOS;
+    final platform = Theme.of(context).platform;
+    final meta = isApplePlatform(platform);
     return CallbackShortcuts(
       bindings: {
         SingleActivator(
@@ -120,86 +124,119 @@ class _HomePageState extends State<HomePage> {
         onSpeedStep: (n) => p.hasTrack ? p.adjustSpeed(n) : null,
         onDelete: _deleteCurrent,
         child: LayoutBuilder(
-          builder: (context, box) =>
-              box.maxWidth >= wideLayoutWidth ? _wide() : _narrow(),
+          builder: (context, box) {
+            final metrics = WsMetrics(WsSize.forWidth(box.maxWidth), platform);
+            return WsLayout(
+              metrics: metrics,
+              child: switch (metrics.size) {
+                WsSize.desktop => _desktop(),
+                WsSize.tablet => _tablet(),
+                WsSize.phone => _phone(),
+              },
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _wide() => Scaffold(
-    key: const Key('layout:wide'),
+  Widget? _recording() {
+    final button = widget.recordingButton;
+    if (button == null || !isDesktopPlatform(Theme.of(context).platform)) {
+      return null;
+    }
+    return KeyedSubtree(key: _recordingKey, child: button);
+  }
+
+  Widget _desktop() => Scaffold(
+    key: const Key('layout:desktop'),
     body: SafeArea(
       child: Row(
         children: [
-          SizedBox(width: 320, child: LibraryView(controller: c)),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: DefaultTabController(
-              length: 2,
-              child: Column(
-                children: [
-                  const TabBar(
-                    tabs: [
-                      Tab(icon: Icon(WsIcons.musicNote), text: 'Player'),
-                      Tab(icon: Icon(WsIcons.metronome), text: 'Metronom'),
-                    ],
-                  ),
-                  Expanded(
-                    child: TabBarView(
-                      children: [_playerTab(), _metronomeTab()],
-                    ),
-                  ),
-                ],
-              ),
+          Builder(
+            builder: (context) => Container(
+              width: 280,
+              color: WsTheme.of(context).panel,
+              child: LibraryView(controller: c),
             ),
           ),
+          const VerticalDivider(width: 1),
+          Expanded(child: _player(trailing: _recording())),
         ],
       ),
     ),
   );
 
-  Widget _narrow() => Scaffold(
-    key: const Key('layout:narrow'),
+  Widget _tablet() => Scaffold(
+    key: _scaffold,
+    drawer: Drawer(
+      key: const Key('libraryDrawer'),
+      width: 340,
+      child: SafeArea(
+        child: LibraryView(
+          controller: c,
+          onSelected: () => _scaffold.currentState?.closeDrawer(),
+        ),
+      ),
+    ),
     body: SafeArea(
-      child: IndexedStack(
-        index: _tab,
-        children: [
-          LibraryView(
-            controller: c,
-            onSelected: () => setState(() => _tab = 1),
-          ),
-          _playerTab(),
-          _metronomeTab(),
-        ],
-      ),
-    ),
-    bottomNavigationBar: ExcludeFocus(
-      child: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(WsIcons.musicNoteList),
-            label: 'Bibliothek',
-          ),
-          NavigationDestination(icon: Icon(WsIcons.musicNote), label: 'Player'),
-          NavigationDestination(
-            icon: Icon(WsIcons.metronome),
-            label: 'Metronom',
-          ),
-        ],
+      key: const Key('layout:tablet'),
+      child: _player(
+        leading: BorderedButton(
+          key: const Key('libraryToggle'),
+          label: 'Bibliothek',
+          icon: WsIcons.sidebar,
+          onPressed: () => _scaffold.currentState?.openDrawer(),
+        ),
+        trailing: _recording(),
       ),
     ),
   );
 
-  Widget _metronomeTab() => ExcludeFocus(
-    child: AccentBackground(
-      child: CardColumn(children: [MetronomePanel(controller: c.metronome)]),
-    ),
-  );
+  Widget _phone() {
+    final showPlayer = _phonePlayer;
+    return PopScope(
+      canPop: !showPlayer,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && showPlayer) setState(() => _phonePlayer = false);
+      },
+      child: Scaffold(
+        key: const Key('layout:phone'),
+        body: SafeArea(
+          child: showPlayer
+              ? _player(
+                  leading: Builder(
+                    builder: (context) => SizedBox.square(
+                      dimension: WsLayout.of(context).target,
+                      child: IconButton(
+                        key: const Key('backToLibrary'),
+                        tooltip: 'Zurück zur Bibliothek',
+                        icon: const Icon(WsIcons.chevronLeft),
+                        onPressed: () => setState(() => _phonePlayer = false),
+                      ),
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    Expanded(
+                      child: LibraryView(
+                        controller: c,
+                        onSelected: () => setState(() => _phonePlayer = true),
+                      ),
+                    ),
+                    _NowPlayingBar(
+                      controller: c,
+                      onOpen: () => setState(() => _phonePlayer = true),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
 
-  Widget _playerTab() => ListenableBuilder(
+  Widget _player({Widget? leading, Widget? trailing}) => ListenableBuilder(
     listenable: Listenable.merge([c.player, c.library]),
     builder: (context, _) {
       final p = c.player;
@@ -215,6 +252,9 @@ class _HomePageState extends State<HomePage> {
             ),
           Expanded(
             child: PlayerView(
+              leading: leading,
+              headerTrailing: trailing,
+              metronome: MetronomeModule(controller: c.metronome),
               state: PlayerViewState(
                 title: p.hasTrack ? p.title : null,
                 artist: track?.artist,
@@ -230,7 +270,10 @@ class _HomePageState extends State<HomePage> {
                 loopEnd: s.loopEnd,
                 ramp: s,
                 rampLabel: p.rampLabel,
+                rampPasses: p.rampPasses,
                 error: p.error,
+                waveform: p.isLoading ? null : p.waveform,
+                trackKey: p.path,
               ),
               actions: PlayerViewActions(
                 open: () => c.pickAndImport(),
@@ -251,13 +294,62 @@ class _HomePageState extends State<HomePage> {
                   (s) => s.copyWith(loopStart: 0, loopEnd: p.duration),
                 ),
               ),
-              extraCards: [
-                if (widget.recordingCard != null) widget.recordingCard!,
-              ],
             ),
           ),
         ],
       );
     },
   );
+}
+
+/// Phone: Leiste unter der Bibliothek, öffnet die Übe-Seite (auch ohne Titel, fürs Metronom).
+class _NowPlayingBar extends StatelessWidget {
+  const _NowPlayingBar({required this.controller, required this.onOpen});
+  final AppController controller;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    final m = WsLayout.of(context);
+    return ListenableBuilder(
+      listenable: controller.player,
+      builder: (context, _) {
+        final p = controller.player;
+        return Material(
+          color: ws.panel,
+          child: InkWell(
+            key: const Key('openPlayer'),
+            onTap: onOpen,
+            child: Container(
+              constraints: BoxConstraints(minHeight: m.target + 8),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: ws.border)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: WsSpace.l),
+              child: Row(
+                spacing: WsSpace.m,
+                children: [
+                  Icon(
+                    p.isPlaying ? WsIcons.pause : WsIcons.musicNote,
+                    size: 18,
+                    color: ws.amber,
+                  ),
+                  Expanded(
+                    child: Text(
+                      p.hasTrack ? p.title ?? '' : 'Üben · Metronom',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(WsIcons.chevronRight, size: 16, color: ws.muted),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

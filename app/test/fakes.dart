@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/app/file_platform.dart';
@@ -91,6 +92,23 @@ class FakeCore implements AudioCore {
   double get duration => _duration;
   @override
   int get loopPasses => passes;
+
+  /// Wellenform (#28): aus, bis ein Test sie einschaltet; dann ein Sinus-Hüllkurve über die Zeit.
+  bool hasWaveform = false;
+  @override
+  WpWaveform? waveform(double start, double end, int count) {
+    if (!hasWaveform || _duration <= 0 || count <= 0 || end <= start) {
+      return null;
+    }
+    final mins = Float32List(count), maxs = Float32List(count);
+    for (var i = 0; i < count; i++) {
+      final t = start + (end - start) * (i + 0.5) / count;
+      final a = 0.2 + 0.7 * (sin(t / 3).abs());
+      mins[i] = -a;
+      maxs[i] = a;
+    }
+    return WpWaveform(mins, maxs);
+  }
 }
 
 class FakeTimer implements Timer {
@@ -165,10 +183,11 @@ class FakeFiles implements FilePlatform {
 
 /// Kern, Timer, Bibliothek in [dir] und Controller zusammen. Laden wird mit [finishLoads] abgeschlossen.
 class TestApp {
-  TestApp(Directory dir) {
+  /// [duration]: Dauer jeder importierten Datei in Sekunden.
+  TestApp(Directory dir, {double duration = 30}) {
     library = Library(
       dir,
-      probe: (_) => 30,
+      probe: (_) => duration,
       saveDelay: Duration.zero,
       random: Random(3),
     );

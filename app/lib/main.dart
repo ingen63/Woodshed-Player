@@ -1,5 +1,5 @@
 // Woodshed Player (Flutter): Bibliothek (#16), Wiedergabe mit Tempo und Loop über den C++-Kern (#15),
-// Metronom (#3), Aufnahme des Systemtons (macOS, #4). Oberfläche wie die Swift-App (#17, #19).
+// Metronom (#3), Aufnahme des Systemtons (macOS, #4). Oberfläche im Design «Studio» (#30).
 import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
@@ -13,7 +13,7 @@ import 'player/audio_core.dart';
 import 'player/player_service.dart';
 import 'ui/font_licenses.dart';
 import 'ui/home_page.dart';
-import 'ui/recording_card.dart';
+import 'ui/recording_button.dart';
 import 'ui/style.dart';
 
 Future<void> main() async {
@@ -66,7 +66,9 @@ class WoodshedApp extends StatelessWidget {
       darkTheme: woodshedTheme(Brightness.dark),
       home: HomePage(
         controller: controller,
-        recordingCard: recording ? RecordingCard(controller: controller) : null,
+        recordingButton: recording
+            ? RecordingButton(controller: controller)
+            : null,
       ),
     );
   }

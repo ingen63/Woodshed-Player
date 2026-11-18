@@ -1,4 +1,5 @@
-// #17/AK7: Rauchtest der echten App mit echtem Audio-Kern: Start, Datei laden, Play/Pause.
+// #17/AK7, #30/AK13: Rauchtest der echten App mit echtem Audio-Kern: Start, Datei laden, Play/Pause,
+// je Grösse (Desktop, Tablet, Phone).
 // Läuft in einem eigenen temporären Ordner, nie in der echten Bibliothek. Testaudio wird erzeugt (Sinus).
 // Aufruf: cd app && flutter test integration_test -d macos
 import 'dart:io';
@@ -45,16 +46,22 @@ Uint8List sineWav(double seconds, {int rate = 44100}) {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('#17/AK7 Start, Datei laden, Play/Pause', (tester) async {
-    final dir = Directory.systemTemp.createTempSync('wp_smoke');
-    addTearDown(() => dir.deleteSync(recursive: true));
-    final wav = File('${dir.path}/Sinus Testton.wav')
-      ..writeAsBytesSync(sineWav(3));
+  late Directory dir;
+  late File wav;
+  setUpAll(() {
+    dir = Directory.systemTemp.createTempSync('wp_smoke');
+    wav = File('${dir.path}/Sinus Testton.wav')..writeAsBytesSync(sineWav(3));
+  });
+  tearDownAll(() => dir.deleteSync(recursive: true));
 
+  testWidgets('#17/AK7 Start, Datei laden, Play/Pause', (tester) async {
     final controller = await createAppController(
       baseDir: Directory('${dir.path}/app'),
     );
     controller.player.setVolume(0); // leise testen
+    tester.view.physicalSize = const Size(1280, 800); // Desktop
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(WoodshedApp(controller: controller));
     await tester.pumpAndSettle();
     expect(find.text('Bibliothek'), findsWidgets); // Start
@@ -69,20 +76,39 @@ void main() {
     expect(find.byKey(const Key('track:Sinus Testton')), findsOneWidget);
     expect(controller.player.hasTrack, isTrue);
     expect(controller.player.duration, closeTo(3.0, 0.01));
-    expect(find.byKey(const Key('card:nowPlaying')), findsOneWidget);
+    expect(find.byKey(const Key('card:loop')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('playPause')));
-    for (var i = 0; i < 20; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
+    // #30/AK13: Rauchtest je Grösse mit echtem Kern und echter Wellenform (#28).
+    for (final (name, size) in [
+      ('desktop', const Size(1280, 800)),
+      ('tablet', const Size(820, 1100)),
+      ('phone', const Size(390, 844)),
+    ]) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpAndSettle();
+      if (name == 'phone') {
+        await tester.tap(find.byKey(const Key('openPlayer')));
+        await tester.pumpAndSettle();
+      }
+      expect(find.byKey(Key('layout:$name')), findsOneWidget, reason: name);
+      expect(find.byKey(const Key('waveformOverview')), findsOneWidget);
+      expect(find.byKey(const Key('waveformDetail')), findsOneWidget);
+
+      controller.player.seek(0);
+      await tester.tap(find.byKey(const Key('playPause')));
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(controller.player.isPlaying, isTrue, reason: name);
+      expect(controller.player.position, greaterThan(0.2), reason: name);
+
+      await tester.tap(find.byKey(const Key('playPause')));
+      await tester.pump(const Duration(milliseconds: 200));
+      final stopped = controller.player.position;
+      expect(controller.player.isPlaying, isFalse, reason: name);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(controller.player.position, stopped, reason: name);
     }
-    expect(controller.player.isPlaying, isTrue);
-    expect(controller.player.position, greaterThan(0.2));
-
-    await tester.tap(find.byKey(const Key('playPause')));
-    await tester.pump(const Duration(milliseconds: 200));
-    final stopped = controller.player.position;
-    expect(controller.player.isPlaying, isFalse);
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(controller.player.position, stopped);
   });
 }

@@ -1,5 +1,8 @@
-// Reiter «Player» im Stil der alten App (#19, Vorlage WoodshedPlayer/Views/PlayerView.swift).
+// Übe-Bildschirm im Design «Studio» (#30, docs/design/A-*.dc.html): Kopf mit Titel und Zeit,
+// Zeitleiste (Wellenform), Loop-Leiste, Module Tempo · Steigerung · Metronom und Wiedergabe.
+// Desktop: drei Module nebeneinander; Tablet: zwei Spalten; Phone: einspaltig, S/Play/E unten.
 import 'dart:io';
+import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
 
@@ -8,8 +11,11 @@ import '../metronome/repeat_button.dart';
 import '../time_format.dart';
 import 'library_view.dart' show TrackArtwork;
 import 'style.dart';
+import 'timeline.dart';
 
-/// Zustand, den der Player-Reiter anzeigt.
+export 'timeline.dart' show ProgressScrubber, Timeline, WaveformQuery;
+
+/// Zustand, den der Übe-Bildschirm anzeigt.
 class PlayerViewState {
   const PlayerViewState({
     this.title,
@@ -26,7 +32,10 @@ class PlayerViewState {
     this.loopEnd = 0,
     this.ramp = const PlaybackSettings(),
     this.rampLabel = '',
+    this.rampPasses = 0,
     this.error,
+    this.waveform,
+    this.trackKey,
   });
 
   final String? title;
@@ -42,12 +51,27 @@ class PlayerViewState {
 
   /// Stufe und Durchgänge, z. B. «75 % · 7 von 10».
   final String rampLabel;
+
+  /// Durchgänge auf der aktuellen Stufe (#29).
+  final int rampPasses;
   final String? error;
+
+  /// Wellenform des Titels (#28); ohne sie zeigt die Zeitleiste einen Fortschrittsbalken.
+  final WaveformQuery? waveform;
+
+  /// Kennung des Titels (z. B. Pfad), damit die Zeitleiste die Wellenform neu holt.
+  final Object? trackKey;
 
   bool get loaded => title != null && duration > 0;
 
   /// Der Loop gilt erst, wenn das Ende mindestens 1 s nach dem Anfang liegt.
   bool get loopValid => loopEnd >= loopStart + 1;
+
+  (double, double)? get activeLoop =>
+      loopOn && loopValid ? (loopStart, loopEnd) : null;
+
+  /// Zählt die Steigerung gerade? Nur mit Geschwindigkeit und aktivem Loop (#29).
+  bool get rampCounting => ramp.rampEnabled && speedOn && activeLoop != null;
 }
 
 /// Ändert einzelne Einstellungen der Steigerung nach Loop-Durchgängen (#29).
@@ -59,7 +83,7 @@ typedef RampChange = void Function({
   int? passes,
 });
 
-/// Aktionen des Player-Reiters.
+/// Aktionen des Übe-Bildschirms.
 class PlayerViewActions {
   const PlayerViewActions({
     required this.open,
@@ -81,7 +105,7 @@ class PlayerViewActions {
   final VoidCallback open, playPause;
   final ValueChanged<double> seek, volume, speed;
 
-  /// Grenze setzen und Loop einschalten (Marker, «Aktuelle Position», Tasten S/E).
+  /// Grenze setzen und Loop einschalten (Marker, «S hier»/«E hier», Tasten S/E).
   final ValueChanged<double> loopStart, loopEnd;
 
   /// Grenze aus dem Zeitfeld; schaltet den Loop nicht ein (wie in der Swift-App).
@@ -105,32 +129,136 @@ class PlayerView extends StatelessWidget {
     required this.state,
     required this.actions,
     this.extraCards = const [],
+    this.metronome,
+    this.leading,
+    this.headerTrailing,
   });
 
   final PlayerViewState state;
   final PlayerViewActions actions;
 
-  /// Weitere Karten am Ende, z. B. die Aufnahme (nur macOS).
+  /// Weitere Module am Ende.
   final List<Widget> extraCards;
+
+  /// Metronom-Modul (drittes Modul am Desktop).
+  final Widget? metronome;
+
+  /// Links im Kopf: Bibliothek einblenden (Tablet) bzw. zurück zur Bibliothek (Phone).
+  final Widget? leading;
+
+  /// Rechts im Kopf, z. B. der Aufnahme-Knopf.
+  final Widget? headerTrailing;
 
   @override
   Widget build(BuildContext context) {
-    return AccentBackground(
-      child: CardColumn(
+    final m = WsLayout.of(context);
+    final s = state;
+    final header = _Header(
+      state: s,
+      leading: leading,
+      trailing: headerTrailing,
+    );
+    final top = <Widget>[header, if (s.error != null) _ErrorCard(s.error!)];
+    if (!s.loaded) {
+      return CardColumn(
         children: [
-          if (state.error != null) _ErrorCard(state.error!),
-          if (state.loaded) ...[
-            _NowPlayingCard(state: state, actions: actions),
-            _SpeedCard(state: state, actions: actions),
-            _LoopCard(state: state, actions: actions),
-            if (actions.ramp != null)
-              _RampCard(state: state, change: actions.ramp!),
-          ] else
-            _EmptyCard(onOpen: actions.open),
+          ...top,
+          _EmptyCard(onOpen: actions.open),
+          ?metronome,
           ...extraCards,
         ],
+      );
+    }
+    final timeline = WsPanel(
+      key: const Key('card:timeline'),
+      padding: EdgeInsets.fromLTRB(
+        m.touch ? 14 : 12,
+        10,
+        m.touch ? 14 : 12,
+        m.touch ? 18 : 10,
+      ),
+      child: Timeline(
+        position: s.position,
+        duration: s.duration,
+        loop: s.activeLoop,
+        onSeek: actions.seek,
+        onLoopStart: actions.loopStart,
+        onLoopEnd: actions.loopEnd,
+        waveform: s.waveform,
+        trackKey: s.trackKey,
       ),
     );
+    final loop = _LoopBar(state: s, actions: actions);
+    final tempo = _TempoModule(state: s, actions: actions);
+    final ramp = actions.ramp == null
+        ? null
+        : _RampModule(state: s, change: actions.ramp!);
+    final transport = _Transport(state: s, actions: actions);
+
+    switch (m.size) {
+      case WsSize.desktop:
+        return CardColumn(
+          children: [
+            ...top,
+            timeline,
+            loop,
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: m.gap,
+                children: [
+                  Expanded(child: tempo),
+                  if (ramp != null) Expanded(child: ramp),
+                  if (metronome != null) Expanded(child: metronome!),
+                ],
+              ),
+            ),
+            transport,
+            ...extraCards,
+          ],
+        );
+      case WsSize.tablet:
+        return CardColumn(
+          children: [
+            ...top,
+            timeline,
+            loop,
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: m.gap,
+                children: [
+                  Expanded(child: tempo),
+                  if (ramp != null) Expanded(child: ramp),
+                ],
+              ),
+            ),
+            ?metronome,
+            transport,
+            ...extraCards,
+          ],
+        );
+      case WsSize.phone:
+        return Column(
+          children: [
+            Expanded(
+              child: CardColumn(
+                children: [
+                  ...top,
+                  timeline,
+                  loop,
+                  tempo,
+                  ?ramp,
+                  ?metronome,
+                  transport,
+                  ...extraCards,
+                ],
+              ),
+            ),
+            _ThumbBar(state: s, actions: actions),
+          ],
+        );
+    }
   }
 }
 
@@ -140,173 +268,731 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final error = Theme.of(context).colorScheme.error;
-    return WsCard(
-      children: [
-        Row(
-          children: [
-            Icon(WsIcons.warning, color: error, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(message, style: TextStyle(color: error)),
-            ),
-          ],
-        ),
-      ],
+    final ws = WsTheme.of(context);
+    return WsPanel(
+      child: Row(
+        spacing: WsSpace.s,
+        children: [
+          Icon(WsIcons.warning, color: ws.record, size: 18),
+          Expanded(
+            child: Text(message, style: TextStyle(color: ws.record)),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Hinweis ohne geladenen Titel (wie ContentUnavailableView).
+/// Hinweis ohne geladenen Titel.
 class _EmptyCard extends StatelessWidget {
   const _EmptyCard({required this.onOpen});
   final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final grey = theme.colorScheme.onSurfaceVariant;
-    return WsCard(
+    final ws = WsTheme.of(context);
+    return WsPanel(
       key: const Key('card:empty'),
+      child: Column(
+        spacing: WsSpace.s,
+        children: [
+          const SizedBox(height: WsSpace.s),
+          Icon(WsIcons.musicNote, size: 44, color: ws.muted),
+          Text(
+            'Kein Titel ausgewählt',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: ws.text,
+            ),
+          ),
+          Text(
+            Platform.isMacOS
+                ? 'Öffne eine MP3-, WAV- oder FLAC-Datei oder zieh sie ins Fenster.'
+                : 'Öffne eine MP3-, WAV- oder FLAC-Datei aus «Dateien».',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: ws.muted),
+          ),
+          const SizedBox(height: WsSpace.xs),
+          BorderedButton(
+            key: const Key('openFile'),
+            label: 'Datei öffnen',
+            icon: WsIcons.folder,
+            onPressed: onOpen,
+            shortcut: const ShortcutBadge('O', command: true),
+          ),
+          const SizedBox(height: WsSpace.s),
+        ],
+      ),
+    );
+  }
+}
+
+// MARK: Kopf
+
+class _Header extends StatelessWidget {
+  const _Header({required this.state, this.leading, this.trailing});
+  final PlayerViewState state;
+  final Widget? leading, trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    final m = WsLayout.of(context);
+    final s = state;
+    final subtitle = [
+      if (s.artist != null) s.artist!,
+      if (s.loaded) formatTime(s.duration),
+    ].join(' · ');
+    final titleSize = m.size == WsSize.desktop ? 20.0 : 17.0;
+    final info = Column(
+      crossAxisAlignment: m.size == WsSize.tablet
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Center(
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Icon(WsIcons.musicNote, size: 44, color: grey),
-              const SizedBox(height: 10),
-              Text(
-                'Kein Titel ausgewählt',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                Platform.isMacOS
-                    ? 'Öffne eine MP3-, WAV- oder FLAC-Datei oder zieh sie ins Fenster.'
-                    : 'Öffne eine MP3-, WAV- oder FLAC-Datei aus «Dateien».',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: grey),
-              ),
-              const SizedBox(height: 14),
-              BorderedButton(
-                key: const Key('openFile'),
-                label: 'Datei öffnen',
-                icon: WsIcons.folder,
-                onPressed: onOpen,
-              ),
-              const SizedBox(height: 8),
-            ],
+        Text(
+          s.title ?? 'Woodshed Player',
+          key: s.title == null ? null : const Key('trackTitle'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: titleSize,
+            fontWeight: FontWeight.w600,
+            color: ws.text,
           ),
         ),
+        if (subtitle.isNotEmpty)
+          Text(
+            subtitle,
+            key: const Key('trackSubtitle'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: m.body - 1, color: ws.muted),
+          ),
+      ],
+    );
+    final clock = s.loaded
+        ? Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: formatTimePrecise(s.position)),
+                if (m.size == WsSize.desktop)
+                  TextSpan(
+                    text: ' / ${formatTimePrecise(s.duration)}',
+                    style: ws.number(m.clock * 0.72, color: ws.muted),
+                  ),
+              ],
+            ),
+            key: const Key('clock'),
+            style: ws.number(m.clock),
+          )
+        : null;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      spacing: WsSpace.m,
+      children: [
+        ?leading,
+        if (s.loaded && m.size == WsSize.desktop)
+          TrackArtwork(path: s.artwork, size: 40),
+        Expanded(child: info),
+        ?clock,
+        ?trailing,
       ],
     );
   }
 }
 
-// MARK: Titel mit Wiedergabe (Aufbau wie der Quick-Look-Player von macOS)
+// MARK: Loop
 
-class _NowPlayingCard extends StatelessWidget {
-  const _NowPlayingCard({required this.state, required this.actions});
+class _LoopBar extends StatelessWidget {
+  const _LoopBar({required this.state, required this.actions});
   final PlayerViewState state;
   final PlayerViewActions actions;
 
   @override
   Widget build(BuildContext context) {
-    final info = _TrackInfo(
-      title: state.title!,
-      artist: state.artist,
-      duration: state.duration,
-    );
-    return WsCard(
-      key: const Key('card:nowPlaying'),
+    final ws = WsTheme.of(context);
+    final m = WsLayout.of(context);
+    final s = state;
+    final times = Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: WsSpace.xs,
       children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: _VolumeCapsule(value: state.volume, onChanged: actions.volume),
+        TimeField(
+          key: const Key('time:Anfang'),
+          value: s.loopStart,
+          onCommit: actions.loopStartField,
+          precise: true,
+          fontSize: m.loopTimes,
         ),
-        LayoutBuilder(
-          builder: (context, c) => c.maxWidth >= 520
-              ? Row(
-                  children: [
-                    TrackArtwork(path: state.artwork, size: 150),
-                    const SizedBox(width: 24),
-                    Expanded(child: info),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(child: TrackArtwork(path: state.artwork, size: 180)),
-                    const SizedBox(height: 16),
-                    info,
-                  ],
-                ),
+        Text('→', style: ws.number(m.loopTimes)),
+        TimeField(
+          key: const Key('time:Ende'),
+          value: s.loopEnd,
+          onCommit: actions.loopEndField,
+          precise: true,
+          fontSize: m.loopTimes,
         ),
-        _TransportBar(state: state, actions: actions),
       ],
     );
+    final length = (s.loopEnd - s.loopStart).clamp(0, double.infinity);
+    final info = Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: '${length.toStringAsFixed(1).replaceAll('.', ',')} s'),
+          if (s.rampCounting) ...[
+            const TextSpan(text: ' · Durchgang '),
+            TextSpan(
+              text: '${s.rampPasses}',
+              style: TextStyle(color: ws.text, fontWeight: FontWeight.w700),
+            ),
+            TextSpan(text: ' von ${s.ramp.rampPasses}'),
+          ],
+        ],
+      ),
+      key: const Key('loopInfo'),
+      style: TextStyle(color: ws.muted, fontSize: m.body),
+    );
+    final toggle = BorderedButton(
+      key: const Key('loopToggle'),
+      label: s.loopOn ? 'Loop an' : 'Loop aus',
+      selected: s.loopOn,
+      onPressed: () => actions.loopOn(!s.loopOn),
+      shortcut: null,
+    );
+    final here = [
+      BorderedButton(
+        key: const Key('here:Anfang'),
+        label: 'S hier',
+        tooltip: 'Aktuelle Wiedergabeposition als Anfang übernehmen',
+        onPressed: () => actions.loopStart(s.position),
+        shortcut: const ShortcutBadge('S'),
+        expand: m.touch,
+      ),
+      BorderedButton(
+        key: const Key('here:Ende'),
+        label: 'E hier',
+        tooltip: 'Aktuelle Wiedergabeposition als Ende übernehmen',
+        onPressed: () => actions.loopEnd(s.position),
+        shortcut: const ShortcutBadge('E'),
+        expand: m.touch,
+      ),
+    ];
+    final extra = [
+      BorderedButton(
+        key: const Key('toLoopStart'),
+        label: 'Zum Loop-Anfang',
+        icon: WsIcons.backwardEnd,
+        iconOnly: true,
+        onPressed: () => actions.seek(s.loopStart),
+      ),
+      BorderedButton(
+        key: const Key('wholeTrack'),
+        label: 'Ganzer Titel',
+        icon: WsIcons.leftRight,
+        onPressed: () => actions.wholeTrack(s.duration),
+      ),
+    ];
+    final warning = s.loopOn && !s.loopValid
+        ? Row(
+            spacing: 6,
+            children: [
+              Icon(WsIcons.warning, size: 14, color: ws.amber),
+              Expanded(
+                child: Text(
+                  'Das Ende muss mindestens 1 Sekunde nach dem Anfang liegen.',
+                  style: TextStyle(fontSize: 12, color: ws.amber),
+                ),
+              ),
+            ],
+          )
+        : null;
+    final label = Text('LOOP', style: ws.label(color: ws.amber));
+
+    final Widget content;
+    switch (m.size) {
+      case WsSize.desktop:
+        content = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: WsSpace.s,
+          children: [
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: WsSpace.l,
+              runSpacing: WsSpace.s,
+              children: [
+                label,
+                times,
+                info,
+                Wrap(
+                  spacing: WsSpace.s,
+                  runSpacing: WsSpace.s,
+                  children: [...here, ...extra, toggle],
+                ),
+              ],
+            ),
+            ?warning,
+          ],
+        );
+      case WsSize.tablet:
+        content = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: WsSpace.m,
+          children: [
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: WsSpace.m,
+              runSpacing: WsSpace.s,
+              children: [label, times, info],
+            ),
+            Row(
+              spacing: 10,
+              children: [
+                for (final b in [...here, toggle]) Expanded(child: b),
+              ],
+            ),
+            Wrap(spacing: WsSpace.s, runSpacing: WsSpace.s, children: extra),
+            ?warning,
+          ],
+        );
+      case WsSize.phone:
+        // S hier / E hier liegen unten in Daumenreichweite (_ThumbBar).
+        content = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: WsSpace.s,
+          children: [
+            Row(
+              spacing: WsSpace.s,
+              children: [
+                label,
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: times,
+                  ),
+                ),
+              ],
+            ),
+            info,
+            Wrap(
+              spacing: WsSpace.s,
+              runSpacing: WsSpace.s,
+              children: [...extra, toggle],
+            ),
+            ?warning,
+          ],
+        );
+    }
+    return WsPanel(key: const Key('card:loop'), child: content);
   }
 }
 
-class _TrackInfo extends StatelessWidget {
-  const _TrackInfo({required this.title, this.artist, required this.duration});
-  final String title;
-  final String? artist;
-  final double duration;
+// MARK: Tempo
+
+class _TempoModule extends StatelessWidget {
+  const _TempoModule({required this.state, required this.actions});
+  final PlayerViewState state;
+  final PlayerViewActions actions;
+
+  /// Schnellwahl (#30/AK7).
+  static const presets = [0.5, 0.75, 0.8, 1.0];
+
+  static String presetLabel(double p) {
+    final t = p.toString();
+    return t.replaceAll('.', ',');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final ws = WsTheme.of(context);
+    final m = WsLayout.of(context);
+    final s = state;
+    return WsCard(
+      key: const Key('card:speed'),
       children: [
-        Text(
-          title,
-          key: const Key('trackTitle'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
+        CardHeader(
+          title: 'Tempo',
+          tooltip: 'Die Tonhöhe bleibt unverändert.',
+          value: s.speedOn,
+          onChanged: actions.speedOn,
+          trailing: const Padding(
+            padding: EdgeInsets.only(right: WsSpace.s),
+            child: ShortcutBadge('← →'),
           ),
         ),
-        if (artist != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            artist!,
-            key: const Key('trackArtist'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-        const SizedBox(height: 10),
-        Text.rich(
-          TextSpan(
+        Dimmed(
+          key: const Key('dim:speed'),
+          enabled: s.speedOn,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: WsSpace.m,
             children: [
-              TextSpan(
-                text: 'Dauer: ',
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              Text(
+                formatRate(s.speed),
+                key: const Key('speedValue'),
+                style: ws.number(m.tempo, color: ws.amber),
               ),
-              TextSpan(
-                text: formatTime(duration),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              SizedBox(
+                height: m.touch ? m.target : 24,
+                child: ExcludeFocus(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: m.touch ? 6 : 4,
+                      thumbShape: RoundSliderThumbShape(
+                        enabledThumbRadius: m.touch ? 13 : 8,
+                      ),
+                      overlayShape: SliderComponentShape.noOverlay,
+                    ),
+                    child: Slider(
+                      key: const Key('speedSlider'),
+                      value: s.speed.clamp(0.1, 2.0),
+                      min: 0.1,
+                      max: 2.0,
+                      onChanged: (v) => actions.speed((v * 20).round() / 20),
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                spacing: m.touch ? 8 : 6,
+                children: [
+                  for (final p in presets)
+                    Expanded(
+                      child: BorderedButton(
+                        key: Key('preset:$p'),
+                        label: presetLabel(p),
+                        mono: true,
+                        expand: true,
+                        selected: (s.speed - p).abs() < 0.001,
+                        onPressed: () => actions.speed(p),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
-          key: const Key('trackDuration'),
         ),
       ],
     );
   }
 }
 
-/// Lautstärke als dunkle Kapsel mit weissem Regler.
-class _VolumeCapsule extends StatelessWidget {
-  const _VolumeCapsule({required this.value, required this.onChanged});
+// MARK: Steigerung nach Durchgängen (#29)
+
+/// Stufen von [PlaybackSettings.rampStart] bis [PlaybackSettings.rampTarget] in Prozent.
+List<int> rampLadder(PlaybackSettings r) {
+  final out = <int>[];
+  for (var p = r.rampStart; p < r.rampTarget; p += r.rampStep) {
+    out.add(p);
+  }
+  out.add(r.rampTarget);
+  return out;
+}
+
+class _RampModule extends StatefulWidget {
+  const _RampModule({required this.state, required this.change});
+  final PlayerViewState state;
+  final RampChange change;
+
+  @override
+  State<_RampModule> createState() => _RampModuleState();
+}
+
+/// Einstellungen eingeklappt, damit am Desktop alle Module ohne Scrollen sichtbar sind.
+class _RampModuleState extends State<_RampModule> {
+  bool _settings = false;
+
+  RampChange get change => widget.change;
+
+  Widget _stepper(
+    BuildContext context,
+    String label,
+    String key,
+    String value,
+    VoidCallback down,
+    VoidCallback up,
+  ) => Row(
+    children: [
+      Expanded(child: Text(label)),
+      RepeatButton(key: Key('ramp:$key:-'), icon: Icons.remove, onStep: down),
+      SizedBox(
+        width: 56,
+        child: Text(
+          value,
+          key: Key('ramp:$key'),
+          textAlign: TextAlign.center,
+          style: WsTheme.of(context).number(13, weight: FontWeight.w500),
+        ),
+      ),
+      RepeatButton(key: Key('ramp:$key:+'), icon: Icons.add, onStep: up),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    final s = widget.state;
+    final r = s.ramp;
+    final on = r.rampEnabled;
+    final ladder = rampLadder(r);
+    final percent = (s.speed * 100).round();
+    final reached = ladder.where((p) => p <= percent);
+    final now = reached.isEmpty ? null : reached.last;
+    return WsCard(
+      key: const Key('card:ramp'),
+      children: [
+        CardHeader(
+          title: 'Steigerung',
+          value: on,
+          onChanged: (v) => change(enabled: v),
+          trailing: BorderedButton(
+            key: const Key('rampSettings'),
+            label: _settings ? 'Einstellungen schliessen' : 'Einstellen',
+            icon: _settings ? WsIcons.close : WsIcons.slider,
+            iconOnly: true,
+            selected: _settings,
+            onPressed: () => setState(() => _settings = !_settings),
+          ),
+        ),
+        Text(
+          '+${r.rampStep} % nach ${r.rampPasses} '
+          '${r.rampPasses == 1 ? 'Durchgang' : 'Durchgängen'}',
+          style: TextStyle(fontSize: 12, color: ws.muted),
+        ),
+        Dimmed(
+          enabled: on,
+          child: _Ladder(steps: ladder, now: on ? now : null),
+        ),
+        if (on)
+          Text(
+            s.rampLabel,
+            key: const Key('ramp:status'),
+            style: ws.number(15),
+          ),
+        if (_settings) ...[
+          Dimmed(
+            key: const Key('dim:ramp'),
+            enabled: on,
+            child: Column(
+              children: [
+                _stepper(
+                  context,
+                  'Startstufe',
+                  'start',
+                  '${r.rampStart} %',
+                  () => change(start: r.rampStart - 5),
+                  () => change(start: r.rampStart + 5),
+                ),
+                _stepper(
+                  context,
+                  'Zielstufe',
+                  'target',
+                  '${r.rampTarget} %',
+                  () => change(target: r.rampTarget - 5),
+                  () => change(target: r.rampTarget + 5),
+                ),
+                Row(
+                  children: [
+                    const Expanded(child: Text('Schrittweite')),
+                    DropdownButton<int>(
+                      key: const Key('ramp:step'),
+                      value: r.rampStep,
+                      items: [
+                        for (final st in PlaybackSettings.rampSteps)
+                          DropdownMenuItem(value: st, child: Text('+$st %')),
+                      ],
+                      onChanged: on ? (v) => change(step: v) : null,
+                    ),
+                  ],
+                ),
+                _stepper(
+                  context,
+                  'Durchgänge pro Stufe',
+                  'passes',
+                  '${r.rampPasses}',
+                  () => change(passes: r.rampPasses - 1),
+                  () => change(passes: r.rampPasses + 1),
+                ),
+              ],
+            ),
+          ),
+          HintText(
+            on && !s.rampCounting
+                ? 'Gezählt wird nur bei eingeschaltetem Tempo und aktivem Loop.'
+                : 'Ein Durchgang zählt beim Sprung vom Loop-Ende zum Anfang. '
+                      'Loop oder Tempo von Hand ändern setzt den Zähler zurück.',
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Stufenleiter: erreichte Stufen gedämpft, aktuelle umrandet, kommende grau.
+class _Ladder extends StatelessWidget {
+  const _Ladder({required this.steps, required this.now});
+  final List<int> steps;
+  final int? now;
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    final n = steps.length;
+    final labelEvery = max(1, (n / 9).ceil());
+    return SizedBox(
+      key: const Key('rampLadder'),
+      height: 24 + 9.0 * min(n, 9) + 18,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        spacing: n > 12 ? 2 : 6,
+        children: [
+          for (var i = 0; i < n; i++)
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                spacing: 4,
+                children: [
+                  Container(
+                    key: Key(
+                      steps[i] == now ? 'ladder:now' : 'ladder:${steps[i]}',
+                    ),
+                    height: 24 + 9.0 * min(n, 9) * (n == 1 ? 1 : i / (n - 1)),
+                    decoration: BoxDecoration(
+                      color: now != null && steps[i] <= now!
+                          ? ws.amber.withValues(
+                              alpha: steps[i] == now ? 1 : 0.45,
+                            )
+                          : ws.border,
+                      borderRadius: BorderRadius.circular(3),
+                      border: steps[i] == now
+                          ? Border.all(color: ws.text, width: 2)
+                          : null,
+                    ),
+                  ),
+                  SizedBox(
+                    height: 14,
+                    child: i % labelEvery == 0 || i == n - 1
+                        ? FittedBox(
+                            child: Text(
+                              '${steps[i]}',
+                              style: ws.number(
+                                11,
+                                color: steps[i] == now ? ws.text : ws.muted,
+                                weight: steps[i] == now
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// MARK: Wiedergabe
+
+class _Transport extends StatelessWidget {
+  const _Transport({required this.state, required this.actions});
+  final PlayerViewState state;
+  final PlayerViewActions actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = WsLayout.of(context);
+    final s = state;
+    final buttons = <Widget>[
+      _IconBtn(
+        icon: WsIcons.backwardEnd,
+        label: 'Zum Loop-Start',
+        onPressed: () => actions.seek(s.activeLoop?.$1 ?? 0),
+      ),
+      _IconBtn(
+        icon: WsIcons.back15,
+        label: '15 Sekunden zurück',
+        onPressed: () => actions.seek((s.position - 15).clamp(0, s.duration)),
+      ),
+      if (m.size != WsSize.phone)
+        _IconBtn(
+          key: const Key('playPause'),
+          icon: s.playing ? WsIcons.pause : WsIcons.play,
+          label: s.playing ? 'Pause' : 'Wiedergabe',
+          onPressed: actions.playPause,
+          wide: true,
+        ),
+      _IconBtn(
+        icon: WsIcons.forward15,
+        label: '15 Sekunden vor',
+        onPressed: () => actions.seek((s.position + 15).clamp(0, s.duration)),
+      ),
+      if (m.size != WsSize.phone) const ShortcutBadge('Leertaste'),
+    ];
+    final volume = _Volume(value: s.volume, onChanged: actions.volume);
+    return Wrap(
+      key: const Key('transportBar'),
+      alignment: m.size == WsSize.tablet
+          ? WrapAlignment.center
+          : WrapAlignment.start,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: m.touch ? WsSpace.l : WsSpace.s,
+      runSpacing: WsSpace.s,
+      children: [...buttons, volume],
+    );
+  }
+}
+
+class _IconBtn extends StatelessWidget {
+  const _IconBtn({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.wide = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final bool wide;
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    final m = WsLayout.of(context);
+    final h = m.touch ? max(48.0, m.target) : 32.0;
+    return ExcludeFocus(
+      child: Tooltip(
+        message: label,
+        child: TextButton(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            foregroundColor: ws.text,
+            backgroundColor: wide ? ws.panel2 : ws.panel,
+            minimumSize: Size(wide ? h * 1.4 : h * 1.15, h),
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            shape: RoundedRectangleBorder(
+              side: BorderSide(color: ws.border),
+              borderRadius: BorderRadius.circular(m.touch ? 10 : 6),
+            ),
+          ),
+          child: Icon(icon, size: m.touch ? 20 : 16, semanticLabel: label),
+        ),
+      ),
+    );
+  }
+}
+
+/// Lautstärke: Symbol und kurzer Regler.
+class _Volume extends StatelessWidget {
+  const _Volume({required this.value, required this.onChanged});
   final double value;
   final ValueChanged<double> onChanged;
 
@@ -319,614 +1005,153 @@ class _VolumeCapsule extends StatelessWidget {
       : WsIcons.speaker3;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    key: const Key('volume'),
-    label: 'Lautstärke',
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(40),
-      ),
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    final m = WsLayout.of(context);
+    return Semantics(
+      key: const Key('volume'),
+      label: 'Lautstärke',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(symbol(value), size: 18, color: ws.muted),
           SizedBox(
-            width: 110,
+            width: 120,
+            height: m.touch ? m.target : 32,
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                activeTrackColor: Colors.white,
-                inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
-                thumbColor: Colors.white,
-                overlayShape: SliderComponentShape.noOverlay,
+                activeTrackColor: ws.muted,
                 trackHeight: 3,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                overlayShape: SliderComponentShape.noOverlay,
+                thumbShape: RoundSliderThumbShape(
+                  enabledThumbRadius: m.touch ? 10 : 7,
+                ),
               ),
               child: ExcludeFocus(
                 child: Slider(value: value.clamp(0, 1), onChanged: onChanged),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 22,
-            child: Icon(symbol(value), color: Colors.white, size: 18),
-          ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
-/// Dunkle Wiedergabeleiste; einzeilig, bei schmalem Platz zweizeilig.
-class _TransportBar extends StatelessWidget {
-  const _TransportBar({required this.state, required this.actions});
+/// Phone: S hier, Play, E hier unten in Daumenreichweite (#30/AK4).
+class _ThumbBar extends StatelessWidget {
+  const _ThumbBar({required this.state, required this.actions});
   final PlayerViewState state;
   final PlayerViewActions actions;
 
   @override
   Widget build(BuildContext context) {
-    final buttons = [
-      _barButton(
-        WsIcons.back15,
-        '15 Sekunden zurück',
-        () => actions.seek((state.position - 15).clamp(0, state.duration)),
-      ),
-      _barButton(
-        state.playing ? WsIcons.pause : WsIcons.play,
-        state.playing ? 'Pause' : 'Wiedergabe',
-        actions.playPause,
-        size: 26,
-        key: const Key('playPause'),
-      ),
-      _barButton(
-        WsIcons.forward15,
-        '15 Sekunden vor',
-        () => actions.seek((state.position + 15).clamp(0, state.duration)),
-      ),
-    ];
-    final timeStyle = const TextStyle(
-      color: Colors.white,
-      fontSize: 13,
-      fontFeatures: [FontFeature.tabularFigures()],
-    );
-    Widget timeline() => Row(
-      children: [
-        Text(formatTime(state.position), style: timeStyle),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ProgressScrubber(
-            position: state.position,
-            duration: state.duration,
-            loop: state.loopOn && state.loopValid
-                ? (state.loopStart, state.loopEnd)
-                : null,
-            onSeek: actions.seek,
-            onLoopStart: actions.loopStart,
-            onLoopEnd: actions.loopEnd,
+    final ws = WsTheme.of(context);
+    final m = WsLayout.of(context);
+    final h = max(56.0, m.target);
+    Widget btn(
+      Key key,
+      String tip,
+      Widget child,
+      VoidCallback onTap, {
+      bool strong = false,
+    }) => Expanded(
+      child: ExcludeFocus(
+        child: Tooltip(
+          message: tip,
+          child: TextButton(
+            key: key,
+            onPressed: onTap,
+            style: TextButton.styleFrom(
+              foregroundColor: ws.text,
+              backgroundColor: strong ? ws.panel2 : ws.panel,
+              minimumSize: Size(m.target, h),
+              textStyle: const TextStyle(
+                fontFamily: textFont,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+              shape: RoundedRectangleBorder(
+                side: BorderSide(color: ws.border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: child,
           ),
         ),
-        const SizedBox(width: 12),
-        Text(formatTime(state.duration), style: timeStyle),
-      ],
+      ),
     );
     return Container(
-      key: const Key('transportBar'),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(24),
+      key: const Key('thumbBar'),
+      color: ws.bg,
+      padding: const EdgeInsets.fromLTRB(
+        WsSpace.l,
+        WsSpace.s,
+        WsSpace.l,
+        WsSpace.l,
       ),
-      child: LayoutBuilder(
-        builder: (context, c) => c.maxWidth >= 420
-            ? Row(
-                children: [
-                  ...buttons,
-                  const SizedBox(width: 6),
-                  Expanded(child: timeline()),
-                ],
-              )
-            : Column(
-                children: [
-                  timeline(),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    spacing: 28,
-                    children: buttons,
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _barButton(
-    IconData icon,
-    String label,
-    VoidCallback onPressed, {
-    double size = 22,
-    Key? key,
-  }) => ExcludeFocus(
-    child: IconButton(
-      key: key,
-      onPressed: onPressed,
-      tooltip: label,
-      color: Colors.white,
-      iconSize: size,
-      visualDensity: VisualDensity.compact,
-      icon: Icon(icon, semanticLabel: label),
-    ),
-  );
-}
-
-/// Dünner Fortschrittsbalken mit weissem Knopf; bei aktivem Loop ist sein Bereich orange.
-class ProgressScrubber extends StatefulWidget {
-  const ProgressScrubber({
-    super.key,
-    required this.position,
-    required this.duration,
-    required this.onSeek,
-    this.loop,
-    this.onLoopStart,
-    this.onLoopEnd,
-  });
-
-  final double position, duration;
-  final (double, double)? loop;
-  final ValueChanged<double> onSeek;
-
-  /// Ziehen der Loop-Marker; wird laufend gerufen, damit die Zeitfelder live mitgehen.
-  final ValueChanged<double>? onLoopStart, onLoopEnd;
-
-  @override
-  State<ProgressScrubber> createState() => _ProgressScrubberState();
-}
-
-class _ProgressScrubberState extends State<ProgressScrubber> {
-  double? _drag;
-
-  double _timeAt(double x, double width) =>
-      width <= 0 ? 0 : (x / width).clamp(0.0, 1.0) * widget.duration;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, c) {
-        final w = c.maxWidth, d = widget.duration;
-        double xOf(double t) => d > 0 ? w * (t / d).clamp(0.0, 1.0) : 0;
-        final x = xOf(_drag ?? widget.position);
-        final loop = widget.loop;
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onHorizontalDragStart: (e) =>
-              setState(() => _drag = _timeAt(e.localPosition.dx, w)),
-          onHorizontalDragUpdate: (e) =>
-              setState(() => _drag = _timeAt(e.localPosition.dx, w)),
-          onHorizontalDragEnd: (_) {
-            if (_drag != null) widget.onSeek(_drag!);
-            setState(() => _drag = null);
-          },
-          onTapUp: (e) => widget.onSeek(_timeAt(e.localPosition.dx, w)),
-          child: SizedBox(
-            height: 24,
-            width: w,
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              clipBehavior: Clip.none,
-              children: [
-                _capsule(w, 5, Colors.white.withValues(alpha: 0.25)),
-                _capsule(x, 5, Colors.white.withValues(alpha: 0.7)),
-                if (loop != null && d > 0)
-                  Positioned(
-                    key: const Key('loopRange'),
-                    left: xOf(loop.$1),
-                    child: _capsule(
-                      (xOf(loop.$2) - xOf(loop.$1)).clamp(3, w),
-                      9,
-                      Colors.orange.withValues(alpha: 0.75),
-                    ),
-                  ),
-                Positioned(
-                  left: (x - 11).clamp(0, (w - 22).clamp(0, w)),
-                  child: Container(
-                    width: 22,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(7),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black26, blurRadius: 1.5),
-                      ],
-                    ),
-                  ),
-                ),
-                if (loop != null && d > 0) ...[
-                  _marker(
-                    xOf(loop.$1),
-                    'loopStartMarker',
-                    w,
-                    widget.onLoopStart,
-                  ),
-                  _marker(xOf(loop.$2), 'loopEndMarker', w, widget.onLoopEnd),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _capsule(double width, double height, Color color) => Container(
-    width: width < 0 ? 0 : width,
-    height: height,
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(height / 2),
-    ),
-  );
-
-  /// Orange Marke; mit [onDrag] ziehbar (breitere, unsichtbare Griff-Fläche).
-  Widget _marker(
-    double x,
-    String key,
-    double width,
-    ValueChanged<double>? onDrag,
-  ) {
-    double timeOf(DragUpdateDetails e) {
-      final box = context.findRenderObject() as RenderBox?;
-      final local = box?.globalToLocal(e.globalPosition).dx ?? 0;
-      return _timeAt(local, width);
-    }
-
-    return Positioned(
-      key: Key(key),
-      left: x - 9,
-      child: MouseRegion(
-        cursor: onDrag == null
-            ? MouseCursor.defer
-            : SystemMouseCursors.resizeLeftRight,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onHorizontalDragUpdate: onDrag == null
-              ? null
-              : (e) => onDrag(timeOf(e)),
-          child: SizedBox(
-            width: 18,
-            height: 24,
-            child: Center(
-              child: Container(
-                width: 4,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(1.5),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.85),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// MARK: Geschwindigkeit
-
-class _SpeedCard extends StatelessWidget {
-  const _SpeedCard({required this.state, required this.actions});
-  final PlayerViewState state;
-  final PlayerViewActions actions;
-
-  static const presets = [0.5, 0.7, 0.8, 0.9, 1.0, 1.1];
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final grey = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
-    return WsCard(
-      key: const Key('card:speed'),
-      children: [
-        CardHeader(
-          icon: WsIcons.speedometer,
-          title: 'Geschwindigkeit',
-          value: state.speedOn,
-          onChanged: actions.speedOn,
-        ),
-        Dimmed(
-          key: const Key('dim:speed'),
-          enabled: state.speedOn,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('0,1×', style: grey),
-                  Expanded(
-                    child: ExcludeFocus(
-                      child: Slider(
-                        value: state.speed.clamp(0.1, 2.0),
-                        min: 0.1,
-                        max: 2.0,
-                        onChanged: (v) => actions.speed((v * 20).round() / 20),
-                      ),
-                    ),
-                  ),
-                  Text('2×', style: grey),
-                  SizedBox(
-                    width: 70,
-                    child: Text(
-                      formatRate(state.speed),
-                      key: const Key('speedValue'),
-                      textAlign: TextAlign.right,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final p in presets)
-                    BorderedButton(
-                      key: Key('preset:$p'),
-                      label: formatRate(p),
-                      selected: (state.speed - p).abs() < 0.001,
-                      onPressed: () => actions.speed(p),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const HintText(
-          'Die Tonhöhe bleibt unverändert. Geschwindigkeit in 0,05er-Schritten.',
-        ),
-      ],
-    );
-  }
-}
-
-/// Steigerung nach Loop-Durchgängen (#29): Schalter, Stufe mit Durchgangszähler und Einstellungen.
-class _RampCard extends StatelessWidget {
-  const _RampCard({required this.state, required this.change});
-  final PlayerViewState state;
-  final RampChange change;
-
-  Widget _stepper(
-    String label,
-    String key,
-    String value,
-    VoidCallback down,
-    VoidCallback up,
-  ) => Row(
-    children: [
-      Expanded(child: Text(label)),
-      RepeatButton(key: Key('ramp:$key:-'), icon: Icons.remove, onStep: down),
-      SizedBox(
-        width: 64,
-        child: Text(value, key: Key('ramp:$key'), textAlign: TextAlign.center),
-      ),
-      RepeatButton(key: Key('ramp:$key:+'), icon: Icons.add, onStep: up),
-    ],
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final r = state.ramp;
-    final on = r.rampEnabled;
-    final counting = on && state.speedOn && state.loopOn && state.loopValid;
-    return WsCard(
-      key: const Key('card:ramp'),
-      children: [
-        CardHeader(
-          icon: WsIcons.speedometer,
-          title: 'Steigerung nach Durchgängen',
-          value: on,
-          onChanged: (v) => change(enabled: v),
-        ),
-        if (on)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              state.rampLabel,
-              key: const Key('ramp:status'),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ),
-        Dimmed(
-          key: const Key('dim:ramp'),
-          enabled: on,
-          child: Column(
-            children: [
-              _stepper(
-                'Startstufe',
-                'start',
-                '${r.rampStart} %',
-                () => change(start: r.rampStart - 5),
-                () => change(start: r.rampStart + 5),
-              ),
-              _stepper(
-                'Zielstufe',
-                'target',
-                '${r.rampTarget} %',
-                () => change(target: r.rampTarget - 5),
-                () => change(target: r.rampTarget + 5),
-              ),
-              Row(
-                children: [
-                  const Expanded(child: Text('Schrittweite')),
-                  DropdownButton<int>(
-                    key: const Key('ramp:step'),
-                    value: r.rampStep,
-                    items: [
-                      for (final st in PlaybackSettings.rampSteps)
-                        DropdownMenuItem(value: st, child: Text('+$st %')),
-                    ],
-                    onChanged: on ? (v) => change(step: v) : null,
-                  ),
-                ],
-              ),
-              _stepper(
-                'Durchgänge pro Stufe',
-                'passes',
-                '${r.rampPasses}',
-                () => change(passes: r.rampPasses - 1),
-                () => change(passes: r.rampPasses + 1),
-              ),
-            ],
-          ),
-        ),
-        HintText(
-          on && !counting
-              ? 'Gezählt wird nur bei eingeschalteter Geschwindigkeit und aktivem Loop.'
-              : 'Ein Durchgang zählt, wenn die Wiedergabe vom Loop-Ende zum Anfang springt. '
-                    'Loop-Grenzen oder Geschwindigkeit von Hand ändern setzt den Zähler zurück.',
-        ),
-      ],
-    );
-  }
-}
-
-// MARK: Loop
-
-class _LoopCard extends StatelessWidget {
-  const _LoopCard({required this.state, required this.actions});
-  final PlayerViewState state;
-  final PlayerViewActions actions;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final label = TextStyle(color: theme.colorScheme.onSurfaceVariant);
-    Widget row(
-      String name,
-      double value,
-      ValueChanged<double> field,
-      ValueChanged<double> set,
-      String help,
-    ) => LayoutBuilder(
-      builder: (context, c) => Row(
+      child: Row(
+        spacing: 10,
         children: [
-          SizedBox(width: 64, child: Text(name, style: label)),
-          TimeField(key: Key('time:$name'), value: value, onCommit: field),
-          const SizedBox(width: 12),
-          BorderedButton(
-            label: 'Aktuelle Position',
-            icon: WsIcons.location,
-            tooltip: help,
-            iconOnly: c.maxWidth < 360, // schmal: nur das Symbol
-            key: Key('here:$name'),
-            onPressed: () => set(state.position),
+          btn(
+            const Key('here:Anfang'),
+            'Aktuelle Wiedergabeposition als Anfang übernehmen',
+            const Text('S hier'),
+            () => actions.loopStart(state.position),
+          ),
+          btn(
+            const Key('playPause'),
+            state.playing ? 'Pause' : 'Wiedergabe',
+            Icon(
+              state.playing ? WsIcons.pause : WsIcons.play,
+              size: 22,
+              semanticLabel: state.playing ? 'Pause' : 'Wiedergabe',
+            ),
+            actions.playPause,
+            strong: true,
+          ),
+          btn(
+            const Key('here:Ende'),
+            'Aktuelle Wiedergabeposition als Ende übernehmen',
+            const Text('E hier'),
+            () => actions.loopEnd(state.position),
           ),
         ],
       ),
     );
-    return WsCard(
-      key: const Key('card:loop'),
-      children: [
-        CardHeader(
-          icon: WsIcons.repeat,
-          title: 'Loop',
-          value: state.loopOn,
-          onChanged: actions.loopOn,
-        ),
-        Dimmed(
-          key: const Key('dim:loop'),
-          enabled: state.loopOn,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              row(
-                'Anfang',
-                state.loopStart,
-                actions.loopStartField,
-                actions.loopStart,
-                'Aktuelle Wiedergabeposition als Anfang übernehmen',
-              ),
-              const SizedBox(height: 10),
-              row(
-                'Ende',
-                state.loopEnd,
-                actions.loopEndField,
-                actions.loopEnd,
-                'Aktuelle Wiedergabeposition als Ende übernehmen',
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  BorderedButton(
-                    label: 'Zum Loop-Anfang',
-                    icon: WsIcons.backwardEnd,
-                    onPressed: () => actions.seek(state.loopStart),
-                  ),
-                  BorderedButton(
-                    label: 'Ganzer Titel',
-                    icon: WsIcons.leftRight,
-                    onPressed: () => actions.wholeTrack(state.duration),
-                  ),
-                ],
-              ),
-              if (state.loopOn && !state.loopValid) ...[
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    const Icon(WsIcons.warning, size: 14, color: Colors.orange),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Das Ende muss mindestens 1 Sekunde nach dem Anfang liegen.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-        const HintText(
-          'Format: mm:ss, z. B. 01:23 – Zehntelsekunden mit Punkt, z. B. 01:23.5. '
-          'Die orangen Marker lassen sich ziehen. Tasten: Leertaste Play/Pause, S Anfang, E Ende, '
-          '← / → Geschwindigkeit.',
-        ),
-      ],
-    );
   }
 }
 
-/// Zeitfeld (mm:ss); übernimmt bei Return oder wenn der Fokus geht.
+// MARK: Zeitfeld
+
+/// Zeitfeld (mm:ss bzw. mm:ss.d); übernimmt bei Return oder wenn der Fokus geht.
 class TimeField extends StatefulWidget {
-  const TimeField({super.key, required this.value, required this.onCommit});
+  const TimeField({
+    super.key,
+    required this.value,
+    required this.onCommit,
+    this.precise = false,
+    this.fontSize,
+  });
   final double value;
   final ValueChanged<double> onCommit;
+
+  /// Immer mit Zehntelsekunden (`00:42.0`).
+  final bool precise;
+
+  /// Ohne Rahmen in der Zahlenschrift dieser Grösse (Loop-Anzeige «Start → Ende»).
+  final double? fontSize;
 
   @override
   State<TimeField> createState() => _TimeFieldState();
 }
 
 class _TimeFieldState extends State<TimeField> {
-  late final _text = TextEditingController(text: formatTimeField(widget.value));
+  late final _text = TextEditingController(text: _format(widget.value));
   final _focus = FocusNode();
+
+  String _format(double v) =>
+      widget.precise ? formatTimePrecise(v) : formatTimeField(v);
 
   @override
   void initState() {
@@ -940,7 +1165,7 @@ class _TimeFieldState extends State<TimeField> {
   void didUpdateWidget(TimeField old) {
     super.didUpdateWidget(old);
     if (!_focus.hasFocus && old.value != widget.value) {
-      _text.text = formatTimeField(widget.value);
+      _text.text = _format(widget.value);
     }
   }
 
@@ -955,31 +1180,47 @@ class _TimeFieldState extends State<TimeField> {
     final parsed = parseTime(_text.text);
     if (parsed != null) {
       widget.onCommit(parsed);
-      _text.text = formatTimeField(parsed);
+      _text.text = _format(parsed);
     } else {
-      _text.text = formatTimeField(widget.value);
+      _text.text = _format(widget.value);
     }
   }
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 96,
-    child: TextField(
-      controller: _text,
-      focusNode: _focus,
-      textAlign: TextAlign.center,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      style: const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
-      decoration: const InputDecoration(
-        isDense: true,
-        hintText: 'mm:ss',
-        border: OutlineInputBorder(),
-        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    final size = widget.fontSize;
+    final style = size == null
+        ? ws.number(14, weight: FontWeight.w500)
+        : ws.number(size);
+    return SizedBox(
+      width: size == null ? 96 : size * 0.62 * 7 + 12,
+      child: TextField(
+        controller: _text,
+        focusNode: _focus,
+        textAlign: TextAlign.center,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        style: style,
+        cursorColor: ws.amber,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'mm:ss',
+          border: size == null
+              ? const OutlineInputBorder()
+              : const UnderlineInputBorder(borderSide: BorderSide.none),
+          focusedBorder: size == null
+              ? OutlineInputBorder(borderSide: BorderSide(color: ws.amber))
+              : UnderlineInputBorder(borderSide: BorderSide(color: ws.amber)),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: size == null ? 8 : 2,
+            vertical: size == null ? 8 : 4,
+          ),
+        ),
+        // Return übernimmt und gibt den Fokus an die Tastenkürzel zurück.
+        onSubmitted: (_) => _focus.unfocus(
+          disposition: UnfocusDisposition.previouslyFocusedChild,
+        ),
       ),
-      // Return übernimmt und gibt den Fokus an die Tastenkürzel zurück.
-      onSubmitted: (_) => _focus.unfocus(
-        disposition: UnfocusDisposition.previouslyFocusedChild,
-      ),
-    ),
-  );
+    );
+  }
 }
