@@ -1,0 +1,31 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-18T10:00:00Z"},
+  "title": "Woodshed Design-Richtungen",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1280, "h": 1560, "title": "Überblick: Richtungen und Plattformregeln (#26)"},
+    "A-Desktop.dc.html": {"x": 0, "y": 2000, "w": 1280, "h": 800, "title": "A Studio · Desktop (macOS)"},
+    "A-Tablet.dc.html": {"x": 1360, "y": 2000, "w": 820, "h": 1180, "title": "A Studio · Tablet (iPad)"},
+    "A-Phone.dc.html": {"x": 2260, "y": 2000, "w": 390, "h": 844, "title": "A Studio · Phone (Android)"},
+    "B-Desktop.dc.html": {"x": 0, "y": 3580, "w": 1280, "h": 800, "title": "B Fokus · Desktop (Windows)"},
+    "B-Tablet.dc.html": {"x": 1360, "y": 3580, "w": 820, "h": 1180, "title": "B Fokus · Tablet (Android) mit Popover"},
+    "B-Phone.dc.html": {"x": 2260, "y": 3580, "w": 390, "h": 844, "title": "B Fokus · Phone (iPhone)"},
+    "C-Desktop.dc.html": {"x": 0, "y": 5160, "w": 1280, "h": 800, "title": "C Woodshed · Desktop (Linux)"},
+    "C-Tablet.dc.html": {"x": 1360, "y": 5160, "w": 820, "h": 1180, "title": "C Woodshed · Tablet (iPad)"},
+    "C-Phone.dc.html": {"x": 2260, "y": 5160, "w": 390, "h": 844, "title": "C Woodshed · Phone (iPhone)"}
+  },
+  "order": [
+    "Main.dc.html",
+    "A-Desktop.dc.html", "A-Tablet.dc.html", "A-Phone.dc.html",
+    "B-Desktop.dc.html", "B-Tablet.dc.html", "B-Phone.dc.html",
+    "C-Desktop.dc.html", "C-Tablet.dc.html", "C-Phone.dc.html"
+  ],
+  "notes": {
+    "rowA": {"x": 0, "y": 1720, "text": "A · Studio: Wellenform im Zentrum", "kind": "title1", "maxW": 2650},
+    "rowB": {"x": 0, "y": 3300, "text": "B · Fokus: nur Loop, Tempo, Stufe", "kind": "title1", "maxW": 2650},
+    "rowC": {"x": 0, "y": 4880, "text": "C · Woodshed: die Werkbank", "kind": "title1", "maxW": 2650}
+  },
+  "designSystems": []
+}

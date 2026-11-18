@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>C Woodshed Desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#E0714F}a:hover{color:#F08A6A}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column; background: {{c.bg}}; color: {{c.text}}; font-family: Inter, system-ui, sans-serif; font-size: 14px; overflow: hidden">
+
+  <div style="height: 46px; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 0 12px 0 18px; background: {{c.panel}}; border-bottom: 1px solid {{c.border}}">
+    <div style="font-family: Fraunces, Georgia, serif; font-size: 18px; font-weight: 600">Woodshed</div>
+    <div style="flex: 1; text-align: center; color: {{c.muted}}">Kupferblues</div>
+    <button style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid {{c.border}}; background: {{c.panel2}}; color: {{c.text}}; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.1em">
+      REC
+      <span style="width: 34px; height: 18px; border-radius: 4px; background: {{c.bg}}; border: 1px solid {{c.border}}; position: relative; display: block"><span style="position: absolute; left: 2px; top: 2px; width: 14px; height: 12px; border-radius: 2px; background: {{c.brass}}; display: block"></span></span>
+    </button>
+    <div style="display: flex; gap: 8px; margin-left: 6px">
+      <button aria-label="Minimieren" style="width: 24px; height: 24px; border-radius: 12px; border: 0; background: {{c.panel2}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 7h8" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+      <button aria-label="Maximieren" style="width: 24px; height: 24px; border-radius: 12px; border: 0; background: {{c.panel2}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.4"></rect></svg></button>
+      <button aria-label="Schliessen" style="width: 24px; height: 24px; border-radius: 12px; border: 0; background: {{c.panel2}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+    </div>
+  </div>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <div style="width: 270px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; padding: 18px 16px; background: {{c.panel}}; border-right: 1px solid {{c.border}}">
+      <div style="font-family: Fraunces, Georgia, serif; font-size: 20px; font-weight: 600; padding: 0 6px">Notenregal</div>
+      <div style="display: flex; gap: 6px; padding: 0 6px">
+        <span style="padding: 4px 10px; border-radius: 12px; background: {{c.panel2}}; font-size: 12px">Alle</span>
+        <span style="padding: 4px 10px; border-radius: 12px; border: 1px solid {{c.border}}; font-size: 12px; color: {{c.muted}}">Gitarre</span>
+        <span style="padding: 4px 10px; border-radius: 12px; border: 1px solid {{c.border}}; font-size: 12px; color: {{c.muted}}">Etüden</span>
+      </div>
+      <sc-for list="{{tracks}}" as="t" hint-placeholder-count="7">
+        <div style="{{t.rowSt}}">
+          <div style="display: flex; justify-content: space-between; gap: 8px">
+            <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{t.title}}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: {{c.muted}}">{{t.len}}</span>
+          </div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: {{t.metaCol}}">{{t.meta}}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 22px 28px">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between">
+        <div>
+          <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 32px; font-weight: 600">Kupferblues</h1>
+          <div style="color: {{c.muted}}">Trio Feldweg · 3:48</div>
+        </div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 20px">0:51.3</div>
+      </div>
+
+      <div style="position: relative; height: 150px; border-radius: 10px; background: {{c.panel}}; border: 1px solid {{c.border}}; padding: 0 20px; display: flex; flex-direction: column; justify-content: center; gap: 10px">
+        <div style="position: relative; height: 64px; border-radius: 3px; background: {{c.tape}}; border-top: 2px solid {{c.tapeLine}}; border-bottom: 2px solid {{c.tapeLine}}; display: flex; align-items: center; gap: 2px; padding: 0 4px; box-sizing: border-box">
+          <sc-for list="{{bars}}" as="b" hint-placeholder-count="120"><div style="{{b.st}}"></div></sc-for>
+          <div style="position: absolute; left: 18.4%; width: 7.3%; top: 0; bottom: 0; background: {{c.terraSoft}}"></div>
+          <div style="position: absolute; left: calc(18.4% - 8px); top: -18px; bottom: -18px; width: 16px; border-radius: 3px; background: {{c.brass}}; display: flex; align-items: flex-start; justify-content: center; color: {{c.bg}}; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; padding-top: 2px; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.35)">S</div>
+          <div style="position: absolute; left: calc(25.7% - 8px); top: -18px; bottom: -18px; width: 16px; border-radius: 3px; background: {{c.brass}}; display: flex; align-items: flex-start; justify-content: center; color: {{c.bg}}; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; padding-top: 2px; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.35)">E</div>
+          <div style="position: absolute; left: 22.5%; top: -10px; bottom: -10px; width: 2px; background: {{c.terra}}"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: {{c.muted}}"><span>0:00</span><span>0:42.0 → 0:58.5</span><span>3:48</span></div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px">
+        <div style="background: {{c.panel}}; border: 1px solid {{c.border}}; border-radius: 10px; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: baseline; justify-content: space-between">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; color: {{c.muted}}">TEMPO</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 44px; font-weight: 600; line-height: 1">0,75×</span>
+          </div>
+          <div style="position: relative; height: 60px">
+            <div style="position: absolute; left: 0; right: 0; top: 22px; height: 8px; border-radius: 4px; background: {{c.bg}}; box-shadow: inset 0 1px 3px rgba(0,0,0,0.4)"></div>
+            <div style="position: absolute; left: 0; right: 0; top: 40px; display: flex; justify-content: space-between">
+              <sc-for list="{{ticks}}" as="t" hint-placeholder-count="11"><div style="{{t.st}}"></div></sc-for>
+            </div>
+            <div style="position: absolute; left: calc(50% - 14px); top: 6px; width: 28px; height: 40px; border-radius: 4px; background: {{c.brass}}; box-shadow: 0 3px 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center"><div style="width: 18px; height: 2px; background: {{c.bg}}"></div></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: {{c.muted}}"><span>0,5</span><span>0,6</span><span>0,7</span><span>0,8</span><span>0,9</span><span>1,0</span></div>
+        </div>
+
+        <div style="background: {{c.panel}}; border: 1px solid {{c.border}}; border-radius: 10px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; color: {{c.muted}}">DURCHGÄNGE</span>
+          <div style="display: flex; align-items: center; gap: 18px; height: 48px">
+            <div style="position: relative; display: flex; gap: 6px">
+              <div style="width: 3px; height: 40px; border-radius: 2px; background: {{c.text}}"></div>
+              <div style="width: 3px; height: 40px; border-radius: 2px; background: {{c.text}}"></div>
+              <div style="width: 3px; height: 40px; border-radius: 2px; background: {{c.text}}"></div>
+              <div style="width: 3px; height: 40px; border-radius: 2px; background: {{c.text}}"></div>
+              <div style="position: absolute; left: -4px; top: 18px; width: 38px; height: 3px; border-radius: 2px; background: {{c.text}}; transform: rotate(-28deg)"></div>
+            </div>
+            <div style="display: flex; gap: 6px">
+              <div style="width: 3px; height: 40px; border-radius: 2px; background: {{c.text}}"></div>
+              <div style="width: 3px; height: 40px; border-radius: 2px; background: {{c.text}}"></div>
+              <div style="width: 3px; height: 40px; border-radius: 2px; background: {{c.border}}"></div>
+              <div style="width: 3px; height: 40px; border-radius: 2px; background: {{c.border}}"></div>
+            </div>
+          </div>
+          <div style="color: {{c.muted}}">7 von 10 · dann <b style="color: {{c.sage}}">80 %</b></div>
+          <div style="display: flex; gap: 4px">
+            <sc-for list="{{steps}}" as="s" hint-placeholder-count="9"><div style="{{s.st}}"></div></sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 22px; padding: 14px 22px; background: {{c.panel}}; border: 1px solid {{c.border}}; border-radius: 10px">
+        <div style="display: flex; gap: 14px">
+          <div style="width: 22px; height: 22px; border-radius: 11px; background: {{c.terra}}; box-shadow: 0 0 12px {{c.terra}}"></div>
+          <div style="width: 22px; height: 22px; border-radius: 11px; background: {{c.ledOff}}"></div>
+          <div style="width: 22px; height: 22px; border-radius: 11px; background: {{c.ledOff}}"></div>
+          <div style="width: 22px; height: 22px; border-radius: 11px; background: {{c.ledOff}}"></div>
+        </div>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 600">96</span>
+        <span style="color: {{c.muted}}">BPM · 4/4 · Achtel · +2 alle 8 Takte</span>
+        <div style="flex: 1"></div>
+        <button style="height: 36px; padding: 0 16px; border-radius: 6px; border: 1px solid {{c.border}}; background: {{c.panel2}}; color: {{c.text}}">Tap</button>
+        <button aria-label="Abspielen" style="width: 44px; height: 36px; border-radius: 6px; border: 1px solid {{c.border}}; background: {{c.panel2}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"></path></svg></button>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: {{c.muted}}">Leertaste · Ctrl+S / Ctrl+E</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dunkel":{"editor":"boolean","default":true},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dunkel ?? true;
+    const c = dark
+      ? { bg: '#1E1916', panel: '#2A221D', panel2: '#352B24', border: '#4A3C32', text: '#F1E8DC', muted: '#B9A994', terra: '#E0714F', terraSoft: 'rgba(224,113,79,0.22)', sage: '#8FB39E', brass: '#C9A45C', tape: '#3A2E26', tapeLine: '#4D3E33', wave: '#6B5A4C', ledOff: '#3F332B' }
+      : { bg: '#F4F1EA', panel: '#FBF9F4', panel2: '#EFE9DD', border: '#DDD4C4', text: '#2B231E', muted: '#6B5D50', terra: '#B8492A', terraSoft: 'rgba(217,93,57,0.18)', sage: '#4A6B5A', brass: '#A8803A', tape: '#E6DFD1', tapeLine: '#D2C8B6', wave: '#B5A894', ledOff: '#DDD4C4' };
+    const bars = []; let s = 11;
+    for (let i = 0; i < 120; i++) {
+      s = (s * 9301 + 49297) % 233280;
+      const r = s / 233280;
+      const env = 0.35 + 0.65 * Math.abs(Math.sin(i / 120 * Math.PI * 2.6 + 0.4));
+      const f = i / 120;
+      bars.push({ st: 'flex: 1 1 0; height: ' + Math.max(6, Math.round((0.2 + 0.8 * r) * env * 80)) + '%; border-radius: 1px; background: ' + (f >= 0.184 && f < 0.257 ? c.terra : c.wave) });
+    }
+    const ticks = Array.from({ length: 11 }, (_, i) => ({ st: 'width: 2px; height: ' + (i % 2 === 0 ? 14 : 8) + 'px; background: ' + c.muted }));
+    const tracks = [
+      ['Kupferblues', '3:48', 'Loop · 0,75× · ||||| ||', true],
+      ['Laternenwalzer', '2:56', 'Loop · 0,85× · |||', false],
+      ['Etüde Nr. 4 in A-Moll', '1:42', 'neu', false],
+      ['Nachtzug nach Lyon', '5:12', 'Loop · 0,70× · ||||| |||||', false],
+      ['Ruby Steps', '4:05', 'neu', false],
+      ['Arpeggio-Übung 14', '1:15', 'Loop · 0,60×', false]
+    ].map(([title, len, meta, active]) => ({
+      title, len, meta,
+      metaCol: meta === 'neu' ? c.muted : c.sage,
+      rowSt: 'display: flex; flex-direction: column; gap: 4px; padding: 10px; border-radius: 8px; ' + (active ? 'background: ' + c.panel2 + '; box-shadow: inset 3px 0 0 ' + c.brass : '')
+    }));
+    const steps = [60, 65, 70, 75, 80, 85, 90, 95, 100].map((p) => ({ st: 'flex: 1; height: 8px; border-radius: 2px; background: ' + (p < 75 ? c.sage : p === 75 ? c.terra : c.ledOff) }));
+    return { c, bars, ticks, tracks, steps };
+  }
+}
+</script>
+</body>
+</html>

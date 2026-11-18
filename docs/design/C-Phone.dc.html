@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>C Woodshed Phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#E0714F}a:hover{color:#F08A6A}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 8px 16px 24px; background: {{c.bg}}; color: {{c.text}}; font-family: Inter, system-ui, sans-serif; font-size: 15px; overflow: hidden">
+
+  <div style="display: flex; align-items: center; height: 44px">
+    <button style="height: 44px; padding: 0 8px 0 0; border: 0; background: transparent; color: {{c.terra}}; font-size: 17px; display: flex; align-items: center; gap: 2px"><svg width="12" height="20" viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>Notenregal</button>
+    <div style="flex: 1"></div>
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: {{c.muted}}">0:51 / 3:48</span>
+  </div>
+
+  <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 30px; font-weight: 600">Kupferblues</h1>
+
+  <div style="height: 120px; border-radius: 10px; background: {{c.panel}}; border: 1px solid {{c.border}}; padding: 0 18px; display: flex; flex-direction: column; justify-content: center; gap: 12px">
+    <div style="position: relative; height: 52px; border-radius: 3px; background: {{c.tape}}; border-top: 2px solid {{c.tapeLine}}; border-bottom: 2px solid {{c.tapeLine}}; display: flex; align-items: center; gap: 2px; padding: 0 3px; box-sizing: border-box">
+      <sc-for list="{{bars}}" as="b" hint-placeholder-count="56"><div style="{{b.st}}"></div></sc-for>
+      <div style="position: absolute; left: 20%; width: 55%; top: 0; bottom: 0; background: {{c.terraSoft}}"></div>
+      <div style="position: absolute; left: calc(20% - 11px); top: -18px; bottom: -18px; width: 22px; border-radius: 4px; background: {{c.brass}}; display: flex; align-items: flex-start; justify-content: center; color: {{c.bg}}; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; padding-top: 2px; box-sizing: border-box">S</div>
+      <div style="position: absolute; left: calc(75% - 11px); top: -18px; bottom: -18px; width: 22px; border-radius: 4px; background: {{c.brass}}; display: flex; align-items: flex-start; justify-content: center; color: {{c.bg}}; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; padding-top: 2px; box-sizing: border-box">E</div>
+      <div style="position: absolute; left: 51%; top: -8px; bottom: -8px; width: 2px; background: {{c.terra}}"></div>
+    </div>
+    <div style="text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: {{c.muted}}">0:42.0 → 0:58.5</div>
+  </div>
+
+  <div style="background: {{c.panel}}; border: 1px solid {{c.border}}; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: baseline; justify-content: space-between">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; color: {{c.muted}}">TEMPO</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 48px; font-weight: 600; line-height: 1">0,75×</span>
+    </div>
+    <div style="position: relative; height: 60px">
+      <div style="position: absolute; left: 0; right: 0; top: 22px; height: 8px; border-radius: 4px; background: {{c.bg}}; box-shadow: inset 0 1px 3px rgba(0,0,0,0.4)"></div>
+      <div style="position: absolute; left: 0; right: 0; top: 42px; display: flex; justify-content: space-between">
+        <sc-for list="{{ticks}}" as="t" hint-placeholder-count="11"><div style="{{t.st}}"></div></sc-for>
+      </div>
+      <div style="position: absolute; left: calc(50% - 18px); top: 2px; width: 36px; height: 48px; border-radius: 5px; background: {{c.brass}}; box-shadow: 0 3px 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center"><div style="width: 22px; height: 2px; background: {{c.bg}}"></div></div>
+    </div>
+    <div style="display: flex; gap: 4px">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="9"><div style="{{s.st}}"></div></sc-for>
+    </div>
+    <div style="font-size: 13px; color: {{c.muted}}">Durchgang 7 von 10 · dann <b style="color: {{c.sage}}">80 %</b></div>
+  </div>
+
+  <div style="background: {{c.panel}}; border: 1px solid {{c.border}}; border-radius: 10px; padding: 12px 18px; display: flex; align-items: center; gap: 12px">
+    <div style="display: flex; gap: 9px">
+      <div style="width: 18px; height: 18px; border-radius: 9px; background: {{c.terra}}; box-shadow: 0 0 10px {{c.terra}}"></div>
+      <div style="width: 18px; height: 18px; border-radius: 9px; background: {{c.ledOff}}"></div>
+      <div style="width: 18px; height: 18px; border-radius: 9px; background: {{c.ledOff}}"></div>
+      <div style="width: 18px; height: 18px; border-radius: 9px; background: {{c.ledOff}}"></div>
+    </div>
+    <div style="flex: 1"></div>
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600">96</span>
+    <span style="color: {{c.muted}}; font-size: 13px">BPM · 4/4</span>
+  </div>
+
+  <div style="margin-top: auto; display: grid; grid-template-columns: 1fr 72px 1fr; gap: 10px">
+    <button style="height: 56px; border-radius: 10px; border: 1px solid {{c.border}}; background: {{c.panel}}; color: {{c.text}}; font-size: 16px; font-weight: 500">S hier</button>
+    <button aria-label="Abspielen" style="height: 56px; border-radius: 10px; border: 1px solid {{c.border}}; background: {{c.panel2}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"></path></svg></button>
+    <button style="height: 56px; border-radius: 10px; border: 1px solid {{c.border}}; background: {{c.panel}}; color: {{c.text}}; font-size: 16px; font-weight: 500">E hier</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dunkel":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dunkel ?? true;
+    const c = dark
+      ? { bg: '#1E1916', panel: '#2A221D', panel2: '#352B24', border: '#4A3C32', text: '#F1E8DC', muted: '#B9A994', terra: '#E0714F', terraSoft: 'rgba(224,113,79,0.22)', sage: '#8FB39E', brass: '#C9A45C', tape: '#3A2E26', tapeLine: '#4D3E33', wave: '#6B5A4C', ledOff: '#3F332B' }
+      : { bg: '#F4F1EA', panel: '#FBF9F4', panel2: '#EFE9DD', border: '#DDD4C4', text: '#2B231E', muted: '#6B5D50', terra: '#B8492A', terraSoft: 'rgba(217,93,57,0.18)', sage: '#4A6B5A', brass: '#A8803A', tape: '#E6DFD1', tapeLine: '#D2C8B6', wave: '#B5A894', ledOff: '#DDD4C4' };
+    const bars = []; let s = 11;
+    for (let i = 0; i < 56; i++) {
+      s = (s * 9301 + 49297) % 233280;
+      const r = s / 233280;
+      const env = 0.35 + 0.65 * Math.abs(Math.sin(i / 56 * Math.PI * 2.6 + 0.4));
+      const f = i / 56;
+      bars.push({ st: 'flex: 1 1 0; height: ' + Math.max(6, Math.round((0.2 + 0.8 * r) * env * 80)) + '%; border-radius: 1px; background: ' + (f >= 0.2 && f < 0.75 ? c.terra : c.wave) });
+    }
+    const ticks = Array.from({ length: 11 }, (_, i) => ({ st: 'width: 2px; height: ' + (i % 2 === 0 ? 12 : 7) + 'px; background: ' + c.muted }));
+    const steps = [60, 65, 70, 75, 80, 85, 90, 95, 100].map((p) => ({ st: 'flex: 1; height: 8px; border-radius: 2px; background: ' + (p < 75 ? c.sage : p === 75 ? c.terra : c.ledOff) }));
+    return { c, bars, ticks, steps };
+  }
+}
+</script>
+</body>
+</html>

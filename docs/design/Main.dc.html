@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Überblick Design-Richtungen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;family=Fraunces:opsz,wght@9..144,600&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0057B8}a:hover{color:#003F86}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1560px; box-sizing: border-box; padding: 64px 72px; background: #FAFAF9; color: #1C1C1E; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; gap: 40px">
+
+  <div style="display: flex; flex-direction: column; gap: 12px; max-width: 900px">
+    <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5C5C63">Woodshed Player · Issue #26</div>
+    <h1 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700">Drei Design-Richtungen für den Übe-Bildschirm</h1>
+    <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #3A3A40">Massstab ist der Übe-Ablauf: Song wählen, Stelle finden, Loop setzen, Tempo senken, wiederholen, Tempo stufenweise bis 100 % steigern. In allen drei Richtungen sind <b>Loop und Tempo grösser als Play/Pause</b>, und die <b>Tempo-Steigerung ist als Stufen sichtbar</b>.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+
+    <div style="background: #FFFFFF; border: 1px solid #E2E2E5; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 16px">
+      <div style="font-size: 13px; font-weight: 600; color: #5C5C63">A</div>
+      <h2 style="margin: 0; font-size: 26px">Studio</h2>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #3A3A40">Pro-Audio-Werkzeug. Die Wellenform mit Loop-Bereich ist das Zentrum, alles ist gleichzeitig sichtbar, jede Funktion hat ein Kürzel.</p>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 12px; font-weight: 600; color: #5C5C63">Dunkel (Standard) / Hell</div>
+        <div style="display: flex; gap: 6px">
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #121214"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #1C1C1F; border: 1px solid #2C2C30"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #FF9F0A"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #4DA3FF"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #ECECEF; border: 1px solid #D4D4D9"></div>
+        </div>
+        <div style="font-size: 12px; color: #5C5C63; font-family: 'JetBrains Mono', monospace">#121214 · #1C1C1F · Bernstein #FF9F0A (Loop) · Blau #4DA3FF (Metronom)</div>
+      </div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Schrift:</b> Inter, Zahlen in JetBrains Mono (tabellarisch)</div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Stärken:</b> präzises Setzen von Loops an der Wellenform, alles mit Tastatur, vertraut für Transkribierende.</div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Risiken:</b> wirkt auf dem Phone gedrängt, ermüdet bei langen Sessions, ähnelt Transcribe!/Anytune am stärksten.</div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Passt zu:</b> Transkribieren am Desktop, Musikstudium.</div>
+    </div>
+
+    <div style="background: #FFFFFF; border: 1px solid #E2E2E5; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 16px">
+      <div style="font-size: 13px; font-weight: 600; color: #5C5C63">B</div>
+      <h2 style="margin: 0; font-size: 26px">Fokus</h2>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #3A3A40">So wenig wie möglich. Im Zentrum stehen die aktuelle Tempo-Stufe und der Loop. Details öffnen sich aus Pills (Popover am Desktop/Tablet, Sheet am Phone).</p>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 12px; font-weight: 600; color: #5C5C63">Hell (Standard) / Dunkel</div>
+        <div style="display: flex; gap: 6px">
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #FFFFFF; border: 1px solid #E5E5EA"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #F5F5F7; border: 1px solid #E5E5EA"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #007AFF"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #1C1C1E"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #000000"></div>
+        </div>
+        <div style="font-size: 12px; color: #5C5C63; font-family: 'JetBrains Mono', monospace">#FFFFFF · #F5F5F7 · Signalblau #007AFF · #1C1C1E · #000000</div>
+      </div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Schrift:</b> Inter, grosse Ziffern mit tabellarischen Zahlen</div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Stärken:</b> ruhig über Stunden, ideal am Notenpult und auf dem Phone, Fortschritt der Stufen steht im Mittelpunkt.</div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Risiken:</b> Loop-Grenzen ohne Wellenform weniger genau, Funktionen sind versteckt, wenig eigene Identität.</div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Passt zu:</b> tägliches Üben, Musikschule, Einsteigerinnen und Einsteiger.</div>
+    </div>
+
+    <div style="background: #FFFFFF; border: 1px solid #E2E2E5; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 16px">
+      <div style="font-size: 13px; font-weight: 600; color: #5C5C63">C</div>
+      <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 28px">Woodshed</h2>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #3A3A40">Die Werkbank im Schuppen. Tonband mit Messingklammern als Loop, Fader mit Skala als Tempo, LED-Zählzeiten, und Durchgänge als eingeritzte Strichliste.</p>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 12px; font-weight: 600; color: #5C5C63">Walnuss (Standard) / Creme</div>
+        <div style="display: flex; gap: 6px">
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #1E1916"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #2A221D"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #E0714F"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #8FB39E"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #C9A45C"></div>
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: #F4F1EA; border: 1px solid #DDD4C4"></div>
+        </div>
+        <div style="font-size: 12px; color: #5C5C63; font-family: 'JetBrains Mono', monospace">Walnuss #1E1916 · Terrakotta #E0714F · Salbei #8FB39E · Messing #C9A45C · Creme #F4F1EA</div>
+      </div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Schrift:</b> Fraunces (Titel), Inter (Text), IBM Plex Mono (Zahlen)</div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Stärken:</b> eigene Identität, deutet den Namen «Woodshed», Fortschritt fühlt sich greifbar an.</div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Risiken:</b> Skeuomorphie altert, mehr Aufwand (CustomPainter), Gefahr von Kitsch, schwerer barrierefrei.</div>
+      <div style="font-size: 14px; line-height: 1.5"><b>Passt zu:</b> Jazz, Akustik, Liebhaberinnen und Liebhaber guter Instrumente.</div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px">
+    <div style="background: #FFFFFF; border: 1px solid #E2E2E5; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 14px">
+      <h2 style="margin: 0; font-size: 22px">Grössen (logische Pixel, nach Fensterbreite)</h2>
+      <div style="display: grid; grid-template-columns: 110px 1fr; gap: 10px 16px; font-size: 14px; line-height: 1.45">
+        <b>Desktop</b><span>&gt; 1000 px · macOS, Windows, Linux · Bibliothek als feste Seitenleiste, Module nebeneinander, Hover, Kürzel-Badges</span>
+        <b>Tablet</b><span>600–1000 px · iPad, Android-Tablet, schmales Desktop-Fenster · Bibliothek einblendbar, zweispaltig, Touch-Ziele ≥ 44/48</span>
+        <b>Phone</b><span>&lt; 600 px · iPhone, Android-Phone · einspaltig, Bibliothek als eigene Seite, Loop und Tempo in Daumenreichweite</span>
+      </div>
+    </div>
+    <div style="background: #FFFFFF; border: 1px solid #E2E2E5; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 14px">
+      <h2 style="margin: 0; font-size: 22px">Plattformregeln (für alle Richtungen)</h2>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 10px 16px; font-size: 14px; line-height: 1.45">
+        <b>Kürzel</b><span>⌘ auf macOS, Ctrl auf Windows/Linux. Badges nur mit Tastatur (auch iPad mit Tastatur). Leertaste, S, E, L, ←/→, ↑/↓</span>
+        <b>Fensterknöpfe</b><span>macOS links (Ampel), Windows und Linux rechts. Eigene Kopfzeile verdeckt sie nie</span>
+        <b>Zurück</b><span>iOS: Wischgeste vom Rand. Android: System-Zurück. Desktop: Esc schliesst Popover</span>
+        <b>Haptik</b><span>iOS und Android: Einrasten bei jeder Tempostufe und an den Loop-Grenzen</span>
+        <b>Aufnahme</b><span>sichtbar auf macOS, Windows, Linux · ausgeblendet auf iPhone/iPad · Android vorerst ausgeblendet</span>
+        <b>Schrift</b><span>mitgeliefert (nicht Systemschrift), damit Zahlen auf allen Plattformen gleich breit sind</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="background: #FFFFFF; border: 1px solid #E2E2E5; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
+    <h2 style="margin: 0; font-size: 22px">So liest Du die Mockups</h2>
+    <p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A3A40">Jede Zeile unten ist eine Richtung in Desktop, Tablet und Phone. Hell und Dunkel schaltest Du je Mockup über <b>Tweaks › Dunkel</b>. Die Fensterleisten zeigen bewusst verschiedene Systeme: A macOS, B Windows, C Linux. Bei B ist am Tablet das Metronom-Popover offen, um die versteckten Details zu zeigen. Alle Titel und Namen sind erfunden.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1560}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
