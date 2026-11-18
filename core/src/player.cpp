@@ -130,6 +130,7 @@ void wp_set_loop(wp_player* p, double a, double b) { if (p) p->core->engine().se
 void wp_set_volume(wp_player* p, float v) { if (p) p->core->engine().setVolume(v); }
 double wp_position(wp_player* p) { return p ? p->core->engine().position() : 0.0; }
 double wp_duration(wp_player* p) { return p ? p->core->engine().duration() : 0.0; }
+long long wp_loop_passes(wp_player* p) { return p ? p->core->engine().loopPasses() : 0; }
 int wp_waveform(wp_player* p, double start, double end, int count, float* mins, float* maxs) {
     return p ? p->core->waveform(start, end, count, mins, maxs) : WP_ERR_INVALID_ARGUMENT;
 }

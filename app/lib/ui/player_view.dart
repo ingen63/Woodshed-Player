@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../library/playback_settings.dart';
+import '../metronome/repeat_button.dart';
 import '../time_format.dart';
 import 'library_view.dart' show TrackArtwork;
 import 'style.dart';
@@ -22,6 +24,8 @@ class PlayerViewState {
     this.loopOn = false,
     this.loopStart = 0,
     this.loopEnd = 0,
+    this.ramp = const PlaybackSettings(),
+    this.rampLabel = '',
     this.error,
   });
 
@@ -32,6 +36,12 @@ class PlayerViewState {
   final String? artwork;
   final double position, duration, volume, speed, loopStart, loopEnd;
   final bool playing, speedOn, loopOn;
+
+  /// Einstellungen der Steigerung nach Loop-Durchgängen (#29), nur die `ramp*`-Felder gelten.
+  final PlaybackSettings ramp;
+
+  /// Stufe und Durchgänge, z. B. «75 % · 7 von 10».
+  final String rampLabel;
   final String? error;
 
   bool get loaded => title != null && duration > 0;
@@ -39,6 +49,15 @@ class PlayerViewState {
   /// Der Loop gilt erst, wenn das Ende mindestens 1 s nach dem Anfang liegt.
   bool get loopValid => loopEnd >= loopStart + 1;
 }
+
+/// Ändert einzelne Einstellungen der Steigerung nach Loop-Durchgängen (#29).
+typedef RampChange = void Function({
+  bool? enabled,
+  int? start,
+  int? target,
+  int? step,
+  int? passes,
+});
 
 /// Aktionen des Player-Reiters.
 class PlayerViewActions {
@@ -55,6 +74,7 @@ class PlayerViewActions {
     ValueChanged<double>? loopStartField,
     ValueChanged<double>? loopEndField,
     this._wholeTrack,
+    this.ramp,
   }) : loopStartField = loopStartField ?? loopStart,
        loopEndField = loopEndField ?? loopEnd;
 
@@ -68,6 +88,9 @@ class PlayerViewActions {
   final ValueChanged<double> loopStartField, loopEndField;
   final VoidCallback? _wholeTrack;
   final ValueChanged<bool> speedOn, loopOn;
+
+  /// Steigerung nach Loop-Durchgängen (#29) einstellen.
+  final RampChange? ramp;
 
   void wholeTrack(double duration) {
     if (_wholeTrack != null) return _wholeTrack();
@@ -100,6 +123,8 @@ class PlayerView extends StatelessWidget {
             _NowPlayingCard(state: state, actions: actions),
             _SpeedCard(state: state, actions: actions),
             _LoopCard(state: state, actions: actions),
+            if (actions.ramp != null)
+              _RampCard(state: state, change: actions.ramp!),
           ] else
             _EmptyCard(onOpen: actions.open),
           ...extraCards,
@@ -667,6 +692,111 @@ class _SpeedCard extends StatelessWidget {
         ),
         const HintText(
           'Die Tonhöhe bleibt unverändert. Geschwindigkeit in 0,05er-Schritten.',
+        ),
+      ],
+    );
+  }
+}
+
+/// Steigerung nach Loop-Durchgängen (#29): Schalter, Stufe mit Durchgangszähler und Einstellungen.
+class _RampCard extends StatelessWidget {
+  const _RampCard({required this.state, required this.change});
+  final PlayerViewState state;
+  final RampChange change;
+
+  Widget _stepper(
+    String label,
+    String key,
+    String value,
+    VoidCallback down,
+    VoidCallback up,
+  ) => Row(
+    children: [
+      Expanded(child: Text(label)),
+      RepeatButton(key: Key('ramp:$key:-'), icon: Icons.remove, onStep: down),
+      SizedBox(
+        width: 64,
+        child: Text(value, key: Key('ramp:$key'), textAlign: TextAlign.center),
+      ),
+      RepeatButton(key: Key('ramp:$key:+'), icon: Icons.add, onStep: up),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final r = state.ramp;
+    final on = r.rampEnabled;
+    final counting = on && state.speedOn && state.loopOn && state.loopValid;
+    return WsCard(
+      key: const Key('card:ramp'),
+      children: [
+        CardHeader(
+          icon: WsIcons.speedometer,
+          title: 'Steigerung nach Durchgängen',
+          value: on,
+          onChanged: (v) => change(enabled: v),
+        ),
+        if (on)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              state.rampLabel,
+              key: const Key('ramp:status'),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        Dimmed(
+          key: const Key('dim:ramp'),
+          enabled: on,
+          child: Column(
+            children: [
+              _stepper(
+                'Startstufe',
+                'start',
+                '${r.rampStart} %',
+                () => change(start: r.rampStart - 5),
+                () => change(start: r.rampStart + 5),
+              ),
+              _stepper(
+                'Zielstufe',
+                'target',
+                '${r.rampTarget} %',
+                () => change(target: r.rampTarget - 5),
+                () => change(target: r.rampTarget + 5),
+              ),
+              Row(
+                children: [
+                  const Expanded(child: Text('Schrittweite')),
+                  DropdownButton<int>(
+                    key: const Key('ramp:step'),
+                    value: r.rampStep,
+                    items: [
+                      for (final st in PlaybackSettings.rampSteps)
+                        DropdownMenuItem(value: st, child: Text('+$st %')),
+                    ],
+                    onChanged: on ? (v) => change(step: v) : null,
+                  ),
+                ],
+              ),
+              _stepper(
+                'Durchgänge pro Stufe',
+                'passes',
+                '${r.rampPasses}',
+                () => change(passes: r.rampPasses - 1),
+                () => change(passes: r.rampPasses + 1),
+              ),
+            ],
+          ),
+        ),
+        HintText(
+          on && !counting
+              ? 'Gezählt wird nur bei eingeschalteter Geschwindigkeit und aktivem Loop.'
+              : 'Ein Durchgang zählt, wenn die Wiedergabe vom Loop-Ende zum Anfang springt. '
+                    'Loop-Grenzen oder Geschwindigkeit von Hand ändern setzt den Zähler zurück.',
         ),
       ],
     );

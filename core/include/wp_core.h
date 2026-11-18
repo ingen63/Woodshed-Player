@@ -68,6 +68,9 @@ WP_API void wp_set_loop(wp_player* p, double a, double b);
 WP_API void wp_set_volume(wp_player* p, float volume);
 WP_API double wp_position(wp_player* p);
 WP_API double wp_duration(wp_player* p);
+/* Loop-Durchgänge (#29): zählt, wie oft die Wiedergabe das Loop-Ende erreicht hat und zum Loop-Anfang
+ * gesprungen ist. Seek zählt nicht. Der Zähler beginnt nie neu; massgebend ist die Differenz zweier Abfragen. */
+WP_API long long wp_loop_passes(wp_player* p);
 /* Wellenform des geladenen Titels (#28): teilt [start, end] Sekunden in genau count gleich lange Abschnitte
  * und schreibt je Abschnitt Minimum nach mins[i] und Maximum nach maxs[i] (−1…1, über alle Kanäle).
  * Die Spitzenwerte werden beim Laden einmal berechnet; der Aufruf ist auch für die Übersicht des ganzen

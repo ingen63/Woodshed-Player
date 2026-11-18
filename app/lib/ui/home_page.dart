@@ -228,6 +228,8 @@ class _HomePageState extends State<HomePage> {
                 loopOn: s.loopEnabled,
                 loopStart: s.loopStart,
                 loopEnd: s.loopEnd,
+                ramp: s,
+                rampLabel: p.rampLabel,
                 error: p.error,
               ),
               actions: PlayerViewActions(
@@ -244,6 +246,7 @@ class _HomePageState extends State<HomePage> {
                     p.updateSettings((s) => s.copyWith(loopStart: v)),
                 loopEndField: (v) =>
                     p.updateSettings((s) => s.copyWith(loopEnd: v)),
+                ramp: p.setRamp,
                 wholeTrack: () => p.updateSettings(
                   (s) => s.copyWith(loopStart: 0, loopEnd: p.duration),
                 ),

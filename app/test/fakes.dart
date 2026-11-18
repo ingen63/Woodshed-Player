@@ -24,6 +24,9 @@ class FakeCore implements AudioCore {
   double rateValue = 1;
   double volumeValue = 1;
   (double, double)? loop;
+
+  /// Loop-Durchgänge des Kerns (#29); Tests zählen sie selbst hoch.
+  int passes = 0;
   final calls = <String>[];
 
   void finishLoad(double duration) {
@@ -86,6 +89,8 @@ class FakeCore implements AudioCore {
   double get position => pos;
   @override
   double get duration => _duration;
+  @override
+  int get loopPasses => passes;
 }
 
 class FakeTimer implements Timer {

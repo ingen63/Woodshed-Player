@@ -215,6 +215,23 @@ void main() {
       expect(again.track(id2)!.settings.loopStart, 0.25);
       expect(again.track(id2)!.settings.loopEnabled, isTrue);
     });
+
+    test('#29/AK7 Steigerung pro Titel wird gespeichert', () async {
+      final base = swiftFolder('lib', goldenNew);
+      final l = await loaded(base);
+      final ramp = const PlaybackSettings().copyWith(
+        rampEnabled: true,
+        rampStart: 55,
+        rampTarget: 95,
+        rampStep: 2,
+        rampPasses: 6,
+      );
+      l.updateSettings(id2, ramp);
+      await Future<void>.delayed(Duration.zero);
+      l.flush();
+      final again = await loaded(base);
+      expect(again.track(id2)!.settings, ramp);
+    });
   });
 
   group('#16/AK4 Import', () {

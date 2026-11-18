@@ -176,6 +176,7 @@ void Engine::seekTo(double seconds) {
 void Engine::publish() {
     publishedPosition_.store(playhead_ / sampleRate_);
     publishedPlaying_.store(playing_);
+    publishedLoopPasses_.store(loopPasses_);
 }
 
 bool Engine::readNext(float* frame) {
@@ -192,8 +193,12 @@ bool Engine::readNext(float* frame) {
 }
 
 void Engine::advancePlayhead(double inputFrames) {
+    const bool beforeLoopEnd = playhead_ < static_cast<double>(loopB_);
     playhead_ += inputFrames;
     if (loopB_ > 0 && playhead_ >= static_cast<double>(loopB_)) {
+        // Nur ein Überschreiten des Loop-Endes ist ein Durchgang, nicht ein Seek hinter das Ende.
+        if (beforeLoopEnd)
+            loopPasses_ += 1 + static_cast<long long>((playhead_ - loopB_) / static_cast<double>(loopB_ - loopA_));
         playhead_ = loopA_ + std::fmod(playhead_ - loopB_, static_cast<double>(loopB_ - loopA_));
     }
     playhead_ = std::min(playhead_, static_cast<double>(frames_));
@@ -246,7 +251,12 @@ void Engine::render(float* out, int frames) {
             // Direkte Wiedergabe: sample-genau, Loop-Sprung ohne Lücke.
             float frame[16];
             for (int i = 0; i < n; ++i) {
-                if (!readNext(frame)) {
+                const long long before = readPos_;
+                const bool ok = readNext(frame);
+                // Sprung zurück aus dem Loop heraus ist ein Durchgang; liegt der Lesekopf nach einem Seek
+                // hinter dem Loop-Ende, ist der Sprung zum Anfang keiner.
+                if (loopB_ > 0 && before < loopB_ && readPos_ < before) ++loopPasses_;
+                if (!ok) {
                     std::fill(dst + static_cast<size_t>(i) * ch, dst + static_cast<size_t>(n) * ch, 0.0f);
                     playing_ = false;
                     break;

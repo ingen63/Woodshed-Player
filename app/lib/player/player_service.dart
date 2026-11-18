@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:wp_core/wp_core.dart';
 
 import '../library/playback_settings.dart';
+import '../metronome/loop_ramp.dart';
 import '../metronome/practice_session.dart';
 import 'audio_core.dart';
 
@@ -64,6 +65,29 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
       ? (_settings.loopStart, _settings.loopEnd)
       : null;
 
+  // ---- Steigerung nach Loop-Durchgängen (#29) ----
+  final _ramp = LoopRamp();
+  int _lastLoopPasses = 0;
+
+  /// Läuft die Steigerung? Nur mit eingeschalteter Geschwindigkeit und aktivem Loop.
+  bool get rampActive =>
+      _settings.rampEnabled && _settings.speedEnabled && activeLoop != null;
+
+  /// Durchgänge auf der aktuellen Stufe.
+  int get rampPasses => _ramp.passes;
+
+  /// #29/AK8: «75 % · 7 von 10».
+  String get rampLabel => _ramp.label(_settings);
+
+  void _countLoopPasses() {
+    final total = core.loopPasses;
+    final added = total - _lastLoopPasses;
+    _lastLoopPasses = total;
+    if (added <= 0 || !rampActive) return;
+    final next = _ramp.addPasses(added, _settings);
+    if (next != null) _commit(_settings.copyWith(speed: next));
+  }
+
   // ---- Positionsabfrage ----
   Timer? _timer;
   int _playGrace = 0; // Ticks, in denen «spielt» gilt, bis der Audio-Thread den Befehl übernommen hat
@@ -85,6 +109,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
       if (corePlaying || _playGrace <= 0) _playing = corePlaying;
       if (_playGrace > 0) _playGrace--;
       _position = core.position.clamp(0, _duration).toDouble();
+      _countLoopPasses();
     }
     if (!_playing && _pending == null) {
       _timer?.cancel();
@@ -139,6 +164,8 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
       _playGrace = 0;
       _error = null;
       _settings = _normalized(p.settings, _duration);
+      _lastLoopPasses = core.loopPasses;
+      _ramp.reset();
       _applySettings();
       core.volume = _volume;
       p.completer.complete(true);
@@ -259,13 +286,55 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
         ); // Loop ohne Grenzen: ganzer Titel
       }
     }
+    if (next.rampEnabled && !old.rampEnabled) {
+      // #29: Einschalten beginnt bei der Startstufe.
+      next = next.copyWith(speedEnabled: true, speed: next.rampStart / 100);
+    }
     if (next == old) return;
+    // #29/AK5: Loop-Grenzen oder Geschwindigkeit von Hand geändert: Zähler auf 0, die Steigerung läuft
+    // ab der neuen Geschwindigkeit weiter.
+    if (next.loopEnabled != old.loopEnabled ||
+        next.loopStart != old.loopStart ||
+        next.loopEnd != old.loopEnd ||
+        next.speedEnabled != old.speedEnabled ||
+        next.speed != old.speed ||
+        next.rampEnabled != old.rampEnabled) {
+      _ramp.reset();
+    }
+    _commit(next);
+  }
+
+  void _commit(PlaybackSettings next) {
     _settings = next;
     _applySettings();
     final id = _trackId;
     if (id != null) onSettingsChanged?.call(id, next);
     notifyListeners();
   }
+
+  /// Einstellungen der Steigerung nach Loop-Durchgängen (#29). Das Ziel liegt nie unter dem Start.
+  void setRamp({
+    bool? enabled,
+    int? start,
+    int? target,
+    int? step,
+    int? passes,
+  }) => updateSettings((s) {
+    var n = s.copyWith(
+      rampEnabled: enabled,
+      rampStart: start,
+      rampTarget: target,
+      rampStep: step,
+      rampPasses: passes,
+    );
+    if (start != null && n.rampTarget < n.rampStart) {
+      n = n.copyWith(rampTarget: n.rampStart);
+    }
+    if (target != null && n.rampStart > n.rampTarget) {
+      n = n.copyWith(rampStart: n.rampTarget);
+    }
+    return n;
+  });
 
   void setSpeedEnabled(bool on) =>
       updateSettings((s) => s.copyWith(speedEnabled: on));

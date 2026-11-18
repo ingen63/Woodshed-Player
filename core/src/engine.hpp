@@ -59,6 +59,9 @@ public:
     int channels() const { return channels_; }
     int sampleRate() const { return sampleRate_; }
     long long frames() const { return publishedFrames_.load(); }
+    // Durchgänge (#29): wie oft die hörbare Position das Loop-Ende erreicht hat und zum Loop-Anfang
+    // gesprungen ist, seit dem Start des Kerns. Seek zählt nicht. Nur die Differenz ist aussagekräftig.
+    long long loopPasses() const { return publishedLoopPasses_.load(); }
 
     // Audio-Thread: schreibt `frames` Frames interleaved nach `out`.
     void render(float* out, int frames);
@@ -105,6 +108,7 @@ private:
     bool stretching_ = false;
     double activeRate_ = 1.0;
     long long loopA_ = 0, loopB_ = 0;  // B == 0: kein Loop
+    long long loopPasses_ = 0;
     std::unique_ptr<Stretch> stretch_;
     std::vector<float> inPlanar_, outPlanar_;
 
@@ -112,6 +116,7 @@ private:
     std::atomic<bool> publishedPlaying_{false};
     std::atomic<double> publishedPosition_{0.0};
     std::atomic<long long> publishedFrames_{0};
+    std::atomic<long long> publishedLoopPasses_{0};
     std::atomic<double> requestedRate_{1.0};
 };
 

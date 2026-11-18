@@ -348,4 +348,171 @@ void main() {
       expect(loadErrorMessage(-99), contains('Unbekannter Fehler'));
     });
   });
+
+  group('#29 Steigerung nach Loop-Durchgängen im PlayerService', () {
+    Future<Harness> rampHarness() async {
+      final h = Harness();
+      await h.loadReady(
+        '/a.wav',
+        60,
+        id: 't1',
+        settings: const PlaybackSettings(
+          loopEnabled: true,
+          loopStart: 10,
+          loopEnd: 20,
+        ),
+      );
+      h.service.setRamp(enabled: true);
+      h.service.play();
+      return h;
+    }
+
+    void passes(Harness h, int n) {
+      h.core.passes += n;
+      h.fire();
+    }
+
+    test('Einschalten beginnt bei der Startstufe', () async {
+      final h = await rampHarness();
+      expect(h.service.settings.speedEnabled, isTrue);
+      expect(h.service.settings.speed, 0.6);
+      expect(h.core.rateValue, 0.6);
+      expect(h.service.rampLabel, '60 % · 0 von 10');
+    });
+
+    test(
+      'AK2/AK3: Durchgänge des Kerns zählen, nach 10 eine Stufe höher',
+      () async {
+        final h = await rampHarness();
+        passes(h, 7);
+        expect(h.service.rampPasses, 7);
+        expect(h.service.rampLabel, '60 % · 7 von 10');
+        passes(h, 3);
+        expect(h.service.settings.speed, 0.65);
+        expect(h.core.rateValue, 0.65);
+        expect(h.service.rampPasses, 0);
+      },
+    );
+
+    test('AK2: Seek von Hand zählt nicht', () async {
+      final h = await rampHarness();
+      h.service.seek(12);
+      h.service.seek(10);
+      h.fire(3);
+      expect(h.service.rampPasses, 0);
+    });
+
+    test(
+      'AK2: Durchgänge vor dem Laden oder Einschalten zählen nicht',
+      () async {
+        final h = Harness();
+        h.core.passes = 42;
+        await h.loadReady(
+          '/a.wav',
+          60,
+          settings: const PlaybackSettings(
+            loopEnabled: true,
+            loopStart: 10,
+            loopEnd: 20,
+          ),
+        );
+        h.service.play();
+        passes(h, 5); // Steigerung noch aus
+        h.service.setRamp(enabled: true);
+        passes(h, 1);
+        expect(h.service.rampPasses, 1);
+      },
+    );
+
+    test(
+      'AK4: an der Zielstufe bleibt die Geschwindigkeit, der Zähler läuft',
+      () async {
+        final h = await rampHarness();
+        h.service.setRamp(target: 65);
+        passes(h, 10);
+        expect(h.service.settings.speed, 0.65);
+        passes(h, 23);
+        expect(h.service.settings.speed, 0.65);
+        expect(h.service.rampPasses, 23);
+        expect(h.service.rampLabel, '65 % · Ziel erreicht · 23 Durchgänge');
+      },
+    );
+
+    test('AK5: Loop-Grenzen ändern setzt den Zähler zurück', () async {
+      final h = await rampHarness();
+      passes(h, 6);
+      h.service.setLoopEnd(25);
+      expect(h.service.rampPasses, 0);
+      expect(h.service.settings.speed, 0.6);
+      passes(h, 6);
+      h.service.setLoopStart(12);
+      expect(h.service.rampPasses, 0);
+    });
+
+    test(
+      'AK5: Geschwindigkeit von Hand: Zähler 0, weiter ab der neuen Stufe',
+      () async {
+        final h = await rampHarness();
+        passes(h, 8);
+        h.service.setSpeed(0.8);
+        expect(h.service.rampPasses, 0);
+        passes(h, 10);
+        expect(h.service.settings.speed, closeTo(0.85, 1e-9));
+      },
+    );
+
+    test(
+      'Stufenwechsel durch die Steigerung setzt den Zähler nicht zurück',
+      () async {
+        final h = await rampHarness();
+        passes(h, 12);
+        expect(h.service.rampPasses, 2);
+      },
+    );
+
+    test('AK6: ausgeschaltet bleibt die Geschwindigkeit', () async {
+      final h = Harness();
+      await h.loadReady(
+        '/a.wav',
+        60,
+        settings: const PlaybackSettings(
+          speedEnabled: true,
+          speed: 0.7,
+          loopEnabled: true,
+          loopStart: 10,
+          loopEnd: 20,
+        ),
+      );
+      h.service.play();
+      passes(h, 50);
+      expect(h.service.settings.speed, 0.7);
+      expect(h.core.rateValue, 0.7);
+      expect(h.service.rampActive, isFalse);
+    });
+
+    test('ohne aktiven Loop wird nicht gezählt', () async {
+      final h = await rampHarness();
+      h.service.setLoopEnabled(false);
+      passes(h, 20);
+      expect(h.service.rampPasses, 0);
+      expect(h.service.settings.speed, 0.6);
+    });
+
+    test('AK7: Stufen werden gespeichert', () async {
+      final h = await rampHarness();
+      final saved = <PlaybackSettings>[];
+      h.service.onSettingsChanged = (_, s) => saved.add(s);
+      passes(h, 10);
+      expect(saved.last.speed, 0.65);
+      expect(saved.last.rampEnabled, isTrue);
+    });
+
+    test('Ziel nie unter dem Start', () async {
+      final h = await rampHarness();
+      h.service.setRamp(start: 120);
+      expect(h.service.settings.rampTarget, 120);
+      h.service.setRamp(target: 50);
+      expect(h.service.settings.rampStart, 50);
+    });
+  });
 }

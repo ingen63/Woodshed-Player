@@ -57,6 +57,8 @@ final _position =
     _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_position');
 final _duration =
     _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_duration');
+final _loopPasses =
+    _lib.lookupFunction<Int64 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_loop_passes');
 final _waveform = _lib.lookupFunction<
     Int32 Function(Pointer<_Player>, Double, Double, Int32, Pointer<Float>, Pointer<Float>),
     int Function(Pointer<_Player>, double, double, int, Pointer<Float>, Pointer<Float>)>('wp_waveform');
@@ -160,6 +162,9 @@ class WpPlayer {
   set volume(double v) => _setVolume(_p, v);
   double get position => _position(_p);
   double get duration => _duration(_p);
+
+  /// Loop-Durchgänge seit dem Start (#29); Seek zählt nicht. Massgebend ist die Differenz zweier Abfragen.
+  int get loopPasses => _loopPasses(_p);
 
   /// Wellenform des geladenen Titels (#28): [count] gleich lange Abschnitte über [start]–[end] Sekunden,
   /// je Abschnitt Minimum und Maximum (−1…1). Schnell, auch für die Übersicht des ganzen Titels.

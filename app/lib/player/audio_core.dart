@@ -22,6 +22,9 @@ abstract class AudioCore {
   set volume(double volume);
   double get position;
   double get duration;
+
+  /// Loop-Durchgänge seit dem Start (#29): Sprünge vom Loop-Ende zum Anfang, ohne Seek. Zählt nur hoch.
+  int get loopPasses;
 }
 
 /// Der echte Kern.
@@ -55,6 +58,8 @@ class WpAudioCore implements AudioCore {
   double get position => player.position;
   @override
   double get duration => player.duration;
+  @override
+  int get loopPasses => player.loopPasses;
 }
 
 /// #15/AK3: verständliche deutsche Meldung zu einem Fehlercode des Kerns.

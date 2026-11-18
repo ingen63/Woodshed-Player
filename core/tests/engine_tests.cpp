@@ -115,6 +115,55 @@ void loopSeamDirectIsSampleExact() {  // #5/AK4
     CHECK(e.playing());
 }
 
+void loopPassesCountJumpsFromLoopEnd() {  // #29/AK2
+    const int sr = 1000;
+    wp::Engine e;
+    e.setSource(ramp(5000), 2, sr);
+    e.setLoop(1.0, 2.0);
+    e.seek(1.5);
+    e.play();
+    renderFrames(e, 400, 333);
+    CHECK(e.loopPasses() == 0);
+    renderFrames(e, 200, 333);  // über das Loop-Ende
+    CHECK(e.loopPasses() == 1);
+    renderFrames(e, 3000, 4096);  // grosse Blöcke: jeder Sprung zählt einzeln
+    CHECK(e.loopPasses() == 4);
+}
+
+void loopPassesIgnoreSeeks() {  // #29/AK2
+    const int sr = 1000;
+    wp::Engine e;
+    e.setSource(ramp(5000), 2, sr);
+    e.setLoop(1.0, 2.0);
+    e.seek(1.9);
+    e.play();
+    renderFrames(e, 50);
+    e.seek(1.2);  // von Hand zurück
+    renderFrames(e, 50);
+    CHECK(e.loopPasses() == 0);
+    e.seek(3.0);  // hinter das Loop-Ende: Sprung zum Anfang ist kein Durchgang
+    renderFrames(e, 50);
+    CHECK(e.loopPasses() == 0);
+    CHECK_NEAR(e.position(), 1.05, 1e-9);
+}
+
+void loopPassesCountWhileStretching() {  // #29/AK2
+    const int sr = 44100;
+    wp::Engine e;
+    e.setSource(sine(440, 6, sr), 2, sr);
+    e.setRate(0.5);
+    e.setLoop(1.0, 2.0);
+    e.seek(1.0);
+    e.play();
+    renderFrames(e, static_cast<long long>(1.9 * sr));  // 0,95 s Original
+    CHECK(e.loopPasses() == 0);
+    renderFrames(e, static_cast<long long>(4.2 * sr));  // bis 3,05 s Original: drei Sprünge
+    CHECK(e.loopPasses() == 3);
+    e.seek(4.0);
+    renderFrames(e, 2048);
+    CHECK(e.loopPasses() == 3);
+}
+
 void seekSetsPositionAndFirstSample() {
     const int sr = 1000;
     wp::Engine e;
@@ -504,6 +553,9 @@ int main(int argc, char** argv) {
     const std::string filter = argc > 1 ? argv[1] : "";  // optional: nur Tests, deren Name das enthält
     const std::vector<std::pair<std::string, std::function<void()>>> tests = {
         {"loopSeamDirectIsSampleExact", loopSeamDirectIsSampleExact},
+        {"loopPassesCountJumpsFromLoopEnd", loopPassesCountJumpsFromLoopEnd},
+        {"loopPassesIgnoreSeeks", loopPassesIgnoreSeeks},
+        {"loopPassesCountWhileStretching", loopPassesCountWhileStretching},
         {"seekSetsPositionAndFirstSample", seekSetsPositionAndFirstSample},
         {"seekOutsideLoopJumpsToLoopStart", seekOutsideLoopJumpsToLoopStart},
         {"loopAtFileEndIsClamped", loopAtFileEndIsClamped},
