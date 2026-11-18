@@ -1,8 +1,10 @@
-// Tests der Metronom-Logik in Dart (#3). AKn = n-tes Abnahmekriterium im Issue #3.
+// Tests der Metronom-Logik in Dart (#3, #23). AKn = n-tes Abnahmekriterium im jeweiligen Issue.
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/metronome/metronome_controller.dart';
+import 'package:woodshed_player/metronome/metronome_panel.dart';
+import 'package:woodshed_player/ui/style.dart';
 import 'package:woodshed_player/metronome/metronome_settings.dart';
 import 'package:woodshed_player/metronome/practice_session.dart';
 import 'package:woodshed_player/metronome/practice_shortcuts.dart';
@@ -18,6 +20,9 @@ class FakeBackend implements MetronomeBackend {
   double volumeValue = 0.7;
   bool rampOn = false;
   int rampStart = 100;
+
+  /// Letzte Steigerung: 'bars' oder 'time' mit Werten.
+  String? lastRamp;
 
   @override
   void start() {
@@ -50,6 +55,20 @@ class FakeBackend implements MetronomeBackend {
     if (enabled && !rampOn && !isRunning) _bpm = start;
     rampOn = enabled;
     rampStart = start;
+    lastRamp = 'bars $start-$target +$step/$everyBars';
+  }
+
+  @override
+  void timedRamp({
+    required bool enabled,
+    required int start,
+    required int target,
+    required int seconds,
+  }) {
+    if (enabled && !rampOn && !isRunning) _bpm = start;
+    rampOn = enabled;
+    rampStart = start;
+    lastRamp = 'time $start-$target ${seconds}s';
   }
 }
 
@@ -250,6 +269,147 @@ void main() {
       backend.bpm = 135;
       c.sync();
       expect(c.settings.bpm, 135);
+    });
+  });
+
+  group('#23 Auto-Steigerung nach Zeit', () {
+    late FakeBackend backend;
+    late MemoryStore store;
+    late MetronomeController c;
+    setUp(() {
+      backend = FakeBackend();
+      store = MemoryStore();
+      c = MetronomeController(backend, store: store);
+    });
+
+    test('#23/AK1, AK4 Standard «Takte», Dauer 4 Minuten, 1–60', () {
+      const s = MetronomeSettings();
+      expect(s.rampByTime, isFalse);
+      expect(s.rampMinutes, 4);
+      expect(s.copyWith(rampMinutes: 0).rampMinutes, 1);
+      expect(s.copyWith(rampMinutes: 61).rampMinutes, 60);
+      expect(s.copyWith(rampMinutes: 17).rampMinutes, 17);
+    });
+
+    test('#23/AK2 «Takte» geht wie bisher an den Kern', () {
+      c.setRamp(enabled: true, start: 100, target: 150, step: 10, everyBars: 2);
+      expect(backend.lastRamp, 'bars 100-150 +10/2');
+    });
+
+    test(
+      '#23/AK4 «Zeit» gibt Start, Ziel und Dauer in Sekunden an den Kern',
+      () {
+        c.setRamp(byTime: true, start: 100, target: 110, minutes: 1);
+        expect(backend.lastRamp, 'time 100-110 60s');
+        c.setRamp(enabled: true);
+        expect(c.settings.bpm, 100); // Einschalten im Stand: Start-BPM
+        c.setRamp(minutes: 99);
+        expect(backend.lastRamp, 'time 100-110 3600s');
+        c.setRamp(byTime: false);
+        expect(backend.lastRamp, startsWith('bars 100-110'));
+      },
+    );
+
+    test('#23/AK10 Modus und Dauer bleiben nach einem Neustart erhalten', () async {
+      c.setRamp(
+        enabled: true,
+        byTime: true,
+        minutes: 12,
+        start: 80,
+        target: 95,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final backend2 = FakeBackend();
+      final c2 = MetronomeController(backend2, store: store);
+      await c2.restore();
+      expect(c2.settings.rampByTime, isTrue);
+      expect(c2.settings.rampMinutes, 12);
+      expect(backend2.lastRamp, 'time 80-95 720s');
+      expect(c2.running, isFalse);
+      // Ältere gespeicherte Einstellungen ohne die neuen Felder: Standardwerte.
+      final old = MetronomeSettings.fromJson({'rampEnabled': true});
+      expect([old.rampByTime, old.rampMinutes], [false, 4]);
+    });
+
+    Future<void> pumpPanel(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(900, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: MetronomePanel(controller: c)),
+          ),
+        ),
+      );
+    }
+
+    bool selected(WidgetTester tester, String key) =>
+        tester.widget<BorderedButton>(find.byKey(Key(key))).selected;
+
+    testWidgets(
+      '#23/AK1 Umschalter «Takte» / «Zeit» neben dem Schalter, Standard «Takte»',
+      (tester) async {
+        await pumpPanel(tester);
+        final header = find.ancestor(
+          of: find.byKey(const Key('switch:Automatische Tempo-Steigerung')),
+          matching: find.byType(CardHeader),
+        );
+        expect(
+          find.descendant(
+            of: header,
+            matching: find.byKey(const Key('rampMode:bars')),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: header,
+            matching: find.byKey(const Key('rampMode:time')),
+          ),
+          findsOneWidget,
+        );
+        expect(selected(tester, 'rampMode:bars'), isTrue);
+        expect(selected(tester, 'rampMode:time'), isFalse);
+        await tester.tap(find.byKey(const Key('rampMode:time')));
+        await tester.pump();
+        expect(c.settings.rampByTime, isTrue);
+        expect(selected(tester, 'rampMode:time'), isTrue);
+      },
+    );
+
+    testWidgets('#23/AK3, AK4 bei «Zeit» nur Start, Ziel und Dauer', (
+      tester,
+    ) async {
+      await pumpPanel(tester);
+      expect(find.text('Schritt'), findsOneWidget);
+      expect(find.text('Alle … Takte'), findsOneWidget);
+      expect(find.text('Dauer (Minuten)'), findsNothing);
+
+      c.setRamp(enabled: true, byTime: true);
+      await tester.pump();
+      expect(find.text('Start-BPM'), findsOneWidget);
+      expect(find.text('Ziel-BPM'), findsOneWidget);
+      expect(find.text('Dauer (Minuten)'), findsOneWidget);
+      expect(find.text('Schritt'), findsNothing);
+      expect(find.text('Alle … Takte'), findsNothing);
+
+      // Dauer per ± in ganzen Minuten, Standard 4.
+      final row = find
+          .ancestor(
+            of: find.text('Dauer (Minuten)'),
+            matching: find.byType(Row),
+          )
+          .first;
+      expect(
+        find.descendant(of: row, matching: find.text('4')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.descendant(of: row, matching: find.byIcon(Icons.add)),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(c.settings.rampMinutes, 5);
     });
   });
 

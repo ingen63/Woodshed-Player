@@ -23,6 +23,14 @@ abstract class MetronomeBackend {
     required int step,
     required int everyBars,
   });
+
+  /// Steigerung nach Zeit (#23), ersetzt die nach Takten.
+  void timedRamp({
+    required bool enabled,
+    required int start,
+    required int target,
+    required int seconds,
+  });
 }
 
 /// Speichert die Einstellungen.
@@ -86,13 +94,7 @@ class MetronomeController extends ChangeNotifier {
       ..meter = s.meter
       ..subdivision = s.subdivision
       ..volume = s.volume;
-    _backend.ramp(
-      enabled: s.rampEnabled,
-      start: s.rampStart,
-      target: s.rampTarget,
-      step: s.rampStep,
-      everyBars: s.rampEveryBars,
-    );
+    _applyRamp(s);
     _backend.bpm = s.rampEnabled ? s.rampStart : s.bpm;
     _settings = s.copyWith(bpm: _backend.bpm);
   }
@@ -159,12 +161,34 @@ class MetronomeController extends ChangeNotifier {
     _update(_settings.copyWith(volume: volume));
   }
 
+  /// Steigerung nach Takten oder nach Zeit (#23) an den Kern geben.
+  void _applyRamp(MetronomeSettings s) {
+    if (s.rampByTime) {
+      _backend.timedRamp(
+        enabled: s.rampEnabled,
+        start: s.rampStart,
+        target: s.rampTarget,
+        seconds: s.rampMinutes * 60,
+      );
+    } else {
+      _backend.ramp(
+        enabled: s.rampEnabled,
+        start: s.rampStart,
+        target: s.rampTarget,
+        step: s.rampStep,
+        everyBars: s.rampEveryBars,
+      );
+    }
+  }
+
   void setRamp({
     bool? enabled,
     int? start,
     int? target,
     int? step,
     int? everyBars,
+    bool? byTime,
+    int? minutes,
   }) {
     final next = _settings.copyWith(
       rampEnabled: enabled,
@@ -172,14 +196,10 @@ class MetronomeController extends ChangeNotifier {
       rampTarget: target,
       rampStep: step,
       rampEveryBars: everyBars,
+      rampByTime: byTime,
+      rampMinutes: minutes,
     );
-    _backend.ramp(
-      enabled: next.rampEnabled,
-      start: next.rampStart,
-      target: next.rampTarget,
-      step: next.rampStep,
-      everyBars: next.rampEveryBars,
-    );
+    _applyRamp(next);
     // Einschalten im Stand setzt der Kern auf Start-BPM; das hier übernehmen.
     _update(next.copyWith(bpm: _backend.bpm));
   }

@@ -78,8 +78,13 @@ WP_API int wp_metro_bpm(wp_player* p);                /* aktuelles Tempo (änder
 WP_API void wp_metro_set_meter(wp_player* p, int beats_per_bar);    /* 2, 3, 4 oder 6 (6/8) */
 WP_API void wp_metro_set_subdivision(wp_player* p, int clicks);     /* 1–4 Klicks pro Schlag */
 WP_API void wp_metro_set_volume(wp_player* p, float volume);        /* 0–1 */
+/* Steigerung nach Takten: alle every_bars Takte um step_bpm. */
 WP_API void wp_metro_set_ramp(wp_player* p, int enabled, int start_bpm, int target_bpm, int step_bpm,
                               int every_bars);
+/* Steigerung nach Zeit (#23): 1-BPM-Stufen gleichmässig über duration_seconds (1–3600), Wechsel am
+ * Taktanfang; danach eine Stufe Ziel, dann wieder Start. Ersetzt die Steigerung nach Takten. */
+WP_API void wp_metro_set_ramp_timed(wp_player* p, int enabled, int start_bpm, int target_bpm,
+                                    int duration_seconds);
 
 /* ---- Aufnahme des Systemtons (nur macOS 14.2+, sonst Rückgabe < 0) ---- */
 /* 1 = auf dieser Plattform verfügbar, 0 = nicht verfügbar. */

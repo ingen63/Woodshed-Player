@@ -52,15 +52,47 @@ void Metronome::setSubdivision(int clicksPerBeat) { subdivision_.store(std::clam
 void Metronome::setVolume(float volume) { volume_.store(std::clamp(volume, 0.0f, 1.0f)); }
 
 void Metronome::setRamp(bool enabled, int startBpm, int targetBpm, int stepBpm, int everyBars) {
+    const bool changed = rampTimed_.exchange(false);
     rampStart_.store(clampBpm(startBpm));
     rampTarget_.store(clampBpm(targetBpm));
     rampStep_.store(std::clamp(stepBpm, 1, 280));
     rampEvery_.store(std::clamp(everyBars, 1, 20));
+    enableRamp(enabled, changed);
+}
+
+void Metronome::setTimedRamp(bool enabled, int startBpm, int targetBpm, int durationSeconds) {
+    const int start = clampBpm(startBpm), target = clampBpm(targetBpm);
+    const int seconds = std::clamp(durationSeconds, 1, 3600);
+    bool changed = !rampTimed_.exchange(true);
+    changed |= rampStart_.exchange(start) != start;
+    changed |= rampTarget_.exchange(target) != target;
+    changed |= rampSeconds_.exchange(seconds) != seconds;
+    enableRamp(enabled, changed);
+}
+
+// Einschalten im Stand: Start-BPM. Einschalten oder Wechsel der Art: Steigerung neu beginnen. Bei Zeit
+// auch nach geänderten Werten, damit die Runde zur neuen Dauer passt (vom laufenden Tempo aus).
+void Metronome::enableRamp(bool enabled, bool changed) {
     const bool was = rampOn_.exchange(enabled);
-    if (enabled && !was) {
-        if (!running_.load()) bpm_.store(rampStart_.load());  // Einschalten im Stand: Start-BPM
-        rampRestart_.store(true);                             // Zählung der Takte neu beginnen
-    }
+    if (enabled && !was && !running_.load()) bpm_.store(rampStart_.load());
+    if (enabled && (!was || changed)) rampRestart_.store(true);
+}
+
+double Metronome::framesPerTimedStep() const {
+    const int steps = std::abs(rampTarget_.load() - rampStart_.load());
+    return steps == 0 ? 0 : static_cast<double>(rampSeconds_.load()) * sampleRate_ / steps;
+}
+
+// Stufe (0 = Start-BPM … |Ziel − Start| = Ziel) zur Position `frame`; eine Runde hat |Ziel − Start| + 1
+// Stufen, die letzte (Ziel halten) endet mit dem Rücksprung auf Start.
+int Metronome::timedStep(double frame) {
+    const double perStep = framesPerTimedStep();
+    if (perStep <= 0) return 0;
+    const int steps = std::abs(rampTarget_.load() - rampStart_.load());
+    const double round = perStep * (steps + 1);
+    if (frame - cycleStart_ >= round) cycleStart_ += std::floor((frame - cycleStart_) / round) * round;
+    const double k = std::floor((frame - cycleStart_) / perStep + 1e-9);
+    return std::clamp(static_cast<int>(k), 0, steps);
 }
 
 double Metronome::framesPerTick() const {
@@ -80,12 +112,20 @@ void Metronome::applyCommands() {
         beat_ = sub_ = 0;
         bar_ = 1;
         barsSinceChange_ = 0;
+        cycleStart_ = 0;
         firstTick_ = true;
         rampRestart_.store(false);
     } else if (cmd == 2) {
         active_ = false;  // laufende Klicks klingen aus
     }
-    if (rampRestart_.exchange(false)) barsSinceChange_ = 0;
+    if (rampRestart_.exchange(false)) {
+        barsSinceChange_ = 0;
+        // Zeit: Runde so legen, dass das laufende Tempo als erreichte Stufe gilt (sonst ab Start).
+        const int start = rampStart_.load(), target = rampTarget_.load(), cur = bpm_.load();
+        const bool inside = (cur - start) * (target - cur) >= 0;
+        const int k = inside ? std::abs(cur - start) : 0;
+        cycleStart_ = static_cast<double>(now_) - k * framesPerTimedStep();
+    }
 
     // Unterteilung mitten im Schlag gewechselt: nächsten Klick ab Beginn des laufenden Schlags neu planen.
     const int subdiv = subdivision_.load();
@@ -103,10 +143,17 @@ void Metronome::applyCommands() {
     }
 }
 
-void Metronome::onBarBoundary() {
+void Metronome::onBarBoundary(double frame) {
     ++bar_;
     ++barsSinceChange_;
-    if (!rampOn_.load() || barsSinceChange_ < rampEvery_.load()) return;
+    if (!rampOn_.load()) return;
+    if (rampTimed_.load()) {
+        const int start = rampStart_.load(), target = rampTarget_.load();
+        const int k = timedStep(frame);
+        bpm_.store(target >= start ? start + k : start - k);
+        return;
+    }
+    if (barsSinceChange_ < rampEvery_.load()) return;
     barsSinceChange_ = 0;
     const int start = rampStart_.load(), target = rampTarget_.load(), step = rampStep_.load();
     const int cur = bpm_.load();
@@ -133,7 +180,7 @@ void Metronome::scheduleTick() {
         beat_ = 0;
     }
     if (beat_ == 0 && sub_ == 0) {
-        if (!firstTick_) onBarBoundary();
+        if (!firstTick_) onBarBoundary(nextTick_);
         firstTick_ = false;
     }
     if (sub_ == 0) beatStart_ = nextTick_;

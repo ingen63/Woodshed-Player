@@ -48,9 +48,14 @@ public:
     void setVolume(float volume);  // 0–1
     float volume() const { return volume_.load(); }
 
-    // Automatische Steigerung. Bei gestopptem Metronom setzt Einschalten das Tempo auf startBpm.
+    // Automatische Steigerung nach Takten. Bei gestopptem Metronom setzt Einschalten das Tempo auf startBpm.
     void setRamp(bool enabled, int startBpm, int targetBpm, int stepBpm, int everyBars);
+    // Automatische Steigerung nach Zeit (#23): in 1-BPM-Stufen gleichmässig über durationSeconds (1–3600),
+    // Stufe k ideal bei k · Dauer / |Ziel − Start|, Wechsel am nächsten Taktanfang. Das Ziel gilt eine
+    // Stufe lang, danach beginnt es wieder bei startBpm. Einschalten wie bei setRamp.
+    void setTimedRamp(bool enabled, int startBpm, int targetBpm, int durationSeconds);
     bool rampEnabled() const { return rampOn_.load(); }
+    bool rampTimed() const { return rampTimed_.load(); }
 
     // Audio-Thread: Klicks zu `out` (interleaved, `channels` Kanäle) addieren.
     void renderAdd(float* out, int frames, int channels);
@@ -68,7 +73,10 @@ private:
     void applyCommands();
     void scheduleTick();
     void advanceStep();
-    void onBarBoundary();
+    void onBarBoundary(double frame);
+    void enableRamp(bool enabled, bool changed);
+    int timedStep(double frame);
+    double framesPerTimedStep() const;
     double framesPerTick() const;
     float renderVoices();
 
@@ -84,6 +92,8 @@ private:
     std::atomic<bool> rampOn_{false};
     std::atomic<int> rampStart_{100}, rampTarget_{150}, rampStep_{5}, rampEvery_{4};
     std::atomic<bool> rampRestart_{false};
+    std::atomic<bool> rampTimed_{false};
+    std::atomic<int> rampSeconds_{240};
 
     // Zustand des Audio-Threads
     bool active_ = false;
@@ -93,6 +103,7 @@ private:
     int activeSub_ = 1;      // Unterteilung, mit der nextTick_ geplant wurde
     int beat_ = 0, sub_ = 0, bar_ = 1;
     int barsSinceChange_ = 0;
+    double cycleStart_ = 0;  // Steigerung nach Zeit: Beginn der laufenden Runde (Frames seit Start)
     bool firstTick_ = true;
     float gain_ = 0.7f;
     float gainCoef_ = 0;

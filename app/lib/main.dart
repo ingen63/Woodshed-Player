@@ -105,4 +105,16 @@ class _PlayerMetronome implements MetronomeBackend {
     step: step,
     everyBars: everyBars,
   );
+  @override
+  void timedRamp({
+    required bool enabled,
+    required int start,
+    required int target,
+    required int seconds,
+  }) => _p.metronomeTimedRamp(
+    enabled: enabled,
+    start: start,
+    target: target,
+    seconds: seconds,
+  );
 }

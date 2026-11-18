@@ -1,4 +1,4 @@
-// Tests des Metronoms (#3) im Offline-Rendering. AKn = n-tes Abnahmekriterium im Issue #3.
+// Tests des Metronoms (#3, #23) im Offline-Rendering. AKn = n-tes Abnahmekriterium im jeweiligen Issue.
 #include <cmath>
 #include <cstdio>
 #include <functional>
@@ -264,6 +264,153 @@ void rampWithSixEightAndSubdivision() {  // #3/AK19
     CHECK(firstBarWithBpm(t, 130) == 2);
 }
 
+
+// ---- #23 Steigerung nach Zeit ----
+
+struct BarStart {
+    double seconds;
+    int bpm;
+};
+
+std::vector<BarStart> barStarts(const Ticks& t, int rate) {
+    std::vector<BarStart> out;
+    for (auto& k : t)
+        if (k.beat == 0 && k.sub == 0) out.push_back({static_cast<double>(k.frame) / rate, k.bpm});
+    return out;
+}
+
+// Jede Stufe k (Tempo start ± k) beginnt am ersten Taktanfang ab ihrem Idealzeitpunkt round0 + k · Dauer/n,
+// also höchstens einen Takt danach.
+bool stepsWithinOneBar(const std::vector<BarStart>& bars, int start, int target, double seconds,
+                       double round0) {
+    const int n = std::abs(target - start);
+    const int dir = target >= start ? 1 : -1;
+    for (int k = 1; k <= n; ++k) {
+        const double ideal = round0 + k * seconds / n;
+        size_t i = 0;
+        while (i < bars.size() && bars[i].bpm != start + dir * k) ++i;
+        if (i == 0 || i == bars.size()) return false;
+        const double barLen = bars[i].seconds - bars[i - 1].seconds;
+        if (bars[i].seconds < ideal - 1e-6 || bars[i].seconds - ideal > barLen + 1e-6) {
+            std::printf("  Stufe %d: %.3f s statt %.3f s\n", k, bars[i].seconds, ideal);
+            return false;
+        }
+    }
+    return true;
+}
+
+void timedRampExampleFromIssue() {  // #23/AK5, AK6
+    const int rate = 44100;
+    Metronome m(rate);
+    m.setTimedRamp(true, 100, 110, 60);
+    CHECK(m.rampTimed());
+    CHECK(m.bpm() == 100);  // Einschalten im Stand: Start-BPM wie bei Takten
+    m.start();
+    auto t = run(m, rate * 64LL);
+    auto bars = barStarts(t, rate);
+    // Nur 1-BPM-Schritte aufwärts, 10 Wechsel bis 110.
+    int changes = 0;
+    bool ok = true;
+    for (size_t i = 1; i < bars.size(); ++i) {
+        if (bars[i].bpm == bars[i - 1].bpm) continue;
+        ++changes;
+        ok = ok && bars[i].bpm == bars[i - 1].bpm + 1;
+    }
+    CHECK(ok);
+    CHECK(changes == 10);
+    // Etwa alle 6 s, je höchstens einen Takt nach dem Idealzeitpunkt; 110 nach etwa 60 s.
+    CHECK(stepsWithinOneBar(bars, 100, 110, 60, 0));
+    // AK6: Tempo wechselt nur am Taktanfang.
+    bool sameInBar = true;
+    for (auto& k : t) sameInBar = sameInBar && k.bpm == bpmOfBar(t, k.bar);
+    CHECK(sameInBar);
+}
+
+void timedRampLoops() {  // #23/AK7
+    const int rate = 44100;
+    Metronome m(rate);
+    m.setTimedRamp(true, 100, 110, 60);
+    m.start();
+    auto bars = barStarts(run(m, rate * 140LL), rate);
+    // Nach dem Ziel (eine Stufe lang, 6 s) zurück auf 100, dann läuft die Steigerung erneut.
+    size_t reset = 0;
+    for (size_t i = 1; i < bars.size(); ++i)
+        if (bars[i - 1].bpm == 110 && bars[i].bpm == 100) {
+            reset = i;
+            break;
+        }
+    CHECK(reset > 0);
+    if (reset > 0) {
+        CHECK(bars[reset].seconds >= 66.0 - 1e-6);
+        CHECK(bars[reset].seconds - 66.0 < bars[reset].seconds - bars[reset - 1].seconds + 1e-6);
+        std::vector<BarStart> second(bars.begin() + static_cast<long>(reset), bars.end());
+        CHECK(stepsWithinOneBar(second, 100, 110, 60, 66.0));
+    }
+}
+
+void timedRampDescending() {  // #23/AK8
+    const int rate = 44100;
+    Metronome m(rate);
+    m.setTimedRamp(true, 120, 100, 60);
+    m.start();
+    auto bars = barStarts(run(m, rate * 70LL), rate);
+    // Bis zum Rücksprung nur 1-BPM-Schritte abwärts bis 100, dann wieder 120.
+    size_t i = 1;
+    bool ok = true;
+    for (; i < bars.size() && bars[i].bpm <= bars[i - 1].bpm; ++i)
+        if (bars[i].bpm != bars[i - 1].bpm) ok = ok && bars[i].bpm == bars[i - 1].bpm - 1;
+    CHECK(ok);
+    CHECK(i < bars.size() && bars[i - 1].bpm == 100 && bars[i].bpm == 120);
+    CHECK(stepsWithinOneBar(bars, 120, 100, 60, 0));
+}
+
+void timedRampStartEqualsTarget() {  // #23/AK9
+    Metronome m(44100);
+    m.setTimedRamp(true, 90, 90, 60);
+    m.start();
+    auto t = run(m, 44100LL * 130);
+    bool ok = !t.empty();
+    for (auto& k : t) ok = ok && k.bpm == 90;
+    CHECK(ok);
+}
+
+void timedRampFastStepsStayWithinOneBar() {  // #23/AK6 bei kurzen Stufen (mehr als eine pro Takt)
+    const int rate = 48000;
+    Metronome m(rate);
+    m.setTimedRamp(true, 60, 300, 60);  // Stufe alle 0,25 s, Takt 0,8–4 s
+    m.start();
+    auto t = run(m, rate * 60LL, 480);  // eine Runde dauert 60,25 s (240 Stufen + Ziel halten)
+    auto bars = barStarts(t, rate);
+    // An jedem Taktanfang gilt die zuletzt fällige Stufe (übersprungene inklusive).
+    bool ok = bars.size() > 30;
+    for (auto& b : bars) ok = ok && b.bpm == 60 + static_cast<int>(std::floor(b.seconds / 0.25 + 1e-9));
+    CHECK(ok);
+}
+
+void switchingModes() {  // #23/AK1, AK2: Takte bleibt wie bisher, Wechsel der Art während des Spielens
+    Metronome m(44100);
+    m.setTimedRamp(true, 100, 150, 600);
+    m.setRamp(true, 100, 150, 20, 1);  // zurück auf Takte
+    CHECK(!m.rampTimed());
+    m.start();
+    auto t = run(m, 44100LL * 20);
+    const int expected[] = {100, 120, 140, 150, 100, 120};
+    for (int bar = 1; bar <= 6; ++bar) CHECK(bpmOfBar(t, bar) == expected[bar - 1]);
+
+    // Während des Spielens auf Zeit: weiter vom laufenden Tempo aus, nächste Stufe nach Dauer/n.
+    Metronome z(44100);
+    z.setRamp(true, 100, 200, 10, 1);
+    z.start();
+    run(z, 44100LL * 5);
+    const int cur = z.bpm();
+    CHECK(cur > 100 && cur < 200);
+    z.setTimedRamp(true, 100, 200, 100);  // 1 BPM pro Sekunde
+    auto bars = barStarts(run(z, 44100LL * 10), 44100);
+    bool ok = bars.size() >= 3;
+    for (auto& b : bars) ok = ok && b.bpm == cur + static_cast<int>(std::floor(b.seconds - 5.0));
+    CHECK(ok);
+}
+
 }  // namespace
 
 int main() {
@@ -281,6 +428,12 @@ int main() {
         {"rampDescendingAndHold", rampDescendingAndHold},
         {"rampStartResetsAndOffKeepsTempo", rampStartResetsAndOffKeepsTempo},
         {"rampWithSixEightAndSubdivision", rampWithSixEightAndSubdivision},
+        {"timedRampExampleFromIssue", timedRampExampleFromIssue},
+        {"timedRampLoops", timedRampLoops},
+        {"timedRampDescending", timedRampDescending},
+        {"timedRampStartEqualsTarget", timedRampStartEqualsTarget},
+        {"timedRampFastStepsStayWithinOneBar", timedRampFastStepsStayWithinOneBar},
+        {"switchingModes", switchingModes},
     };
     for (auto& [name, fn] : tests) {
         const int before = failures;

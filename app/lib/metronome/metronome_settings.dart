@@ -11,6 +11,8 @@ class MetronomeSettings {
     this.rampTarget = 150,
     this.rampStep = 5,
     this.rampEveryBars = 4,
+    this.rampByTime = false,
+    this.rampMinutes = 4,
   });
 
   static const minBpm = 20;
@@ -28,6 +30,10 @@ class MetronomeSettings {
   final int rampStep;
   final int rampEveryBars;
 
+  /// Steigerung nach Zeit statt nach Takten (#23), über [rampMinutes] (1–60).
+  final bool rampByTime;
+  final int rampMinutes;
+
   static int clampBpm(int bpm) => bpm.clamp(minBpm, maxBpm);
 
   static String meterLabel(int meter) => meter == 6 ? '6/8' : '$meter/4';
@@ -42,6 +48,8 @@ class MetronomeSettings {
     int? rampTarget,
     int? rampStep,
     int? rampEveryBars,
+    bool? rampByTime,
+    int? rampMinutes,
   }) => MetronomeSettings(
     bpm: clampBpm(bpm ?? this.bpm),
     meter: meters.contains(meter) ? meter! : this.meter,
@@ -52,6 +60,8 @@ class MetronomeSettings {
     rampTarget: clampBpm(rampTarget ?? this.rampTarget),
     rampStep: rampSteps.contains(rampStep) ? rampStep! : this.rampStep,
     rampEveryBars: (rampEveryBars ?? this.rampEveryBars).clamp(1, 20),
+    rampByTime: rampByTime ?? this.rampByTime,
+    rampMinutes: (rampMinutes ?? this.rampMinutes).clamp(1, 60),
   );
 
   Map<String, Object> toJson() => {
@@ -63,6 +73,8 @@ class MetronomeSettings {
     'rampTarget': rampTarget,
     'rampStep': rampStep,
     'rampEveryBars': rampEveryBars,
+    'rampByTime': rampByTime,
+    'rampMinutes': rampMinutes,
   };
 
   /// Liest gespeicherte Werte; fehlende oder ungültige Felder bekommen den Standardwert bzw. werden begrenzt.
@@ -81,6 +93,10 @@ class MetronomeSettings {
       rampTarget: i('rampTarget'),
       rampStep: i('rampStep'),
       rampEveryBars: i('rampEveryBars'),
+      rampByTime: json['rampByTime'] is bool
+          ? json['rampByTime'] as bool
+          : null,
+      rampMinutes: i('rampMinutes'),
     );
   }
 

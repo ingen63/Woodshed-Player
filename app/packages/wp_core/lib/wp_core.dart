@@ -66,6 +66,8 @@ final _mSetVolume = _lib.lookupFunction<Void Function(Pointer<_Player>, Float),
     void Function(Pointer<_Player>, double)>('wp_metro_set_volume');
 final _mSetRamp = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32, Int32, Int32, Int32, Int32),
     void Function(Pointer<_Player>, int, int, int, int, int)>('wp_metro_set_ramp');
+final _mSetRampTimed = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32, Int32, Int32, Int32),
+    void Function(Pointer<_Player>, int, int, int, int)>('wp_metro_set_ramp_timed');
 
 final _recAvailable = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_available');
 final _recStart = _lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('wp_rec_start');
@@ -169,6 +171,10 @@ class WpPlayer {
   void metronomeRamp({required bool enabled, required int start, required int target, required int step,
           required int everyBars}) =>
       _mSetRamp(_p, enabled ? 1 : 0, start, target, step, everyBars);
+
+  /// Steigerung nach Zeit (#23): 1-BPM-Stufen gleichmässig über [seconds], Wechsel am Taktanfang.
+  void metronomeTimedRamp({required bool enabled, required int start, required int target, required int seconds}) =>
+      _mSetRampTimed(_p, enabled ? 1 : 0, start, target, seconds);
 }
 
 /// Dauer einer Datei in Sekunden, ohne sie zu laden. Negativ = Fehlercode ([WpCode]).

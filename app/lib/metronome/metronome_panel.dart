@@ -149,14 +149,22 @@ class MetronomePanel extends StatelessWidget {
                   title: 'Automatische Tempo-Steigerung',
                   value: s.rampEnabled,
                   onChanged: (v) => controller.setRamp(enabled: v),
+                  trailing: _RampMode(
+                    controller: controller,
+                    byTime: s.rampByTime,
+                  ),
                 ),
                 Dimmed(
                   enabled: s.rampEnabled,
                   child: _RampSettings(controller: controller, settings: s),
                 ),
-                const HintText(
-                  'Das Tempo steigt jeweils am Taktanfang. Ist das Ziel erreicht, '
-                  'bleibt es gleich viele Takte und beginnt dann wieder beim Start-BPM.',
+                HintText(
+                  s.rampByTime
+                      ? 'Das Tempo ändert sich in 1-BPM-Schritten gleichmässig über die Dauer, '
+                            'jeweils am Taktanfang. Ist das Ziel erreicht, bleibt es einen Schritt lang '
+                            'und beginnt dann wieder beim Start-BPM.'
+                      : 'Das Tempo steigt jeweils am Taktanfang. Ist das Ziel erreicht, '
+                            'bleibt es gleich viele Takte und beginnt dann wieder beim Start-BPM.',
                 ),
               ],
             ),
@@ -165,6 +173,35 @@ class MetronomePanel extends StatelessWidget {
       },
     );
   }
+}
+
+/// Umschalter «Takte» / «Zeit» der Auto-Steigerung (#23).
+class _RampMode extends StatelessWidget {
+  const _RampMode({required this.controller, required this.byTime});
+
+  final MetronomeController controller;
+  final bool byTime;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const SizedBox(width: 8),
+      BorderedButton(
+        key: const Key('rampMode:bars'),
+        label: 'Takte',
+        selected: !byTime,
+        onPressed: () => controller.setRamp(byTime: false),
+      ),
+      const SizedBox(width: 4),
+      BorderedButton(
+        key: const Key('rampMode:time'),
+        label: 'Zeit',
+        selected: byTime,
+        onPressed: () => controller.setRamp(byTime: true),
+      ),
+    ],
+  );
 }
 
 class _RampSettings extends StatelessWidget {
@@ -198,24 +235,32 @@ class _RampSettings extends StatelessWidget {
           s.rampTarget,
           (v) => controller.setRamp(target: v),
         ),
-        Row(
-          children: [
-            const Expanded(child: Text('Schritt')),
-            DropdownButton<int>(
-              value: s.rampStep,
-              items: [
-                for (final st in MetronomeSettings.rampSteps)
-                  DropdownMenuItem(value: st, child: Text('+$st BPM')),
-              ],
-              onChanged: (v) => controller.setRamp(step: v),
-            ),
-          ],
-        ),
-        _stepper(
-          'Alle … Takte',
-          s.rampEveryBars,
-          (v) => controller.setRamp(everyBars: v),
-        ),
+        if (s.rampByTime)
+          _stepper(
+            'Dauer (Minuten)',
+            s.rampMinutes,
+            (v) => controller.setRamp(minutes: v),
+          )
+        else ...[
+          Row(
+            children: [
+              const Expanded(child: Text('Schritt')),
+              DropdownButton<int>(
+                value: s.rampStep,
+                items: [
+                  for (final st in MetronomeSettings.rampSteps)
+                    DropdownMenuItem(value: st, child: Text('+$st BPM')),
+                ],
+                onChanged: (v) => controller.setRamp(step: v),
+              ),
+            ],
+          ),
+          _stepper(
+            'Alle … Takte',
+            s.rampEveryBars,
+            (v) => controller.setRamp(everyBars: v),
+          ),
+        ],
       ],
     );
   }

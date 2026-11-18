@@ -128,6 +128,13 @@ class FakeMetronome implements MetronomeBackend {
     required int step,
     required int everyBars,
   }) {}
+  @override
+  void timedRamp({
+    required bool enabled,
+    required int start,
+    required int target,
+    required int seconds,
+  }) {}
 }
 
 class FakeFiles implements FilePlatform {

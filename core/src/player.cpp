@@ -142,5 +142,8 @@ void wp_metro_set_volume(wp_player* p, float v) { if (p) p->core->metronome().se
 void wp_metro_set_ramp(wp_player* p, int enabled, int start, int target, int step, int every) {
     if (p) p->core->metronome().setRamp(enabled != 0, start, target, step, every);
 }
+void wp_metro_set_ramp_timed(wp_player* p, int enabled, int start, int target, int seconds) {
+    if (p) p->core->metronome().setTimedRamp(enabled != 0, start, target, seconds);
+}
 
 }  // extern "C"
