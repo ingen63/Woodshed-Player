@@ -1,6 +1,7 @@
 /// Dart-Anbindung des Audio-Kerns (core/include/wp_core.h).
-/// Alle Aufrufe sind kurz und laufen direkt im Haupt-Isolate; nur [WpPlayer.load] dekodiert die
-/// ganze Datei und kann bei langen Titeln etwas dauern.
+/// Alle Aufrufe sind kurz und laufen direkt im Haupt-Isolate. Laden geht mit [WpPlayer.loadAsync] im
+/// Hintergrund; [WpPlayer.load] wartet dagegen, bis die ganze Datei dekodiert ist.
+/// Ein Test (app/test/ffi_coverage_test.dart) prüft, dass jede Funktion aus wp_core.h hier angebunden ist.
 library;
 
 import 'dart:ffi';
@@ -21,6 +22,14 @@ final _create = _lib.lookupFunction<Pointer<_Player> Function(), Pointer<_Player
 final _destroy = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_destroy');
 final _load = _lib.lookupFunction<Int32 Function(Pointer<_Player>, Pointer<Utf8>),
     int Function(Pointer<_Player>, Pointer<Utf8>)>('wp_load');
+final _loadAsync = _lib.lookupFunction<Int32 Function(Pointer<_Player>, Pointer<Utf8>),
+    int Function(Pointer<_Player>, Pointer<Utf8>)>('wp_load_async');
+final _loadState =
+    _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_load_state');
+final _loadProgress =
+    _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_load_progress');
+final _loadWait =
+    _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_load_wait');
 final _errorMessage =
     _lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('wp_error_message');
 final _play = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_play');
@@ -65,6 +74,23 @@ final _recLevel = _lib.lookupFunction<Float Function(), double Function()>('wp_r
 final _recOnlySilence = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_only_silence');
 final _recError = _lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('wp_rec_error');
 
+/// Fehlercodes und Ladezustände wie in wp_core.h (`WP_ERR_*`, `WP_LOAD_*`).
+abstract final class WpCode {
+  static const ok = 0;
+  static const invalidArgument = -1;
+  static const fileNotFound = -2;
+  static const unsupportedFormat = -3;
+  static const deviceUnavailable = -4;
+  static const outOfMemory = -5;
+  static const fileUnreadable = -6;
+  static const cancelled = -7;
+  static const busy = -8;
+
+  static const loadIdle = 0;
+  static const loadRunning = 1;
+  static const loadReady = 2;
+}
+
 /// Ein Player mit eigenem Audiogerät.
 class WpPlayer {
   WpPlayer() : _p = _create() {
@@ -83,6 +109,28 @@ class WpPlayer {
       malloc.free(c);
     }
   }
+
+  /// Startet das Laden im Hintergrund. [WpCode.ok] oder Fehlercode (< 0); ein laufendes Laden wird abgebrochen.
+  int loadAsync(String path) {
+    final c = path.toNativeUtf8();
+    try {
+      return _loadAsync(_p, c);
+    } finally {
+      malloc.free(c);
+    }
+  }
+
+  /// `WpCode.load*` oder Fehlercode (< 0) des letzten Ladens.
+  int get loadState => _loadState(_p);
+
+  /// Fortschritt 0–1 des laufenden bzw. letzten Ladens.
+  double get loadProgress => _loadProgress(_p);
+
+  /// Wartet, bis das laufende Laden fertig ist. [WpCode.ok] oder Fehlercode.
+  int loadWait() => _loadWait(_p);
+
+  /// Text des Kerns zu einem Fehlercode.
+  static String errorMessage(int code) => _errorMessage(code).toDartString();
 
   void play() => _play(_p);
   void pause() => _pause(_p);

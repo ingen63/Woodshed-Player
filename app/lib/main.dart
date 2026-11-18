@@ -11,6 +11,8 @@ import 'metronome/metronome_controller.dart';
 import 'metronome/metronome_panel.dart';
 import 'metronome/practice_session.dart';
 import 'metronome/practice_shortcuts.dart';
+import 'player/audio_core.dart';
+import 'player/player_service.dart';
 import 'time_format.dart';
 import 'ui/player_view.dart';
 import 'ui/style.dart';
@@ -42,28 +44,16 @@ class _PlayerPageState extends State<PlayerPage> {
   static const _files = MethodChannel('woodshed/files');
 
   final WpPlayer _player = WpPlayer();
+  late final PlayerService _service = PlayerService(WpAudioCore(_player));
   late final MetronomeController _metronome = MetronomeController(
     _PlayerMetronome(_player),
     onRunningChanged: (on) =>
         _files.invokeMethod('keepAwake', on).catchError((_) => null),
     store: _SupportDirStore(_files),
   );
-  late final PracticeSession _session = PracticeSession(
-    _PlayerTitle(_player),
-    _metronome,
-  );
-  Timer? _ticker;
-  String? _title;
-  String? _error;
-  double _position = 0;
-  double _duration = 0;
-  bool _playing = false;
-  double _volume = 1.0;
-  bool _speedOn = false;
-  double _rate = 1.0;
-  double _loopStart = 0;
-  double _loopEnd = 0;
-  bool _loopOn = false;
+  late final PracticeSession _session = PracticeSession(_service, _metronome);
+  Timer? _ticker; // nur für Metronom-Steigerung und Aufnahme
+  String? _error; // Fehler ausserhalb der Wiedergabe (Datei-Dialog, Aufnahme)
 
   // Aufnahme
   bool _recording = false;
@@ -75,7 +65,8 @@ class _PlayerPageState extends State<PlayerPage> {
   @override
   void initState() {
     super.initState();
-    _ticker = Timer.periodic(const Duration(milliseconds: 33), (_) => _tick());
+    _service.addListener(_changed);
+    _metronome.addListener(_updateTicker);
     _metronome.restore();
     // Datei per Drag & Drop ins Fenster (macOS).
     _files.setMethodCallHandler((call) async {
@@ -90,15 +81,31 @@ class _PlayerPageState extends State<PlayerPage> {
   void dispose() {
     _ticker?.cancel();
     if (WpRecorder.isRecording) WpRecorder.stop();
+    _metronome.removeListener(_updateTicker);
     _metronome.dispose();
+    _service.dispose();
     _player.dispose();
     super.dispose();
   }
 
+  void _changed() => setState(() {});
+
+  /// Der Ticker läuft nur, solange das Metronom läuft oder aufgenommen wird.
+  void _updateTicker() {
+    final needed = _metronome.running || _recording;
+    if (needed && _ticker == null) {
+      _ticker = Timer.periodic(
+        const Duration(milliseconds: 33),
+        (_) => _tick(),
+      );
+    } else if (!needed) {
+      _ticker?.cancel();
+      _ticker = null;
+    }
+  }
+
   void _tick() {
     setState(() {
-      _position = _player.position;
-      _playing = _player.isPlaying;
       if (_metronome.running) {
         _metronome.sync(); // Tempo der automatischen Steigerung
       }
@@ -119,58 +126,16 @@ class _PlayerPageState extends State<PlayerPage> {
     }
   }
 
-  void _load(String path, String title) {
-    try {
-      _player.load(path);
-      _player.rate = _speedOn ? _rate : 1.0;
-      _player.volume = _volume;
-      setState(() {
-        _title = title;
-        _duration = _player.duration;
-        _error = null;
-        _loopStart = 0;
-        _loopEnd = _duration;
-        _loopOn = false;
-      });
-      _session.playTitle();
-    } on WpException catch (e) {
-      setState(() => _error = e.message);
-    }
-  }
-
-  void _setRate(double r) {
-    final rounded = ((r * 20).round() / 20).clamp(0.1, 2.0); // 0,05er-Schritte
-    setState(() => _rate = rounded);
-    _player.rate = _speedOn ? rounded : 1.0;
-  }
-
-  void _setSpeedOn(bool on) {
-    setState(() => _speedOn = on);
-    _player.rate = on ? _rate : 1.0;
-  }
-
-  void _setVolume(double v) {
-    setState(() => _volume = v);
-    _player.volume = v;
-  }
-
-  void _setLoop({bool? on, double? start, double? end}) {
-    setState(() {
-      _loopOn = on ?? _loopOn;
-      _loopStart = (start ?? _loopStart).clamp(0, _duration);
-      _loopEnd = (end ?? _loopEnd).clamp(0, _duration);
-    });
-    if (_loopOn && _loopEnd >= _loopStart + 1) {
-      _player.setLoop(_loopStart, _loopEnd);
-    } else {
-      _player.clearLoop();
-    }
+  Future<void> _load(String path, String title) async {
+    setState(() => _error = null);
+    if (await _service.load(path, title: title)) _session.playTitle();
   }
 
   Future<void> _toggleRecording() async {
     if (_recording) {
       WpRecorder.stop();
       setState(() => _recording = false);
+      _updateTicker();
       final path = _recPath;
       if (path != null && File(path).existsSync()) {
         _load(path, _recordingTitle(DateTime.now()));
@@ -190,6 +155,7 @@ class _PlayerPageState extends State<PlayerPage> {
         _recSilent = false;
         _error = null;
       });
+      _updateTicker();
     } on WpException catch (e) {
       setState(() => _error = 'Aufnahme nicht möglich: ${e.message}');
     }
@@ -202,13 +168,13 @@ class _PlayerPageState extends State<PlayerPage> {
     return PracticeShortcuts(
       metronome: _metronome,
       onPlayPause: () {
-        if (_duration > 0) _session.toggleTitle();
+        if (_service.hasTrack) _session.toggleTitle();
       },
       child: DefaultTabController(
         length: 2,
         child: Scaffold(
           appBar: AppBar(
-            title: Text(_title ?? 'Woodshed Player'),
+            title: Text(_service.title ?? 'Woodshed Player'),
             bottom: const TabBar(
               tabs: [
                 Tab(icon: Icon(WsIcons.musicNote), text: 'Player'),
@@ -229,28 +195,28 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               PlayerView(
                 state: PlayerViewState(
-                  title: _title,
-                  position: _position,
-                  duration: _duration,
-                  playing: _playing,
-                  volume: _volume,
-                  speedOn: _speedOn,
-                  speed: _rate,
-                  loopOn: _loopOn,
-                  loopStart: _loopStart,
-                  loopEnd: _loopEnd,
-                  error: _error,
+                  title: _service.hasTrack ? _service.title : null,
+                  position: _service.position,
+                  duration: _service.duration,
+                  playing: _service.isPlaying,
+                  volume: _service.volume,
+                  speedOn: _service.settings.speedEnabled,
+                  speed: _service.settings.speed,
+                  loopOn: _service.settings.loopEnabled,
+                  loopStart: _service.settings.loopStart,
+                  loopEnd: _service.settings.loopEnd,
+                  error: _error ?? _service.error,
                 ),
                 actions: PlayerViewActions(
                   open: _open,
                   playPause: _session.toggleTitle,
-                  seek: _player.seek,
-                  volume: _setVolume,
-                  speedOn: _setSpeedOn,
-                  speed: _setRate,
-                  loopOn: (v) => _setLoop(on: v),
-                  loopStart: (v) => _setLoop(start: v),
-                  loopEnd: (v) => _setLoop(end: v),
+                  seek: _service.seek,
+                  volume: _service.setVolume,
+                  speedOn: _service.setSpeedEnabled,
+                  speed: _service.setSpeed,
+                  loopOn: _service.setLoopEnabled,
+                  loopStart: _service.setLoopStart,
+                  loopEnd: _service.setLoopEnd,
                 ),
                 extraCards: [if (WpRecorder.available) _recordingCard()],
               ),
@@ -316,19 +282,6 @@ class _PlayerPageState extends State<PlayerPage> {
       ),
     );
   }
-}
-
-/// Titel-Wiedergabe für die PracticeSession.
-class _PlayerTitle implements TitleTransport {
-  _PlayerTitle(this._p);
-  final WpPlayer _p;
-
-  @override
-  bool get isPlaying => _p.isPlaying;
-  @override
-  void play() => _p.play();
-  @override
-  void pause() => _p.pause();
 }
 
 /// Verbindet den MetronomeController mit dem Audio-Kern.
