@@ -11,12 +11,14 @@ import 'library/library.dart';
 import 'metronome/metronome_controller.dart';
 import 'player/audio_core.dart';
 import 'player/player_service.dart';
+import 'ui/font_licenses.dart';
 import 'ui/home_page.dart';
 import 'ui/recording_card.dart';
 import 'ui/style.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerFontLicenses();
   final controller = await createAppController();
   runApp(WoodshedApp(controller: controller, recording: WpRecorder.available));
 }

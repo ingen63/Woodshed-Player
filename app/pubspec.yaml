@@ -62,6 +62,28 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Schriften unter SIL OFL 1.1 (#27), Quellen in assets/fonts/README.md
+  assets:
+    - assets/fonts/inter/OFL.txt
+    - assets/fonts/jetbrains-mono/OFL.txt
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/inter/Inter-Regular.ttf
+        - asset: assets/fonts/inter/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/inter/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/inter/Inter-Bold.ttf
+          weight: 700
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Bold.ttf
+          weight: 700
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

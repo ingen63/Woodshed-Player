@@ -8,3 +8,6 @@ Bildschirmfoto*.png
 
 # lokale Claude-Code-Einstellungen
 .claude/settings.local.json
+
+# lokaler Arbeitsordner: nicht ins Git
+/local/
