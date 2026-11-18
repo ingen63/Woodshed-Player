@@ -313,23 +313,6 @@ class _Header extends StatelessWidget {
                 ),
             ],
           ),
-          if (controller.files.canImportLegacyLibrary)
-            PopupMenuButton<int>(
-              key: const Key('moreMenu'),
-              tooltip: 'Weitere',
-              icon: const Icon(WsIcons.ellipsisCircle),
-              onSelected: (_) => controller.importLegacyLibrary(),
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 0,
-                  child: Text(
-                    lib.legacyImported
-                        ? 'Alte Bibliothek erneut übernehmen …'
-                        : 'Alte Bibliothek übernehmen …',
-                  ),
-                ),
-              ],
-            ),
         ],
       ),
     );

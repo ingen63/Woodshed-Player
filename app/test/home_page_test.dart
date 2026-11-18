@@ -251,31 +251,6 @@ void main() {
       ].map((t) => tester.getTopLeft(find.byKey(Key('track:$t'))).dy).toList();
       expect(ys, orderedEquals([...ys]..sort()));
     });
-
-    testWidgets('#16/AK3 Menü zum Übernehmen der alten Bibliothek (macOS)', (
-      tester,
-    ) async {
-      await pumpApp(tester);
-      await tester.tap(find.byKey(const Key('moreMenu')));
-      await tester.pumpAndSettle();
-      expect(find.text('Alte Bibliothek übernehmen …'), findsOneWidget);
-    });
-
-    testWidgets('ohne Übernahme-Möglichkeit kein Menü (iOS, Android)', (
-      tester,
-    ) async {
-      final dir = Directory.systemTemp.createTempSync('wp_ui_test');
-      addTearDown(() => dir.deleteSync(recursive: true));
-      final app = TestApp(dir)..files.legacy = false;
-      await tester.pumpWidget(
-        MaterialApp(home: HomePage(controller: app.controller)),
-      );
-      expect(find.byKey(const Key('moreMenu')), findsNothing);
-      expect(
-        find.byKey(const Key('addFirst')),
-        findsOneWidget,
-      ); // leere Bibliothek
-    });
   });
 
   group('#17/AK2 Player', () {

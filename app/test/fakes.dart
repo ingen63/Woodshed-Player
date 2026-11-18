@@ -132,8 +132,6 @@ class FakeMetronome implements MetronomeBackend {
 
 class FakeFiles implements FilePlatform {
   List<String> nextPick = [];
-  String? nextFolder;
-  bool legacy = true;
   int picks = 0;
   void Function(List<String>)? drop;
 
@@ -143,10 +141,6 @@ class FakeFiles implements FilePlatform {
     return nextPick;
   }
 
-  @override
-  Future<String?> pickLegacyLibrary() async => nextFolder;
-  @override
-  bool get canImportLegacyLibrary => legacy;
   @override
   Future<String?> supportDir() async => null;
   @override

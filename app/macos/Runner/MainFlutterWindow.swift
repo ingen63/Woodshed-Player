@@ -53,25 +53,6 @@ class MainFlutterWindow: NSWindow {
         panel.begin { response in
           result(response == .OK ? panel.urls.map(\.path) : [])
         }
-      case "pickLegacyLibrary":
-        // Ordner der Swift-App (#16): sie lief in der Sandbox, ihr Ordner liegt im eigenen Container.
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.message = "Ordner «WoodshedPlayer» der bisherigen App wählen (enthält library.json)."
-        panel.prompt = "Übernehmen"
-        if let home = getpwuid(getuid())?.pointee.pw_dir {
-          let base = URL(fileURLWithPath: String(cString: home))
-          let candidates = [
-            "Library/Containers/de.papa.WoodshedPlayer/Data/Library/Application Support/WoodshedPlayer",
-            "Library/Application Support/WoodshedPlayer",
-          ].map { base.appendingPathComponent($0) }
-          panel.directoryURL = candidates.first { FileManager.default.fileExists(atPath: $0.path) }
-        }
-        panel.begin { response in
-          result(response == .OK ? panel.url?.path : nil)
-        }
       case "supportDir":
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

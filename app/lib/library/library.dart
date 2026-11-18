@@ -25,24 +25,6 @@ class ImportResult {
   final List<String> failed;
 }
 
-class LegacyImportResult {
-  const LegacyImportResult({
-    required this.tracks,
-    required this.folders,
-    required this.skipped,
-    required this.missing,
-  });
-
-  /// Übernommene Titel und Ordner.
-  final int tracks, folders;
-
-  /// Schon vorhanden (z. B. zweite Übernahme).
-  final int skipped;
-
-  /// In der alten Bibliothek eingetragen, aber Datei fehlt.
-  final int missing;
-}
-
 class Library extends ChangeNotifier {
   /// [base] enthält `library.json`, `preferences.json` und den Ordner `Tracks/`.
   Library(
@@ -67,7 +49,6 @@ class Library extends ChangeNotifier {
   List<Track> _tracks = [];
   List<TrackFolder> _folders = [];
   TrackSortOrder _sortOrder = TrackSortOrder.dateAdded;
-  bool _legacyImported = false;
   bool _importing = false;
   int _droppedMissing = 0;
   String? lastError;
@@ -76,7 +57,6 @@ class Library extends ChangeNotifier {
   List<Track> get tracks => List.unmodifiable(_tracks);
   List<TrackFolder> get folders => List.unmodifiable(_folders);
   bool get isImporting => _importing;
-  bool get legacyImported => _legacyImported;
 
   /// Beim letzten Laden entfernte Einträge, deren Datei fehlte.
   int get droppedMissing => _droppedMissing;
@@ -173,7 +153,6 @@ class Library extends ChangeNotifier {
     try {
       final p = jsonDecode(_prefsFile.readAsStringSync()) as Map;
       _sortOrder = TrackSortOrder.parse(p['sortOrder'] as String?);
-      _legacyImported = p['legacyImported'] == true;
     } catch (_) {
       // keine oder unlesbare Einstellungen: Standardwerte
     }
@@ -182,12 +161,7 @@ class Library extends ChangeNotifier {
   void _savePrefs() {
     try {
       base.createSync(recursive: true);
-      _prefsFile.writeAsStringSync(
-        jsonEncode({
-          'sortOrder': _sortOrder.name,
-          'legacyImported': _legacyImported,
-        }),
-      );
+      _prefsFile.writeAsStringSync(jsonEncode({'sortOrder': _sortOrder.name}));
     } catch (_) {}
   }
 
@@ -438,76 +412,5 @@ class Library extends ChangeNotifier {
     _tracks[i] = _tracks[i].copyWith(settings: settings);
     _scheduleSave();
     notifyListeners();
-  }
-
-  // ---- Übernahme der Swift-Bibliothek (#16/AK3) ----
-
-  /// Übernimmt Dateien, Ordner und Einstellungen aus dem Ordner der Swift-App
-  /// (*Application Support/WoodshedPlayer*). Schon vorhandene Titel werden übersprungen.
-  Future<LegacyImportResult> importSwiftLibrary(Directory oldBase) async {
-    final oldIndex = File('${oldBase.path}/library.json');
-    if (!oldIndex.existsSync()) {
-      throw const FileSystemException(
-        'In diesem Ordner liegt keine library.json der alten App.',
-      );
-    }
-    final (oldFolders, oldTracks) = _readIndex(oldIndex);
-    if (oldTracks == null) {
-      throw const FormatException(
-        'Die library.json der alten App ist nicht lesbar.',
-      );
-    }
-
-    tracksDir.createSync(recursive: true);
-    final knownFolders = {for (final f in _folders) f.id};
-    var folderCount = 0;
-    for (final f in oldFolders) {
-      if (knownFolders.add(f.id)) {
-        _folders.add(f);
-        folderCount++;
-      }
-    }
-    final knownTracks = {for (final t in _tracks) t.id};
-    final offset = _nextOrder;
-    var added = 0, skipped = 0, missing = 0;
-    final ordered = [...oldTracks]
-      ..sort((a, b) => a.customOrder.compareTo(b.customOrder));
-    for (final t in ordered) {
-      if (knownTracks.contains(t.id)) {
-        skipped++;
-        continue;
-      }
-      final src = File('${oldBase.path}/Tracks/${t.fileName}');
-      if (!src.existsSync()) {
-        missing++;
-        continue;
-      }
-      await src.copy('${tracksDir.path}/${t.fileName}');
-      var hasArtwork = false;
-      final art = File('${oldBase.path}/Tracks/${t.id}.artwork');
-      if (t.hasArtwork && art.existsSync()) {
-        await art.copy('${tracksDir.path}/${t.id}.artwork');
-        hasArtwork = true;
-      }
-      _tracks.add(
-        t.copyWith(
-          hasArtwork: hasArtwork,
-          customOrder: offset + added,
-          folderId: () => knownFolders.contains(t.folderId) ? t.folderId : null,
-        ),
-      );
-      knownTracks.add(t.id);
-      added++;
-    }
-    _legacyImported = true;
-    _savePrefs();
-    save();
-    notifyListeners();
-    return LegacyImportResult(
-      tracks: added,
-      folders: folderCount,
-      skipped: skipped,
-      missing: missing,
-    );
   }
 }

@@ -97,35 +97,4 @@ void main() {
     a.controller.clearMessage();
     expect(a.controller.message, isNull);
   });
-
-  group('#16/AK3 Swift-Bibliothek übernehmen', () {
-    test('Ergebnis als Meldung, Abbruch ändert nichts', () async {
-      final a = await app();
-      final old = Directory('${tmp.path}/alt/Tracks')
-        ..createSync(recursive: true);
-      File('test/golden/library_swift.json')
-          .copySync('${old.parent.path}/library.json');
-      File('${old.path}/0F0E0D0C-0B0A-0908-0706-050403020100.mp3')
-          .writeAsStringSync('x');
-      a.files.nextFolder = null;
-      await a.controller.importLegacyLibrary();
-      expect(a.library.tracks, isEmpty);
-      expect(a.controller.message, isNull);
-
-      a.files.nextFolder = old.parent.path;
-      await a.controller.importLegacyLibrary();
-      expect(
-        a.controller.message,
-        '1 Titel und 2 Ordner übernommen. 1 fehlten in der alten Bibliothek.',
-      );
-      expect(a.library.legacyImported, isTrue);
-    });
-
-    test('falscher Ordner: verständliche Meldung', () async {
-      final a = await app();
-      a.files.nextFolder = (Directory('${tmp.path}/leer')..createSync()).path;
-      await a.controller.importLegacyLibrary();
-      expect(a.controller.message, contains('keine library.json'));
-    });
-  });
 }

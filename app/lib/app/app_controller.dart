@@ -1,7 +1,5 @@
-// Verbindet Bibliothek, Player und Metronom (#17): Titel wählen, importieren, löschen, Swift-Bibliothek
-// übernehmen. Ohne Widgets, damit es sich in Tests prüfen lässt.
-import 'dart:io';
-
+// Verbindet Bibliothek, Player und Metronom (#17): Titel wählen, importieren, löschen.
+// Ohne Widgets, damit es sich in Tests prüfen lässt.
 import 'package:flutter/foundation.dart';
 
 import '../library/library.dart';
@@ -88,25 +86,6 @@ class AppController extends ChangeNotifier {
   void deleteTracks(Set<String> ids) {
     if (ids.contains(player.trackId)) player.unload();
     library.delete(ids);
-  }
-
-  /// #16/AK3: Bibliothek der Swift-App übernehmen (macOS).
-  Future<void> importLegacyLibrary() async {
-    final dir = await files.pickLegacyLibrary();
-    if (dir == null) return;
-    try {
-      final r = await library.importSwiftLibrary(Directory(dir));
-      final parts = [
-        '${r.tracks} Titel und ${r.folders} Ordner übernommen.',
-        if (r.skipped > 0) '${r.skipped} waren schon vorhanden.',
-        if (r.missing > 0) '${r.missing} fehlten in der alten Bibliothek.',
-      ];
-      _show(parts.join(' '));
-    } on FileSystemException catch (e) {
-      _show(e.message);
-    } on FormatException catch (e) {
-      _show(e.message);
-    }
   }
 
   /// Fertige Aufnahme in die Bibliothek und abspielen.

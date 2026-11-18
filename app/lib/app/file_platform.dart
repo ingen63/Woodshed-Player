@@ -1,17 +1,9 @@
 // Dateiauswahl, Ordner und Drag & Drop vom nativen Teil (Kanal «woodshed/files»), austauschbar für Tests.
-import 'dart:io';
-
 import 'package:flutter/services.dart';
 
 abstract class FilePlatform {
   /// Audiodateien wählen (mehrere). Leer bei Abbruch.
   Future<List<String>> pickAudioFiles();
-
-  /// Ordner der Swift-App wählen (nur macOS). null bei Abbruch.
-  Future<String?> pickLegacyLibrary();
-
-  /// Ob es die Übernahme der Swift-Bibliothek auf dieser Plattform gibt.
-  bool get canImportLegacyLibrary;
 
   /// *Application Support* der App.
   Future<String?> supportDir();
@@ -47,13 +39,6 @@ class ChannelFilePlatform implements FilePlatform {
       (await _channel.invokeMethod<List<Object?>>('pickAudioFiles'))
           ?.cast<String>() ??
       const [];
-
-  @override
-  Future<String?> pickLegacyLibrary() =>
-      _channel.invokeMethod<String>('pickLegacyLibrary');
-
-  @override
-  bool get canImportLegacyLibrary => Platform.isMacOS;
 
   @override
   Future<String?> supportDir() => _channel.invokeMethod<String>('supportDir');

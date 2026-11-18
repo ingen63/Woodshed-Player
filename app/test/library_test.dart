@@ -138,6 +138,19 @@ void main() {
       },
     );
 
+    test('#21/AK4 bestehende library.json und preferences.json mit altem Schlüssel werden gelesen', () async {
+      final base = swiftFolder('lib', goldenNew);
+      File(
+        '${base.path}/preferences.json',
+      ).writeAsStringSync('{"sortOrder":"alphabetical","legacyImported":true}');
+      final before = File('${base.path}/library.json').readAsStringSync();
+      final l = await loaded(base);
+      expect(l.tracks.map((t) => t.id), containsAll([id1, id2]));
+      expect(l.folders.length, 2);
+      expect(l.sortOrder, TrackSortOrder.alphabetical);
+      expect(File('${base.path}/library.json').readAsStringSync(), before);
+    });
+
     test('fehlende Dateien: Einträge fallen weg und werden gezählt', () async {
       final base = swiftFolder('lib', goldenNew);
       File('${base.path}/Tracks/$id2.flac').deleteSync();
@@ -201,73 +214,6 @@ void main() {
       final again = await loaded(base);
       expect(again.track(id2)!.settings.loopStart, 0.25);
       expect(again.track(id2)!.settings.loopEnabled, isTrue);
-    });
-  });
-
-  group('#16/AK3 Übernahme der Swift-Bibliothek', () {
-    test(
-      'Dateien, Cover, Ordner und Einstellungen werden übernommen',
-      () async {
-        final old = swiftFolder('alt', goldenNew);
-        final l = await loaded(dir('neu'));
-        await l.importFiles([source('vorher.wav').path]);
-        final r = await l.importSwiftLibrary(old);
-        expect(r.tracks, 2);
-        expect(r.folders, 2);
-        expect(r.skipped, 0);
-        expect(r.missing, 0);
-        expect(l.legacyImported, isTrue);
-        final t = l.track(id1)!;
-        expect(File(l.filePath(t)).readAsStringSync(), 'mp3');
-        expect(File(l.artworkPath(t)!).readAsStringSync(), 'jpg');
-        expect(t.settings.speed, 0.75);
-        expect(t.folderId, etueden);
-        // Eigene Reihenfolge: nach den vorhandenen Titeln, alte Reihenfolge bleibt
-        final custom = (l..sortOrder = TrackSortOrder.custom).sortedTracks
-            .map((t) => t.title)
-            .toList();
-        expect(custom, ['vorher', 'sinus', 'Übung in C']);
-      },
-    );
-
-    test('einmalig: zweite Übernahme fügt nichts doppelt hinzu', () async {
-      final old = swiftFolder('alt', goldenNew);
-      final l = await loaded(dir('neu'));
-      await l.importSwiftLibrary(old);
-      final r = await l.importSwiftLibrary(old);
-      expect(r.tracks, 0);
-      expect(r.folders, 0);
-      expect(r.skipped, 2);
-      expect(l.tracks.length, 2);
-      expect(l.folders.length, 2);
-    });
-
-    test(
-      'fehlende Dateien der alten Bibliothek werden gezählt, Rest übernommen',
-      () async {
-        final old = swiftFolder('alt', goldenLegacy);
-        File('${old.path}/Tracks/$id1.mp3').deleteSync();
-        final l = await loaded(dir('neu'));
-        final r = await l.importSwiftLibrary(old);
-        expect(r.tracks, 1);
-        expect(r.missing, 1);
-        expect(l.track(id2), isNotNull);
-      },
-    );
-
-    test('übernommen bleibt nach Neustart vermerkt', () async {
-      final base = dir('neu');
-      await (await loaded(base))
-          .importSwiftLibrary(swiftFolder('alt', goldenNew));
-      expect((await loaded(base)).legacyImported, isTrue);
-    });
-
-    test('falscher Ordner: verständlicher Fehler', () async {
-      final l = await loaded(dir('neu'));
-      expect(
-        () => l.importSwiftLibrary(dir('leer')),
-        throwsA(isA<FileSystemException>()),
-      );
     });
   });
 

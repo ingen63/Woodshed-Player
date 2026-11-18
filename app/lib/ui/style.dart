@@ -34,11 +34,6 @@ abstract final class WsIcons {
   static const chevronDown = IconData(0xf5d5, fontFamily: _f, fontPackage: _p);
   static const chevronRight = IconData(0xf3d3, fontFamily: _f, fontPackage: _p);
   static const ellipsis = IconData(0xf46a, fontFamily: _f, fontPackage: _p);
-  static const ellipsisCircle = IconData(
-    0xf647,
-    fontFamily: _f,
-    fontPackage: _p,
-  );
   static const folderBadgePlus = IconData(
     0xf678,
     fontFamily: _f,
