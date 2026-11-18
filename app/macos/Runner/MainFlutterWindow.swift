@@ -2,7 +2,9 @@ import Cocoa
 import FlutterMacOS
 import UniformTypeIdentifiers
 
-class MainFlutterWindow: NSWindow {
+// NSDraggingDestination ausdrücklich angeben (#22): Ohne die Konformität sind die Drag-Methoden unten
+// für AppKit unsichtbar (kein @objc), und es greift die Standard-Implementierung von NSWindow, die nichts tut.
+class MainFlutterWindow: NSWindow, NSDraggingDestination {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
@@ -16,32 +18,43 @@ class MainFlutterWindow: NSWindow {
     super.awakeFromNib()
   }
 
-  private var channel: FlutterMethodChannel?
+  private(set) var channel: FlutterMethodChannel?
 
-  // MARK: Drag & Drop: Audiodateien ins Fenster ziehen (#17), sie kommen in die Bibliothek.
+  // MARK: Drag & Drop: Audiodateien ins Fenster ziehen (#17, #22), sie kommen in die Bibliothek.
 
-  private func droppedAudioURLs(_ sender: NSDraggingInfo) -> [URL] {
-    let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingContentsConformToTypes: [UTType.audio.identifier]]
-    return (sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]) ?? []
+  /// Pfade der Audiodateien auf dem Pasteboard; andere Dateien werden übergangen (#22/AK2).
+  static func audioPaths(on pasteboard: NSPasteboard) -> [String] {
+    let options: [NSPasteboard.ReadingOptionKey: Any] = [
+      .urlReadingFileURLsOnly: true,
+      .urlReadingContentsConformToTypes: [UTType.audio.identifier],
+    ]
+    let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] ?? []
+    return urls.map(\.path)
   }
 
-  func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-    droppedAudioURLs(sender).isEmpty ? [] : .copy
-  }
-
-  func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-    droppedAudioURLs(sender).isEmpty ? [] : .copy
-  }
-
-  func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-    let urls = droppedAudioURLs(sender)
-    guard !urls.isEmpty else { return false }
-    channel?.invokeMethod("dropFiles", arguments: urls.map(\.path))
+  /// Übergibt die Pfade an Dart (Kanal «woodshed/files», Methode «dropFiles»). false: nichts Brauchbares.
+  @discardableResult
+  func deliverDrop(_ pasteboard: NSPasteboard) -> Bool {
+    let paths = Self.audioPaths(on: pasteboard)
+    guard !paths.isEmpty else { return false }
+    channel?.invokeMethod("dropFiles", arguments: paths)
     return true
   }
 
+  func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+    Self.audioPaths(on: sender.draggingPasteboard).isEmpty ? [] : .copy
+  }
+
+  func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+    Self.audioPaths(on: sender.draggingPasteboard).isEmpty ? [] : .copy
+  }
+
+  func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    deliverDrop(sender.draggingPasteboard)
+  }
+
   /// Dateiauswahl und Ablageort für Aufnahmen (ohne zusätzliches Plugin).
-  private func registerFileChannel(_ messenger: FlutterBinaryMessenger) {
+  func registerFileChannel(_ messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(name: "woodshed/files", binaryMessenger: messenger)
     self.channel = channel
     channel.setMethodCallHandler { call, result in

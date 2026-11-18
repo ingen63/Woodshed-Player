@@ -1,7 +1,11 @@
-// #17: Zusammenspiel von Bibliothek, Player und Metronom ohne Oberfläche; #16/AK3 Übernahme über den Controller.
+// #17: Zusammenspiel von Bibliothek, Player und Metronom ohne Oberfläche; #22 Drag & Drop über den Kanal.
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:woodshed_player/app/app_controller.dart';
+import 'package:woodshed_player/app/file_platform.dart';
+import 'package:woodshed_player/metronome/metronome_controller.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:wp_core/wp_core.dart';
 
@@ -89,6 +93,32 @@ void main() {
     await until(() => a.library.tracks.length == 2);
     expect(a.library.tracks.map((t) => t.title), containsAll(['x', 'y']));
   });
+
+  test(
+    '#22/AK3 Regressionstest: «dropFiles» vom nativen Teil landet im Import',
+    () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final a = await app();
+      final controller = AppController(
+        library: a.library,
+        player: a.player,
+        metronome: MetronomeController(a.metronome),
+        files: ChannelFilePlatform(),
+      );
+      addTearDown(controller.dispose);
+      final paths = [src('x.mp3').path, src('y.flac').path];
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+            'woodshed/files',
+            const StandardMethodCodec().encodeMethodCall(
+              MethodCall('dropFiles', paths),
+            ),
+            (_) {},
+          );
+      await until(() => a.library.tracks.length == 2);
+      expect(a.library.tracks.map((t) => t.title), containsAll(['x', 'y']));
+    },
+  );
 
   test('Importfehler werden als Meldung gezeigt', () async {
     final a = await app();
