@@ -49,10 +49,10 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::vector<float> out(1024 * ch);
-    while (engine.playing()) {
+    do {  // Befehle wirken erst im ersten render()
         engine.render(out.data(), 1024);
         ma_encoder_write_pcm_frames(&enc, out.data(), 1024, nullptr);
-    }
+    } while (engine.playing());
     ma_encoder_uninit(&enc);
     std::printf("%s: %.2f s Quelle, Tempo %.2f\n", argv[2], engine.duration(), engine.rate());
     return 0;

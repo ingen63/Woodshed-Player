@@ -18,26 +18,18 @@ struct Engine::Stretch {
     std::vector<float> seekBuf;
 };
 
-Engine::Engine() : stretch_(std::make_unique<Stretch>()) {}
-Engine::~Engine() = default;
+Engine::Engine() : stretch_(std::make_unique<Stretch>()) { configure(2, 44100); }
 
-void Engine::setSource(std::vector<float> interleaved, int channels, int sampleRate) {
-    data_ = std::move(interleaved);
-    channels_ = std::max(1, channels);
+Engine::~Engine() {
+    Command c;
+    while (commands_.pop(c)) delete c.source;
+    collectGarbage();
+    delete source_;
+}
+
+void Engine::configure(int channels, int sampleRate) {
+    channels_ = std::clamp(channels, 1, 16);
     sampleRate_ = std::max(1, sampleRate);
-    frames_ = static_cast<long long>(data_.size()) / channels_;
-
-    readPos_ = 0;
-    playhead_ = 0;
-    inAccum_ = 0;
-    stretching_ = false;
-    activeRate_ = 1.0;
-    loopA_ = loopB_ = 0;
-    pendingSeek_.store(-1.0);
-    loopChanged_.store(false);
-    playing_.store(false);
-    publishedPosition_.store(0.0);
-
     auto& st = *stretch_;
     st.s.presetDefault(channels_, static_cast<float>(sampleRate_));
     // Puffer einmal anlegen, damit der Audio-Thread nichts reserviert.
@@ -48,51 +40,131 @@ void Engine::setSource(std::vector<float> interleaved, int channels, int sampleR
     st.seekBuf.assign(static_cast<size_t>(channels_) * seekLen, 0.0f);
     st.in.assign(channels_, nullptr);
     st.out.assign(channels_, nullptr);
+    stretching_ = false;
 }
 
-void Engine::play() {
-    if (frames_ == 0) return;
-    if (loopB_ == 0 && publishedPosition_.load() >= duration() - 1e-3) {
-        pendingSeek_.store(0.0);  // am Dateiende: von vorn
-    }
-    playing_.store(true);
+void Engine::setSource(std::vector<float> interleaved, int channels, int sampleRate) {
+    configure(channels, sampleRate);
+    auto* s = new Source;
+    s->frames = static_cast<long long>(interleaved.size()) / channels_;
+    s->data = std::move(interleaved);
+    installSource(s);
+    collectGarbage();
 }
 
-void Engine::pause() { playing_.store(false); }
-
-void Engine::seek(double seconds) { pendingSeek_.store(std::max(0.0, seconds)); }
-
-void Engine::setRate(double rate) { rate_.store(std::clamp(rate, kMinRate, kMaxRate)); }
-
-void Engine::setLoop(double a, double b) {
-    long long fa = 0, fb = 0;
-    if (b >= a + kMinLoopSeconds && a >= 0) {
-        fa = static_cast<long long>(std::llround(a * sampleRate_));
-        fb = std::min(static_cast<long long>(std::llround(b * sampleRate_)), frames_);
-        if (fb - fa < static_cast<long long>(kMinLoopSeconds * sampleRate_)) fa = fb = 0;
-    }
-    pendingLoopA_.store(fa);
-    pendingLoopB_.store(fb);
-    loopChanged_.store(true);
+bool Engine::submitSource(std::unique_ptr<Source> source) {
+    if (!source) return false;
+    const long long frames = source->frames;
+    Command c;
+    c.type = Command::SetSource;
+    c.source = source.get();
+    if (!send(c)) return false;
+    source.release();  // gehört jetzt der Queue bzw. dem Audio-Thread
+    // Sofort sichtbar, auch bevor der Audio-Thread den Titel übernimmt.
+    publishedFrames_.store(frames);
+    publishedPosition_.store(0.0);
+    publishedPlaying_.store(false);
+    return true;
 }
+
+void Engine::collectGarbage() {
+    Source* s = nullptr;
+    while (retired_.pop(s)) delete s;
+}
+
+bool Engine::send(const Command& c) { return commands_.push(c); }
+
+bool Engine::play() { return send({Command::Play}); }
+
+bool Engine::pause() { return send({Command::Pause}); }
+
+bool Engine::seek(double seconds) { return send({Command::Seek, std::max(0.0, seconds)}); }
+
+bool Engine::setRate(double rate) {
+    const double r = std::clamp(rate, kMinRate, kMaxRate);
+    requestedRate_.store(r);
+    return send({Command::Rate, r});
+}
+
+bool Engine::setLoop(double a, double b) { return send({Command::Loop, a, b}); }
+
+bool Engine::setVolume(float v) { return send({Command::Volume, static_cast<double>(v)}); }
 
 double Engine::position() const { return publishedPosition_.load(); }
 
-double Engine::duration() const { return static_cast<double>(frames_) / sampleRate_; }
+double Engine::duration() const { return static_cast<double>(publishedFrames_.load()) / sampleRate_; }
 
-void Engine::applyPending() {
-    if (loopChanged_.exchange(false)) {
-        loopA_ = pendingLoopA_.load();
-        loopB_ = pendingLoopB_.load();
+void Engine::applyCommands() {
+    Command c;
+    while (commands_.pop(c)) apply(c);
+}
+
+void Engine::apply(const Command& c) {
+    switch (c.type) {
+        case Command::Play:
+            if (frames_ == 0) break;
+            if (loopB_ == 0 && playhead_ >= static_cast<double>(frames_)) seekTo(0.0);  // am Dateiende: von vorn
+            playing_ = true;
+            break;
+        case Command::Pause:
+            playing_ = false;
+            break;
+        case Command::Seek:
+            seekTo(c.a);
+            break;
+        case Command::Rate:
+            rate_ = c.a;
+            break;
+        case Command::Volume:
+            volume_ = static_cast<float>(c.a);
+            break;
+        case Command::Loop: {
+            const double a = c.a, b = c.b;
+            long long fa = 0, fb = 0;
+            if (b >= a + kMinLoopSeconds && a >= 0) {
+                fa = static_cast<long long>(std::llround(a * sampleRate_));
+                fb = std::min(static_cast<long long>(std::llround(b * sampleRate_)), frames_);
+                if (fb - fa < static_cast<long long>(kMinLoopSeconds * sampleRate_)) fa = fb = 0;
+            }
+            loopA_ = fa;
+            loopB_ = fb;
+            break;
+        }
+        case Command::SetSource:
+            installSource(c.source);
+            break;
     }
-    const double target = pendingSeek_.exchange(-1.0);
-    if (target >= 0) {
-        long long f = std::min(static_cast<long long>(std::llround(target * sampleRate_)), frames_);
-        readPos_ = f;
-        playhead_ = static_cast<double>(f);
-        if (stretching_) primeStretch(activeRate_);
-        publishedPosition_.store(playhead_ / sampleRate_);
-    }
+    publish();
+}
+
+void Engine::installSource(Source* s) {
+    // Den alten Titel nicht hier freigeben (Audio-Thread), sondern über collectGarbage().
+    // Ist die Rückgabe-Queue voll, bleibt er lieber liegen, als hier Speicher freizugeben.
+    if (source_) retired_.push(source_);
+    source_ = s;
+    data_ = s ? s->data.data() : nullptr;
+    frames_ = s ? s->frames : 0;
+    readPos_ = 0;
+    playhead_ = 0;
+    inAccum_ = 0;
+    stretching_ = false;
+    activeRate_ = 1.0;
+    loopA_ = loopB_ = 0;
+    playing_ = false;
+    publishedFrames_.store(frames_);
+    publish();
+}
+
+void Engine::seekTo(double seconds) {
+    const long long f = std::min(static_cast<long long>(std::llround(seconds * sampleRate_)), frames_);
+    readPos_ = f;
+    playhead_ = static_cast<double>(f);
+    if (stretching_) primeStretch(activeRate_);
+}
+
+void Engine::publish() {
+    publishedPosition_.store(playhead_ / sampleRate_);
+    publishedPlaying_.store(playing_);
 }
 
 bool Engine::readNext(float* frame) {
@@ -101,7 +173,7 @@ bool Engine::readNext(float* frame) {
         std::fill(frame, frame + channels_, 0.0f);
         return false;
     }
-    const float* src = data_.data() + readPos_ * channels_;
+    const float* src = data_ + readPos_ * channels_;
     std::copy(src, src + channels_, frame);
     ++readPos_;
     if (loopB_ > 0 && readPos_ >= loopB_) readPos_ = loopA_;
@@ -134,7 +206,7 @@ void Engine::primeStretch(double rate) {
 }
 
 void Engine::render(float* out, int frames) {
-    applyPending();
+    applyCommands();
     const int ch = channels_;
     int done = 0;
     while (done < frames) {
@@ -142,12 +214,12 @@ void Engine::render(float* out, int frames) {
         float* dst = out + static_cast<size_t>(done) * ch;
         done += n;
 
-        if (!playing_.load() || frames_ == 0) {
+        if (!playing_ || frames_ == 0) {
             std::fill(dst, dst + static_cast<size_t>(n) * ch, 0.0f);
             continue;
         }
-        const float vol = volume_.load();
-        const double r = rate_.load();
+        const float vol = volume_;
+        const double r = rate_;
         const bool wantStretch = std::fabs(r - 1.0) > 1e-6;
 
         if (wantStretch && !stretching_) {
@@ -165,7 +237,7 @@ void Engine::render(float* out, int frames) {
             for (int i = 0; i < n; ++i) {
                 if (!readNext(frame)) {
                     std::fill(dst + static_cast<size_t>(i) * ch, dst + static_cast<size_t>(n) * ch, 0.0f);
-                    playing_.store(false);
+                    playing_ = false;
                     break;
                 }
                 for (int c = 0; c < ch; ++c) dst[i * ch + c] = frame[c] * vol;
@@ -193,9 +265,9 @@ void Engine::render(float* out, int frames) {
         for (int i = 0; i < n; ++i)
             for (int c = 0; c < ch; ++c) dst[i * ch + c] = st.out[c][i] * vol;
         advancePlayhead(n * r);
-        if (loopB_ == 0 && playhead_ >= static_cast<double>(frames_)) playing_.store(false);
+        if (loopB_ == 0 && playhead_ >= static_cast<double>(frames_)) playing_ = false;
     }
-    publishedPosition_.store(playhead_ / sampleRate_);
+    publish();
 }
 
 }  // namespace wp

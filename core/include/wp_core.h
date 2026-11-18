@@ -1,5 +1,6 @@
-/* C-API des Woodshed-Player-Audio-Kerns (Prototyp #5).
- * Alle Funktionen sind von beliebigen Threads aufrufbar, ausser wp_create/wp_destroy.
+/* C-API des Woodshed-Player-Audio-Kerns (#5, #14).
+ * Alle Funktionen sind von beliebigen Threads aufrufbar, ausser wp_create/wp_destroy. Steuerbefehle
+ * erreichen den Audio-Thread über eine Lock-free-Queue; der Audio-Thread sperrt nicht und reserviert nichts.
  * Zeiten in Sekunden der Originaldatei, Tempo als Faktor (1.0 = Originaltempo). */
 #ifndef WP_CORE_H
 #define WP_CORE_H
@@ -16,13 +17,46 @@ extern "C" {
 
 typedef struct wp_player wp_player;
 
+/* ---- Fehlercodes (Rückgabe < 0) ---- */
+#define WP_OK 0
+#define WP_ERR_INVALID_ARGUMENT -1   /* Player oder Pfad fehlt */
+#define WP_ERR_FILE_NOT_FOUND -2     /* Datei fehlt */
+#define WP_ERR_UNSUPPORTED_FORMAT -3 /* Format unbekannt oder Datei beschädigt */
+#define WP_ERR_DEVICE_UNAVAILABLE -4 /* kein Audiogerät */
+#define WP_ERR_OUT_OF_MEMORY -5
+#define WP_ERR_FILE_UNREADABLE -6    /* keine Leserechte, Ordner statt Datei, Lesefehler */
+#define WP_ERR_CANCELLED -7          /* durch ein neueres Laden abgebrochen */
+#define WP_ERR_BUSY -8               /* Befehls-Queue voll */
+
+/* Deutscher Text zu einem Fehlercode, statisch, nie NULL. */
+WP_API const char* wp_error_message(int code);
+
 /* ---- Wiedergabe ---- */
+/* Ohne Audiogerät liefert wp_create trotzdem einen Player; Laden meldet dann WP_ERR_DEVICE_UNAVAILABLE.
+ * NULL nur, wenn kein Speicher frei ist. */
 WP_API wp_player* wp_create(void);
 WP_API void wp_destroy(wp_player* p);
-/* Lädt eine Audiodatei (MP3, WAV, FLAC) vollständig in den Speicher. 0 = ok, sonst Fehlercode < 0. */
+
+/* Laden (MP3, WAV, FLAC). Dekodiert vollständig in den Speicher, im Hintergrund. Ein Fehler lässt den
+ * bisherigen Titel unverändert spielbar. Ein neuer Titel steht am Anfang, pausiert, ohne Loop. */
+#define WP_LOAD_IDLE 0     /* noch nichts geladen */
+#define WP_LOAD_RUNNING 1  /* dekodiert gerade */
+#define WP_LOAD_READY 2    /* letzter Ladevorgang erfolgreich */
+/* Startet das Laden und kehrt sofort zurück; ein noch laufendes Laden wird abgebrochen.
+ * WP_OK = gestartet, < 0 = Fehler sofort. */
+WP_API int wp_load_async(wp_player* p, const char* path);
+/* WP_LOAD_* oder Fehlercode (< 0) des letzten Ladevorgangs. */
+WP_API int wp_load_state(wp_player* p);
+/* Fortschritt 0–1 des laufenden bzw. letzten Ladevorgangs. */
+WP_API double wp_load_progress(wp_player* p);
+/* Wartet auf das Ende des laufenden Ladens. WP_OK oder Fehlercode. */
+WP_API int wp_load_wait(wp_player* p);
+/* Lädt und wartet (blockiert den Aufrufer). WP_OK oder Fehlercode. */
 WP_API int wp_load(wp_player* p, const char* path);
 WP_API void wp_play(wp_player* p);
 WP_API void wp_pause(wp_player* p);
+/* Gerätewechsel (z. B. Kopfhörer ab), Unterbrechung oder Geräteausfall pausieren Wiedergabe und
+ * Metronom; die Position bleibt. */
 WP_API int wp_is_playing(wp_player* p);
 WP_API void wp_seek(wp_player* p, double seconds);
 /* 0.1–2.0, Tonhöhe bleibt gleich. Werte ausserhalb werden begrenzt. */

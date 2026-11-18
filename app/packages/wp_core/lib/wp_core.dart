@@ -21,6 +21,8 @@ final _create = _lib.lookupFunction<Pointer<_Player> Function(), Pointer<_Player
 final _destroy = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_destroy');
 final _load = _lib.lookupFunction<Int32 Function(Pointer<_Player>, Pointer<Utf8>),
     int Function(Pointer<_Player>, Pointer<Utf8>)>('wp_load');
+final _errorMessage =
+    _lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('wp_error_message');
 final _play = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_play');
 final _pause = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_pause');
 final _isPlaying =
@@ -66,7 +68,7 @@ final _recError = _lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Fu
 /// Ein Player mit eigenem Audiogerät.
 class WpPlayer {
   WpPlayer() : _p = _create() {
-    if (_p == nullptr) throw WpException('Audiogerät konnte nicht gestartet werden');
+    if (_p == nullptr) throw WpException('Audio-Kern konnte nicht angelegt werden');
   }
 
   final Pointer<_Player> _p;
@@ -76,7 +78,7 @@ class WpPlayer {
     final c = path.toNativeUtf8();
     try {
       final r = _load(_p, c);
-      if (r != 0) throw WpException('Datei konnte nicht geladen werden (Fehler $r)');
+      if (r != 0) throw WpException('Datei konnte nicht geladen werden: ${_errorMessage(r).toDartString()}');
     } finally {
       malloc.free(c);
     }

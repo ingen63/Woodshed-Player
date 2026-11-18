@@ -33,6 +33,7 @@ Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) sieht aus
 | --- | --- |
 | Metronom | Start/Stopp mit **M**, Tempo 20–300 BPM mit −/+ (gedrückt halten wiederholt), Regler oder **↑** / **↓** (mit Shift ±10), Tap-Tempo mit **T**. Taktarten 4/4, 3/4, 2/4, 6/8, Unterteilungen Viertel bis Sechzehntel, eigene Lautstärke. Eigener Reiter «Metronom»; Titel und Metronom laufen nie gleichzeitig (Start des einen pausiert den anderen). Nach einem Neustart gilt 120 BPM, die übrigen Einstellungen bleiben erhalten |
 | Automatische Tempo-Steigerung | Start- und Ziel-BPM, Schritt und alle wie viele Takte. Ist das Ziel erreicht, geht es nach gleich vielen Takten wieder beim Start-BPM los |
+| Gerätewechsel | Wird die Ausgabe gewechselt (z. B. Kopfhörer ab) oder kommt ein Anruf dazwischen, pausieren Titel und Metronom; die Position bleibt. Weiter geht es mit Play |
 | Aufnahme (nur Mac, ab macOS 14.2) | Nimmt den Systemton auf, ohne Mikrofon und ohne den eigenen Player-Ton. Beim ersten Mal fragt macOS nach der Berechtigung |
 
 ## Technik
@@ -46,6 +47,9 @@ Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) sieht aus
 - `WoodshedPlayerTests/`: Tests (Swift Testing) für Zeitformat, Loop-Grenzen und `library.json`. Testaudio wird im Test erzeugt.
   Ausführen mit ⌘U in Xcode oder `xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' test`.
 - Auf iOS läuft die Wiedergabe auch im Hintergrund weiter (Background Mode *Audio*).
+- `core/` (Flutter-App): Audio-Kern in C++ mit C-API `core/include/wp_core.h` (miniaudio, Signalsmith Stretch).
+  Steuerbefehle erreichen den Audio-Thread über eine Lock-free-Queue, Titel werden im Hintergrund dekodiert,
+  Ladefehler kommen mit Code und Text (`wp_error_message`). Tests mit `ctest`, Testaudio aus `core/tools/make_test_audio.sh`.
 
 ## Datenschutz
 

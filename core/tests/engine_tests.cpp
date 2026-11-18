@@ -1,11 +1,39 @@
 // Tests der Wiedergabe-Logik im Offline-Rendering (ohne Audiogerät). Testaudio wird erzeugt.
+#include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
+#include <new>
 #include <string>
+#include <thread>
 #include <vector>
 
+#include "command_queue.hpp"
 #include "engine.hpp"
+#include "metronome.hpp"
+
+// Zählt Speicherreservierungen und -freigaben im markierten Thread (#14/AK1).
+namespace {
+thread_local bool tCountAllocs = false;
+std::atomic<long> gAllocs{0};
+void* countedAlloc(std::size_t n) {
+    if (tCountAllocs) ++gAllocs;
+    if (void* p = std::malloc(n ? n : 1)) return p;
+    throw std::bad_alloc();
+}
+void countedFree(void* p) noexcept {
+    if (p && tCountAllocs) ++gAllocs;
+    std::free(p);
+}
+}  // namespace
+
+void* operator new(std::size_t n) { return countedAlloc(n); }
+void* operator new[](std::size_t n) { return countedAlloc(n); }
+void operator delete(void* p) noexcept { countedFree(p); }
+void operator delete[](void* p) noexcept { countedFree(p); }
+void operator delete(void* p, std::size_t) noexcept { countedFree(p); }
+void operator delete[](void* p, std::size_t) noexcept { countedFree(p); }
 
 namespace {
 
@@ -172,11 +200,11 @@ void stretchKeepsPitchAndChangesLength() {  // #5/AK3
         long long rendered = 0;
         std::vector<float> all;
         std::vector<float> block(512 * 2);
-        while (e.playing() && rendered < sr * 20) {
+        do {  // Befehle wirken erst im ersten render()
             e.render(block.data(), 512);
             all.insert(all.end(), block.begin(), block.end());
             rendered += 512;
-        }
+        } while (e.playing() && rendered < sr * 20);
         const double seconds = double(rendered) / sr;
         std::printf("  Tempo %.2f: %.3f s gespielt (erwartet %.3f)\n", rate, seconds, 2.0 / rate);
         CHECK_NEAR(seconds, 2.0 / rate, 0.05);
@@ -289,9 +317,161 @@ void seekDuringStretchedPlayback() {
     CHECK(e.playing());
 }
 
+
+void queueKeepsOrderAndRejectsWhenFull() {  // #14/AK1
+    wp::CommandQueue<int> q(4);
+    CHECK(q.capacity() == 4);
+    for (int i = 0; i < 4; ++i) CHECK(q.push(i));
+    CHECK(!q.push(99));
+    int v = -1;
+    for (int i = 0; i < 4; ++i) {
+        CHECK(q.pop(v));
+        CHECK(v == i);
+    }
+    CHECK(!q.pop(v));
+    CHECK(q.push(5) && q.pop(v) && v == 5);  // nach dem Umlauf weiter benutzbar
+}
+
+void queueManyProducersDeliverEachCommandOnce() {  // #14/AK1
+    wp::CommandQueue<int> q(64);
+    constexpr int kThreads = 4, kPerThread = 20000;
+    std::vector<std::thread> producers;
+    for (int t = 0; t < kThreads; ++t) {
+        producers.emplace_back([&q, t] {
+            for (int i = 0; i < kPerThread; ++i)
+                while (!q.push(t * kPerThread + i)) std::this_thread::yield();
+        });
+    }
+    std::vector<int> seen(kThreads * kPerThread, 0);
+    std::vector<int> last(kThreads, -1);
+    bool ordered = true;
+    int received = 0, v = 0;
+    while (received < kThreads * kPerThread) {
+        if (!q.pop(v)) continue;
+        ++seen[v];
+        ++received;
+        const int t = v / kPerThread;
+        ordered = ordered && v > last[t];  // je Erzeuger in Reihenfolge
+        last[t] = v;
+    }
+    for (auto& th : producers) th.join();
+    bool once = true;
+    for (int n : seen) once = once && n == 1;
+    CHECK(once);
+    CHECK(ordered);
+    CHECK(!q.pop(v));
+}
+
+void commandsApplyInOrderAtNextRender() {  // #14/AK1
+    const int sr = 1000;
+    wp::Engine e;
+    e.setSource(ramp(5000), 2, sr);
+    e.seek(1.0);
+    e.seek(2.0);
+    e.play();
+    CHECK(!e.playing());  // wirkt erst im Audio-Thread
+    float frame[2];
+    e.render(frame, 1);
+    CHECK(frame[0] == 2000.0f);
+    CHECK(e.playing());
+    e.play();
+    e.pause();
+    e.render(frame, 1);
+    CHECK(!e.playing());
+    CHECK(frame[0] == 0.0f);
+}
+
+void renderDoesNotAllocate() {  // #14/AK1: Audio-Thread reserviert keinen Speicher
+    const int sr = 48000;
+    wp::Engine e;
+    e.setSource(sine(440, 4.0, sr), 2, sr);
+    wp::Metronome m(sr);
+    m.setSubdivision(4);
+    m.start();
+    auto next = std::make_unique<wp::Source>();
+    next->data = sine(220, 3.0, sr);
+    next->frames = static_cast<long long>(next->data.size()) / 2;
+    std::vector<float> out(512 * 2);
+    auto block = [&](int n) {
+        for (int i = 0; i < n; ++i) {
+            e.render(out.data(), 512);
+            m.renderAdd(out.data(), 512, 2);
+        }
+    };
+
+    gAllocs = 0;
+    tCountAllocs = true;
+    e.play();
+    e.setVolume(0.8f);
+    e.setLoop(0.5, 2.0);
+    block(20);
+    e.setRate(0.5);
+    block(60);
+    e.seek(1.0);
+    block(10);
+    e.setRate(1.7);
+    block(40);
+    e.setRate(1.0);
+    e.setLoop(0, 0);
+    block(10);
+    tCountAllocs = false;
+
+    CHECK(e.submitSource(std::move(next)));
+    tCountAllocs = true;
+    block(5);  // Titelwechsel: alter Titel wird im Audio-Thread nicht freigegeben
+    e.play();
+    e.setRate(0.8);
+    block(20);
+    tCountAllocs = false;
+    CHECK(gAllocs.load() == 0);
+    if (gAllocs.load() != 0) std::printf("  %ld Reservierungen im Audio-Thread\n", gAllocs.load());
+    e.collectGarbage();
+    CHECK_NEAR(e.duration(), 3.0, 1e-9);
+    CHECK(e.playing());
+}
+
+void commandsFromManyThreadsWhileRendering() {  // #14/AK1
+    const int sr = 8000;
+    wp::Engine e;
+    e.setSource(sine(440, 10.0, sr), 2, sr);
+    e.setLoop(1.0, 9.0);
+    e.play();
+    std::atomic<bool> stop{false};
+    std::vector<std::thread> controllers;
+    for (int t = 0; t < 3; ++t) {
+        controllers.emplace_back([&e, &stop, t] {
+            int i = 0;
+            while (!stop.load()) {
+                switch ((i++ + t) % 4) {
+                    case 0: e.seek((i % 90) / 10.0); break;
+                    case 1: e.setRate(0.5 + (i % 15) / 10.0); break;
+                    case 2: e.setVolume((i % 10) / 10.0f); break;
+                    default: e.play(); break;
+                }
+                std::this_thread::yield();
+            }
+        });
+    }
+    std::vector<float> out(256 * 2);
+    bool finite = true;
+    for (int i = 0; i < 400; ++i) {
+        e.render(out.data(), 256);
+        for (float x : out) finite = finite && std::isfinite(x);
+    }
+    stop = true;
+    for (auto& th : controllers) th.join();
+    e.render(out.data(), 256);  // restliche Befehle abarbeiten
+    CHECK(finite);
+    CHECK(e.position() >= 0.0 && e.position() <= 10.0);
+    e.pause();
+    e.render(out.data(), 256);
+    CHECK(!e.playing());
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    const std::string filter = argc > 1 ? argv[1] : "";  // optional: nur Tests, deren Name das enthält
     const std::vector<std::pair<std::string, std::function<void()>>> tests = {
         {"loopSeamDirectIsSampleExact", loopSeamDirectIsSampleExact},
         {"seekSetsPositionAndFirstSample", seekSetsPositionAndFirstSample},
@@ -307,8 +487,14 @@ int main() {
         {"volumeScalesDirectOutput", volumeScalesDirectOutput},
         {"rateChangeKeepsPositionAndSignal", rateChangeKeepsPositionAndSignal},
         {"seekDuringStretchedPlayback", seekDuringStretchedPlayback},
+        {"queueKeepsOrderAndRejectsWhenFull", queueKeepsOrderAndRejectsWhenFull},
+        {"queueManyProducersDeliverEachCommandOnce", queueManyProducersDeliverEachCommandOnce},
+        {"commandsApplyInOrderAtNextRender", commandsApplyInOrderAtNextRender},
+        {"renderDoesNotAllocate", renderDoesNotAllocate},
+        {"commandsFromManyThreadsWhileRendering", commandsFromManyThreadsWhileRendering},
     };
     for (auto& [name, fn] : tests) {
+        if (name.find(filter) == std::string::npos) continue;
         const int before = failures;
         fn();
         std::printf("%s %s\n", failures == before ? "ok  " : "FAIL", name.c_str());
