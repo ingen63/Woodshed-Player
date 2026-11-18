@@ -95,22 +95,33 @@ double Engine::position() const { return publishedPosition_.load(); }
 double Engine::duration() const { return static_cast<double>(publishedFrames_.load()) / sampleRate_; }
 
 void Engine::applyCommands() {
+    // Seeks werden pro Block zusammengefasst: nur das letzte Ziel zählt. Ein Seek im gedehnten Pfad ist
+    // teuer (outputSeek); viele davon in einem Block (z. B. schnelles Ziehen) würden den Block sprengen.
+    double seekTarget = -1.0;
+    bool changed = false;
     Command c;
-    while (commands_.pop(c)) apply(c);
+    while (commands_.pop(c)) {
+        apply(c, seekTarget);
+        changed = true;
+    }
+    if (seekTarget >= 0) seekTo(seekTarget);
+    if (changed) publish();
 }
 
-void Engine::apply(const Command& c) {
+void Engine::apply(const Command& c, double& seekTarget) {
     switch (c.type) {
-        case Command::Play:
+        case Command::Play: {
             if (frames_ == 0) break;
-            if (loopB_ == 0 && playhead_ >= static_cast<double>(frames_)) seekTo(0.0);  // am Dateiende: von vorn
+            const double at = seekTarget >= 0 ? seekTarget * sampleRate_ : playhead_;
+            if (loopB_ == 0 && at >= static_cast<double>(frames_)) seekTarget = 0.0;  // am Dateiende: von vorn
             playing_ = true;
             break;
+        }
         case Command::Pause:
             playing_ = false;
             break;
         case Command::Seek:
-            seekTo(c.a);
+            seekTarget = c.a;
             break;
         case Command::Rate:
             rate_ = c.a;
@@ -132,9 +143,9 @@ void Engine::apply(const Command& c) {
         }
         case Command::SetSource:
             installSource(c.source);
+            seekTarget = -1.0;  // ein Seek davor galt dem alten Titel
             break;
     }
-    publish();
 }
 
 void Engine::installSource(Source* s) {

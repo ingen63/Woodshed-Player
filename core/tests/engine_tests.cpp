@@ -1,5 +1,6 @@
 // Tests der Wiedergabe-Logik im Offline-Rendering (ohne Audiogerät). Testaudio wird erzeugt.
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -468,6 +469,35 @@ void commandsFromManyThreadsWhileRendering() {  // #14/AK1
     CHECK(!e.playing());
 }
 
+
+void seeksAreCoalescedPerBlock() {  // #14/AK1: viele Seeks in einem Block kosten nur einen
+    const int sr = 48000;
+    wp::Engine e;
+    e.setSource(sine(440, 10.0, sr), 2, sr);
+    e.setRate(0.5);
+    e.play();
+    std::vector<float> out(512 * 2);
+    e.render(out.data(), 512);  // gedehnter Pfad aktiv
+    for (int i = 0; i < 1000; ++i) e.seek((i % 90) / 10.0);
+    e.seek(4.0);
+    const auto t0 = std::chrono::steady_clock::now();
+    e.render(out.data(), 1);
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    CHECK_NEAR(e.position(), 4.0, 1e-3);
+    CHECK(ms < 50.0);
+    if (ms >= 50.0) std::printf("  Block mit 1001 Seeks: %.1f ms\n", ms);
+
+    // Seek vor einem Titelwechsel gilt dem alten Titel und verfällt.
+    auto next = std::make_unique<wp::Source>();
+    next->data = sine(220, 2.0, sr);
+    next->frames = static_cast<long long>(next->data.size()) / 2;
+    e.seek(5.0);
+    CHECK(e.submitSource(std::move(next)));
+    e.render(out.data(), 1);
+    CHECK(e.position() == 0.0);
+    e.collectGarbage();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -491,6 +521,7 @@ int main(int argc, char** argv) {
         {"queueManyProducersDeliverEachCommandOnce", queueManyProducersDeliverEachCommandOnce},
         {"commandsApplyInOrderAtNextRender", commandsApplyInOrderAtNextRender},
         {"renderDoesNotAllocate", renderDoesNotAllocate},
+        {"seeksAreCoalescedPerBlock", seeksAreCoalescedPerBlock},
         {"commandsFromManyThreadsWhileRendering", commandsFromManyThreadsWhileRendering},
     };
     for (auto& [name, fn] : tests) {

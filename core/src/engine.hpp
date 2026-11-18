@@ -77,7 +77,7 @@ private:
 
     bool send(const Command& c);
     void applyCommands();
-    void apply(const Command& c);
+    void apply(const Command& c, double& seekTarget);
     void installSource(Source* s);
     void seekTo(double seconds);
     void publish();
