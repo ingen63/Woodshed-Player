@@ -25,7 +25,7 @@ SRC="${1:-$APP_DIR/assets/icons/concepts/icon_1_waveform_loop.svg}"
 BG="#121214"
 
 if [[ ! -f "$SRC" ]]; then
-  echo "Vorlage nicht gefunden: $SRC" >&2
+  echo "Source SVG not found: $SRC" >&2
   exit 1
 fi
 
@@ -50,10 +50,10 @@ elif [[ -x "$CHROME" ]]; then
     -draw "color 0,0 floodfill" -draw "color 1023,0 floodfill" \
     -draw "color 0,1023 floodfill" -draw "color 1023,1023 floodfill" "$MASTER"
 elif command -v magick >/dev/null 2>&1; then
-  echo "Warnung: rsvg-convert und Chrome fehlen, magick rendert Konturen möglicherweise falsch." >&2
+  echo "Warning: rsvg-convert and Chrome are missing, magick may render outlines incorrectly." >&2
   magick -background none -density 96 "$SRC" -resize 1024x1024 "$MASTER"
 else
-  echo "Kein SVG-Renderer gefunden (brew install librsvg, Google Chrome oder imagemagick)." >&2
+  echo "No SVG renderer found (brew install librsvg, Google Chrome or imagemagick)." >&2
   exit 1
 fi
 
@@ -109,7 +109,7 @@ cat > "$AND/mipmap-anydpi-v26/ic_launcher.xml" <<'XML'
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>
 XML
-echo "Android: $AND (Projekt braucht android/ mit flutter create)"
+echo "Android: $AND (the project needs android/ from flutter create)"
 
 # --- Windows ---------------------------------------------------------------
 WIN="$GEN/windows"
