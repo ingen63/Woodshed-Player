@@ -348,9 +348,10 @@ function wire() {
   for (const id of ['metOn', 'bpm']) $(id).onchange = sendMetronome;
   $('route').onchange = connectRoute;
   $('session').onchange = applySession;
+  // Erst beim Öffnen der Auswahl leeren: der Name bleibt sichtbar, dieselbe Datei lässt sich erneut wählen.
+  $('file').onclick = (e) => { e.target.value = ''; };
   $('file').onchange = (e) => {
     const f = e.target.files[0];
-    e.target.value = '';  // dieselbe Datei lässt sich erneut wählen
     if (f) loadFile(f).catch((err) => log(`Datei: ${err.message || err}`));
   };
   $('write').onclick = async () => {
