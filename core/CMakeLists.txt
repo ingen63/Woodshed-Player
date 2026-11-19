@@ -27,6 +27,15 @@ if(MSVC)
 endif()
 find_package(Threads REQUIRED)
 
+# #9/AK7: no fused multiply-add, so native and web cores render the same samples. Apple Clang
+# contracts a * b + c into one FMA instruction on arm64 (-ffp-contract=on), WebAssembly has none;
+# the time stretch amplified that rounding difference up to 2e-2 at rate 0.1. Without contraction
+# the outputs are bit-identical. MSVC does not contract by default (/fp:precise). The Flutter
+# plugin sets the same flag (app/packages/wp_core/*/wp_core.podspec).
+if(NOT MSVC)
+  add_compile_options(-ffp-contract=off)
+endif()
+
 set(WP_THIRD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
 # #7: warnings are errors in our own code. Third-party code (miniaudio, signalsmith) is compiled
@@ -158,6 +167,9 @@ add_executable(realtime_tests tests/realtime_tests.cpp)
 target_link_libraries(realtime_tests PRIVATE wp_playercore ${CMAKE_DL_LIBS})
 wp_strict_warnings(realtime_tests)
 add_test(NAME realtime_tests COMMAND realtime_tests)
+
+# #9: audio reference cases against the offline C API, natively and under WASM (tests/reference.cmake)
+include(tests/reference.cmake)
 
 # #57: in a sanitizer build every test runs with these options; a finding ends the test with a
 # non-zero exit code. Suppression files in tests/sanitizer/ (each entry with a reason).

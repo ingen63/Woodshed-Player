@@ -182,6 +182,44 @@ void meterChangeWhilePlaying() { // #3/AK10
   CHECK(t.size() == 4);
 }
 
+// #3/AK10, found by #9: a subdivision change re-plans the next click within the beat of the last
+// click. Before the fix it counted from the beat after it and skipped a beat (the accent of the
+// next bar came as a plain beat).
+void subdivisionChangeKeepsBeat() {
+  // Between beats: beats 1 and 2 at 0 and 22 050 played, the next tick (beat 3) is due at 44 100.
+  // Eighths from there on: beat 3 at 44 100, its eighth at 55 125, beat 4 at 66 150, then the
+  // accent of bar 2 at 88 200.
+  {
+    Metronome m(44100);
+    m.start();
+    auto t = run(m, 44100);
+    CHECK(t.size() == 2);
+    m.setSubdivision(2);
+    t = run(m, 44100 + 1);
+    CHECK(t.size() == 5);
+    if (t.size() == 5) {
+      CHECK(t[0].frame == 44100 && t[0].beat == 2 && t[0].sub == 0);
+      CHECK(t[1].frame == 55125 && t[1].beat == 2 && t[1].sub == 1);
+      CHECK(t[2].frame == 66150 && t[2].beat == 3 && t[2].sub == 0);
+      CHECK(t[4].frame == 88200 && t[4].beat == 0 && t[4].kind == Metronome::Accent);
+    }
+  }
+  // Within a beat: 100 frames after beat 2 (22 050). Its eighth follows at 22 050 + 11 025 =
+  // 33 075 and still belongs to beat 2; beat 3 at 44 100.
+  {
+    Metronome m(44100);
+    m.start();
+    auto t = run(m, 22050 + 100);
+    m.setSubdivision(2);
+    t = run(m, 22050);
+    CHECK(t.size() == 2);
+    if (t.size() == 2) {
+      CHECK(t[0].frame == 33075 && t[0].beat == 1 && t[0].sub == 1 && t[0].kind == Metronome::Sub);
+      CHECK(t[1].frame == 44100 && t[1].beat == 2 && t[1].sub == 0);
+    }
+  }
+}
+
 void volumeChangeWithoutCrackle() { // #3/AK12
   Metronome m(44100);
   m.start();
@@ -448,6 +486,7 @@ int main() {
       {"beatsAreSampleExactWithoutDrift", beatsAreSampleExactWithoutDrift},
       {"accentsPerMeter", accentsPerMeter},
       {"subdivisionsAndQuieterSubClicks", subdivisionsAndQuieterSubClicks},
+      {"subdivisionChangeKeepsBeat", subdivisionChangeKeepsBeat},
       {"meterChangeWhilePlaying", meterChangeWhilePlaying},
       {"volumeChangeWithoutCrackle", volumeChangeWithoutCrackle},
       {"rampExampleFromIssue", rampExampleFromIssue},

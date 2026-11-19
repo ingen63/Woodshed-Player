@@ -45,13 +45,16 @@ target_compile_definitions(player_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRE
 wp_strict_warnings(player_tests)
 add_test(NAME player_tests COMMAND player_tests)
 
+# #9: the same reference cases as natively; compared against the native outputs (#9/AK7)
+include(tests/reference.cmake)
+
 # ---- Kern fürs AudioWorklet ----
-add_executable(wp_core_web web/wp_core_web.cpp src/player_core.cpp src/miniaudio_impl.c ${WP_ENGINE_SOURCES})
+add_executable(wp_core_web web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp src/miniaudio_impl.c ${WP_ENGINE_SOURCES})
 target_include_directories(wp_core_web PRIVATE include web ${WP_ENGINE_INCLUDES})
 target_include_directories(wp_core_web SYSTEM PRIVATE ${WP_ENGINE_SYSTEM_INCLUDES} ${WP_THIRD_PARTY}/miniaudio)
 # #7: strict warnings for our own sources only, not for miniaudio_impl.c (compiles miniaudio itself).
 if(WP_STRICT_WARNINGS)
-  set_source_files_properties(web/wp_core_web.cpp src/player_core.cpp ${WP_ENGINE_SOURCES}
+  set_source_files_properties(web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp ${WP_ENGINE_SOURCES}
     TARGET_DIRECTORY wp_core_web PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
 endif()
 target_compile_definitions(wp_core_web PRIVATE ${WP_MINIAUDIO_DEFS})

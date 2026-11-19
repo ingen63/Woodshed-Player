@@ -118,7 +118,7 @@ void Metronome::applyCommands() {
     nextTick_ = 0;
     beatStart_ = 0;
     activeSub_ = subdivision_.load();
-    beat_ = sub_ = 0;
+    beat_ = sub_ = tickBeat_ = 0;
     bar_ = 1;
     barsSinceChange_ = 0;
     cycleStart_ = 0;
@@ -143,10 +143,18 @@ void Metronome::applyCommands() {
     activeSub_ = subdiv;
     const double interval = framesPerTick();
     const long long k = static_cast<long long>(std::floor((now_ - beatStart_) / interval)) + 1;
+    // After the last click of a beat advanceStep() has already moved on to the next beat (sub_ ==
+    // 0, beat_ and bar wrap decided with the meter of that moment). Moving on once more skipped a
+    // beat (#9): the next beat is then simply the planned one, and a click still inside the beat
+    // belongs to the beat of the last click.
+    const bool movedOn = sub_ == 0;
     if (k >= subdiv) {
-      sub_ = subdiv; // nächster Klick ist der nächste Schlag
+      if (!movedOn)
+        sub_ = subdiv; // the next click is the next beat
       nextTick_ = beatStart_ + interval * subdiv;
     } else {
+      if (movedOn)
+        beat_ = tickBeat_;
       sub_ = static_cast<int>(k);
       nextTick_ = beatStart_ + interval * static_cast<double>(k);
     }
@@ -199,6 +207,7 @@ void Metronome::scheduleTick() {
   if (sub_ == 0)
     beatStart_ = nextTick_;
   activeSub_ = subdiv;
+  tickBeat_ = beat_;
 
   int kind;
   if (sub_ > 0) {

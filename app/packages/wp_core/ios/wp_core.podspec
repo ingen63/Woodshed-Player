@@ -18,6 +18,9 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
+    # #9/AK7: no fused multiply-add, same samples as the web core and the tests (core/CMakeLists.txt)
+    'OTHER_CFLAGS' => '$(inherited) -ffp-contract=off',
+    'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -ffp-contract=off',
     'HEADER_SEARCH_PATHS' => [
       "\"#{core}/include\"", "\"#{core}/src\"", "\"#{core}/third_party/miniaudio\"",
       "\"#{core}/third_party/signalsmith-stretch/include\"", "\"#{core}/third_party/signalsmith-linear/include\""

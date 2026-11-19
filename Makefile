@@ -51,7 +51,12 @@ test-core-debug:
 	$(PIPEFAIL) cmake --build core/build-debug -j 8 2>&1 | tail -20
 	ctest --test-dir core/build-debug --output-on-failure -j 4
 
+# #9/AK7: the WASM reference cases compare their samples with the native run
+# (core/build/reference_native.bin, tolerance 1e-6), so that one is rendered first.
 test-wasm:
+	cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release >/dev/null
+	$(PIPEFAIL) cmake --build core/build -j 8 --target reference_tests 2>&1 | tail -20
+	$(PIPEFAIL) core/build/reference_tests --dump core/build/reference_native.bin | tail -2
 	emcmake cmake -S core -B core/build-wasm -DCMAKE_BUILD_TYPE=Release >/dev/null
 	$(PIPEFAIL) cmake --build core/build-wasm -j 8 2>&1 | tail -20
 	ctest --test-dir core/build-wasm --output-on-failure

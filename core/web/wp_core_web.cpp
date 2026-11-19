@@ -254,7 +254,24 @@ void wp_metro_set_ramp_timed(wp_player *p, int enabled, int start, int target, i
     p->core->metronome().setTimedRamp(enabled != 0, start, target, seconds);
 }
 
-// Aufnahme gibt es im Browser nicht.
-int wp_rec_available(void) { return 0; }
+// Loading by path (#9/AK7): only where there is a file system and threads, i.e. natively and in the
+// Node.js tests (WP_WEB_FILES); the AudioWorklet build loads through wp_web_load_encoded and
+// wp_web_pcm_*. The device check of src/player.cpp does not apply: rendering is driven offline.
+// Recording: src/recorder_stub.cpp (not available in the browser and offline).
+#ifdef WP_WEB_FILES
+int wp_load(wp_player *p, const char *path) {
+  const int r = wp_load_async(p, path);
+  return r != WP_OK ? r : wp_load_wait(p);
+}
+int wp_load_async(wp_player *p, const char *path) {
+  return p && path ? p->core->loadAsync(path) : WP_ERR_INVALID_ARGUMENT;
+}
+int wp_load_wait(wp_player *p) { return p ? p->core->waitForLoad() : WP_ERR_INVALID_ARGUMENT; }
+int wp_load_state(wp_player *p) { return p ? p->core->loadState() : WP_ERR_INVALID_ARGUMENT; }
+double wp_load_progress(wp_player *p) { return p ? p->core->loadProgress() : 0.0; }
+double wp_file_duration(const char *path) {
+  return path ? wp::fileDuration(path) : WP_ERR_INVALID_ARGUMENT;
+}
+#endif
 
 } // extern "C"

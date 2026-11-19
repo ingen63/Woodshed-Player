@@ -105,6 +105,8 @@ private:
   double beatStart_ = 0; // Position des laufenden Schlags
   int activeSub_ = 1;    // Unterteilung, mit der nextTick_ geplant wurde
   int beat_ = 0, sub_ = 0, bar_ = 1;
+  // beat_ and sub_ are those of the next click; tickBeat_ is the beat of the last scheduled one.
+  int tickBeat_ = 0;
   int barsSinceChange_ = 0;
   double cycleStart_ = 0; // Steigerung nach Zeit: Beginn der laufenden Runde (Frames seit Start)
   bool firstTick_ = true;

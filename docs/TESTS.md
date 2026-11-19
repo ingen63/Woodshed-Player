@@ -24,10 +24,10 @@ VivaPlan.
 | Schicht | Wo | Was geprüft wird | Stand |
 |---|---|---|---|
 | 1 Einheiten | `app/test/*_test.dart`, `core/tests/*_tests.cpp` | Zeitformat, Bibliothek, Stempel und Zusammenführen, Metadaten, Player-Service, Metronom-Logik, Engine, Befehls-Queue, Wellenform | vorhanden |
-| 2 Audio-Referenzfälle | `core/tests/engine_tests.cpp`, `metronome_tests.cpp`, `player_tests.cpp`; im Web dieselben Fälle unter Node.js (`core/build-wasm`) | Offline-Rendering ohne Audiogerät: Loop-Naht, Seek, Tempo und Tonhöhe, Klickpositionen | teilweise, Ausbau #9 |
+| 2 Audio-Referenzfälle | `core/tests/reference_tests.cpp` über die C-API, dazu `engine_tests.cpp`, `metronome_tests.cpp`, `player_tests.cpp`; im Web dieselben Fälle unter Node.js (`core/build-wasm`), Vergleich der Samples nativ ↔ Web | Offline-Rendering ohne Audiogerät: Loop-Naht, Seek und Pause, Tempo und Tonhöhe, Klickpositionen, jede Funktion von `wp_core.h` | vorhanden (#9) |
 | 3 Invarianten und Zufallstests | – | Eigenschaften über viele zufällige Fälle mit festem, ausgegebenem Startwert | Lücke, #10 |
 | 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler); alle Kerntests unter ASan/UBSan und TSan (`make sanitize`, `make sanitize-thread`) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | teilweise (Sanitizer vorhanden, #57), Fuzzing #10 |
-| 5 Golden-Dateien | `app/test/golden/` (`library.json` der Swift-App, alt und neu) | jede Version liest alle alten Stände; Klickpositionen des Metronoms | teilweise, #9 und #10 |
+| 5 Golden-Dateien | `app/test/golden/` (`library.json` der Swift-App, alt und neu), `core/tests/golden/metronome_positions.txt` | jede Version liest alle alten Stände; Klickpositionen des Metronoms (#9) | teilweise, #10 |
 | 6 Oberfläche | Widget-Tests in `app/test/`, Rauchtest `app/integration_test/app_smoke_test.dart`, Prüfseiten im Browser `app/tool/web_*_check.dart` | Layout je Grösse, Bedienung, Texte, Tastenkürzel | teilweise, #13 |
 | Werkzeuge | `app/tool/after_commit_hook_test.dart`, `coverage_test.dart`, `pre_push_hook_test.dart` | Hook nach dem Commit, Abdeckung je Teil, `coverage-diff`, `pre-push` | vorhanden (#7, #8) |
 
@@ -63,7 +63,7 @@ zugeordnet.
 | Gerätewechsel pausiert, Position bleibt | vorhanden: `player_tests.cpp` (`devicePolicy`, `deviceChangePausesAndKeepsPosition`) | – |
 | Render-Pfad ohne Speicheranforderung und ohne Sperre, Befehle aus vielen Threads | vorhanden: `engine_tests.cpp` (`renderDoesNotAllocate`, `commandsFromManyThreadsWhileRendering`, Queue-Fälle), `realtime_tests.cpp` (#57/AK4, `Player::render` mit Tempo, Loop, Metronom), `player_tests.cpp` (`controlFromSecondThreadWhileRendering`, #57/AK2) | – |
 | Wellenform (Minimum/Maximum je Abschnitt, Grenzen) | vorhanden: `waveform_tests.cpp`, `wp_waveform_ffi_test.dart`, `web_binding_test.dart` (#34/AK3) | – |
-| Seek auf t beginnt bei Sample round(t × Abtastrate); Pause und Fortsetzen ohne verlorenes Sample | Lücke (Seek nur Position und erstes Sample) | #9 |
+| Seek auf t beginnt bei Sample round(t × Abtastrate); Pause und Fortsetzen ohne verlorenes Sample | vorhanden: `reference_tests.cpp` (#9/AK3, Rampe, t knapp unter und über einem halben Sample, im Stand und beim Spielen) | – |
 | Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | Lücke | #10 |
 | AddressSanitizer, UBSan, ThreadSanitizer | vorhanden: `make sanitize`, `make sanitize-thread`, Selbsttest `tests/sanitizer/selftest.cpp`, Workflow `test-quality.yml` (#57) | – |
 | Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | Lücke | #59 |
@@ -74,7 +74,7 @@ zugeordnet.
 |---|---|---|
 | Tempo 0,1× – 2×, Schritte 0,05, Pfeiltasten | vorhanden: `engine_tests.cpp` (`rateIsClamped`), `player_service_test.dart` («Tempo in 0,05er-Schritten») | – |
 | Tonhöhe bleibt, Länge = Eingabe / Rate (0,25 / 0,5 / 1,5 / 2,0) | vorhanden: `engine_tests.cpp` (`stretchKeepsPitchAndChangesLength`, `stretchIsDeterministic`, `rateChangeKeepsPositionAndSignal`, `positionFollowsRate`) | – |
-| Dieselbe Prüfung für 0,1 und 1,0 mit 1 % Toleranz | Lücke | #9 |
+| Dieselbe Prüfung für 0,1 / 0,5 / 1,0 / 2,0 mit 1 % Toleranz; Stille bleibt Stille | vorhanden: `reference_tests.cpp` (#9/AK4, #9/AK1) | – |
 | Klang gegen AVAudioUnitTimePitch | vorhanden, von Hand (Hörvergleich, nicht automatisierbar): `tools/hoervergleich.sh` | – |
 | Rechenzeit je Puffer ≤ 50 % des Echtzeitbudgets | Lücke | #59 |
 
@@ -87,7 +87,7 @@ zugeordnet.
 | Durchgänge zählen nur beim Sprung vom Ende, nicht bei Seek | vorhanden: `engine_tests.cpp` (`loopPasses*`), `player_service_test.dart` (#29/AK2) | – |
 | Steigerung nach Durchgängen (Stufen, Ziel, Zurücksetzen, Speichern) | vorhanden: `loop_ramp_test.dart` (#29), `player_service_test.dart` (#29), `library_test.dart` (#29/AK7) | – |
 | Marker ziehen, Zeitfelder, S/E, Ganzer Titel | vorhanden: `home_page_test.dart` (#17/AK4), `player_view_test.dart` (#19/AK7, #19/AK9), `studio_design_test.dart` (#30/AK6) | – |
-| Naht mit Rampe über 100 Durchläufe | Lücke | #9 |
+| Naht mit Rampe über 100 Durchläufe, Durchgänge zählen genau | vorhanden: `reference_tests.cpp` (#9/AK2, Blöcke 1–4096 Frames) | – |
 | Grenzen nach jeder zufälligen Änderung gültig | Lücke | #10 |
 
 ### Zeitformat
@@ -104,7 +104,8 @@ zugeordnet.
 | Klicks sampelgenau ohne Drift, Betonung je Taktart, Unterteilungen, Lautstärke ohne Knacken | vorhanden: `metronome_tests.cpp` (`beatsAreSampleExactWithoutDrift`, `accentsPerMeter`, `subdivisionsAndQuieterSubClicks`, `volumeChangeWithoutCrackle`) | – |
 | Steigerung nach Takten und nach Zeit (#23), Wechsel der Betriebsart | vorhanden: `metronome_tests.cpp` (`ramp*`, `timedRamp*`, `switchingModes`), `metronome_test.dart` (#23) | – |
 | Einstellungen, Tap-Tempo, Kürzel, nie gleichzeitig mit dem Titel | vorhanden: `metronome_test.dart` (#3/AK20) | – |
-| 120 BPM bei 44,1 kHz: 22 050 Samples Abstand über 5 min; Positionen als Golden-Datei | Lücke | #9 |
+| 120 BPM bei 44,1 kHz: 22 050 Samples Abstand über 5 min; Betonung, Nebenakzent (6/8), Unterteilungen an den berechneten Stellen; Positionen eines festen Ablaufs als Golden-Datei | vorhanden: `reference_tests.cpp` (#3/AK7–AK10, #9/AK5, Klicks aus der Ausgabe erkannt), `core/tests/golden/metronome_positions.txt` | – |
+| Wechsel der Unterteilung an der Schlaggrenze überspringt keinen Schlag | vorhanden: `metronome_tests.cpp` (`subdivisionChangeKeepsBeat`, #3/AK10, gefunden mit #9) | – |
 
 ### Aufnahme (nur Mac)
 
@@ -123,7 +124,7 @@ zugeordnet.
 | Dart-Anbindung per bedingtem Import, Wellenform im Browser | vorhanden: `web_binding_test.dart` (#34) | – |
 | Auslieferung auf GitHub Pages, Service Worker für COOP/COEP | vorhanden: `web_hosting_test.dart` (#41) | – |
 | Im echten Browser: Position, Pegel, Tempo, Loop, Metronom, Laden ohne Aussetzer, OPFS | vorhanden, von Hand: `app/tool/web_core_check.sh`, `app/tool/web_store_check.sh` (#34, #35, #42); Lücke: automatischer Lauf im Browser | #13 |
-| Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6), jede Funktion der C-API in einem Referenzfall | Lücke | #9 |
+| Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6), jede Funktion der C-API in einem Referenzfall | vorhanden: `reference_tests` (nativ `--dump`, WASM `--compare`), `reference_api_coverage` (#9/AK7), `core_build_flags_test.dart` (ohne FMA) | – |
 | `flutter build web` und `flutter test --platform chrome` bei jedem Push | Lücke | #13 |
 | Content-Security-Policy mit erlaubten Hosts | Lücke | #58 |
 | Web-Audio auf iPhone und Android | vorhanden unter Node.js: `core/web/w0_test.mjs`; Lücke: auf echten Geräten nur von Hand | #32 |
@@ -178,7 +179,7 @@ zugeordnet.
 
 ```sh
 make test           # Kern (ctest), App (flutter test) und die Tests der Werkzeuge
-make test-wasm      # Kern unter Node.js (Emscripten)
+make test-wasm      # Kern unter Node.js (Emscripten), Referenzfälle gegen die Samples des nativen Laufs
 make test-core-debug  # Kerntests im Debug-Build (core/build-debug), gleiche Toleranzen wie Release
 make sanitize       # Kerntests mit AddressSanitizer und UBSan (core/build-asan)
 make sanitize-thread  # Kerntests mit ThreadSanitizer (core/build-tsan)
@@ -278,8 +279,8 @@ genannt):
 - **Native Anbindung** (`platform_native.dart`, `audio_core_ffi.dart`, Teile von `file_platform.dart`) zählt zur
   Dart-Logik, wird aber nur im Rauchtest mit echtem Kern ausgeführt (`app_smoke_test.dart`, von Hand), also mit 0 %
   bzw. 36 % gezählt.
-- **Nicht übersetzt auf macOS:** `recorder_stub.cpp` (Aufnahme auf anderen Plattformen) wird auf dem Mac nicht
-  gebaut und daher nicht gemessen; `capi_tests.cpp` prüft ihn auf den anderen Plattformen. `miniaudio_impl.c` bindet
+- **`recorder_stub.cpp`** (Aufnahme auf anderen Plattformen, im Browser und im Offline-Kern) wird seit #9 auch auf
+  dem Mac gebaut und von `reference_tests.cpp` gemessen. `miniaudio_impl.c` bindet
   nur `third_party/miniaudio` ein und hat keine eigenen Zeilen.
 - **`wp_core.h`:** `llvm-cov` rechnet Zeilen von Makros (`WP_ERR_*`, `WP_REC_ERR_*`) dem Header zu, wo sie im Code
   verwendet werden; sie zählen mit.
@@ -313,8 +314,8 @@ Hintergrund) die Wiedergabe, während gerendert wird.
 **Debug und Release (AK3).** Alle Kerntests laufen in Debug (`make test-core-debug`, auch die Sanitizer-Builds) und in
 Release (`make test-core`) mit denselben Fällen und denselben Toleranzen; es gibt keine Toleranz je Build. Nur die
 Zeitgrenzen (Wellenform in 200 ms, 1001 Seeks in 50 ms) prüfen ausschliesslich optimierte Builds ohne Sanitizer
-(`core/tests/test_timing.hpp`). Die Referenzfälle und Golden-Dateien aus #9 kommen als `ctest`-Fälle dazu und laufen
-damit ohne weitere Einrichtung in allen vier Builds.
+(`core/tests/test_timing.hpp`). Die Referenzfälle und die Golden-Datei aus #9 (`reference_tests`, `reference_api_coverage`) sind
+`ctest`-Fälle und laufen damit ohne weitere Einrichtung in allen vier Builds mit denselben Toleranzen.
 
 **Echtzeitsicherheit (AK4).** `core/tests/realtime_tests.cpp` rendert über `Player::render` (das ruft der Callback des
 Audiogeräts) mit Tempo 0,75, 1,5, 0,5 und 1,25, Loop, Metronom mit Taktart, Unterteilung und Steigerung, Seek,
@@ -339,6 +340,55 @@ braucht darüber einen Kommentar mit Meldung, Grund und Issue und steht in der f
 **Grenzen.** LeakSanitizer gibt es mit ASan auf macOS nicht; Lecks prüft nur der Linux-Lauf. `capi_tests` öffnet ein
 echtes Audiogerät; ohne Gerät (Linux-Runner) überspringt er die Ladefälle, der Callback des Geräts läuft dann nicht
 unter den Sanitizern.
+
+## Audio-Referenzfälle (#9)
+
+`core/tests/reference_tests.cpp` rendert offline, ohne Audiogerät, über die C-API von `wp_core.h`. Gerendert wird
+mit dem Offline-Kern `wp_core_offline` (`core/tests/reference.cmake`): `core/web/wp_core_web.cpp`, dieselbe Quelle
+wie der Kern im Browser, dazu das Laden per Pfad (`WP_WEB_FILES`, nur wo es Dateisystem und Threads gibt) und
+`recorder_stub.cpp`. Der Kern der App (`player.cpp`) ist dieselbe dünne Hülle um `wp::Player` plus Audiogerät; ihn
+prüft `capi_tests.cpp`. Jeder Fall leitet den Erwartungswert im Kommentar her und nennt `#9/AKn`, Metronom-Fälle
+zusätzlich `#3/AKn`.
+
+| Fall | Testaudio | Erwartung |
+|---|---|---|
+| #9/AK1 | Sinus, Rampe, Stille, im Test erzeugt | Rampe bildet Frame-Index ab ((n + 1) · 2⁻²⁴, rechts negativ); Stille bleibt bei Tempo 0,5 exakt 0 |
+| #9/AK2 Loop-Naht | Rampe 3 s, Loop 0,5–1,6 s | Ausgabe k = 22 050 + (k mod 48 510), 100 Durchläufe, Zähler +100; Blöcke 1–4096 Frames |
+| #9/AK3 Seek, Pause | Rampe | erstes Sample round(t · 44 100), im Stand und beim Spielen; Pause verliert und wiederholt nichts |
+| #9/AK4 Tempo | Sinus 440 Hz, 1 s | Länge 44 100 / r ± 1 % für r = 0,1 / 0,5 / 1,0 / 2,0, Grundfrequenz 440 Hz ± 1 % |
+| #9/AK5, #3 Metronom | ohne Titel und mit stillem Titel | 600 Klicks in 5 min genau k · 22 050; 6/8 A B B S B B; Unterteilungen bei round(k · 22 050 / s), leiser; fester Ablauf als Golden-Datei |
+| #9/AK7 übrige C-API | WAV (Float, 22,05 kHz), im Test geschrieben | Laden, Dauer, Wellenform, Fehlercodes, Aufnahme nicht verfügbar |
+
+**Klickerkennung.** Ein Klick beginnt mit sin(0) = 0; zwischen den Klicks ist die Ausgabe exakt 0. Die Position ist
+das erste Sample ungleich 0 nach mindestens 64 stillen Samples minus 1, die Art folgt aus der Frequenz (Nulldurchgänge
+in 1500 Samples: 1600 / 1250 / 1000 / 700 Hz).
+
+**Golden-Datei.** `core/tests/golden/metronome_positions.txt` hält Position und Art jedes Klicks eines festen
+Ablaufs (4/4, Wechsel auf 6/8 mit Triolen, 3/4 mit Achteln bei 90 BPM, Steigerung nach Takten, Steigerung nach Zeit,
+Stopp). Die ersten 14 Klicks leitet der Fall zusätzlich von Hand her. Nach einer gewollten Änderung neu schreiben und
+den Diff prüfen:
+
+```sh
+GOLDEN_UPDATE=1 core/build/reference_tests
+```
+
+**Vertrag nativ ↔ Web (AK7).** Derselbe Quelltext läuft nativ (`ctest` in `core/build`, `build-debug`, `build-asan`,
+`build-tsan`) und als WebAssembly unter Node.js (`core/build-wasm`). Der native Lauf schreibt jede aufgezeichnete
+Ausgabe nach `reference_native.bin` im eigenen Build-Ordner (`--dump`); der WASM-Lauf vergleicht mit
+`core/build/reference_native.bin` (`--compare`, Toleranz 1e-6, CMake-Variable `WP_REFERENCE_DUMP`) und verlangt, dass
+jede native Ausgabe auch dort entsteht. `make test-wasm` rendert den nativen Stand vorher. Stand 19.11.2026: alle
+12 Ausgaben bitgleich (grösste Abweichung 0). `reference_api_coverage` (`core/tests/reference_api_coverage.cmake`)
+liest alle `WP_API`-Funktionen aus `wp_core.h` und schlägt fehl, wenn eine davon in `reference_tests.cpp` nicht
+aufgerufen wird.
+
+**Ohne FMA.** Kern, Tests, Werkzeuge und Web bauen mit `-ffp-contract=off` (`core/CMakeLists.txt`), das Flutter-Plugin
+ebenso (`app/packages/wp_core/*/wp_core.podspec`, geprüft in `app/test/core_build_flags_test.dart`). Apple-Clang fasst
+auf arm64 sonst `a · b + c` zu einer FMA-Anweisung zusammen, WebAssembly kennt keine; der Time-Stretch verstärkte den
+Rundungsunterschied bis 2e-2 (siehe «Gefundene Fehler»).
+
+**Grenze.** Die Aufnahme ist im Offline-Kern der Stub (nicht verfügbar); die echte Aufnahme (`recorder_mac.mm`)
+braucht Systemton (#51). Der optionale Vergleich mit AVAudioUnitTimePitch bleibt der Hörvergleich von Hand
+(`tools/hoervergleich.sh`).
 
 ## Hook nach dem Commit
 
@@ -367,3 +417,15 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
    Sortierung umstellen», Tippen ging daneben) und `recording_test.dart` (#4/AK3) in zwei von sechs Läufen
    gemeinsam fehl; einzeln immer grün. Vermutlich abhängig von der Rechnerlast (parallele Testprozesse), noch nicht
    behoben und noch keinem Issue zugeordnet.
+4. 19.11.2026, #9: Das Metronom übersprang einen Schlag, wenn die Unterteilung genau an einer Schlaggrenze oder
+   im Rest eines Schlags nach dessen letztem Klick wechselte (`Metronome::applyCommands`): Der Zähler war schon auf
+   den nächsten Schlag weitergerückt und wurde beim Neuplanen ein zweites Mal weitergezählt. Folge: Die Betonung des
+   nächsten Takts kam als gewöhnlicher Schlag, das 6/8-Muster war verschoben. Gefunden mit der Golden-Datei
+   (`reference_tests.cpp`, #9/AK5), behoben, Test `subdivisionChangeKeepsBeat` (`metronome_tests.cpp`, #3/AK10).
+5. 19.11.2026, #9/AK7: Nativer Kern und WASM-Kern lieferten beim Time-Stretch verschiedene Samples (bis 2,1e-2 bei
+   Tempo 0,1, 3,9e-3 bei 2,0, 9,7e-5 bei 0,5; ohne Stretch bitgleich). Ursache: Apple-Clang fasst auf arm64
+   Multiplikation und Addition zu FMA zusammen, WebAssembly nicht. Behoben mit `-ffp-contract=off` in CMake und im
+   Flutter-Plugin; jetzt bitgleich.
+6. 19.11.2026, #9: `sanitizer_selftest_thread` (#57) schlug in `make sanitize-thread` einmal fehl, als parallel
+   `make coverage` lief; einzeln dreimal grün. Der absichtliche Wettlauf wird unter starker Last offenbar nicht immer
+   erkannt. Noch nicht behoben und noch keinem Issue zugeordnet.
