@@ -27,7 +27,7 @@ Geschwindigkeit und Loop werden **pro Datei** gespeichert und beim nächsten Öf
 
 ### Flutter-App (im Umbau, `app/`)
 
-Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) hat dieselbe Bibliothek wie die bisherige App und das Design «Studio» (Mockups in `docs/design/`): Wellenform mit Loop-Bereich im Zentrum, Loop und Tempo grösser als Play/Pause, Zahlen in JetBrains Mono mit gleich breiten Ziffern, Text in Inter. Hell und Dunkel folgen der Systemeinstellung.
+Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) hat dieselbe Bibliothek wie die bisherige App und das Design «Studio» (Mockups in `docs/design/`): Wellenform mit Loop-Bereich im Zentrum, Loop und Tempo grösser als Play/Pause, Zahlen in JetBrains Mono mit gleich breiten Ziffern, Text in Inter. Hell oder Dunkel ist im Kopf der Bibliothek wählbar, Standard ist die Systemeinstellung.
 
 | Desktop (> 1000 px) | Tablet (600–1000 px) | Phone (< 600 px) |
 | --- | --- | --- |
@@ -52,6 +52,7 @@ Die Screenshots zeigen erfundene Titel und eine erzeugte Wellenform (`cd app && 
 | Steigerung nach Durchgängen | Modul «Steigerung» mit Stufenleiter (erreichte Stufen gedämpft, aktuelle umrandet), die Einstellungen öffnet das Regler-Symbol. Die Geschwindigkeit des Titels steigt stufenweise mit der Zahl der Loop-Durchgänge, einstellbar sind Start- und Zielstufe, Schrittweite (+1 bis +20 %) und Durchgänge pro Stufe (Standard 60 % → 100 %, +5 % alle 10 Durchgänge). Ein Durchgang zählt, wenn die Wiedergabe vom Loop-Ende zum Anfang springt, Springen von Hand nicht. Angezeigt werden Stufe und Durchgänge, z. B. «75 % · 7 von 10»; am Ziel bleibt die Geschwindigkeit, der Zähler läuft weiter. Loop-Grenzen oder Geschwindigkeit von Hand ändern setzt den Zähler auf 0. Gespeichert pro Titel |
 | Gerätewechsel | Wird die Ausgabe gewechselt (z. B. Kopfhörer ab) oder kommt ein Anruf dazwischen, pausieren Titel und Metronom; die Position bleibt. Weiter geht es mit Play |
 | Aufnahme (nur Mac, ab macOS 14.2) | Knopf «Aufnahme» oben rechts (auf iPhone/iPad und Android nie sichtbar). Nimmt den Systemton auf, ohne Mikrofon und ohne den eigenen Player-Ton. Beim ersten Mal fragt macOS nach der Berechtigung |
+| Darstellung | Knopf im Kopf der Bibliothek (Symbol Auto, Sonne oder Mond) mit *System*, *Hell* und *Dunkel*, auch im Phone-Layout. *Hell* und *Dunkel* gelten sofort und unabhängig von der Systemeinstellung, *System* folgt ihr auch bei laufender App. Die Wahl steht in `preferences.json` neben der Sortierung und bleibt nach einem Neustart erhalten; fehlt sie oder ist sie unlesbar, gilt *System* |
 | Sprache | Die Oberfläche folgt der Systemsprache: Deutsch oder Englisch, bei jeder anderen Sprache Englisch. Zahlen und Grössen stehen in der Schreibweise der Sprache (z. B. «0,75×» und «1,2 GB» auf Deutsch, «0.75×» und «1.2 GB» auf Englisch); Zeiten `mm:ss` sind überall gleich |
 
 ## Technik

@@ -92,6 +92,7 @@ class Library extends ChangeNotifier {
   List<Track> _tracks = [];
   List<TrackFolder> _folders = [];
   TrackSortOrder _sortOrder = TrackSortOrder.dateAdded;
+  Appearance _appearance = Appearance.system;
   bool _importing = false;
   int _droppedMissing = 0;
 
@@ -120,6 +121,15 @@ class Library extends ChangeNotifier {
   set sortOrder(TrackSortOrder o) {
     if (o == _sortOrder) return;
     _sortOrder = o;
+    _savePrefs();
+    notifyListeners();
+  }
+
+  /// Light, dark or system appearance (#31), stored in `preferences.json` next to the sort order.
+  Appearance get appearance => _appearance;
+  set appearance(Appearance a) {
+    if (a == _appearance) return;
+    _appearance = a;
     _savePrefs();
     notifyListeners();
   }
@@ -268,6 +278,7 @@ class Library extends ChangeNotifier {
       if (raw == null) return;
       final p = jsonDecode(utf8.decode(raw)) as Map;
       _sortOrder = TrackSortOrder.parse(p['sortOrder'] as String?);
+      _appearance = Appearance.parse(p['appearance']);
     } catch (_) {
       // unlesbare Einstellungen: Standardwerte
     }
@@ -275,7 +286,12 @@ class Library extends ChangeNotifier {
 
   void _savePrefs() {
     final bytes = Uint8List.fromList(
-      utf8.encode(jsonEncode({'sortOrder': _sortOrder.name})),
+      utf8.encode(
+        jsonEncode({
+          'sortOrder': _sortOrder.name,
+          'appearance': _appearance.name,
+        }),
+      ),
     );
     store.write(_prefsName, bytes).catchError((_) {});
   }

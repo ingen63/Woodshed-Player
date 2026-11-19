@@ -48,6 +48,13 @@ abstract final class WsIcons {
     fontPackage: _p,
   );
   static const sort = IconData(0xf51f, fontFamily: _f, fontPackage: _p);
+  static const appearanceAuto = IconData(
+    0xf5f0,
+    fontFamily: _f,
+    fontPackage: _p,
+  );
+  static const sun = IconData(0xf4b6, fontFamily: _f, fontPackage: _p);
+  static const moon = IconData(0xf716, fontFamily: _f, fontPackage: _p);
   static const musicNoteList = IconData(
     0xf726,
     fontFamily: _f,

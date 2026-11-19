@@ -412,6 +412,25 @@ class _Header extends StatelessWidget {
                 ),
             ],
           ),
+          PopupMenuButton<Appearance>(
+            key: const Key('appearanceMenu'),
+            tooltip: l.appearance,
+            icon: Icon(switch (lib.appearance) {
+              Appearance.system => WsIcons.appearanceAuto,
+              Appearance.light => WsIcons.sun,
+              Appearance.dark => WsIcons.moon,
+            }),
+            onSelected: (a) => lib.appearance = a,
+            itemBuilder: (_) => [
+              for (final a in Appearance.values)
+                CheckedPopupMenuItem(
+                  key: Key('appearance-${a.name}'),
+                  value: a,
+                  checked: lib.appearance == a,
+                  child: Text(appearanceLabel(l, a)),
+                ),
+            ],
+          ),
         ],
       ),
     );

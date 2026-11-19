@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'app/app_controller.dart';
 import 'l10n/app_localizations.dart';
+import 'library/library.dart';
 import 'app/platform_native.dart'
     if (dart.library.js_interop) 'app/platform_web.dart';
 import 'ui/font_licenses.dart';
@@ -41,6 +42,14 @@ class WoodshedApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // #31: rebuilds when the appearance changes; MaterialApp animates to the new theme.
+    return ListenableBuilder(
+      listenable: controller.library,
+      builder: (context, _) => _app(controller.library.appearance),
+    );
+  }
+
+  Widget _app(Appearance appearance) {
     return MaterialApp(
       title: 'Woodshed Player',
       locale: locale,
@@ -51,8 +60,9 @@ class WoodshedApp extends StatelessWidget {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       localeListResolutionCallback: resolveLocale,
-      theme: woodshedTheme(Brightness.light),
-      darkTheme: woodshedTheme(Brightness.dark),
+      theme: _lightTheme,
+      darkTheme: _darkTheme,
+      themeMode: themeModeFor(appearance),
       home: HomePage(
         controller: controller,
         recordingButton: recordingButton?.call(controller),
@@ -60,6 +70,16 @@ class WoodshedApp extends StatelessWidget {
     );
   }
 }
+
+final _lightTheme = woodshedTheme(Brightness.light);
+final _darkTheme = woodshedTheme(Brightness.dark);
+
+/// #31/AK2, AK3: [Appearance.system] leaves the choice to the platform, also while the app runs.
+ThemeMode themeModeFor(Appearance a) => switch (a) {
+  Appearance.system => ThemeMode.system,
+  Appearance.light => ThemeMode.light,
+  Appearance.dark => ThemeMode.dark,
+};
 
 /// #43/AK3: the first system language the app has (by language code), otherwise English.
 Locale resolveLocale(List<Locale>? preferred, Iterable<Locale> supported) {

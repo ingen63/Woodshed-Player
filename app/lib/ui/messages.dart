@@ -65,6 +65,13 @@ String sortOrderLabel(AppLocalizations l, TrackSortOrder o) => switch (o) {
   TrackSortOrder.custom => l.sortCustom,
 };
 
+/// #31/AK1: entries of the appearance menu.
+String appearanceLabel(AppLocalizations l, Appearance a) => switch (a) {
+  Appearance.system => l.appearanceSystem,
+  Appearance.light => l.appearanceLight,
+  Appearance.dark => l.appearanceDark,
+};
+
 /// #29/AK8: «75 % · 7 von 10», at the target «100 % · Ziel erreicht · 14 Durchgänge».
 String rampStatus(AppLocalizations l, PlaybackSettings s, int passes) =>
     LoopRamp.atTarget(s)

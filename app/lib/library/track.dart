@@ -161,3 +161,14 @@ enum TrackSortOrder {
     orElse: () => TrackSortOrder.dateAdded,
   );
 }
+
+/// Light or dark appearance of the app (#31); [system] follows the platform setting.
+enum Appearance {
+  system,
+  light,
+  dark;
+
+  /// #31/AK5: missing or unknown values mean [system].
+  static Appearance parse(Object? s) =>
+      values.firstWhere((v) => v.name == s, orElse: () => Appearance.system);
+}

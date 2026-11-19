@@ -111,6 +111,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sortCustom => 'Eigene Reihenfolge';
 
   @override
+  String get appearance => 'Darstellung';
+
+  @override
+  String get appearanceSystem => 'System';
+
+  @override
+  String get appearanceLight => 'Hell';
+
+  @override
+  String get appearanceDark => 'Dunkel';
+
+  @override
   String get noTracks => 'Keine Titel';
 
   @override
