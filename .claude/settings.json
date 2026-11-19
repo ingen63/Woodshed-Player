@@ -33,6 +33,7 @@
       "Bash(flutter build:*)",
       "Bash(gh issue edit:*)",
       "Bash(gh issue comment:*)",
+      "Bash(gh issue close:*)",
       "Bash(tools/hoervergleich.sh:*)"
     ],
     "deny": [
