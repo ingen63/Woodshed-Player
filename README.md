@@ -7,7 +7,7 @@ Native SwiftUI-App für **macOS 14+** und **iOS/iPadOS 17+** aus einer gemeinsam
 1. **Xcode** aus dem Mac App Store installieren (Version 16 oder neuer) und einmal öffnen.
 2. `WoodshedPlayer.xcodeproj` öffnen.
 3. Target *WoodshedPlayer* → *Signing & Capabilities* → unter *Team* deine Apple-ID wählen.
-   Falls die Bundle-ID `de.papa.WoodshedPlayer` schon vergeben ist, dort ändern.
+   Falls die Bundle-ID `ch.woodshed-player-app.legacy` schon vergeben ist, dort ändern.
 4. Oben in der Leiste als Ziel **My Mac** oder einen iPhone-Simulator/dein iPhone wählen → **⌘R**.
 
 ## Funktionen
