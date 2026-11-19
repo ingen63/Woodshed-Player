@@ -35,7 +35,8 @@ Der Desktop braucht dafür eine Anmeldung, aber nur einmal: Desktop-Apps bekomme
 
 | | Google Drive | OneDrive |
 |---|---|---|
-| Recht | `drive.file` (nicht sensibel, nur einfache Prüfung der App) | `Files.ReadWrite.AppFolder` |
+| Recht | `drive.file` (nicht sensibel) | `Files.ReadWrite.AppFolder` |
+| Prüfung durch Google (geklärt 19.11.2026) | **Keine Prüfung nötig, keine eigene Domain, keine Kosten.** Bei nur nicht sensiblen Rechten ist die Prüfung nicht Pflicht; die Warnung «Google hat diese App nicht überprüft» und die Grenze von 100 Nutzern gelten nur für sensible oder eingeschränkte Rechte. Die kostenpflichtige Sicherheitsprüfung (CASA) gilt nur für eingeschränkte Rechte (z. B. `drive`). Status «In Produktion», nicht «Test» (Test: nur eingetragene Testnutzer, kurzlebige Refresh-Tokens). Pflicht bleibt eine öffentliche Startseite, die die App beschreibt; dafür genügt GitHub Pages. **Optional** ist die Markenprüfung, damit Name und Logo auf dem Zustimmungsbildschirm erscheinen: Dann müssen Startseite und Datenschutzerklärung auf einer eigenen, in der Search Console verifizierten Domain liegen; `github.io` lässt sich nicht verifizieren (geteilte Domain). Vorbehalt: Google kann die Einstufung eines Rechts ändern. | eigene Prüfung bei Microsoft, siehe #55 |
 | Ort | Ordner `WoodshedPlayer` in Meine Ablage, von der App angelegt. Weitere Geräte finden ihn über die Suche nach Name (sie sehen ohnehin nur Dateien dieser App) | App-Ordner `Apps/Woodshed Player` (`approot`) |
 | Was die App sieht | nur ihre eigenen Dateien | nur ihren App-Ordner |
 | Desktop-Anmeldung | Systembrowser, Refresh-Token, Schlüsselbund bzw. Credential Store | ebenso |
@@ -111,17 +112,17 @@ Sync-Engine (#37) + PerDeviceLayout
 |---|---|---|
 | M0 | Machbarkeitstest: P1–P4 mit Testkonten und K0 (#52) | 3–4 Tage · **Go/No-Go** je Weg |
 | M1 | `PerDeviceLayout` und mehrere Quellen je Gerät in der Engine (#53); Tests mit `InMemoryProvider` (zwei, drei Geräte, Brücke, Reihenfolge vertauscht, Abbrüche) | 3–4 Tage |
-| M2 | `OneDriveProvider`: App-Ordner, Upload-Sitzungen, Anmeldung Desktop und Web | 3–4 Tage |
-| M3 | `GoogleDriveProvider`: `drive.file`, Ordner anlegen und finden, Pfade auf IDs, Anmeldung Desktop und Web | 3–4 Tage |
-| M4 | Direkte Verbindung: Kopplung, Relays, `PeerProvider` (K2/K3 im Konzept ohne Registrierung) | 7–10 Tage |
-| M5 | Oberfläche: Speicherort wählen und wechseln, Koppeln, Status je Gerät, Texte in allen ARB-Dateien (ersetzt Teile von #40) | 3 Tage |
-| M6 | `README.md`, `DATENSCHUTZ.md`, `CLAUDE.md`, `PLAN-WEB-UND-SYNC.md` nachführen | 0,5 Tage |
+| M2 | `OneDriveProvider` (#55): App-Ordner, Upload-Sitzungen, Anmeldung Desktop und Web | 3–4 Tage |
+| M3 | `GoogleDriveProvider` (#54): `drive.file`, Ordner anlegen und finden, Pfade auf IDs, Anmeldung Desktop und Web | 3–4 Tage |
+| M4 | Direkte Verbindung (#56): Kopplung, Relays, `PeerProvider` (K2/K3 im Konzept ohne Registrierung) | 7–10 Tage |
+| M5 | Oberfläche, parallel in #54, #55, #56 (ersetzt #40): Speicherort wählen und wechseln, Koppeln, Status je Gerät, Texte in allen ARB-Dateien (ersetzt Teile von #40) | 3 Tage |
+| M6 | #41: `README.md`, `DATENSCHUTZ.md`, `CLAUDE.md`, `PLAN-WEB-UND-SYNC.md` nachführen | 0,5 Tage |
 
 **Reihenfolge (entschieden):** M0, M1, dann **M3 Google**, M2 OneDrive, M4 direkte Verbindung, M5 wächst mit jedem Weg mit, M6 zum Schluss. Nach M3 ist der erste Abgleich nutzbar. **Gesamt:** ca. 23–30 Arbeitstage.
 
-**Vorher bei Dir:** Google-Cloud-Projekt (OAuth-Client «Web» und «Desktop», Zustimmungsbildschirm mit `drive.file`, einfache Prüfung), Microsoft-Entra-Registrierung (Plattformen «SPA» und «Mobile/Desktop», `Files.ReadWrite.AppFolder`). Beides kostenlos. Die Weiterleitung zeigt auf die GitHub-Pages-Adresse.
+**Vorher bei Dir:** Google-Cloud-Projekt (OAuth-Client «Web» und «Desktop», Zustimmungsbildschirm mit `drive.file`, Status «In Produktion», ohne Prüfung), Microsoft-Entra-Registrierung (Plattformen «SPA» und «Mobile/Desktop», `Files.ReadWrite.AppFolder`). Beides kostenlos. Die Weiterleitung zeigt auf die GitHub-Pages-Adresse.
 
-**Folgen für Issues:** #38 umschreiben (Kommentar, nicht still): Dropbox entfällt, Google mit `drive.file`, Layout je Gerät. Neue Issues für M1 und M4. #40 bekommt den Bereich Speicherort und Koppeln.
+**Issues (19.11.2026):** #52 M0, #53 M1, #54 M3 Google, #55 M2 OneDrive, #56 M4 direkt, #41 M6. #38 und #40 als «not planned» geschlossen (abgelöst), #39, #41 und #50 kommentiert. Geklärt am 19.11.2026: Google verlangt für `drive.file` keine Prüfung und keine eigene Domain (Tabelle «Anbieter»); eine eigene Domain (#50) braucht es nur für Name und Logo auf dem Zustimmungsbildschirm.
 
 ## Entscheidungen (19.11.2026)
 
