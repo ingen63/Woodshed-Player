@@ -23,7 +23,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>Woodshed Player nimmt Musik auf, die gerade auf dem Mac läuft, damit Du sie zum Üben langsamer abspielen und loopen kannst.</string>
+	<string>Woodshed Player records the music currently playing on your Mac as a practice take, so you can play it back slower and loop it. The recording stays on your Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
