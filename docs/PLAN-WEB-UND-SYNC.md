@@ -10,25 +10,25 @@ Stand: 19.11.2026 · Status: freigegeben, Issues #32 bis #41 · Ergänzt `UMBAUP
 | iPhone/iPad, Android | **Web-App (PWA) im Browser**, aus Safari bzw. Chrome auf den Home-Bildschirm installiert | nie |
 
 1. Bibliothek und Konfiguration sind auf allen Plattformen dieselben Daten.
-2. Änderungen gleichen sich über einen **optionalen** Cloudspeicher ab: Google Drive, Dropbox oder OneDrive.
-3. **Ohne Cloud-Konto bleibt alles lokal.** Die App öffnet dann keine Netzverbindung zu einem Cloud-Anbieter und synchronisiert nichts.
+2. Änderungen gleichen sich **optional** ab: über Google Drive oder OneDrive, oder direkt zwischen gekoppelten Geräten ohne Konto (Mischform, `docs/KONZEPT-SYNC.md`).
+3. **Ohne Konto und ohne Kopplung bleibt alles lokal.** Die App öffnet dann keine Netzverbindung und synchronisiert nichts.
 
 ## Entscheidungen (aus der Klärung vom 19.11.2026)
 
 | Thema | Entscheidung |
 |---|---|
-| Cloud-Anbieter | Google Drive, Dropbox, OneDrive; später weitere über dieselbe Schnittstelle (z. B. WebDAV) |
+| Cloud-Anbieter | Google Drive (#54) und OneDrive (#55), dazu die direkte Verbindung ohne Konto (#56); Dropbox gestrichen (`docs/KONZEPT-SYNC.md`). Weitere später über dieselbe Schnittstelle (z. B. WebDAV) |
 | Umfang | Metadaten **und** Audiodateien |
-| Zugriffsrechte | nur ein app-eigener Ordner (Google `drive.appdata`, Dropbox «App folder», OneDrive «App folder»); die App sieht sonst nichts |
+| Zugriffsrechte | Google `drive.file` (nur Dateien, die die App selbst anlegt), OneDrive «App folder»; die App sieht sonst nichts |
 | Konflikte | pro Titel und Feld zusammenführen, neuester Zeitstempel gewinnt, kein Dialog |
 | Verschlüsselung | keine eigene; Anmeldung per OAuth mit PKCE im Systembrowser bzw. im Browser |
-| Hosting der Web-App | GitHub Pages |
+| Hosting der Web-App | GitHub Pages unter `/app/`, gebaut aus dem letzten Tag (#41) |
 | Native iOS/Android | gestrichen (Phase 6 des Umbauplans, Issue #25) |
 | Handy-Speicher | einstellbare Obergrenze (Standard 2 GB), älteste Titel zuerst entfernen, «Offline halten» pro Titel |
 | Hochladen pro Titel | Schalter «nicht hochladen» je Titel schon in W5 |
 | Desktop-Ordner | nur auf Wunsch: beim Anmelden wählst Du, welche Ordner synchronisiert werden; neue Titel in gewählten Ordnern laden automatisch hoch |
 | Sicherung | die Cloud behält die letzten 5 Stände von `state.json` |
-| Adresse | GitHub-Pages-Adresse (`<konto>.github.io/<repo>`), keine eigene Domain |
+| Adresse | <https://ingen63.github.io/Woodshed-Player/app/>, keine eigene Domain |
 
 ## Architektur
 
@@ -200,13 +200,14 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - **Auslöser:** Start (`AppController.start`), Rückkehr in den Vordergrund (`AppLifecycleListener`), Änderung (`Library.onLocalChange`, 5 s verzögert und zusammengefasst). Der Knopf «Jetzt abgleichen» (`syncNow`) und die Wiederherstellung aus `backup/` kommen mit #40.
 
 ### W6 – Anbieter und Anmeldung (6–9 Tage)
+Abgelöst durch `docs/KONZEPT-SYNC.md` (Mischform): Google Drive #54, OneDrive #55, direkte Verbindung #56; Dropbox entfällt.
 - Je Anbieter ein Modul über die REST-API mit dem Paket `http`, ohne grosse SDKs:
-  - **Google Drive:** Bereich `drive.appdata`, Ordner `appDataFolder`.
-  - **Dropbox:** App-Ordner, Upload-Sitzungen für grosse Dateien.
+  - **Google Drive:** Bereich `drive.file` (nur Dateien, die die App selbst anlegt), eigener Ordner.
   - **OneDrive:** Microsoft Graph, Bereich `Files.ReadWrite.AppFolder`, Sitzungen für grosse Dateien.
+  - **Direkte Verbindung:** gekoppelte Geräte ohne Konto, Verbindungsaufbau über öffentliche Relays und STUN-Server, Ende-zu-Ende verschlüsselt.
 - OAuth mit PKCE: Desktop im Systembrowser mit lokalem Loopback-Empfänger, Web per Weiterleitung auf die Pages-Adresse.
-- **App-Registrierung** bei den drei Anbietern (öffentliche Client-IDs, kein Geheimnis im Code). Das legst Du an, die IDs kommen in die Konfiguration.
-- Token-Ablage: Desktop im Schlüsselbund bzw. Credential Store, Web in IndexedDB. Ziel sind Refresh-Tokens, wo der Anbieter sie für Web-Apps ausgibt (Dropbox, OneDrive). Bei Google gibt es ohne eigenen Server nur kurzlebige Zugriffstokens, deshalb stille Neuanmeldung, im Zweifel ein Tippen.
+- **App-Registrierung** bei Google und Microsoft (öffentliche Client-IDs, kein Geheimnis im Code). Das legst Du an, die IDs kommen in die Konfiguration.
+- Token-Ablage: Desktop im Schlüsselbund bzw. Credential Store, Web in IndexedDB. Ziel sind Refresh-Tokens, wo der Anbieter sie für Web-Apps ausgibt (OneDrive). Bei Google gibt es ohne eigenen Server nur kurzlebige Zugriffstokens, deshalb stille Neuanmeldung, im Zweifel ein Tippen.
 - Kontingent anzeigen, Warnung bei fast vollem Speicher.
 
 ### W7 – PWA und Handy-Bedienung (4–6 Tage)
@@ -216,13 +217,19 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - Aufnahme-Knopf bleibt unsichtbar; Datei-Import über Auswahl.
 
 ### W8 – Einstellungen, Oberfläche, Desktop (3–4 Tage)
-- Bereich «Cloud» in den Einstellungen: Anbieter wählen, anmelden, abmelden, Status, letzter Abgleich, Fehler.
-- Abmelden entfernt Tokens, lässt alle lokalen Daten stehen und beendet jeden Netzverkehr.
+Abgelöst durch M5 in `docs/KONZEPT-SYNC.md`: die Oberfläche wächst in #54, #55 und #56 mit (#40 geschlossen).
+- Bereich «Abgleich» in den Einstellungen: Weg wählen (Google Drive, OneDrive, direkte Verbindung), anmelden bzw. koppeln, abmelden bzw. entkoppeln, Status je Gerät, letzter Abgleich, Fehler.
+- Abmelden bzw. Entkoppeln entfernt Tokens und Schlüssel, lässt alle lokalen Daten stehen und beendet jeden Netzverkehr.
 - Desktop: Audio aus der Cloud wird in den Datenordner der App geladen; vorhandene lokale Ordner werden nur hochgeladen, nicht verschoben.
 - Beim ersten Anmelden fragt die App, welche Ordner synchronisiert werden (Auswahlliste mit Grösse); später je Ordner umschaltbar. Zeigt vorab die Datenmenge und das freie Kontingent.
 
 ### W9 – Auslieferung, CI, Dokumente (2–3 Tage)
 - GitHub Actions: Web-Build, Tests, Veröffentlichung auf GitHub Pages bei Tag; Windows und Linux laufen wie im Umbauplan.
+
+#### Umsetzung W9 (#41)
+- **Adresse:** <https://ingen63.github.io/Woodshed-Player/app/>; die Startseite (#50) hat den Knopf «App öffnen». Datenschutz, Nutzungsbedingungen und `/w0/` bleiben an der Wurzel.
+- **Workflow** `.github/workflows/pages.yml`: läuft bei jedem Push auf `main` und bei jedem Tag `v*` und veröffentlicht die ganze Seite. Die App darin kommt aus dem letzten Tag (`git describe --tags --abbrev=0`): Checkout dieses Stands, WASM-Kern mit Emscripten bauen (`app/tool/build_web_core.sh`), unter Node.js prüfen (`wp_core_web_test.mjs`), `flutter test`, dann `flutter build web --base-href /Woodshed-Player/app/` mit Tag und Datum für den Info-Dialog. Ohne Tag fehlen App und Knopf. Neue App-Stände erscheinen also nur mit einem neuen Tag, Text-Korrekturen sofort.
+- **COOP/COEP:** `app/web/sw.js` setzt die Header auf alle Antworten der eigenen Seite (Verfahren wie W0); `index.html` registriert ihn vor dem Start von Flutter und lädt beim ersten Besuch einmal neu. Danach ist die Seite «cross-origin isolated» und hat `SharedArrayBuffer`. W7 (#39) erweitert denselben Service Worker um den Offline-Start.
 - `README.md`: Funktionstabelle, Plattformen, Datenschutz (neuer Abschnitt Cloud und Hosting).
 - `UMBAUPLAN-FLUTTER.md` nachführen: Zieltabelle, Phase 6 und Abschnitt «Android» ersetzen durch Verweis hierher.
 - `CLAUDE.md`: Regel «Kein Netzwerk» um die Ausnahme erweitern (siehe unten).
@@ -231,8 +238,8 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 
 ## Datenschutz und Regeln
 
-- Neue Ausnahme für «Kein Netzwerk», Vorschlag: *«Netzwerkzugriff nur für den Cloud-Sync und nur nach ausdrücklicher Anmeldung durch die Nutzerin oder den Nutzer, ausschliesslich zum gewählten Anbieter, und für das Laden der Web-App selbst. Kein Tracking.»*
-- Beim Laden der Web-App sieht GitHub die IP-Adresse (wie bei jeder Webseite). Die App selbst sendet nichts ausser an den gewählten Anbieter.
+- Ausnahme für «Kein Netzwerk» (in `CLAUDE.md` seit #41, Fassung aus `docs/KONZEPT-SYNC.md`): *«Netzwerkzugriff nur für den Abgleich und nur nach ausdrücklicher Wahl: zum gewählten Cloud-Anbieter (Google Drive oder OneDrive) nach Anmeldung, oder zu gekoppelten Geräten, mit Verbindungsaufbau über öffentliche Relays und STUN-Server. Dazu das Laden der Web-App selbst. Kein Tracking.»*
+- Beim Laden der Web-App sieht GitHub die IP-Adresse (wie bei jeder Webseite). Die App selbst sendet nichts ausser an den gewählten Anbieter bzw. an gekoppelte Geräte (über Relays und STUN-Server).
 - **Neue Abhängigkeiten (nur nach Rückfrage, alle MIT-verträglich):** `http` (BSD-3), `web` (BSD-3), `flutter_secure_storage` (BSD-3), `crypto` (BSD-3, SHA-256), ggf. `url_launcher` (BSD-3). Emscripten (MIT/UIQ) ist nur Werkzeug.
 - Testdaten ohne echte Namen, Titel oder Konten. Cloud-Tests laufen gegen den `InMemoryProvider` und aufgezeichnete Antworten, nie gegen echte Konten.
 

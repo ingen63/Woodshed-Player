@@ -1,19 +1,21 @@
 # Umbauplan: Woodshed Player auf Flutter
 
-Stand: 16.11.2026 · Status: Entwurf
+Stand: 19.11.2026 (Web-App statt Android, #41) · Status: Entwurf
 
 ## Ziel
 
-Eine Codebasis für **macOS, Windows, Linux, iPhone/iPad und Android** (Android siehe unten).
+Eine Codebasis für **macOS, Windows, Linux und iPhone/iPad**, dazu die **Web-App** im Browser für Android und alle anderen Geräte (siehe «Android und Web-App» unten und `docs/PLAN-WEB-UND-SYNC.md`).
 
-| Funktion | macOS | Windows | Linux | iPhone/iPad | Android |
+| Funktion | macOS | Windows | Linux | iPhone/iPad | Web-App (auch Android) |
 |---|---|---|---|---|---|
 | Bibliothek, Ordner, Sortierung | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Tempo ohne Tonhöhenänderung | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Loops mit Markern | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Metronom | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Aufnahme laufender Musik (ohne Mikrofon) | ✓ | ✓ | ✓ | **–** | optional, später |
-| Cloud-Sync | später | später | später | später | später |
+| Aufnahme laufender Musik (ohne Mikrofon) | ✓ | ✓ | ✓ | **–** | **–** |
+| Abgleich (Google Drive, OneDrive, direkte Verbindung) | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+Die Web-App liegt auf GitHub Pages unter <https://ingen63.github.io/Woodshed-Player/app/> (#41).
 
 ## Architektur
 
@@ -109,13 +111,13 @@ Nachbau der bestehenden Ansichten (`TrackListView`, `PlayerView`):
 - Tempo: Schalter, Regler 0,05er-Schritte, Schnellwahl 0,5/0,7/0,8/0,9/1,0/1,1.
 - Loop: Schalter, `mm:ss`-Felder, „Aktuelle Position“, ziehbare Marker.
 - Tastatur (Desktop): Leertaste, S, E, ←/→. Auf dem Desktop Dateien in die Liste ziehen.
-- Layouts: Desktop/iPad zweispaltig, iPhone/Android-Phone einspaltig mit Navigation.
+- Layouts: Desktop/iPad zweispaltig, Phone (iPhone, Web-App auf dem Handy) einspaltig mit Navigation.
 
 ### Phase 6 – Plattform-Integration (3–4 Tage)
 - iOS: Hintergrund-Audio, Audio-Session, Sperrbildschirm und Kopfhörertasten.
-- Android: Foreground-Service für Hintergrundwiedergabe, Medien-Benachrichtigung.
+- Android: keine native App, stattdessen die Web-App (`docs/PLAN-WEB-UND-SYNC.md`, W7 #39: Media Session, Wake Lock, Offline-Start).
 - Desktop: Menüs, Fenstergrösse merken, Mediatasten.
-- Teilen/„Öffnen mit“ auf iOS und Android als Importweg.
+- Teilen/„Öffnen mit“ auf iOS als Importweg.
 
 **Meilenstein: Gleichstand mit der Swift-App.** Danach `/legacy` einfrieren.
 
@@ -129,11 +131,11 @@ Nachbau der bestehenden Ansichten (`TrackListView`, `PlayerView`):
 ### Phase 8 – Neue Funktionen (je 2–5 Tage)
 - **Metronom** im Audio-Kern (sample-genau, Takt, Betonung, Lautstärke, optional zum Track mitlaufend).
 - **Playlisten** (getrennt von Ordnern, ein Titel kann in mehreren sein).
-- **Cloud-Sync** (iCloud Drive, Google Drive, …): eigener Plan, ist plattformabhängig.
+- **Abgleich** über Google Drive, OneDrive oder direkte Verbindung: eigener Plan (`docs/KONZEPT-SYNC.md`).
 
 ### Phase 9 – Veröffentlichung (3–5 Tage)
 - macOS/iOS: TestFlight, App Store (Apple-Entwicklerkonto nötig).
-- Windows: MSIX oder Installer; Linux: Flatpak/AppImage; Android: Google Play (einmalig 25 USD).
+- Windows: MSIX oder Installer; Linux: Flatpak/AppImage; Web-App: GitHub Pages bei jedem Tag (#41).
 - CI: GitHub Actions baut alle Plattformen bei jedem Push.
 - Datenschutzangaben je Store, `PrivacyInfo.xcprivacy` für Apple.
 
@@ -156,16 +158,9 @@ Nachbau der bestehenden Ansichten (`TrackListView`, `PlayerView`):
 | Oberfläche wirkt auf Apple-Geräten weniger nativ | Cupertino-Widgets, plattformabhängige Details (Menüs, Tastenkürzel) |
 | Bestehende Daten der Swift-App | gleiches JSON-Format, einmaliger Import |
 
-## Android
+## Android und Web-App
 
-Flutter unterstützt Android gleichwertig, die App läuft dort ohne Zusatzaufwand ausser Phase 6.
-
-**Aufnahme ist auf Android möglich, aber eingeschränkt** (AudioPlaybackCapture, ab Android 10):
-- Der Nutzer muss jede Aufnahme bestätigen (Systemdialog wie bei Bildschirmaufnahme), dazu läuft ein Foreground-Service mit Benachrichtigung.
-- Apps können das Mitschneiden verbieten. Viele Streaming-Apps (z. B. Spotify, Netflix) tun das, dann kommt Stille.
-- Mitschneiden lassen sich vor allem Browser, YouTube-ähnliche Apps ohne Sperre und eigene Wiedergabe.
-
-Empfehlung: Android in den Phasen 0–6 mitnehmen, die Aufnahme dort erst nach Phase 7 als Option prüfen.
+Eine native Android-App gibt es nicht (#25 als «not planned» geschlossen). Android-Geräte nutzen die **Web-App** im Browser, die aus derselben Flutter-Codebasis mit dem Audio-Kern als WebAssembly entsteht und sich auf den Home-Bildschirm legen lässt (PWA, #39). Aufnahme gibt es dort nicht. Plan, Phasen W0 bis W9 und Auslieferung auf GitHub Pages: `docs/PLAN-WEB-UND-SYNC.md`.
 
 ## Nächster Schritt
 

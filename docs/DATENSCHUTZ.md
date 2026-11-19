@@ -67,6 +67,8 @@ Die Web-Version (Browser) lädt alles von der eigenen Seite, auch die Audioverar
 
 Die Web-Version und diese Seite werden über GitHub Pages ausgeliefert. Beim Laden sieht der Hosting-Anbieter GitHub Deine IP-Adresse. Das ist technisch unvermeidbar.
 
+Die Web-Version liegt unter <https://ingen63.github.io/Woodshed-Player/app/>. Ein Service Worker in Deinem Browser setzt dort nur Sicherheits-Header auf die Dateien der eigenen Seite, damit die Audioverarbeitung im Browser laufen kann; er sendet nichts und speichert nichts über Dich.
+
 ## 8. Keine Weitergabe
 
 Wir geben keine Daten weiter. Ohne Abgleich verlassen keine Daten das Gerät. Mit Cloud-Konto gehen die Daten nur zum gewählten Anbieter, mit direkter Verbindung nur zu Deinen gekoppelten Geräten. Wo der Anbieter die Daten speichert, regeln seine Bedingungen (Abschnitt 5).

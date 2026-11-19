@@ -68,6 +68,20 @@
         "app/build/web_store_check"
       ],
       "port": 8736
+    },
+    {
+      "name": "pages",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8737",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "app/build/pages"
+      ],
+      "port": 8737
     }
   ]
 }

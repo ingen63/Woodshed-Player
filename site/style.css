@@ -15,3 +15,6 @@ h1 { font-size: 1.9rem; line-height: 1.25; margin: 0.6em 0 0.4em; }
 h2 { font-size: 1.2rem; margin: 1.8em 0 0.4em; }
 code { font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--line); padding: 0.1em 0.3em; border-radius: 4px; }
 li { margin: 0.3em 0; }
+a.button { display: inline-block; padding: 0.55em 1.2em; border-radius: 8px; background: var(--accent); color: var(--bg); font-weight: 600; text-decoration: none; }
+a.button:hover, a.button:focus-visible { filter: brightness(1.1); }
+.hint { display: inline-block; margin-left: 0.5em; color: var(--muted); font-size: 15px; }

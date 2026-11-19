@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- Woodshed Player im Browser (#34). Audio-Kern unter wp_core/ (app/tool/build_web_core.sh).
-     Icons, Manifest und Bedienung auf dem Handy folgen mit W7 (#39). -->
+<!-- Woodshed Player in the browser (#34). Audio core under wp_core/ (app/tool/build_web_core.sh).
+     Published under /app/ on GitHub Pages (#41). Icons, manifest and phone use follow with W7 (#39). -->
 <html lang="en">
 <head>
   <base href="$FLUTTER_BASE_HREF">
@@ -15,6 +15,31 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Cross-origin isolation (#41/AK2): sw.js sets COOP/COEP. On the first visit the page itself was
+    // loaded without the worker, so it reloads once; then Flutter starts. Without service workers
+    // (e.g. no secure context) the app starts anyway, just without SharedArrayBuffer.
+    (async () => {
+      const flag = 'wp-isolation-reload';
+      if ('serviceWorker' in navigator && window.isSecureContext) {
+        try {
+          await navigator.serviceWorker.register('sw.js', { scope: './' });
+          await navigator.serviceWorker.ready;
+          if (!self.crossOriginIsolated && !sessionStorage.getItem(flag)) {
+            sessionStorage.setItem(flag, '1');
+            location.reload();
+            return;
+          }
+          if (self.crossOriginIsolated) sessionStorage.removeItem(flag);
+        } catch (err) {
+          console.warn(`Service worker: ${err}`);
+        }
+      }
+      const script = document.createElement('script');
+      script.src = 'flutter_bootstrap.js';
+      script.async = true;
+      document.body.appendChild(script);
+    })();
+  </script>
 </body>
 </html>

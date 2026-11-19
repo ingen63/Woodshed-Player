@@ -1,20 +1,20 @@
-# GitHub Pages (#50): start page, privacy policy and terms (from docs/*.md) at the root, W0 test page (#32) under w0/.
+# GitHub Pages (#50, #41): start page, privacy policy and terms (from docs/*.md) at the root, W0 test page (#32)
+# under w0/, the web app (#41) under app/.
+# Every push to main publishes the whole site; the app in it is built from the latest tag reachable from the
+# pushed commit (git describe), so new app versions only go online with a new tag, while text fixes to the start
+# page and legal texts go online at once. A tag push runs the same workflow. Without any tag the app is left out.
+# Before the app build the tests of that tag run: WASM core under Node.js and flutter test.
 # The person details are filled in from repository secrets CONTROLLER_NAME, CONTROLLER_ADDRESS and CONTACT_EMAIL;
 # the build fails if one is missing or a placeholder is left (site/build_site.py).
-# w0.wasm is committed prebuilt (core/web/build_w0.sh), so no Emscripten is needed here.
+# w0.wasm is committed prebuilt (core/web/build_w0.sh); wp_core_web.wasm for the app is built here with Emscripten
+# (app/tool/build_web_core.sh), it is not in the repository.
 # One-time setup: repo → Settings → Pages → Source «GitHub Actions».
 name: Pages
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'web/**'
-      - 'core/web/**'
-      - 'site/**'
-      - 'docs/DATENSCHUTZ.md'
-      - 'docs/NUTZUNGSBEDINGUNGEN.md'
-      - '.github/workflows/pages.yml'
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -26,6 +26,9 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  FLUTTER_VERSION: 3.50.0
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -34,17 +37,70 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tags for git describe
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check WASM core (#32/AK3)
+      - name: Check WASM core of the W0 page (#32/AK3)
         run: node core/web/w0_test.mjs
+
+      - name: Find the latest tag (#41/AK1)
+        id: tag
+        run: |
+          tag=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ -z "$tag" ]; then echo "::notice::No tag yet, the web app is left out"; else echo "Web app from $tag"; fi
+      - name: Check out the tag for the app build
+        if: steps.tag.outputs.tag != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          path: app-src
+      - name: Install Flutter ${{ env.FLUTTER_VERSION }}
+        if: steps.tag.outputs.tag != ''
+        run: |
+          curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" \
+            | tar -xJ -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - name: Install Emscripten
+        if: steps.tag.outputs.tag != ''
+        run: |
+          git clone --quiet --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install latest >/dev/null
+          "$RUNNER_TEMP/emsdk/emsdk" activate latest >/dev/null
+      - name: Build WASM core of the app (#33)
+        if: steps.tag.outputs.tag != ''
+        run: |
+          . "$RUNNER_TEMP/emsdk/emsdk_env.sh" >/dev/null
+          app-src/app/tool/build_web_core.sh
+      - name: Test WASM core under Node.js (#41/AK1)
+        if: steps.tag.outputs.tag != ''
+        run: node app-src/core/web/wp_core_web_test.mjs app-src/app/web/wp_core/wp_core_web.wasm app-src/core/tests/audio
+      - name: Flutter tests (#41/AK1)
+        if: steps.tag.outputs.tag != ''
+        working-directory: app-src/app
+        run: |
+          flutter --version
+          flutter pub get >/dev/null
+          flutter test --reporter failures-only
+      - name: Build web app under /app/ (#41)
+        if: steps.tag.outputs.tag != ''
+        working-directory: app-src/app
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          BASE_HREF: /${{ github.event.repository.name }}/app/
+        run: |
+          flutter build web --release --no-wasm-dry-run --base-href "$BASE_HREF" \
+            --dart-define=WP_GIT_TAG="$TAG" --dart-define=WP_BUILD_DATE="$(date -u +%Y-%m-%d)"
+
       - name: Build site (#50)
         env:
           CONTROLLER_NAME: ${{ secrets.CONTROLLER_NAME }}
           CONTROLLER_ADDRESS: ${{ secrets.CONTROLLER_ADDRESS }}
           CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
-        run: python3 site/build_site.py _site
+          APP_ARGS: ${{ steps.tag.outputs.tag != '' && '--app app-src/app/build/web' || '' }}
+        run: python3 site/build_site.py _site $APP_ARGS
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

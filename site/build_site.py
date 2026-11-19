@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""Builds the public GitHub Pages site (#50): start page, privacy policy and terms as HTML, W0 test page under w0/.
+"""Builds the public GitHub Pages site (#50): start page, privacy policy and terms as HTML, W0 test page under w0/,
+and with --app the built web app under app/ (#41).
 
-Usage: python3 site/build_site.py <output dir>
+Usage: python3 site/build_site.py <output dir> [--app <flutter build web output>]
+
+The start page has an «App öffnen» button between <!--app--> and <!--/app-->; without --app (no tag to build
+the app from) the button is removed, so the page never links to a missing app.
 
 The person placeholders ({{CONTROLLER_NAME}}, {{CONTROLLER_ADDRESS}}, {{CONTACT_EMAIL}}) are filled from
 environment variables of the same name (set from repository secrets in the Pages workflow). The build fails
@@ -107,23 +111,37 @@ def render(template: str, title: str, body: str) -> str:
     return template.replace("{{TITLE}}", html.escape(title)).replace("{{BODY}}", body)
 
 
+def app_link(index: str, with_app: bool) -> str:
+    """Keeps the content of the <!--app-->…<!--/app--> block when the app is published, else drops the block."""
+    keep = r"\1" if with_app else ""
+    return re.sub(r"<!--app-->(.*?)<!--/app-->\n?", keep, index, flags=re.S)
+
+
 def main(argv: list[str], env: dict[str, str]) -> int:
-    if len(argv) != 2:
-        print("usage: build_site.py <output dir>", file=sys.stderr)
+    args = argv[1:]
+    app_dir = None
+    if len(args) == 3 and args[1] == "--app":
+        app_dir = Path(args[2])
+        args = args[:1]
+    if len(args) != 1:
+        print("usage: build_site.py <output dir> [--app <web build dir>]", file=sys.stderr)
         return 2
+    if app_dir is not None and not (app_dir / "index.html").is_file():
+        print(f"error: no web app in {app_dir} (index.html missing)", file=sys.stderr)
+        return 1
     missing = [n for n in PLACEHOLDERS if not env.get(n, "").strip()]
     if missing:
         print(f"error: missing secrets: {', '.join(missing)}", file=sys.stderr)
         return 1
     values = {n: env[n].strip() for n in PLACEHOLDERS}
 
-    out = Path(argv[1])
+    out = Path(args[0])
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
     template = (SITE / "page.html").read_text(encoding="utf-8")
 
-    pages = {"index.html": (SITE / "index.html").read_text(encoding="utf-8")}
+    pages = {"index.html": app_link((SITE / "index.html").read_text(encoding="utf-8"), app_dir is not None)}
     for name, source in PAGES.items():
         title, body = markdown_to_html(source.read_text(encoding="utf-8"))
         pages[name] = render(template, title, body)
@@ -141,7 +159,9 @@ def main(argv: list[str], env: dict[str, str]) -> int:
 
     shutil.copy(SITE / "style.css", out / "style.css")
     shutil.copytree(ROOT / "web" / "w0", out / "w0")
-    print(f"site built in {out}: {', '.join(sorted(pages))}, style.css, w0/")
+    if app_dir is not None:
+        shutil.copytree(app_dir, out / "app")
+    print(f"site built in {out}: {', '.join(sorted(pages))}, style.css, w0/" + (", app/" if app_dir else ""))
     return 0
 
 
