@@ -80,6 +80,11 @@ String loadErrorMessage(AppLocalizations l, LoadError e) => switch (e.code) {
   _ => l.loadUnknown(e.code),
 };
 
+/// #4/AK4: title of a new recording from date and time in the user's locale, e.g.
+/// «Aufnahme 19.11.2026, 14:05:09» or «Recording 11/19/2026, 2:05:09 PM».
+String recordingTitle(AppLocalizations l, DateTime t) =>
+    l.recordingFileName(DateFormat.yMd(l.localeName).add_jms().format(t));
+
 /// #44/AK1: localized message for a recording error of the core; the OSStatus stays a plain number.
 String recordingErrorMessage(AppLocalizations l, WpRecordingException e) {
   final text = switch (e.code) {

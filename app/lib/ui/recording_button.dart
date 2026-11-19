@@ -1,5 +1,5 @@
-// Aufnahme des Systemtons (#4, nur macOS 14.2+) als Knopf im Kopf (#30). Fertige Aufnahmen kommen in
-// die Bibliothek (#17).
+// Recording of the system audio (#4, macOS 14.2+ only) as a button in the header (#30). Finished
+// recordings go to the library (#17), titled with date and time in the user's locale.
 import 'dart:async';
 import 'dart:io';
 
@@ -11,9 +11,50 @@ import '../time_format.dart';
 import 'messages.dart';
 import 'style.dart';
 
+/// The recorder behind the button; tests replace the core with a fake (#4).
+abstract class Recorder {
+  /// Throws [WpRecordingException] if recording cannot start.
+  void start(String wavPath);
+  void stop();
+  bool get isRecording;
+  double get seconds;
+
+  /// Peak level since the last query, 0–1.
+  double get level;
+
+  /// Only silence so far: no permission, or nothing is playing.
+  bool get onlySilence;
+}
+
+/// [Recorder] of the audio core.
+class CoreRecorder implements Recorder {
+  const CoreRecorder();
+  @override
+  void start(String wavPath) => WpRecorder.start(wavPath);
+  @override
+  void stop() => WpRecorder.stop();
+  @override
+  bool get isRecording => WpRecorder.isRecording;
+  @override
+  double get seconds => WpRecorder.seconds;
+  @override
+  double get level => WpRecorder.level;
+  @override
+  bool get onlySilence => WpRecorder.onlySilence;
+}
+
 class RecordingButton extends StatefulWidget {
-  const RecordingButton({super.key, required this.controller});
+  const RecordingButton({
+    super.key,
+    required this.controller,
+    this.recorder = const CoreRecorder(),
+    this.now = DateTime.now,
+  });
   final AppController controller;
+  final Recorder recorder;
+
+  /// Clock for the name of the recording.
+  final DateTime Function() now;
 
   @override
   State<RecordingButton> createState() => _RecordingButtonState();
@@ -25,6 +66,7 @@ class _RecordingButtonState extends State<RecordingButton> {
   double _seconds = 0, _level = 0;
   bool _silent = false;
   String? _path;
+  String? _title;
 
   /// Error of the core when recording could not start (#44).
   WpRecordingException? _error;
@@ -32,40 +74,44 @@ class _RecordingButtonState extends State<RecordingButton> {
   @override
   void dispose() {
     _ticker?.cancel();
-    if (WpRecorder.isRecording) WpRecorder.stop();
+    if (widget.recorder.isRecording) widget.recorder.stop();
     super.dispose();
   }
 
   Future<void> _toggle() async {
     if (_recording) {
-      WpRecorder.stop();
+      widget.recorder.stop();
       _ticker?.cancel();
       _ticker = null;
       setState(() => _recording = false);
       final path = _path;
       if (path != null && File(path).existsSync()) {
-        await widget.controller.addRecording(path);
+        await widget.controller.addRecording(path, title: _title);
       }
       return;
     }
-    final name = context.l10n.recordingFileName(fileStamp(DateTime.now()));
+    final l = context.l10n;
+    final now = widget.now();
+    final name = l.recordingFileName(fileStamp(now));
+    final title = recordingTitle(l, now);
     final dir = await widget.controller.files.recordingsDir();
-    if (dir == null) return;
+    if (dir == null || !mounted) return;
     final path = '$dir/$name.wav';
     try {
-      WpRecorder.start(path);
+      widget.recorder.start(path);
       setState(() {
         _recording = true;
         _path = path;
+        _title = title;
         _seconds = 0;
         _silent = false;
         _error = null;
       });
       _ticker = Timer.periodic(const Duration(milliseconds: 33), (_) {
         setState(() {
-          _seconds = WpRecorder.seconds;
-          _level = WpRecorder.level;
-          _silent = _seconds > 3 && WpRecorder.onlySilence;
+          _seconds = widget.recorder.seconds;
+          _level = widget.recorder.level;
+          _silent = _seconds > 3 && widget.recorder.onlySilence;
         });
       });
     } on WpRecordingException catch (e) {
@@ -114,6 +160,7 @@ class _RecordingButtonState extends State<RecordingButton> {
             SizedBox(
               width: 40,
               child: LinearProgressIndicator(
+                key: const Key('recordingLevel'),
                 value: _level.clamp(0, 1),
                 color: ws.record,
                 minHeight: 4,
@@ -154,6 +201,7 @@ class _RecordingButtonState extends State<RecordingButton> {
                   _recording
                       ? Text(
                           formatTime(_seconds),
+                          key: const Key('recordingDuration'),
                           style: ws.number(12, weight: FontWeight.w600),
                         )
                       : Text(l.recording),

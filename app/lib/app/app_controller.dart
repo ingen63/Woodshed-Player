@@ -115,11 +115,17 @@ class AppController extends ChangeNotifier {
     library.delete(ids);
   }
 
-  /// Fertige Aufnahme in die Bibliothek und abspielen.
-  Future<void> addRecording(String path) async {
+  /// Adds a finished recording to the library and plays it (#4). [title] replaces the name taken from
+  /// the file, e.g. the date and time in the user's locale; it stays editable like any title (#24).
+  Future<void> addRecording(String path, {String? title}) async {
     final r = await library.importFiles([path]);
     if (r.imported.isEmpty) return;
-    if (await select(r.imported.first)) session.playTitle();
+    var track = r.imported.first;
+    if (title != null &&
+        library.editMetadata(track.id, title: title, artist: track.artist)) {
+      track = library.track(track.id) ?? track;
+    }
+    if (await select(track)) session.playTitle();
   }
 
   @override

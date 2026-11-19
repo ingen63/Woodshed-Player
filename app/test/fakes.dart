@@ -191,7 +191,10 @@ class FakeFiles implements FilePlatform {
   @override
   Future<String?> supportDir() async => null;
   @override
-  Future<String?> recordingsDir() async => null;
+  Future<String?> recordingsDir() async => recordings;
+
+  /// Folder for recordings (#4); null: none, as without a support folder.
+  String? recordings;
   @override
   void keepAwake(bool on) {}
   @override
