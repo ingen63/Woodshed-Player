@@ -1,0 +1,53 @@
+# GitHub Pages (#50): start page, privacy policy and terms (from docs/*.md) at the root, W0 test page (#32) under w0/.
+# The person details are filled in from repository secrets CONTROLLER_NAME, CONTROLLER_ADDRESS and CONTACT_EMAIL;
+# the build fails if one is missing or a placeholder is left (site/build_site.py).
+# w0.wasm is committed prebuilt (core/web/build_w0.sh), so no Emscripten is needed here.
+# One-time setup: repo → Settings → Pages → Source «GitHub Actions».
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'core/web/**'
+      - 'site/**'
+      - 'docs/DATENSCHUTZ.md'
+      - 'docs/NUTZUNGSBEDINGUNGEN.md'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check WASM core (#32/AK3)
+        run: node core/web/w0_test.mjs
+      - name: Build site (#50)
+        env:
+          CONTROLLER_NAME: ${{ secrets.CONTROLLER_NAME }}
+          CONTROLLER_ADDRESS: ${{ secrets.CONTROLLER_ADDRESS }}
+          CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+        run: python3 site/build_site.py _site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -578,4 +578,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String trackNotOnDevice(String title) {
     return 'The audio file of «$title» is only on another device and not in the cloud.';
   }
+
+  @override
+  String get aboutApp => 'About Woodshed Player';
+
+  @override
+  String aboutVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String get aboutLicense =>
+      'Open source under the MIT License. The name “Woodshed Player” is not covered by it.';
+
+  @override
+  String get privacyPolicy => 'Privacy policy';
+
+  @override
+  String get termsOfUse => 'Terms of use';
+
+  @override
+  String get sourceCode => 'Source code';
 }

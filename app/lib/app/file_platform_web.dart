@@ -67,4 +67,15 @@ class WebFilePlatform implements FilePlatform {
 
   @override
   set onDropFiles(void Function(List<String> paths)? handler) {}
+
+  @override
+  Future<void> openUrl(String url) async {
+    web.window.open(url, '_blank', 'noopener');
+  }
+
+  @override
+  set onShowAbout(void Function()? handler) {}
+
+  @override
+  void setAboutMenuTitle(String title) {}
 }

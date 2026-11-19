@@ -64,6 +64,15 @@ abstract class FilePlatform {
 
   /// Dateien wurden ins Fenster gezogen (macOS).
   set onDropFiles(void Function(List<String> paths)? handler);
+
+  /// Opens [url] in the system browser (#50/AK6); the app itself loads nothing from the network.
+  Future<void> openUrl(String url);
+
+  /// The macOS app menu item «About …» was chosen (#50/AK6).
+  set onShowAbout(void Function()? handler);
+
+  /// Title of the macOS app menu item «About …» in the UI language (#50/AK6); no-op elsewhere.
+  void setAboutMenuTitle(String title);
 }
 
 class ChannelFilePlatform implements FilePlatform {
@@ -71,12 +80,15 @@ class ChannelFilePlatform implements FilePlatform {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'dropFiles' && call.arguments is List) {
         _onDrop?.call((call.arguments as List).cast<String>());
+      } else if (call.method == 'showAbout') {
+        _onShowAbout?.call();
       }
     });
   }
 
   static const _channel = MethodChannel('woodshed/files');
   void Function(List<String>)? _onDrop;
+  void Function()? _onShowAbout;
 
   @override
   set onDropFiles(void Function(List<String> paths)? handler) =>
@@ -98,4 +110,16 @@ class ChannelFilePlatform implements FilePlatform {
   @override
   void keepAwake(bool on) =>
       _channel.invokeMethod('keepAwake', on).catchError((_) => null);
+
+  @override
+  Future<void> openUrl(String url) =>
+      _channel.invokeMethod<void>('openUrl', url).catchError((_) {});
+
+  @override
+  set onShowAbout(void Function()? handler) => _onShowAbout = handler;
+
+  @override
+  void setAboutMenuTitle(String title) => _channel
+      .invokeMethod<void>('setAboutMenuTitle', title)
+      .catchError((_) {});
 }

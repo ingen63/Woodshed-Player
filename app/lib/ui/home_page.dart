@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import '../app/app_controller.dart';
 import '../metronome/metronome_panel.dart';
 import '../metronome/practice_shortcuts.dart';
+import 'about_dialog.dart';
 import 'library_view.dart';
 import 'messages.dart';
 import 'player_view.dart';
@@ -45,11 +46,21 @@ class _HomePageState extends State<HomePage> {
     c.addListener(_showMessage);
     c.metronome.addListener(_updateTicker);
     _lifecycle = AppLifecycleListener(onResume: () => c.resumed());
+    c.files.onShowAbout = () {
+      if (mounted) showAbout(context, c.files);
+    };
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    c.files.setAboutMenuTitle(context.l10n.aboutApp); // #50/AK6: macOS app menu
   }
 
   @override
   void dispose() {
     _lifecycle.dispose();
+    c.files.onShowAbout = null;
     c.removeListener(_showMessage);
     c.metronome.removeListener(_updateTicker);
     _metronomeTicker?.cancel();

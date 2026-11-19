@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import '../app/app_controller.dart';
 import '../library/library.dart';
 import '../time_format.dart';
+import 'about_dialog.dart';
 import 'messages.dart';
 import 'style.dart';
 
@@ -449,6 +450,12 @@ class _Header extends StatelessWidget {
                   child: Text(appearanceLabel(l, a)),
                 ),
             ],
+          ),
+          IconButton(
+            key: const Key('aboutButton'),
+            tooltip: l.aboutApp,
+            icon: const Icon(WsIcons.info),
+            onPressed: () => showAbout(context, controller.files),
           ),
         ],
       ),

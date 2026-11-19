@@ -77,9 +77,37 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
           .appendingPathComponent("Recordings", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         result(dir.path)
+      case "openUrl":
+        // #50/AK6: links of the About dialog open in the default browser.
+        if let text = call.arguments as? String, let url = URL(string: text),
+          url.scheme == "https"
+        {
+          NSWorkspace.shared.open(url)
+        }
+        result(nil)
+      case "setAboutMenuTitle":
+        if let title = call.arguments as? String { self.routeAboutMenu(title: title) }
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
     }
+  }
+
+  // MARK: About (#50/AK6): the app menu item «About …» opens the Flutter dialog instead of the standard panel.
+
+  /// Points the first item of the app menu (the standard «About …») at [showAbout] and sets its localized title.
+  func routeAboutMenu(title: String) {
+    guard let item = NSApp.mainMenu?.items.first?.submenu?.items.first,
+      item.action == #selector(NSApplication.orderFrontStandardAboutPanel(_:))
+        || item.action == #selector(showAbout(_:))
+    else { return }
+    item.title = title
+    item.target = self
+    item.action = #selector(showAbout(_:))
+  }
+
+  @objc func showAbout(_ sender: Any?) {
+    channel?.invokeMethod("showAbout", arguments: nil)
   }
 }

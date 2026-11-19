@@ -199,6 +199,19 @@ class FakeFiles implements FilePlatform {
   void keepAwake(bool on) {}
   @override
   set onDropFiles(void Function(List<String> paths)? handler) => drop = handler;
+
+  /// URLs handed to the system browser (#50).
+  final opened = <String>[];
+  @override
+  Future<void> openUrl(String url) async => opened.add(url);
+
+  void Function()? showAbout;
+  @override
+  set onShowAbout(void Function()? handler) => showAbout = handler;
+
+  String? aboutMenuTitle;
+  @override
+  void setAboutMenuTitle(String title) => aboutMenuTitle = title;
 }
 
 /// Kern, Timer, Bibliothek in [dir] und Controller zusammen. Laden wird mit [finishLoads] abgeschlossen.

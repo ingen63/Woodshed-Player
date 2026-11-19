@@ -1,0 +1,17 @@
+/* Public pages (#50): start page, privacy policy, terms. System fonts only, nothing loaded from elsewhere. */
+:root { --bg: #fbfaf8; --fg: #1d1c1a; --muted: #6b6762; --accent: #b4532a; --line: #e4e0da; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161514; --fg: #ecebe8; --muted: #a29e98; --accent: #e88a5c; --line: #34312e; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+nav, main, footer { max-width: 44rem; margin: 0 auto; padding: 0 16px; }
+nav { padding-top: 20px; font-weight: 600; }
+main { padding-top: 12px; padding-bottom: 32px; overflow-wrap: anywhere; }
+footer { padding-top: 16px; padding-bottom: 32px; border-top: 1px solid var(--line); color: var(--muted); font-size: 15px; }
+a { color: var(--accent); }
+nav a { color: var(--fg); text-decoration: none; }
+h1 { font-size: 1.9rem; line-height: 1.25; margin: 0.6em 0 0.4em; }
+h2 { font-size: 1.2rem; margin: 1.8em 0 0.4em; }
+code { font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--line); padding: 0.1em 0.3em; border-radius: 4px; }
+li { margin: 0.3em 0; }

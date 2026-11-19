@@ -405,5 +405,24 @@
         "type": "String"
       }
     }
-  }
+  },
+  "aboutApp": "About Woodshed Player",
+  "@aboutApp": {
+    "description": "Library header button and macOS app menu item (#50): opens the About dialog."
+  },
+  "aboutVersion": "Version {version}",
+  "@aboutVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "aboutLicense": "Open source under the MIT License. The name “Woodshed Player” is not covered by it.",
+  "privacyPolicy": "Privacy policy",
+  "@privacyPolicy": {
+    "description": "About dialog link (#50): opens the published privacy policy in the browser."
+  },
+  "termsOfUse": "Terms of use",
+  "sourceCode": "Source code"
 }

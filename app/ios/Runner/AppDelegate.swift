@@ -29,6 +29,14 @@ import UniformTypeIdentifiers
         // Bildschirm bleibt an, solange das Metronom läuft (FEA-3).
         UIApplication.shared.isIdleTimerDisabled = (call.arguments as? Bool) ?? false
         result(nil)
+      case "openUrl":
+        // #50/AK6: links of the About dialog open in the browser.
+        if let text = call.arguments as? String, let url = URL(string: text),
+          url.scheme == "https"
+        {
+          UIApplication.shared.open(url)
+        }
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }

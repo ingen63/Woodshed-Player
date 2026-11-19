@@ -102,7 +102,7 @@ Aufwand in Arbeitstagen, grob, mit KI-Unterstützung. Grösste Unsicherheit: W0 
 
 - **Kern:** `core/web/w0_bridge.cpp` stellt Engine und Metronom als WebAssembly bereit (`core/web/build_w0.sh`, Emscripten, `STANDALONE_WASM`, SIMD, 112 KB). Abweichend vom Plan läuft der Kern **ohne** `-sAUDIO_WORKLET` direkt im `AudioWorkletProcessor`: keine JS-Hülle, keine Threads nötig. Der Status geht über einen `SharedArrayBuffer` an die Seite, damit Punkt 5 echt geprüft wird.
 - **Testseite:** `web/w0/` (Worklet, OPFS-Worker, Service Worker für COOP/COEP und Offline, Manifest). Testsignal wird erzeugt (Töne über 110-Hz-Grundton, Loop 4–8 s im Signal nahtlos); eigene Dateien lassen sich lokal laden. Die Seite misst selbst: Klickabweichung, Rechenlast, ob Audio im Hintergrund weiterlief (Zeit des AudioContext gegen Wanduhr), OPFS-Inhalt Byte für Byte.
-- **Veröffentlichung:** `.github/workflows/w0-pages.yml` prüft den Kern mit Node.js und stellt `web/` auf GitHub Pages (Adresse `…/w0/`). Das Repo ist privat: Pages braucht dafür ein kostenpflichtiges GitHub-Konto, sonst Repo öffentlich machen oder Ausweichen laut Risiken.
+- **Veröffentlichung:** `.github/workflows/pages.yml` (bis #50 `w0-pages.yml`) prüft den Kern mit Node.js und stellt `web/` auf GitHub Pages (Adresse `…/w0/`). Das Repo ist privat: Pages braucht dafür ein kostenpflichtiges GitHub-Konto, sonst Repo öffentlich machen oder Ausweichen laut Risiken.
 - **Lokal:** `python3 -m http.server 8732 --directory web/w0`, dann `http://localhost:8732` (localhost gilt als sicher, Service Worker und Isolation funktionieren).
 
 #### Ergebnis W0

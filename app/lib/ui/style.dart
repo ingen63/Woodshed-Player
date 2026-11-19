@@ -55,6 +55,7 @@ abstract final class WsIcons {
   );
   static const sun = IconData(0xf4b6, fontFamily: _f, fontPackage: _p);
   static const moon = IconData(0xf716, fontFamily: _f, fontPackage: _p);
+  static const info = IconData(0xf44c, fontFamily: _f, fontPackage: _p);
   static const musicNoteList = IconData(
     0xf726,
     fontFamily: _f,

@@ -1009,6 +1009,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The audio file of «{title}» is only on another device and not in the cloud.'**
   String trackNotOnDevice(String title);
+
+  /// Library header button and macOS app menu item (#50): opens the About dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'About Woodshed Player'**
+  String get aboutApp;
+
+  /// No description provided for @aboutVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String aboutVersion(String version);
+
+  /// No description provided for @aboutLicense.
+  ///
+  /// In en, this message translates to:
+  /// **'Open source under the MIT License. The name “Woodshed Player” is not covered by it.'**
+  String get aboutLicense;
+
+  /// About dialog link (#50): opens the published privacy policy in the browser.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get privacyPolicy;
+
+  /// No description provided for @termsOfUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of use'**
+  String get termsOfUse;
+
+  /// No description provided for @sourceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Source code'**
+  String get sourceCode;
 }
 
 class _AppLocalizationsDelegate
