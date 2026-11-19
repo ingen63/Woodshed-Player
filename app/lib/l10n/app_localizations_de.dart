@@ -172,6 +172,48 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get recordingErrorInvalidPath => 'Kein Dateipfad für die Aufnahme.';
+
+  @override
+  String get recordingErrorUnsupported =>
+      'Aufnahme braucht macOS 14.2 oder neuer.';
+
+  @override
+  String get recordingErrorTap =>
+      'Der Systemton konnte nicht abgegriffen werden.';
+
+  @override
+  String get recordingErrorTapFormat =>
+      'Der Systemton hat ein unerwartetes Format.';
+
+  @override
+  String get recordingErrorNoOutput => 'Kein Ausgabegerät gefunden.';
+
+  @override
+  String get recordingErrorAggregate =>
+      'Das Aufnahmegerät konnte nicht eingerichtet werden.';
+
+  @override
+  String get recordingErrorOutOfMemory => 'Zu wenig Speicher für die Aufnahme.';
+
+  @override
+  String get recordingErrorFile =>
+      'Die Aufnahmedatei konnte nicht angelegt werden.';
+
+  @override
+  String get recordingErrorIoProc =>
+      'Der Audiostrom für die Aufnahme konnte nicht eingerichtet werden.';
+
+  @override
+  String get recordingErrorStart =>
+      'Die Aufnahme konnte nicht gestartet werden.';
+
+  @override
+  String recordingErrorUnknown(int code) {
+    return 'Unbekannter Fehler ($code).';
+  }
+
+  @override
   String get recordingSilent =>
       'Es kommt nur Stille an. Läuft gerade Musik? Sonst die Berechtigung erteilen: Systemeinstellungen › Datenschutz & Sicherheit › Bildschirm- & Systemaudioaufnahme.';
 

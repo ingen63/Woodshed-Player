@@ -3,11 +3,12 @@
 
 extern "C" {
 int wp_rec_available(void) { return 0; }
-int wp_rec_start(const char*) { return -1; }
+int wp_rec_start(const char*) { return WP_REC_ERR_UNSUPPORTED; }
 void wp_rec_stop(void) {}
 int wp_rec_is_recording(void) { return 0; }
 double wp_rec_seconds(void) { return 0.0; }
 float wp_rec_level(void) { return 0.0f; }
 int wp_rec_only_silence(void) { return 1; }
-const char* wp_rec_error(void) { return "Aufnahme ist auf dieser Plattform nicht verfügbar"; }
+int wp_rec_os_status(void) { return 0; }
+const char* wp_rec_error(void) { return "Recording is not available on this platform"; }
 }

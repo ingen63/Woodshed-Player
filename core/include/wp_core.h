@@ -96,10 +96,21 @@ WP_API void wp_metro_set_ramp_timed(wp_player* p, int enabled, int start_bpm, in
                                     int duration_seconds);
 
 /* ---- Aufnahme des Systemtons (nur macOS 14.2+, sonst Rückgabe < 0) ---- */
+/* Error codes of wp_rec_start (#44); the UI maps each one to its own localized text. */
+#define WP_REC_ERR_INVALID_PATH -1  /* no file path */
+#define WP_REC_ERR_UNSUPPORTED -2   /* platform without recording or macOS older than 14.2 */
+#define WP_REC_ERR_TAP -3           /* system audio tap could not be created */
+#define WP_REC_ERR_TAP_FORMAT -4    /* tap format unknown or not float32 */
+#define WP_REC_ERR_NO_OUTPUT -5     /* no output device found */
+#define WP_REC_ERR_AGGREGATE -6     /* aggregate device could not be created */
+#define WP_REC_ERR_OUT_OF_MEMORY -7 /* no memory for the ring buffer */
+#define WP_REC_ERR_FILE -8          /* WAV file could not be created */
+#define WP_REC_ERR_IO_PROC -9       /* IOProc could not be created */
+#define WP_REC_ERR_START -10        /* device could not be started */
 /* 1 = auf dieser Plattform verfügbar, 0 = nicht verfügbar. */
 WP_API int wp_rec_available(void);
 /* Startet die Aufnahme als WAV-Datei. Der eigene Ton von Woodshed Player wird nicht mit aufgenommen.
- * 0 = ok, < 0 = Fehler (siehe wp_rec_error). */
+ * 0 = ok, < 0 = WP_REC_ERR_*. */
 WP_API int wp_rec_start(const char* wav_path);
 WP_API void wp_rec_stop(void);
 WP_API int wp_rec_is_recording(void);
@@ -108,6 +119,9 @@ WP_API double wp_rec_seconds(void);
 WP_API float wp_rec_level(void);
 /* 1 = es kam bisher nur Stille an (z. B. keine Berechtigung oder nichts läuft). */
 WP_API int wp_rec_only_silence(void);
+/* OSStatus of the last failed wp_rec_start, 0 if the error has none. */
+WP_API int wp_rec_os_status(void);
+/* English description of the last error, for logs only; the UI uses the code (#44). Never NULL. */
 WP_API const char* wp_rec_error(void);
 
 #ifdef __cplusplus

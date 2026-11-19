@@ -26,8 +26,8 @@ class _RecordingButtonState extends State<RecordingButton> {
   bool _silent = false;
   String? _path;
 
-  /// Detail of the core when recording could not start.
-  String? _error;
+  /// Error of the core when recording could not start (#44).
+  WpRecordingException? _error;
 
   @override
   void dispose() {
@@ -68,8 +68,9 @@ class _RecordingButtonState extends State<RecordingButton> {
           _silent = _seconds > 3 && WpRecorder.onlySilence;
         });
       });
-    } on WpException catch (e) {
-      setState(() => _error = e.message);
+    } on WpRecordingException catch (e) {
+      debugPrint(e.toString());
+      setState(() => _error = e);
     }
   }
 
@@ -93,7 +94,7 @@ class _RecordingButtonState extends State<RecordingButton> {
     final l = context.l10n;
     final error = _error;
     final problem = error != null
-        ? l.recordingFailed(error)
+        ? l.recordingFailed(recordingErrorMessage(l, error))
         : (_silent ? l.recordingSilent : null);
     return ExcludeFocus(
       child: Row(

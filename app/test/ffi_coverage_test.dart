@@ -41,4 +41,19 @@ void main() {
       reason: 'neuer Fehlercode in wp_core.h: WpCode und loadErrorMessage nachführen',
     );
   });
+
+  test('#44/AK1: recording error codes as in wp_core.h', () {
+    final defines = {
+      for (final m in RegExp(
+        r'#define WP_REC_ERR_\w+ (-?\d+)',
+      ).allMatches(header))
+        int.parse(m.group(1)!),
+    };
+    expect(
+      defines,
+      WpRecCode.all.toSet(),
+      reason: 'new WP_REC_ERR_* in wp_core.h: update WpRecCode and recordingErrorMessage',
+    );
+    expect(WpRecCode.all.toSet().length, WpRecCode.all.length);
+  });
 }

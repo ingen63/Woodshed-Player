@@ -92,6 +92,7 @@ final _recIsRecording = _lib.lookupFunction<Int32 Function(), int Function()>('w
 final _recSeconds = _lib.lookupFunction<Double Function(), double Function()>('wp_rec_seconds');
 final _recLevel = _lib.lookupFunction<Float Function(), double Function()>('wp_rec_level');
 final _recOnlySilence = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_only_silence');
+final _recOsStatus = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_os_status');
 final _recError = _lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('wp_rec_error');
 
 /// Ein Player mit eigenem Audiogerät.
@@ -212,11 +213,12 @@ double wpFileDuration(String path) {
 abstract final class WpRecorder {
   static bool get available => _recAvailable() != 0;
 
-  /// Startet die Aufnahme als WAV. Wirft mit Begründung, wenn es nicht geht.
+  /// Starts recording as WAV. Throws [WpRecordingException] with the error code if it fails.
   static void start(String wavPath) {
     final c = wavPath.toNativeUtf8();
     try {
-      if (_recStart(c) != 0) throw WpException(_recError().toDartString());
+      final code = _recStart(c);
+      if (code != 0) throw WpRecordingException(code, _recOsStatus(), _recError().toDartString());
     } finally {
       malloc.free(c);
     }

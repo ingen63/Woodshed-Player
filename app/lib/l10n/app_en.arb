@@ -97,6 +97,24 @@
       }
     }
   },
+  "recordingErrorInvalidPath": "No file path for the recording.",
+  "recordingErrorUnsupported": "Recording requires macOS 14.2 or later.",
+  "recordingErrorTap": "The system audio could not be tapped.",
+  "recordingErrorTapFormat": "The system audio has an unexpected format.",
+  "recordingErrorNoOutput": "No output device found.",
+  "recordingErrorAggregate": "The recording device could not be set up.",
+  "recordingErrorOutOfMemory": "Not enough memory for the recording.",
+  "recordingErrorFile": "The recording file could not be created.",
+  "recordingErrorIoProc": "The audio stream for the recording could not be set up.",
+  "recordingErrorStart": "The recording could not be started.",
+  "recordingErrorUnknown": "Unknown error ({code}).",
+  "@recordingErrorUnknown": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
   "recordingSilent": "Only silence is coming in. Is music playing? Otherwise grant the permission: System Settings › Privacy & Security › Screen & System Audio Recording.",
   "recordingTooltip": "Records the system audio (without microphone). The recording is only stored locally and then added to the library.",
   "noTrackSelected": "No track selected",

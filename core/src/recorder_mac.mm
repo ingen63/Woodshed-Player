@@ -23,6 +23,7 @@ namespace {
 struct Recorder {
     std::mutex mutex;
     std::string error;
+    OSStatus osStatus = noErr;  // of the last failed start
     std::atomic<bool> recording{false};
     std::atomic<bool> onlySilence{true};
     std::atomic<float> peak{0.0f};
@@ -59,7 +60,13 @@ OSStatus getProperty(AudioObjectID obj, AudioObjectPropertySelector sel, T& valu
     return AudioObjectGetPropertyData(obj, &addr, qualifierSize, qualifier, &size, &value);
 }
 
-std::string osstatus(const char* what, OSStatus st) { return std::string(what) + " (OSStatus " + std::to_string(st) + ")"; }
+// Stores the English log text and the OSStatus of a failed start and returns the error code.
+int fail(Recorder& r, int code, const char* what, OSStatus st = noErr) {
+    r.error = what;
+    r.osStatus = st;
+    if (st != noErr) r.error += " (OSStatus " + std::to_string(st) + ")";
+    return code;
+}
 
 void writerLoop(Recorder* r) {
     while (r->writerRun.load() || ma_pcm_rb_available_read(&r->ring) > 0) {
@@ -151,24 +158,19 @@ int startTap(Recorder& r, const char* path) API_AVAILABLE(macos(14.2)) {
     }
 
     CATapDescription* desc = [[CATapDescription alloc] initStereoGlobalTapButExcludeProcesses:exclude];
-    desc.name = @"Woodshed Player Aufnahme";
+    desc.name = @"Woodshed Player Recording";
     desc.privateTap = YES;
     desc.muteBehavior = CATapUnmuted;
 
     OSStatus st = AudioHardwareCreateProcessTap(desc, &r.tap);
-    if (st != noErr) {
-        r.error = osstatus("Systemton-Tap konnte nicht angelegt werden", st);
-        return -2;
-    }
+    if (st != noErr) return fail(r, WP_REC_ERR_TAP, "System audio tap could not be created", st);
 
     AudioStreamBasicDescription fmt{};
     if ((st = getProperty(r.tap, kAudioTapPropertyFormat, fmt)) != noErr) {
-        r.error = osstatus("Format des Taps unbekannt", st);
-        return -3;
+        return fail(r, WP_REC_ERR_TAP_FORMAT, "Tap format unknown", st);
     }
     if (!(fmt.mFormatFlags & kAudioFormatFlagIsFloat) || fmt.mBitsPerChannel != 32) {
-        r.error = "Unerwartetes Tap-Format (kein float32)";
-        return -3;
+        return fail(r, WP_REC_ERR_TAP_FORMAT, "Unexpected tap format (not float32)");
     }
     r.sampleRate = fmt.mSampleRate;
     r.tapChannels = std::max<UInt32>(1, fmt.mChannelsPerFrame);
@@ -179,12 +181,11 @@ int startTap(Recorder& r, const char* path) API_AVAILABLE(macos(14.2)) {
     CFStringRef outputUID = nullptr;
     if (getProperty(kAudioObjectSystemObject, kAudioHardwarePropertyDefaultSystemOutputDevice, output) != noErr ||
         getProperty(output, kAudioDevicePropertyDeviceUID, outputUID) != noErr || !outputUID) {
-        r.error = "Kein Ausgabegerät gefunden";
-        return -4;
+        return fail(r, WP_REC_ERR_NO_OUTPUT, "No output device found");
     }
     NSString* outUID = (__bridge_transfer NSString*)outputUID;
     NSDictionary* agg = @{
-        @kAudioAggregateDeviceNameKey : @"Woodshed Player Aufnahme",
+        @kAudioAggregateDeviceNameKey : @"Woodshed Player Recording",
         @kAudioAggregateDeviceUIDKey : [NSUUID UUID].UUIDString,
         @kAudioAggregateDeviceMainSubDeviceKey : outUID,
         @kAudioAggregateDeviceIsPrivateKey : @YES,
@@ -195,8 +196,7 @@ int startTap(Recorder& r, const char* path) API_AVAILABLE(macos(14.2)) {
             @[ @{@kAudioSubTapDriftCompensationKey : @YES, @kAudioSubTapUIDKey : desc.UUID.UUIDString} ],
     };
     if ((st = AudioHardwareCreateAggregateDevice((__bridge CFDictionaryRef)agg, &r.aggregate)) != noErr) {
-        r.error = osstatus("Aggregate-Device konnte nicht angelegt werden", st);
-        return -5;
+        return fail(r, WP_REC_ERR_AGGREGATE, "Aggregate device could not be created", st);
     }
     // Die Daten kommen im Takt des Aggregate-Devices (Ausgabegerät, z. B. 44,1 kHz), auch wenn das Tap-Format
     // eine andere Rate meldet. Mit der Tap-Rate wäre der Mitschnitt zu schnell und zu hoch.
@@ -208,15 +208,13 @@ int startTap(Recorder& r, const char* path) API_AVAILABLE(macos(14.2)) {
     // 3. Ziel: Ringpuffer (2 s) und WAV-Datei.
     if (ma_pcm_rb_init(ma_format_f32, kChannels, static_cast<ma_uint32>(r.sampleRate * 2), nullptr, nullptr,
                        &r.ring) != MA_SUCCESS) {
-        r.error = "Kein Speicher für den Ringpuffer";
-        return -6;
+        return fail(r, WP_REC_ERR_OUT_OF_MEMORY, "No memory for the ring buffer");
     }
     r.ringReady = true;
     ma_encoder_config ec = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, kChannels,
                                                   static_cast<ma_uint32>(r.sampleRate));
     if (ma_encoder_init_file(path, &ec, &r.encoder) != MA_SUCCESS) {
-        r.error = "WAV-Datei konnte nicht angelegt werden";
-        return -7;
+        return fail(r, WP_REC_ERR_FILE, "WAV file could not be created");
     }
     r.encoderReady = true;
     r.writerRun.store(true);
@@ -228,13 +226,9 @@ int startTap(Recorder& r, const char* path) API_AVAILABLE(macos(14.2)) {
     st = AudioDeviceCreateIOProcIDWithBlock(&r.ioProc, r.aggregate, r.queue,
                                             ^(const AudioTimeStamp*, const AudioBufferList* in, const AudioTimeStamp*,
                                               AudioBufferList*, const AudioTimeStamp*) { onInput(rp, in); });
-    if (st != noErr) {
-        r.error = osstatus("IOProc konnte nicht angelegt werden", st);
-        return -8;
-    }
+    if (st != noErr) return fail(r, WP_REC_ERR_IO_PROC, "IOProc could not be created", st);
     if ((st = AudioDeviceStart(r.aggregate, r.ioProc)) != noErr) {
-        r.error = osstatus("Aufnahme konnte nicht gestartet werden", st);
-        return -9;
+        return fail(r, WP_REC_ERR_START, "Recording could not be started", st);
     }
     return 0;
 }
@@ -253,10 +247,8 @@ int wp_rec_start(const char* wav_path) {
     std::lock_guard<std::mutex> lock(r.mutex);
     if (r.recording.load()) return 0;
     r.error.clear();
-    if (!wav_path) {
-        r.error = "Kein Dateipfad";
-        return -1;
-    }
+    r.osStatus = noErr;
+    if (!wav_path) return fail(r, WP_REC_ERR_INVALID_PATH, "No file path");
     if (@available(macOS 14.2, *)) {
         r.frames.store(0);
         r.peak.store(0);
@@ -269,8 +261,7 @@ int wp_rec_start(const char* wav_path) {
         r.recording.store(true);
         return 0;
     }
-    r.error = "Aufnahme braucht macOS 14.2 oder neuer";
-    return -1;
+    return fail(r, WP_REC_ERR_UNSUPPORTED, "Recording requires macOS 14.2 or later");
 }
 
 void wp_rec_stop(void) {
@@ -289,6 +280,8 @@ double wp_rec_seconds(void) {
 float wp_rec_level(void) { return rec().peak.exchange(0.0f); }
 
 int wp_rec_only_silence(void) { return rec().onlySilence.load() ? 1 : 0; }
+
+int wp_rec_os_status(void) { return static_cast<int>(rec().osStatus); }
 
 const char* wp_rec_error(void) { return rec().error.c_str(); }
 

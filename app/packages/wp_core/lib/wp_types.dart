@@ -21,6 +21,44 @@ abstract final class WpCode {
   static const loadReady = 2;
 }
 
+/// Error codes of `wp_rec_start` as in wp_core.h (`WP_REC_ERR_*`, #44).
+abstract final class WpRecCode {
+  static const invalidPath = -1;
+  static const unsupported = -2;
+  static const tap = -3;
+  static const tapFormat = -4;
+  static const noOutput = -5;
+  static const aggregate = -6;
+  static const outOfMemory = -7;
+  static const file = -8;
+  static const ioProc = -9;
+  static const start = -10;
+
+  static const all = [
+    invalidPath,
+    unsupported,
+    tap,
+    tapFormat,
+    noOutput,
+    aggregate,
+    outOfMemory,
+    file,
+    ioProc,
+    start, //
+  ];
+}
+
+/// Recording could not start (#44): [code] is a [WpRecCode], [osStatus] the OSStatus or 0,
+/// [message] the English text of the core for logs.
+class WpRecordingException implements Exception {
+  const WpRecordingException(this.code, this.osStatus, this.message);
+  final int code;
+  final int osStatus;
+  final String message;
+  @override
+  String toString() => 'WpRecordingException($code): $message';
+}
+
 /// Minimum und Maximum je Abschnitt einer Wellenform, gleich lang, Werte −1…1.
 class WpWaveform {
   WpWaveform(this.min, this.max);

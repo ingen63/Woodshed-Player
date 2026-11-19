@@ -53,6 +53,24 @@ String loadErrorMessage(AppLocalizations l, LoadError e) => switch (e.code) {
   _ => l.loadUnknown(e.code),
 };
 
+/// #44/AK1: localized message for a recording error of the core; the OSStatus stays a plain number.
+String recordingErrorMessage(AppLocalizations l, WpRecordingException e) {
+  final text = switch (e.code) {
+    WpRecCode.invalidPath => l.recordingErrorInvalidPath,
+    WpRecCode.unsupported => l.recordingErrorUnsupported,
+    WpRecCode.tap => l.recordingErrorTap,
+    WpRecCode.tapFormat => l.recordingErrorTapFormat,
+    WpRecCode.noOutput => l.recordingErrorNoOutput,
+    WpRecCode.aggregate => l.recordingErrorAggregate,
+    WpRecCode.outOfMemory => l.recordingErrorOutOfMemory,
+    WpRecCode.file => l.recordingErrorFile,
+    WpRecCode.ioProc => l.recordingErrorIoProc,
+    WpRecCode.start => l.recordingErrorStart,
+    _ => l.recordingErrorUnknown(e.code),
+  };
+  return e.osStatus == 0 ? text : '$text (OSStatus ${e.osStatus})';
+}
+
 String libraryMessageText(AppLocalizations l, LibraryMessage m) => switch (m) {
   LibraryCorrupt(:final backupName) => l.libraryCorrupt(backupName),
   LibrarySaveFailed(:final detail) => l.librarySaveFailed(detail),

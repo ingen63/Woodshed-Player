@@ -386,6 +386,72 @@ abstract class AppLocalizations {
   /// **'Recording not possible: {detail}'**
   String recordingFailed(String detail);
 
+  /// No description provided for @recordingErrorInvalidPath.
+  ///
+  /// In en, this message translates to:
+  /// **'No file path for the recording.'**
+  String get recordingErrorInvalidPath;
+
+  /// No description provided for @recordingErrorUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording requires macOS 14.2 or later.'**
+  String get recordingErrorUnsupported;
+
+  /// No description provided for @recordingErrorTap.
+  ///
+  /// In en, this message translates to:
+  /// **'The system audio could not be tapped.'**
+  String get recordingErrorTap;
+
+  /// No description provided for @recordingErrorTapFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'The system audio has an unexpected format.'**
+  String get recordingErrorTapFormat;
+
+  /// No description provided for @recordingErrorNoOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'No output device found.'**
+  String get recordingErrorNoOutput;
+
+  /// No description provided for @recordingErrorAggregate.
+  ///
+  /// In en, this message translates to:
+  /// **'The recording device could not be set up.'**
+  String get recordingErrorAggregate;
+
+  /// No description provided for @recordingErrorOutOfMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough memory for the recording.'**
+  String get recordingErrorOutOfMemory;
+
+  /// No description provided for @recordingErrorFile.
+  ///
+  /// In en, this message translates to:
+  /// **'The recording file could not be created.'**
+  String get recordingErrorFile;
+
+  /// No description provided for @recordingErrorIoProc.
+  ///
+  /// In en, this message translates to:
+  /// **'The audio stream for the recording could not be set up.'**
+  String get recordingErrorIoProc;
+
+  /// No description provided for @recordingErrorStart.
+  ///
+  /// In en, this message translates to:
+  /// **'The recording could not be started.'**
+  String get recordingErrorStart;
+
+  /// No description provided for @recordingErrorUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error ({code}).'**
+  String recordingErrorUnknown(int code);
+
   /// No description provided for @recordingSilent.
   ///
   /// In en, this message translates to:

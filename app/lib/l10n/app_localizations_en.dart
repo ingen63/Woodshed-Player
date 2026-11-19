@@ -171,6 +171,46 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get recordingErrorInvalidPath => 'No file path for the recording.';
+
+  @override
+  String get recordingErrorUnsupported =>
+      'Recording requires macOS 14.2 or later.';
+
+  @override
+  String get recordingErrorTap => 'The system audio could not be tapped.';
+
+  @override
+  String get recordingErrorTapFormat =>
+      'The system audio has an unexpected format.';
+
+  @override
+  String get recordingErrorNoOutput => 'No output device found.';
+
+  @override
+  String get recordingErrorAggregate =>
+      'The recording device could not be set up.';
+
+  @override
+  String get recordingErrorOutOfMemory =>
+      'Not enough memory for the recording.';
+
+  @override
+  String get recordingErrorFile => 'The recording file could not be created.';
+
+  @override
+  String get recordingErrorIoProc =>
+      'The audio stream for the recording could not be set up.';
+
+  @override
+  String get recordingErrorStart => 'The recording could not be started.';
+
+  @override
+  String recordingErrorUnknown(int code) {
+    return 'Unknown error ($code).';
+  }
+
+  @override
   String get recordingSilent =>
       'Only silence is coming in. Is music playing? Otherwise grant the permission: System Settings › Privacy & Security › Screen & System Audio Recording.';
 
