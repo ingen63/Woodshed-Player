@@ -19,3 +19,6 @@ core/build-*/
 app/web/wp_core/
 _site/
 __pycache__/
+
+# Coverage profiles of instrumented runs (#8)
+*.profraw

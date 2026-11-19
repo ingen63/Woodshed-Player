@@ -29,7 +29,7 @@ VivaPlan.
 | 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | teilweise, #10 und #57 |
 | 5 Golden-Dateien | `app/test/golden/` (`library.json` der Swift-App, alt und neu) | jede Version liest alle alten Stände; Klickpositionen des Metronoms | teilweise, #9 und #10 |
 | 6 Oberfläche | Widget-Tests in `app/test/`, Rauchtest `app/integration_test/app_smoke_test.dart`, Prüfseiten im Browser `app/tool/web_*_check.dart` | Layout je Grösse, Bedienung, Texte, Tastenkürzel | teilweise, #13 |
-| Werkzeuge | `app/tool/after_commit_hook_test.dart` | Hook nach dem Commit | vorhanden (#7) |
+| Werkzeuge | `app/tool/after_commit_hook_test.dart`, `coverage_test.dart`, `pre_push_hook_test.dart` | Hook nach dem Commit, Abdeckung je Teil, `coverage-diff`, `pre-push` | vorhanden (#7, #8) |
 
 ## Testmatrix und QA-Abgleich
 
@@ -168,27 +168,31 @@ zugeordnet.
 | Formatierung `dart format` und `clang-format`, `make format-check` | vorhanden: `Makefile`, `core/.clang-format` (#7) | – |
 | Warnungen sind Fehler: strenge Dart-Analyse, `-Wall -Wextra -Werror`, `clang-tidy` | vorhanden: `app/analysis_options.yaml`, `core/CMakeLists.txt`, `core/.clang-tidy` (#7) | – |
 | Hook nach dem Commit mit eigenen Tests | vorhanden: `app/tool/after_commit_hook_test.dart` (#7/AK7) | – |
-| Abdeckung je Teil, `coverage-diff`, `pre-push` | Lücke | #8 |
+| Abdeckung je Teil mit Untergrenze, `coverage-diff`, `pre-push` mit eigenen Tests | vorhanden: `tools/coverage-min`, `tools/git-hooks/pre-push`, `app/tool/coverage_test.dart`, `app/tool/pre_push_hook_test.dart` (#8) | – |
+| C-API (`player.cpp`) über die geteilte Bibliothek: Nullzeiger, Laden, Seek, Tempo, Loop, Wellenform, Metronom, Aufnahme im Ruhezustand | vorhanden: `core/tests/capi_tests.cpp` (#8) | – |
 | Mutationstests | Lücke | #11 |
 | Übersichtsseite Testqualität | Lücke | #12 |
 
 ## Ausführen
 
 ```sh
-make test           # Kern (ctest), App (flutter test) und die Tests des Hooks
+make test           # Kern (ctest), App (flutter test) und die Tests der Werkzeuge
 make test-wasm      # Kern unter Node.js (Emscripten)
+make coverage       # alle Tests mit Abdeckung, Prüfung je Teil gegen tools/coverage-min
+make coverage-diff  # Abdeckung der seit BASE geänderten Zeilen (Vorgabe origin/main), ein Hinweis
 make format         # dart format (app/) und clang-format (core/, ohne third_party)
 make format-check   # schlägt fehl, wenn eine Datei nicht formatiert ist
 make lint           # flutter analyze (streng), C++ mit -Werror, clang-tidy
 cd app && flutter test integration_test -d macos   # Rauchtest mit echtem Kern
 ```
 
-Noch nicht eingerichtet; die Ziele melden «noch nicht eingerichtet» mit Issue und brechen ab: `make coverage` und
-`coverage-diff` (#8), `make mutants` (#11), `make fuzz` (#10), `make report` (#12), `make sanitize` (#57),
-`make network-free` (#58).
+Noch nicht eingerichtet; die Ziele melden «noch nicht eingerichtet» mit Issue und brechen ab: `make mutants` (#11),
+`make fuzz` (#10), `make report` (#12), `make sanitize` (#57), `make network-free` (#58).
 
 Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten für `test-wasm`, Homebrew `llvm` für
 `clang-format` und `clang-tidy` (`brew install llvm`; das Makefile findet sie unter `$(brew --prefix llvm)/bin`).
+`llvm-cov` und `llvm-profdata` für `make coverage` müssen zum Compiler passen; auf macOS nimmt das Makefile die aus
+Xcode (`xcrun`), sonst die aus dem `PATH` bzw. Homebrew.
 
 ## Formatierung und Warnungen (#7)
 
@@ -205,6 +209,78 @@ Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten für `test-
 - **clang-tidy:** schlanke Auswahl in `core/.clang-tidy` (`bugprone-*`, `clang-analyzer-*`, `performance-*` und
   einzelne weitere), jeder Fund ist ein Fehler. Abgeschaltete Prüfungen stehen dort mit Begründung; einzelne
   Ausnahmen im Code nur als `NOLINT(<Prüfung>)` mit Begründung.
+
+## Abdeckung (#8)
+
+Abdeckung zeigt, was ausgeführt wird, nicht was geprüft wird. Die Untergrenze ist deshalb eine Untergrenze, kein Ziel;
+ein Test zählt nur, wenn er konkrete Werte prüft (siehe Grundsatz).
+
+**Teile.** Gemessen wird die Zeilenabdeckung getrennt je Teil; die Regeln stehen in `app/tool/coverage.dart`
+(`classify`):
+
+| Teil | Dateien | Messung | Untergrenze |
+|---|---|---|---|
+| C++-Kern | `core/src/`, `core/include/` | `llvm-cov` über alle `ctest`-Programme und die geteilte Bibliothek `libwp_core` (Build `core/build-cov`, Release mit `-DWP_COVERAGE=ON`) | ja |
+| Dart-Logik | `app/lib/` ohne die drei folgenden Gruppen | `flutter test --coverage` | ja |
+| Dart-Oberfläche | `app/lib/ui/`, `app/lib/main.dart` und jede Datei, die ein Widget oder einen `State` deklariert (z. B. `metronome_panel.dart`) | `flutter test --coverage` | nein, nur ausgewiesen |
+| Dart nur fürs Web | `*_web.dart` und Dateien mit `package:web` oder `dart:js_interop` | nicht messbar, nur aufgelistet | nein |
+| Erzeugt | `app/lib/l10n/app_localizations*.dart` (`gen-l10n`) | nicht gezählt, aufgelistet | nein |
+
+Die Untergrenze (80 %) steht nur in `tools/coverage-min`. `app/tool/coverage_check.dart` liest sie dort; der
+pre-push-Hook und später der Workflow `test-quality.yml` (#13) rufen dieses Werkzeug auf. Jeder Teil mit Untergrenze
+muss sie für sich erreichen. Eine Datei der Dart-Logik, die kein Test lädt, lässt die Prüfung ebenfalls scheitern
+(`flutter test --coverage` kennt nur geladene Dateien); ausgenommen sind Dateien ohne ausführbaren Code (nur
+Konstanten, z. B. `app_info.dart`).
+
+**Ablauf.** `make coverage-run` führt alle Tests mit Abdeckung aus (`app/coverage/lcov.info`,
+`core/build-cov/lcov.info`, dazu die Tests der Werkzeuge), `make coverage` prüft danach je Teil. `make coverage-diff`
+(Basis `BASE=<Commit>`, Vorgabe `origin/main`) zeigt, welcher Anteil der seit der Basis geänderten ausführbaren Zeilen
+(Commits und Arbeitsbaum) von Tests ausgeführt wird, mit den nicht abgedeckten Zeilen; ein Hinweis, keine Sperre.
+
+**Vor dem Push.** `tools/git-hooks/pre-push` führt `make coverage-run` aus und danach die Prüfung je Teil. Schlägt ein
+Test fehl oder liegt ein Teil unter der Untergrenze, bricht der Push ab, mit dem Grund (letzte Zeilen der Testausgabe
+bzw. Teil und Anteil). Einrichten einmal je Klon:
+
+```sh
+git config core.hooksPath tools/git-hooks
+```
+
+Nur im Notfall umgehen: `git push --no-verify`. Die Tests von Hook und Werkzeugen (`app/tool/coverage_test.dart`,
+`app/tool/pre_push_hook_test.dart`, in `make test`) arbeiten mit gestellten Abdeckungsdateien, Diffs und Schwellen,
+erreicht und verfehlt, in kleinen Git-Repositorys mit einem gestellten `make`; ein Fall pusht echt in ein leeres
+Repository mit `core.hooksPath`.
+
+**Stand** 19.11.2026 (`make coverage`): C++-Kern **80,8 %** (1065 von 1318 Zeilen), Dart-Logik **90,3 %** (1754 von
+1943), Dart-Oberfläche 95,1 % (2093 von 2200, ohne Untergrenze). Im Kern: `engine.cpp` 99,2 %, `metronome.cpp`
+96,3 %, `waveform.cpp` 100 %, `player_core.cpp` 90,2 %, C-API `player.cpp` 90,1 % (vor #8 ohne Test: 0 %),
+Aufnahme `recorder_mac.mm` 20,9 %. Für #8 neu: `core/tests/capi_tests.cpp` und Fälle für nicht lesbare Dateien,
+WAV ohne Frames, Wellenform ohne Audio und Play ohne Titel.
+
+**Ausnahmen und Grenzen der Messung** (nichts davon wird aus einem Teil mit Untergrenze herausgerechnet, ausser wo
+genannt):
+
+- **Code nur fürs Web** (`file_platform_web.dart`, `file_store_web.dart`, `platform_web.dart`,
+  `audio_core_web.dart`): Diese Dateien importieren `package:web` bzw. `dart:js_interop` und lassen sich in der
+  Dart-VM von `flutter test` nicht laden; `flutter test --platform chrome` liefert keine Abdeckung. Sie werden bei jeder
+  Prüfung aufgelistet. Geprüft werden sie im Browser (`app/tool/web_*_check.sh`, von Hand) und über
+  `web_binding_test.dart`; ein automatischer Lauf im Browser folgt mit #13.
+- **Erzeugte Übersetzungen** (`app_localizations*.dart`): von `gen-l10n` aus den ARB-Dateien erzeugt, nicht von
+  Hand geschrieben. Ihre Vollständigkeit prüft `l10n_test.dart`.
+- **Aufnahme `recorder_mac.mm`** zählt zum Kern, obwohl sie grösstenteils nur mit echtem Systemton und der
+  Berechtigung des Nutzers läuft (Core Audio Process Tap, #51); getestet sind Ruhezustand und Argumentprüfung. Sie
+  drückt den Kern um rund 13 Prozentpunkte (ohne sie 93 %).
+- **Fehlerpfade ohne Auslöser** im Kern (Speichermangel, Audiogerät lässt sich nicht anlegen, Gerätemeldungen von
+  miniaudio in `player.cpp`) bleiben nicht abgedeckt; sie zählen mit.
+- **Native Anbindung** (`platform_native.dart`, `audio_core_ffi.dart`, Teile von `file_platform.dart`) zählt zur
+  Dart-Logik, wird aber nur im Rauchtest mit echtem Kern ausgeführt (`app_smoke_test.dart`, von Hand), also mit 0 %
+  bzw. 36 % gezählt.
+- **Nicht übersetzt auf macOS:** `recorder_stub.cpp` (Aufnahme auf anderen Plattformen) wird auf dem Mac nicht
+  gebaut und daher nicht gemessen; `capi_tests.cpp` prüft ihn auf den anderen Plattformen. `miniaudio_impl.c` bindet
+  nur `third_party/miniaudio` ein und hat keine eigenen Zeilen.
+- **`wp_core.h`:** `llvm-cov` rechnet Zeilen von Makros (`WP_ERR_*`, `WP_REC_ERR_*`) dem Header zu, wo sie im Code
+  verwendet werden; sie zählen mit.
+- **Zähler über 64 Bit:** Beim Zusammenführen der Profile mehrerer Testprogramme meldet `llvm-cov` für einzelne
+  Inline-Funktionen aus Headern («mismatched data») übergelaufene Zähler; sie gelten als ausgeführt.
 
 ## Hook nach dem Commit
 

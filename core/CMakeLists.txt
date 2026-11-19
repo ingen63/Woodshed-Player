@@ -38,6 +38,14 @@ function(wp_strict_warnings target)
   endif()
 endfunction()
 
+# #8: line coverage with llvm-cov (make coverage). Instruments every target of this build; the
+# report keeps only our own sources (tools/coverage_check.dart reads tools/coverage-min).
+option(WP_COVERAGE "Instrument the build for llvm-cov" OFF)
+if(WP_COVERAGE)
+  add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+  add_link_options(-fprofile-instr-generate)
+endif()
+
 if(EMSCRIPTEN)
   include(web/web.cmake)  # eigener Zweig: Tests unter Node.js, Kern fürs AudioWorklet
   return()
@@ -123,3 +131,10 @@ target_include_directories(player_tests PRIVATE include)
 target_compile_definitions(player_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
 wp_strict_warnings(player_tests)
 add_test(NAME player_tests COMMAND player_tests)
+
+# #8: the C API (src/player.cpp) through the shared library, as the Dart binding calls it
+add_executable(capi_tests tests/capi_tests.cpp)
+target_link_libraries(capi_tests PRIVATE wp_core)
+target_compile_definitions(capi_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
+wp_strict_warnings(capi_tests)
+add_test(NAME capi_tests COMMAND capi_tests)

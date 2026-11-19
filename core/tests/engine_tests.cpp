@@ -582,10 +582,25 @@ void seeksAreCoalescedPerBlock() { // #14/AK1: viele Seeks in einem Block kosten
 
 } // namespace
 
+// #8: without a title, play does nothing: the output stays silent and the position at 0.
+void playWithoutTitleStaysSilent() {
+  wp::Engine e;
+  CHECK(!e.submitSource(nullptr)); // no source: rejected, nothing queued
+  e.play();
+  const auto out = renderFrames(e, 1024);
+  bool silent = true;
+  for (float v : out)
+    silent = silent && v == 0.0f;
+  CHECK(silent);
+  CHECK(!e.playing());
+  CHECK(e.position() == 0.0);
+}
+
 int main(int argc, char **argv) {
   const std::string filter = argc > 1 ? argv[1] : ""; // optional: nur Tests, deren Name das enthält
   const std::vector<std::pair<std::string, std::function<void()>>> tests = {
       {"loopSeamDirectIsSampleExact", loopSeamDirectIsSampleExact},
+      {"playWithoutTitleStaysSilent", playWithoutTitleStaysSilent},
       {"loopPassesCountJumpsFromLoopEnd", loopPassesCountJumpsFromLoopEnd},
       {"loopPassesIgnoreSeeks", loopPassesIgnoreSeeks},
       {"loopPassesCountWhileStretching", loopPassesCountWhileStretching},

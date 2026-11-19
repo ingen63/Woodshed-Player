@@ -427,6 +427,37 @@ std::string readBytes(const fs::path &p) {
 }
 
 // Dekodieren aus dem Speicher (Web) liefert dasselbe wie aus der Datei (#33/AK3).
+// #8: a file without read permission is reported as unreadable (wp_core.h: WP_ERR_FILE_UNREADABLE),
+// not as missing or as unsupported; the current title stays playable.
+void unreadableFileIsReported() {
+  wp::Player p(kSr);
+  CHECK(p.load(writeIndexWav("good3.wav", 2 * kSr).string()) == wp::kOk);
+  const fs::path locked = writeIndexWav("locked.wav", kSr);
+  fs::permissions(locked, fs::perms::none);
+  std::ifstream probe(locked);
+  if (probe.is_open()) { // running as root: permissions do not apply
+    std::printf("  note: file permissions not enforced, check skipped\n");
+  } else {
+    CHECK(p.load(locked.string()) == wp::kErrFileUnreadable);
+    CHECK(std::strcmp(wp::errorMessage(wp::kErrFileUnreadable), "File cannot be read") == 0);
+    CHECK(wp::fileDuration(locked.string()) == wp::kErrFileUnreadable);
+    checkStillPlayable(p, 2.0);
+  }
+  fs::permissions(locked, fs::perms::owner_read | fs::perms::owner_write);
+}
+
+// #8: a valid WAV header without a single frame is no audio.
+void emptyAudioIsUnsupported() {
+  wp::Player p(kSr);
+  const fs::path empty = writeIndexWav("zero-frames.wav", 0);
+  CHECK(p.load(empty.string()) == wp::kErrUnsupportedFormat);
+  CHECK(wp::fileDuration(empty.string()) == wp::kErrUnsupportedFormat);
+  const std::string bytes = readBytes(empty);
+  wp::Source out;
+  CHECK(wp::decodeMemory(bytes.data(), bytes.size(), kSr, out) == wp::kErrUnsupportedFormat);
+  CHECK(out.frames == 0 && out.data.empty());
+}
+
 void decodeMemoryMatchesFile() {
   for (const fs::path &file :
        {writeIndexWav("mem.wav", kSr / 2), kAudio / "sine440.flac", kAudio / "sine440.mp3"}) {
@@ -564,6 +595,8 @@ int main() {
       {"devicePolicy", devicePolicy},
       {"deviceChangePausesAndKeepsPosition", deviceChangePausesAndKeepsPosition},
       {"decodeMemoryMatchesFile", decodeMemoryMatchesFile},
+      {"unreadableFileIsReported", unreadableFileIsReported},
+      {"emptyAudioIsUnsupported", emptyAudioIsUnsupported},
       {"convertPcmToPlayerFormat", convertPcmToPlayerFormat},
       {"setSourceWithoutPeaks", setSourceWithoutPeaks},
   };

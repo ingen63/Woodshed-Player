@@ -117,11 +117,26 @@ void overviewIsFast() { // #28/AK5: 5 Minuten, 1000 Werte, auf dem Mac unter 200
 
 } // namespace
 
+// #8: without samples, channels or frames there is no overview and every query fails.
+void noAudioHasNoOverview() {
+  const std::vector<float> stereo(64, 0.5f); // 32 frames
+  float mins[2] = {7, 7}, maxs[2] = {7, 7};
+  for (const wp::Peaks &p :
+       {wp::Peaks(nullptr, 32, 2, 48000), wp::Peaks(stereo.data(), 0, 2, 48000),
+        wp::Peaks(stereo.data(), -5, 2, 48000), wp::Peaks(stereo.data(), 32, 0, 48000)}) {
+    CHECK(p.frames() == 0);
+    CHECK(p.duration() == 0.0);
+    CHECK(!p.query(0.0, 0.0005, 2, mins, maxs));
+  }
+  CHECK(mins[0] == 7 && maxs[1] == 7); // nothing written
+}
+
 int main() {
   const std::vector<std::pair<std::string, std::function<void()>>> tests = {
       {"sineHasHalfAmplitude", sineHasHalfAmplitude}, {"silenceIsZero", silenceIsZero},
       {"exactlyCountValues", exactlyCountValues},     {"clipsToRange", clipsToRange},
       {"invalidRangesFail", invalidRangesFail},       {"overviewIsFast", overviewIsFast},
+      {"noAudioHasNoOverview", noAudioHasNoOverview},
   };
   for (auto &[name, fn] : tests) {
     const int before = failures;
