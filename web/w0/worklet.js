@@ -15,7 +15,9 @@ class W0Processor extends AudioWorkletProcessor {
     this.busyMs = 0;
     this.loadPeak = 0;
     this.lastReport = 0;
-    this.port.onmessage = (e) => this.onMessage(e.data);
+    // Nachrichten der Reihe nach abarbeiten: ein Titel darf erst nach dem Laden des Kerns ankommen.
+    this.queue = Promise.resolve();
+    this.port.onmessage = (e) => { this.queue = this.queue.then(() => this.onMessage(e.data)); };
   }
 
   async onMessage(m) {

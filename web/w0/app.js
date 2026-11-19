@@ -90,8 +90,17 @@ function makeTestSignal(sr) {
   return [L, R];
 }
 
-async function startAudio() {
-  if (ctx) return;
+// Startet Audio einmal; das Versprechen erfüllt sich, wenn der Kern im Worklet bereit ist.
+let starting = null;
+let coreReady = null;
+let userFile = false;
+function startAudio() {
+  starting = starting || doStartAudio().catch((err) => { starting = null; throw err; });
+  return starting;
+}
+
+async function doStartAudio() {
+  const ready = new Promise((resolve) => { coreReady = resolve; });
   ctx = new AudioContext({ latencyHint: 'playback' });
   ctx.onstatechange = () => log(`AudioContext: ${ctx.state}`);
   applySession();
@@ -112,13 +121,17 @@ async function startAudio() {
   }
   connectRoute();
   setupMediaSession();
+  await ready;
 }
 
 function onWorklet(m) {
   if (m.type === 'ready') {
     log(`Kern bereit, ${m.sampleRate} Hz, Latenz base ${ms(ctx.baseLatency)}, output ${ms(ctx.outputLatency)}`);
-    const [L, R] = makeTestSignal(m.sampleRate);
-    node.port.postMessage({ type: 'source', left: L, right: R }, [L.buffer, R.buffer]);
+    if (!userFile) {
+      const [L, R] = makeTestSignal(m.sampleRate);
+      node.port.postMessage({ type: 'source', left: L, right: R }, [L.buffer, R.buffer]);
+    }
+    coreReady();
   } else if (m.type === 'loaded') {
     log(`Titel geladen, ${m.duration.toFixed(1)} s`);
     for (const b of ['play', 'pause', 'seek0']) $(b).disabled = false;
@@ -170,7 +183,7 @@ function setupMediaSession() {
 }
 
 async function play() {
-  if (!ctx) await startAudio();
+  await startAudio();
   await ctx.resume();
   if ($('route').value === 'element') $('sink').play().catch(() => {});
   cmd('play');
@@ -202,8 +215,16 @@ function sendMetronome() {
 }
 
 async function loadFile(file) {
-  if (!ctx) await startAudio();
-  const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+  userFile = true;
+  log(`Datei gewählt: ${(file.size / 1e6).toFixed(1)} MB, Typ «${file.type || 'unbekannt'}»`);
+  await startAudio();
+  let buf;
+  try {
+    buf = await ctx.decodeAudioData(await file.arrayBuffer());
+  } catch (err) {
+    throw new Error(`Dekodieren fehlgeschlagen (${err && err.name ? err.name : err}). Format vom Browser nicht unterstützt?`);
+  }
+  log(`Dekodiert: ${buf.duration.toFixed(1)} s, ${buf.numberOfChannels} Kanäle, ${buf.sampleRate} Hz`);
   const L = new Float32Array(buf.getChannelData(0));
   const R = new Float32Array(buf.numberOfChannels > 1 ? buf.getChannelData(1) : buf.getChannelData(0));
   node.port.postMessage({ type: 'source', left: L, right: R }, [L.buffer, R.buffer]);
@@ -327,7 +348,11 @@ function wire() {
   for (const id of ['metOn', 'bpm']) $(id).onchange = sendMetronome;
   $('route').onchange = connectRoute;
   $('session').onchange = applySession;
-  $('file').onchange = (e) => e.target.files[0] && loadFile(e.target.files[0]).catch((err) => log(`Datei: ${err}`));
+  $('file').onchange = (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';  // dieselbe Datei lässt sich erneut wählen
+    if (f) loadFile(f).catch((err) => log(`Datei: ${err.message || err}`));
+  };
   $('write').onclick = async () => {
     if (navigator.storage?.persist) log(`persist(): ${await navigator.storage.persist()}`);
     opfsWorker().postMessage({ type: 'write', mb: Number($('mb').value) || 500 });
