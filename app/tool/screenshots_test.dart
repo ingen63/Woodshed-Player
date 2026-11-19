@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/ui/home_page.dart';
+import 'package:woodshed_player/ui/messages.dart';
 import 'package:woodshed_player/ui/style.dart';
 
 import '../test/fakes.dart';
@@ -85,13 +86,17 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             debugShowCheckedModeBanner: false,
+            // #47/AK2: fixed language (English, the default), independent of the system language.
+            locale: const Locale('en'),
+            localizationsDelegates: testDelegates,
+            supportedLocales: testLocales,
             theme: woodshedTheme(b),
             home: HomePage(
               controller: app.controller,
               recordingButton: name == 'desktop'
                   ? Builder(
                       builder: (context) => BorderedButton(
-                        label: 'Aufnahme',
+                        label: context.l10n.recording,
                         icon: WsIcons.record,
                         onPressed: () {},
                       ),

@@ -34,7 +34,6 @@ const _allowed = <(String, String)>{
   ('app/tool/screenshots_test.dart', "'Übungsband'"),
   ('app/tool/screenshots_test.dart', "'Etüde in A-Moll'"),
   ('app/tool/screenshots_test.dart', "'Arpeggio-Übung 14'"),
-  ('app/tool/screenshots_test.dart', "'Aufnahme'"),
   // German words that the English error texts must not contain (#46).
   ('core/tests/player_tests.cpp', '"datei"'),
   ('core/tests/player_tests.cpp', '"fehler"'),

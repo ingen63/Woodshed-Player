@@ -34,7 +34,7 @@ Die neue App für alle Plattformen (Plan: `docs/UMBAUPLAN-FLUTTER.md`) hat diese
 | ![Desktop, dunkel](docs/screenshots/studio-desktop-dark.png) | ![Tablet, dunkel](docs/screenshots/studio-tablet-dark.png) | ![Phone, dunkel](docs/screenshots/studio-phone-dark.png) |
 | ![Desktop, hell](docs/screenshots/studio-desktop-light.png) | ![Tablet, hell](docs/screenshots/studio-tablet-light.png) | ![Phone, hell](docs/screenshots/studio-phone-light.png) |
 
-Die Screenshots zeigen erfundene Titel und eine erzeugte Wellenform (`cd app && flutter test tool/screenshots_test.dart --update-goldens`).
+Die Screenshots zeigen die englische Oberfläche mit erfundenen Titeln und einer erzeugten Wellenform; sie entstehen unabhängig von der Systemsprache (`cd app && flutter test tool/screenshots_test.dart --update-goldens`).
 
 | Funktion | Bedienung |
 | --- | --- |
