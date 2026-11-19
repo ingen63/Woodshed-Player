@@ -379,7 +379,9 @@ Ausgabe nach `reference_native.bin` im eigenen Build-Ordner (`--dump`); der WASM
 jede native Ausgabe auch dort entsteht. `make test-wasm` rendert den nativen Stand vorher. Stand 19.11.2026: alle
 12 Ausgaben bitgleich (grösste Abweichung 0). `reference_api_coverage` (`core/tests/reference_api_coverage.cmake`)
 liest alle `WP_API`-Funktionen aus `wp_core.h` und schlägt fehl, wenn eine davon in `reference_tests.cpp` nicht
-aufgerufen wird.
+aufgerufen wird. Derselbe Test verlangt, dass die Referenzfälle keine Audiodatei aus `core/tests/audio/` lesen
+(#9/AK1); dort liegen nur die Dateien für die Decoder-Tests von `player_tests.cpp` und `capi_tests.cpp`, erzeugt von
+`core/tools/make_test_audio.sh`.
 
 **Ohne FMA.** Kern, Tests, Werkzeuge und Web bauen mit `-ffp-contract=off` (`core/CMakeLists.txt`), das Flutter-Plugin
 ebenso (`app/packages/wp_core/*/wp_core.podspec`, geprüft in `app/test/core_build_flags_test.dart`). Apple-Clang fasst

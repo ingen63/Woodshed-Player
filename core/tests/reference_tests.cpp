@@ -801,7 +801,8 @@ int main(int argc, char **argv) {
   run("#9/AK4 tempo: length input / r, pitch 440 Hz", tempoLengthAndPitch);
   run("#3/AK9 #9/AK5 120 BPM without drift over 5 min", metronomeWithoutDriftOverFiveMinutes);
   run("#3/AK7 #3/AK8 #9/AK5 accents and subdivisions", metronomeAccentsAndSubdivisions);
-  run("#9/AK5 golden click positions of a fixed sequence", metronomeGoldenSequence);
+  run("#3/AK10 #3/AK11 #3/AK15 #3/AK18 #9/AK5 golden click positions of a fixed sequence",
+      metronomeGoldenSequence);
   run("#3/AK20 #9/AK5 metronome with title", metronomeWithTitle);
   run("#9/AK7 load from file, waveform, errors", loadFromFile);
   run("#9/AK7 recording unavailable offline", recordingUnavailableOffline);

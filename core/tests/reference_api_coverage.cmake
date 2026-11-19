@@ -1,8 +1,16 @@
 # #9/AK7: every WP_API function declared in wp_core.h is called in at least one reference case
 # (tests/reference_tests.cpp). A new function without a case fails this test.
+# #9/AK1: the reference cases generate their test audio and read no audio file from the repository
+# (tests/audio holds the decoder fixtures of player_tests and capi_tests, docs/TESTS.md).
 # cmake -DHEADER=<wp_core.h> -DCASES=<reference_tests.cpp> -P reference_api_coverage.cmake
 file(READ "${HEADER}" header)
 file(READ "${CASES}" cases)
+foreach(forbidden IN ITEMS "WP_TEST_AUDIO_DIR" "tests/audio")
+  string(FIND "${cases}" "${forbidden}" at)
+  if(NOT at EQUAL -1)
+    message(FATAL_ERROR "reference cases must generate their test audio (#9/AK1): ${forbidden}")
+  endif()
+endforeach()
 string(REGEX MATCHALL "WP_API[^;(]*[ *](wp_[a-z0-9_]+)\\(" decls "${header}")
 set(missing)
 set(count 0)
