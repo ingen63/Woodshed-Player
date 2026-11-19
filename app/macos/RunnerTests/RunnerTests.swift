@@ -4,7 +4,7 @@ import FlutterMacOS
 import Testing
 import UniformTypeIdentifiers
 
-@testable import woodshed_player
+@testable import Woodshed_Player
 
 /// Fängt, was das Fenster über den Kanal an Dart schickt.
 final class RecordingMessenger: NSObject, FlutterBinaryMessenger {
