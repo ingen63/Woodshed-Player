@@ -4,6 +4,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/ui/player_view.dart';
 import 'package:woodshed_player/ui/style.dart';
 
+import 'fakes.dart';
+
 void main() {
   late List<String> calls;
 
@@ -31,6 +33,9 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
+        locale: testLocale,
+        localizationsDelegates: testDelegates,
+        supportedLocales: testLocales,
         theme: woodshedTheme(Brightness.light),
         home: Scaffold(
           body: PlayerView(state: state, actions: actions(), extraCards: extra),
@@ -198,6 +203,9 @@ void main() {
     calls = [];
     await tester.pumpWidget(
       MaterialApp(
+        locale: testLocale,
+        localizationsDelegates: testDelegates,
+        supportedLocales: testLocales,
         theme: woodshedTheme(Brightness.dark),
         home: Scaffold(
           body: PlayerView(state: loaded, actions: actions()),

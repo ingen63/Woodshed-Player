@@ -16,6 +16,8 @@ import 'package:woodshed_player/ui/style.dart';
 
 import 'fakes.dart';
 
+import 'package:woodshed_player/ui/messages.dart';
+
 const goldenNew = 'test/golden/library_swift.json';
 const goldenLegacy = 'test/golden/library_swift_legacy.json';
 
@@ -331,20 +333,40 @@ void main() {
 
   group('#35/AK5 persistent storage and storage usage', () {
     test('line for desktop and browser', () {
-      expect(const StorageInfo(used: 1234567890).label, '1,2 GB belegt');
-      expect(const StorageInfo(used: 512).label, '512 B belegt');
-      expect(const StorageInfo(used: 12300).label, '12,3 KB belegt');
+      String line(StorageInfo s) => storageLabel(de, s);
+      expect(line(const StorageInfo(used: 1234567890)), '1,2 GB belegt');
+      expect(line(const StorageInfo(used: 512)), '512 B belegt');
+      expect(line(const StorageInfo(used: 12300)), '12,3 KB belegt');
       expect(
-        const StorageInfo(
-          used: 1200000000,
-          quota: 59200000000,
-          persisted: true,
-        ).label,
+        line(
+          const StorageInfo(
+            used: 1200000000,
+            quota: 59200000000,
+            persisted: true,
+          ),
+        ),
         '1,2 GB belegt · 58,0 GB frei · dauerhaft gespeichert',
       );
       expect(
-        const StorageInfo(used: 0, quota: 1000, persisted: false).label,
+        line(const StorageInfo(used: 0, quota: 1000, persisted: false)),
         '0 B belegt · 1,0 KB frei · nicht dauerhaft gespeichert',
+      );
+    });
+
+    test('#43/AK4 sizes follow the locale', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      expect(formatBytes(1234567890, 'de'), '1,2 GB');
+      expect(formatBytes(1234567890, 'en'), '1.2 GB');
+      expect(
+        storageLabel(
+          en,
+          const StorageInfo(
+            used: 1200000000,
+            quota: 59200000000,
+            persisted: false,
+          ),
+        ),
+        '1.2 GB used · 58.0 GB free · not stored permanently',
       );
     });
 
@@ -355,8 +377,11 @@ void main() {
       await w.library.importFiles([w.pick('a.mp3', 'a')]);
       await w.library.importFiles([w.pick('b.mp3', 'b')]);
       expect(w.store.persistRequests, 1);
-      expect(w.library.storage!.label, contains('dauerhaft gespeichert'));
-      expect(w.library.storage!.label, contains('frei'));
+      expect(
+        storageLabel(de, w.library.storage!),
+        contains('dauerhaft gespeichert'),
+      );
+      expect(storageLabel(de, w.library.storage!), contains('frei'));
 
       final again = WebLike(w.store);
       await again.library.load();
@@ -372,7 +397,7 @@ void main() {
       await l.importFiles([source('a.mp3', 'x' * 2000).path]);
       expect(l.storage!.used, greaterThanOrEqualTo(2000));
       expect(l.storage!.quota, isNull);
-      expect(l.storage!.label, endsWith('belegt'));
+      expect(storageLabel(de, l.storage!), endsWith('belegt'));
       final used = l.storage!.used;
       l.delete({l.tracks.single.id});
       await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -390,6 +415,9 @@ void main() {
       });
       await tester.pumpWidget(
         MaterialApp(
+          locale: testLocale,
+          localizationsDelegates: testDelegates,
+          supportedLocales: testLocales,
           theme: woodshedTheme(Brightness.light),
           home: HomePage(controller: app.controller),
         ),

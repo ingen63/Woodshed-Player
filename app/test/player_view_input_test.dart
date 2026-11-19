@@ -3,6 +3,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/ui/player_view.dart';
 
+import 'fakes.dart';
+
 void main() {
   testWidgets('#19/AK9 Zeitfeld: ungültige Eingabe wird verworfen', (
     tester,
@@ -10,6 +12,9 @@ void main() {
     final commits = <double>[];
     await tester.pumpWidget(
       MaterialApp(
+        locale: testLocale,
+        localizationsDelegates: testDelegates,
+        supportedLocales: testLocales,
         home: Scaffold(
           body: TimeField(
             key: const Key('tf'),
@@ -37,6 +42,9 @@ void main() {
     final seeks = <double>[];
     await tester.pumpWidget(
       MaterialApp(
+        locale: testLocale,
+        localizationsDelegates: testDelegates,
+        supportedLocales: testLocales,
         home: Scaffold(
           body: Center(
             child: SizedBox(

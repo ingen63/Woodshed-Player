@@ -1,5 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/time_format.dart';
+import 'package:woodshed_player/ui/messages.dart';
+
+import 'fakes.dart';
+
+import 'dart:ui' show Locale;
 
 void main() {
   group('formatTime (mm:ss wie die alte App, #19)', () {
@@ -39,9 +44,10 @@ void main() {
     });
   });
 
-  test('#19 Geschwindigkeit mit Dezimalkomma', () {
-    expect(formatRate(0.75), '0,75×');
-    expect(formatRate(1), '1,00×');
+  test('#19 Geschwindigkeit mit Dezimalkomma (#43: nach Gebietsschema)', () {
+    expect(de.rate(0.75), '0,75×');
+    expect(de.rate(1), '1,00×');
+    expect(lookupAppLocalizations(const Locale('en')).rate(0.75), '0.75×');
   });
 
   test('fileStamp ohne Doppelpunkte', () {

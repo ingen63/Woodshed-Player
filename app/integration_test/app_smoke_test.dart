@@ -62,7 +62,9 @@ void main() {
     tester.view.physicalSize = const Size(1280, 800); // Desktop
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(WoodshedApp(controller: controller));
+    await tester.pumpWidget(
+      WoodshedApp(controller: controller, locale: const Locale('de')),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Bibliothek'), findsWidgets); // Start
 

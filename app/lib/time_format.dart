@@ -36,10 +36,6 @@ double? parseTime(String text) {
   return result;
 }
 
-/// Geschwindigkeit mit zwei Nachkommastellen und Dezimalkomma: `0,75×`.
-String formatRate(double rate) =>
-    '${rate.toStringAsFixed(2).replaceAll('.', ',')}×';
-
 /// Zeitstempel für Dateinamen, z. B. `2026-11-16 14.05.09` (ohne Doppelpunkte).
 String fileStamp(DateTime t) =>
     '${t.year}-${_two(t.month)}-${_two(t.day)} ${_two(t.hour)}.${_two(t.minute)}.${_two(t.second)}';

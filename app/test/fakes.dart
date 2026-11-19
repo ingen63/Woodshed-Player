@@ -5,9 +5,11 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
+import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/app/file_platform.dart';
 import 'package:woodshed_player/app/file_store_io.dart';
+import 'package:woodshed_player/l10n/app_localizations.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/metronome/metronome_controller.dart';
 import 'package:woodshed_player/player/audio_core.dart';
@@ -15,6 +17,18 @@ import 'package:woodshed_player/player/player_service.dart';
 import 'package:wp_core/wp_core.dart';
 
 /// Kern-Attrappe: Laden bleibt «läuft», bis der Test es mit [finishLoad] oder [failLoad] beendet.
+/// UI tests fix the language (#43): German, so the expected texts below stay independent of the system.
+const testLocale = Locale('de');
+const testDelegates = <LocalizationsDelegate<Object?>>[
+  AppLocalizations.delegate,
+  ...GlobalMaterialLocalizations.delegates,
+];
+
+const testLocales = AppLocalizations.supportedLocales;
+
+/// German texts for checks outside widgets.
+final de = lookupAppLocalizations(testLocale);
+
 class FakeCore implements AudioCore {
   final immediateErrors = <String, int>{};
   int _state = WpCode.loadIdle;

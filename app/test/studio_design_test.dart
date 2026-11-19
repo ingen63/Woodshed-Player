@@ -93,7 +93,9 @@ void main() {
         (Brightness.light, const Color(0xFFECECEF)),
       ]) {
         tester.platformDispatcher.platformBrightnessTestValue = b;
-        await tester.pumpWidget(WoodshedApp(controller: app.controller));
+        await tester.pumpWidget(
+          WoodshedApp(controller: app.controller, locale: testLocale),
+        );
         await tester.pumpAndSettle();
         final ctx = tester.element(find.byType(HomePage));
         expect(Theme.of(ctx).scaffoldBackgroundColor, bg, reason: '$b');
@@ -441,6 +443,9 @@ void main() {
           final app = await pumpApp(tester, size: size);
           await tester.pumpWidget(
             MaterialApp(
+              locale: testLocale,
+              localizationsDelegates: testDelegates,
+              supportedLocales: testLocales,
               theme: woodshedTheme(Brightness.dark),
               home: HomePage(
                 controller: app.controller,

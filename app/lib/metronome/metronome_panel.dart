@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'metronome_controller.dart';
 import 'metronome_settings.dart';
+import '../ui/messages.dart';
 import '../ui/style.dart';
 import 'repeat_button.dart';
 
@@ -11,12 +12,7 @@ class MetronomePanel extends StatelessWidget {
 
   final MetronomeController controller;
 
-  static const _subdivisions = {
-    1: 'Viertel',
-    2: 'Achtel',
-    3: 'Triolen',
-    4: 'Sechzehntel',
-  };
+  static const _subdivisions = [1, 2, 3, 4];
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +21,7 @@ class MetronomePanel extends StatelessWidget {
       builder: (context, _) {
         final s = controller.settings;
         final theme = Theme.of(context);
+        final l = context.l10n;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 16,
@@ -34,7 +31,7 @@ class MetronomePanel extends StatelessWidget {
               children: [
                 CardHeader(
                   icon: WsIcons.metronome,
-                  title: 'Metronom',
+                  title: l.metronome,
                   trailing: ExcludeFocus(
                     child: FilledButton.icon(
                       key: const Key('metronomeToggle'),
@@ -44,7 +41,9 @@ class MetronomePanel extends StatelessWidget {
                         size: 16,
                       ),
                       label: Text(
-                        controller.running ? 'Stopp (M)' : 'Start (M)',
+                        controller.running
+                            ? l.metronomeStopKey
+                            : l.metronomeStartKey,
                       ),
                     ),
                   ),
@@ -53,12 +52,12 @@ class MetronomePanel extends StatelessWidget {
                   children: [
                     RepeatButton(
                       icon: Icons.remove,
-                      tooltip: 'Langsamer (↓)',
+                      tooltip: l.slower,
                       onStep: () => controller.changeBpm(-1),
                     ),
                     Expanded(
                       child: Text(
-                        '${s.bpm} BPM',
+                        l.bpm(s.bpm),
                         key: const Key('metronomeBpm'),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.headlineMedium?.copyWith(
@@ -69,11 +68,11 @@ class MetronomePanel extends StatelessWidget {
                     ),
                     RepeatButton(
                       icon: Icons.add,
-                      tooltip: 'Schneller (↑)',
+                      tooltip: l.faster,
                       onStep: () => controller.changeBpm(1),
                     ),
                     const SizedBox(width: 8),
-                    BorderedButton(label: 'Tap (T)', onPressed: controller.tap),
+                    BorderedButton(label: l.tapKey, onPressed: controller.tap),
                   ],
                 ),
                 Slider(
@@ -85,16 +84,13 @@ class MetronomePanel extends StatelessWidget {
                   label: '${s.bpm}',
                   onChanged: (v) => controller.setBpm(v.round()),
                 ),
-                const HintText(
-                  'Tasten: M = Start/Stopp, ↑ / ↓ = Tempo ±1 (mit Shift ±10), T = Tap-Tempo. '
-                  'Titel und Metronom laufen nie gleichzeitig.',
-                ),
+                HintText(l.metronomeKeysHint),
               ],
             ),
             WsCard(
               key: const Key('card:meter'),
               children: [
-                const CardHeader(icon: WsIcons.timer, title: 'Takt und Klang'),
+                CardHeader(icon: WsIcons.timer, title: l.meterAndSound),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -111,11 +107,11 @@ class MetronomePanel extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final e in _subdivisions.entries)
+                    for (final sub in _subdivisions)
                       BorderedButton(
-                        label: e.value,
-                        selected: s.subdivision == e.key,
-                        onPressed: () => controller.setSubdivision(e.key),
+                        label: subdivisionLabel(l, sub),
+                        selected: s.subdivision == sub,
+                        onPressed: () => controller.setSubdivision(sub),
                       ),
                   ],
                 ),
@@ -126,14 +122,14 @@ class MetronomePanel extends StatelessWidget {
                       child: Slider(
                         value: s.volume,
                         onChanged: controller.setVolume,
-                        label: '${(s.volume * 100).round()} %',
+                        label: l.percent((s.volume * 100).round()),
                         divisions: 100,
                       ),
                     ),
                     SizedBox(
                       width: 48,
                       child: Text(
-                        '${(s.volume * 100).round()} %',
+                        l.percent((s.volume * 100).round()),
                         textAlign: TextAlign.right,
                       ),
                     ),
@@ -146,7 +142,7 @@ class MetronomePanel extends StatelessWidget {
               children: [
                 CardHeader(
                   icon: WsIcons.speedometer,
-                  title: 'Automatische Tempo-Steigerung',
+                  title: l.autoTempoRamp,
                   value: s.rampEnabled,
                   onChanged: (v) => controller.setRamp(enabled: v),
                   trailing: _RampMode(
@@ -158,14 +154,7 @@ class MetronomePanel extends StatelessWidget {
                   enabled: s.rampEnabled,
                   child: _RampSettings(controller: controller, settings: s),
                 ),
-                HintText(
-                  s.rampByTime
-                      ? 'Das Tempo ändert sich in 1-BPM-Schritten gleichmässig über die Dauer, '
-                            'jeweils am Taktanfang. Ist das Ziel erreicht, bleibt es einen Schritt lang '
-                            'und beginnt dann wieder beim Start-BPM.'
-                      : 'Das Tempo steigt jeweils am Taktanfang. Ist das Ziel erreicht, '
-                            'bleibt es gleich viele Takte und beginnt dann wieder beim Start-BPM.',
-                ),
+                HintText(s.rampByTime ? l.rampByTimeHint : l.rampByBarsHint),
               ],
             ),
           ],
@@ -189,14 +178,14 @@ class _RampMode extends StatelessWidget {
       const SizedBox(width: 8),
       BorderedButton(
         key: const Key('rampMode:bars'),
-        label: 'Takte',
+        label: context.l10n.bars,
         selected: !byTime,
         onPressed: () => controller.setRamp(byTime: false),
       ),
       const SizedBox(width: 4),
       BorderedButton(
         key: const Key('rampMode:time'),
-        label: 'Zeit',
+        label: context.l10n.time,
         selected: byTime,
         onPressed: () => controller.setRamp(byTime: true),
       ),
@@ -227,36 +216,37 @@ class _RampSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = settings;
+    final l = context.l10n;
     return Column(
       children: [
-        _stepper('Start-BPM', s.rampStart, (v) => controller.setRamp(start: v)),
+        _stepper(l.startBpm, s.rampStart, (v) => controller.setRamp(start: v)),
         _stepper(
-          'Ziel-BPM',
+          l.targetBpm,
           s.rampTarget,
           (v) => controller.setRamp(target: v),
         ),
         if (s.rampByTime)
           _stepper(
-            'Dauer (Minuten)',
+            l.durationMinutes,
             s.rampMinutes,
             (v) => controller.setRamp(minutes: v),
           )
         else ...[
           Row(
             children: [
-              const Expanded(child: Text('Schritt')),
+              Expanded(child: Text(l.step)),
               DropdownButton<int>(
                 value: s.rampStep,
                 items: [
                   for (final st in MetronomeSettings.rampSteps)
-                    DropdownMenuItem(value: st, child: Text('+$st BPM')),
+                    DropdownMenuItem(value: st, child: Text(l.bpmStep(st))),
                 ],
                 onChanged: (v) => controller.setRamp(step: v),
               ),
             ],
           ),
           _stepper(
-            'Alle … Takte',
+            l.everyBars,
             s.rampEveryBars,
             (v) => controller.setRamp(everyBars: v),
           ),
@@ -311,7 +301,7 @@ class MetronomeModule extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     child: BorderedButton(
                       key: const Key('metronomeSettingsClose'),
-                      label: 'Fertig',
+                      label: context.l10n.done,
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
@@ -332,11 +322,11 @@ class MetronomeModule extends StatelessWidget {
         final ws = WsTheme.of(context);
         final m = WsLayout.of(context);
         final s = controller.settings;
-        final sub = MetronomePanel._subdivisions[s.subdivision] ?? '';
+        final l = context.l10n;
         final ramp = s.rampEnabled
             ? s.rampByTime
-                  ? 'Auto ${s.rampStart}→${s.rampTarget} BPM in ${s.rampMinutes} min'
-                  : 'Auto +${s.rampStep} BPM / ${s.rampEveryBars} Takte'
+                  ? l.moduleRampTime(s.rampStart, s.rampTarget, s.rampMinutes)
+                  : l.moduleRampBars(s.rampStep, s.rampEveryBars)
             : null;
         final bpm = Text(
           '${s.bpm}',
@@ -344,12 +334,15 @@ class MetronomeModule extends StatelessWidget {
           style: ws.number(m.bpm, color: ws.blue),
         );
         final details = Text(
-          'BPM · ${MetronomeSettings.meterLabel(s.meter)} · $sub',
+          l.moduleDetails(
+            MetronomeSettings.meterLabel(s.meter),
+            subdivisionLabel(l, s.subdivision),
+          ),
           style: TextStyle(color: ws.muted, fontSize: m.body),
         );
         final toggle = BorderedButton(
           key: const Key('moduleMetronomeToggle'),
-          label: controller.running ? 'Stopp' : 'Start',
+          label: controller.running ? l.stop : l.start,
           icon: controller.running ? WsIcons.stop : WsIcons.play,
           iconOnly: true,
           selected: controller.running,
@@ -360,18 +353,18 @@ class MetronomeModule extends StatelessWidget {
           children: [
             RepeatButton(
               icon: Icons.remove,
-              tooltip: 'Langsamer (↓)',
+              tooltip: l.slower,
               onStep: () => controller.changeBpm(-1),
             ),
             RepeatButton(
               icon: Icons.add,
-              tooltip: 'Schneller (↑)',
+              tooltip: l.faster,
               onStep: () => controller.changeBpm(1),
             ),
             Expanded(
               child: BorderedButton(
                 key: const Key('moduleTap'),
-                label: 'Tap',
+                label: l.tap,
                 expand: true,
                 onPressed: controller.tap,
               ),
@@ -379,7 +372,7 @@ class MetronomeModule extends StatelessWidget {
             toggle,
             BorderedButton(
               key: const Key('metronomeSettings'),
-              label: 'Einstellungen',
+              label: l.settings,
               icon: WsIcons.slider,
               iconOnly: true,
               onPressed: () => _openSettings(context),
@@ -390,7 +383,7 @@ class MetronomeModule extends StatelessWidget {
           key: const Key('module:metronome'),
           children: [
             CardHeader(
-              title: 'Metronom',
+              title: l.metronome,
               trailing: const ShortcutBadge('M · T · ↑↓'),
             ),
             Row(

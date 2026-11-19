@@ -15,31 +15,6 @@ class StorageInfo {
 
   /// Persistent storage granted (the browser won't evict it on its own); null on desktop and mobile.
   final bool? persisted;
-
-  /// Short UI line, e.g. «1,2 GB belegt» or «1,2 GB belegt · 58 GB frei · dauerhaft gespeichert».
-  String get label {
-    final parts = ['${formatBytes(used)} belegt'];
-    if (quota case final q?) parts.add('${formatBytes(max0(q - used))} frei');
-    if (persisted case final p?) {
-      parts.add(p ? 'dauerhaft gespeichert' : 'nicht dauerhaft gespeichert');
-    }
-    return parts.join(' · ');
-  }
-
-  static int max0(int v) => v < 0 ? 0 : v;
-}
-
-/// Bytes in German notation, one decimal from KB on: «512 B», «1,2 GB».
-String formatBytes(int bytes) {
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  if (bytes < 1000) return '$bytes B';
-  var v = bytes / 1000;
-  var i = 0;
-  while (v >= 999.95 && i < units.length - 1) {
-    v /= 1000;
-    i++;
-  }
-  return '${v.toStringAsFixed(1).replaceAll('.', ',')} ${units[i]}';
 }
 
 /// Library storage. Names are relative and separated by «/» («library.json», «Tracks/‹id›.mp3»).

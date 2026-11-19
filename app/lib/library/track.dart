@@ -149,13 +149,11 @@ class TrackFolder {
   Map<String, Object?> toJson() => {'id': id, 'name': name};
 }
 
+/// Sort order of the library; the UI names it in the user's language (#43).
 enum TrackSortOrder {
-  alphabetical('Alphabetisch'),
-  dateAdded('Hinzugefügt'),
-  custom('Eigene Reihenfolge');
-
-  const TrackSortOrder(this.label);
-  final String label;
+  alphabetical,
+  dateAdded,
+  custom;
 
   static TrackSortOrder parse(String? s) => values.firstWhere(
     (v) => v.name == s,

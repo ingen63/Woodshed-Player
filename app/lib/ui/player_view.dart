@@ -8,9 +8,11 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../library/playback_settings.dart';
+import '../player/audio_core.dart' show LoadError;
 import '../metronome/repeat_button.dart';
 import '../time_format.dart';
 import 'library_view.dart' show TrackArtwork;
+import 'messages.dart';
 import 'style.dart';
 import 'timeline.dart';
 
@@ -32,7 +34,6 @@ class PlayerViewState {
     this.loopStart = 0,
     this.loopEnd = 0,
     this.ramp = const PlaybackSettings(),
-    this.rampLabel = '',
     this.rampPasses = 0,
     this.error,
     this.waveform,
@@ -50,12 +51,9 @@ class PlayerViewState {
   /// Einstellungen der Steigerung nach Loop-Durchgängen (#29), nur die `ramp*`-Felder gelten.
   final PlaybackSettings ramp;
 
-  /// Stufe und Durchgänge, z. B. «75 % · 7 von 10».
-  final String rampLabel;
-
   /// Durchgänge auf der aktuellen Stufe (#29).
   final int rampPasses;
-  final String? error;
+  final LoadError? error;
 
   /// Wellenform des Titels (#28); ohne sie zeigt die Zeitleiste einen Fortschrittsbalken.
   final WaveformQuery? waveform;
@@ -264,8 +262,8 @@ class PlayerView extends StatelessWidget {
 }
 
 class _ErrorCard extends StatelessWidget {
-  const _ErrorCard(this.message);
-  final String message;
+  const _ErrorCard(this.error);
+  final LoadError error;
 
   @override
   Widget build(BuildContext context) {
@@ -276,7 +274,10 @@ class _ErrorCard extends StatelessWidget {
         children: [
           Icon(WsIcons.warning, color: ws.record, size: 18),
           Expanded(
-            child: Text(message, style: TextStyle(color: ws.record)),
+            child: Text(
+              loadErrorMessage(context.l10n, error),
+              style: TextStyle(color: ws.record),
+            ),
           ),
         ],
       ),
@@ -292,6 +293,7 @@ class _EmptyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ws = WsTheme.of(context);
+    final l = context.l10n;
     return WsPanel(
       key: const Key('card:empty'),
       child: Column(
@@ -300,7 +302,7 @@ class _EmptyCard extends StatelessWidget {
           const SizedBox(height: WsSpace.s),
           Icon(WsIcons.musicNote, size: 44, color: ws.muted),
           Text(
-            'Kein Titel ausgewählt',
+            l.noTrackSelected,
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
@@ -309,15 +311,15 @@ class _EmptyCard extends StatelessWidget {
           ),
           Text(
             !kIsWeb && Platform.isMacOS
-                ? 'Öffne eine MP3-, WAV- oder FLAC-Datei oder zieh sie ins Fenster.'
-                : 'Öffne eine MP3-, WAV- oder FLAC-Datei aus «Dateien».',
+                ? l.openFileHintDrop
+                : l.openFileHintFiles,
             textAlign: TextAlign.center,
             style: TextStyle(color: ws.muted),
           ),
           const SizedBox(height: WsSpace.xs),
           BorderedButton(
             key: const Key('openFile'),
-            label: 'Datei öffnen',
+            label: l.openFile,
             icon: WsIcons.folder,
             onPressed: onOpen,
             shortcut: const ShortcutBadge('O', command: true),
@@ -415,6 +417,7 @@ class _LoopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final ws = WsTheme.of(context);
     final m = WsLayout.of(context);
+    final l = context.l10n;
     final s = state;
     final times = Row(
       mainAxisSize: MainAxisSize.min,
@@ -441,14 +444,14 @@ class _LoopBar extends StatelessWidget {
     final info = Text.rich(
       TextSpan(
         children: [
-          TextSpan(text: '${length.toStringAsFixed(1).replaceAll('.', ',')} s'),
+          TextSpan(text: l.loopLength(length.toDouble())),
           if (s.rampCounting) ...[
-            const TextSpan(text: ' · Durchgang '),
-            TextSpan(
-              text: '${s.rampPasses}',
-              style: TextStyle(color: ws.text, fontWeight: FontWeight.w700),
+            const TextSpan(text: ' · '),
+            ..._withBold(
+              l.loopPass(_mark, '${s.ramp.rampPasses}'),
+              '${s.rampPasses}',
+              TextStyle(color: ws.text, fontWeight: FontWeight.w700),
             ),
-            TextSpan(text: ' von ${s.ramp.rampPasses}'),
           ],
         ],
       ),
@@ -457,7 +460,7 @@ class _LoopBar extends StatelessWidget {
     );
     final toggle = BorderedButton(
       key: const Key('loopToggle'),
-      label: s.loopOn ? 'Loop an' : 'Loop aus',
+      label: s.loopOn ? l.loopOn : l.loopOff,
       selected: s.loopOn,
       onPressed: () => actions.loopOn(!s.loopOn),
       shortcut: null,
@@ -465,16 +468,16 @@ class _LoopBar extends StatelessWidget {
     final here = [
       BorderedButton(
         key: const Key('here:Anfang'),
-        label: 'S hier',
-        tooltip: 'Aktuelle Wiedergabeposition als Anfang übernehmen',
+        label: l.setStartHere,
+        tooltip: l.setStartHereTooltip,
         onPressed: () => actions.loopStart(s.position),
         shortcut: const ShortcutBadge('S'),
         expand: m.touch,
       ),
       BorderedButton(
         key: const Key('here:Ende'),
-        label: 'E hier',
-        tooltip: 'Aktuelle Wiedergabeposition als Ende übernehmen',
+        label: l.setEndHere,
+        tooltip: l.setEndHereTooltip,
         onPressed: () => actions.loopEnd(s.position),
         shortcut: const ShortcutBadge('E'),
         expand: m.touch,
@@ -483,14 +486,14 @@ class _LoopBar extends StatelessWidget {
     final extra = [
       BorderedButton(
         key: const Key('toLoopStart'),
-        label: 'Zum Loop-Anfang',
+        label: l.toLoopStart,
         icon: WsIcons.backwardEnd,
         iconOnly: true,
         onPressed: () => actions.seek(s.loopStart),
       ),
       BorderedButton(
         key: const Key('wholeTrack'),
-        label: 'Ganzer Titel',
+        label: l.wholeTrack,
         icon: WsIcons.leftRight,
         onPressed: () => actions.wholeTrack(s.duration),
       ),
@@ -502,14 +505,14 @@ class _LoopBar extends StatelessWidget {
               Icon(WsIcons.warning, size: 14, color: ws.amber),
               Expanded(
                 child: Text(
-                  'Das Ende muss mindestens 1 Sekunde nach dem Anfang liegen.',
+                  l.loopTooShort,
                   style: TextStyle(fontSize: 12, color: ws.amber),
                 ),
               ),
             ],
           )
         : null;
-    final label = Text('LOOP', style: ws.label(color: ws.amber));
+    final label = Text(l.loopLabel, style: ws.label(color: ws.amber));
 
     final Widget content;
     switch (m.size) {
@@ -590,6 +593,20 @@ class _LoopBar extends StatelessWidget {
   }
 }
 
+/// Placeholder for a value that is shown in bold inside a translated sentence.
+const _mark = '\u{E000}';
+
+/// [text] with [_mark] replaced by [value] in [bold] (the language decides where the value goes).
+List<TextSpan> _withBold(String text, String value, TextStyle bold) {
+  final i = text.indexOf(_mark);
+  if (i < 0) return [TextSpan(text: text)];
+  return [
+    TextSpan(text: text.substring(0, i)),
+    TextSpan(text: value, style: bold),
+    TextSpan(text: text.substring(i + _mark.length)),
+  ];
+}
+
 // MARK: Tempo
 
 class _TempoModule extends StatelessWidget {
@@ -600,22 +617,18 @@ class _TempoModule extends StatelessWidget {
   /// Schnellwahl (#30/AK7).
   static const presets = [0.5, 0.75, 0.8, 1.0];
 
-  static String presetLabel(double p) {
-    final t = p.toString();
-    return t.replaceAll('.', ',');
-  }
-
   @override
   Widget build(BuildContext context) {
     final ws = WsTheme.of(context);
     final m = WsLayout.of(context);
+    final l = context.l10n;
     final s = state;
     return WsCard(
       key: const Key('card:speed'),
       children: [
         CardHeader(
-          title: 'Tempo',
-          tooltip: 'Die Tonhöhe bleibt unverändert.',
+          title: l.speed,
+          tooltip: l.speedTooltip,
           value: s.speedOn,
           onChanged: actions.speedOn,
           trailing: const Padding(
@@ -631,7 +644,7 @@ class _TempoModule extends StatelessWidget {
             spacing: WsSpace.m,
             children: [
               Text(
-                formatRate(s.speed),
+                l.rate(s.speed),
                 key: const Key('speedValue'),
                 style: ws.number(m.tempo, color: ws.amber),
               ),
@@ -663,7 +676,7 @@ class _TempoModule extends StatelessWidget {
                     Expanded(
                       child: BorderedButton(
                         key: Key('preset:$p'),
-                        label: presetLabel(p),
+                        label: formatPreset(p, l.localeName),
                         mono: true,
                         expand: true,
                         selected: (s.speed - p).abs() < 0.001,
@@ -734,6 +747,7 @@ class _RampModuleState extends State<_RampModule> {
   @override
   Widget build(BuildContext context) {
     final ws = WsTheme.of(context);
+    final l = context.l10n;
     final s = widget.state;
     final r = s.ramp;
     final on = r.rampEnabled;
@@ -745,12 +759,12 @@ class _RampModuleState extends State<_RampModule> {
       key: const Key('card:ramp'),
       children: [
         CardHeader(
-          title: 'Steigerung',
+          title: l.rampTitle,
           value: on,
           onChanged: (v) => change(enabled: v),
           trailing: BorderedButton(
             key: const Key('rampSettings'),
-            label: _settings ? 'Einstellungen schliessen' : 'Einstellen',
+            label: _settings ? l.rampSettingsClose : l.rampSettingsOpen,
             icon: _settings ? WsIcons.close : WsIcons.slider,
             iconOnly: true,
             selected: _settings,
@@ -758,8 +772,7 @@ class _RampModuleState extends State<_RampModule> {
           ),
         ),
         Text(
-          '+${r.rampStep} % nach ${r.rampPasses} '
-          '${r.rampPasses == 1 ? 'Durchgang' : 'Durchgängen'}',
+          l.rampSummary(r.rampStep, r.rampPasses),
           style: TextStyle(fontSize: 12, color: ws.muted),
         ),
         Dimmed(
@@ -768,7 +781,7 @@ class _RampModuleState extends State<_RampModule> {
         ),
         if (on)
           Text(
-            s.rampLabel,
+            rampStatus(l, s.ramp.copyWith(speed: s.speed), s.rampPasses),
             key: const Key('ramp:status'),
             style: ws.number(15),
           ),
@@ -780,29 +793,32 @@ class _RampModuleState extends State<_RampModule> {
               children: [
                 _stepper(
                   context,
-                  'Startstufe',
+                  l.rampStartLevel,
                   'start',
-                  '${r.rampStart} %',
+                  l.percent(r.rampStart),
                   () => change(start: r.rampStart - 5),
                   () => change(start: r.rampStart + 5),
                 ),
                 _stepper(
                   context,
-                  'Zielstufe',
+                  l.rampTargetLevel,
                   'target',
-                  '${r.rampTarget} %',
+                  l.percent(r.rampTarget),
                   () => change(target: r.rampTarget - 5),
                   () => change(target: r.rampTarget + 5),
                 ),
                 Row(
                   children: [
-                    const Expanded(child: Text('Schrittweite')),
+                    Expanded(child: Text(l.rampStepSize)),
                     DropdownButton<int>(
                       key: const Key('ramp:step'),
                       value: r.rampStep,
                       items: [
                         for (final st in PlaybackSettings.rampSteps)
-                          DropdownMenuItem(value: st, child: Text('+$st %')),
+                          DropdownMenuItem(
+                            value: st,
+                            child: Text(l.rampStepOption(st)),
+                          ),
                       ],
                       onChanged: on ? (v) => change(step: v) : null,
                     ),
@@ -810,7 +826,7 @@ class _RampModuleState extends State<_RampModule> {
                 ),
                 _stepper(
                   context,
-                  'Durchgänge pro Stufe',
+                  l.rampPassesPerLevel,
                   'passes',
                   '${r.rampPasses}',
                   () => change(passes: r.rampPasses - 1),
@@ -819,12 +835,7 @@ class _RampModuleState extends State<_RampModule> {
               ],
             ),
           ),
-          HintText(
-            on && !s.rampCounting
-                ? 'Gezählt wird nur bei eingeschaltetem Tempo und aktivem Loop.'
-                : 'Ein Durchgang zählt beim Sprung vom Loop-Ende zum Anfang. '
-                      'Loop oder Tempo von Hand ändern setzt den Zähler zurück.',
-          ),
+          HintText(on && !s.rampCounting ? l.rampNotCountingHint : l.rampHint),
         ],
       ],
     );
@@ -908,32 +919,33 @@ class _Transport extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = WsLayout.of(context);
+    final l = context.l10n;
     final s = state;
     final buttons = <Widget>[
       _IconBtn(
         icon: WsIcons.backwardEnd,
-        label: 'Zum Loop-Start',
+        label: l.jumpToLoopStart,
         onPressed: () => actions.seek(s.activeLoop?.$1 ?? 0),
       ),
       _IconBtn(
         icon: WsIcons.back15,
-        label: '15 Sekunden zurück',
+        label: l.back15,
         onPressed: () => actions.seek((s.position - 15).clamp(0, s.duration)),
       ),
       if (m.size != WsSize.phone)
         _IconBtn(
           key: const Key('playPause'),
           icon: s.playing ? WsIcons.pause : WsIcons.play,
-          label: s.playing ? 'Pause' : 'Wiedergabe',
+          label: s.playing ? l.pause : l.play,
           onPressed: actions.playPause,
           wide: true,
         ),
       _IconBtn(
         icon: WsIcons.forward15,
-        label: '15 Sekunden vor',
+        label: l.forward15,
         onPressed: () => actions.seek((s.position + 15).clamp(0, s.duration)),
       ),
-      if (m.size != WsSize.phone) const ShortcutBadge('Leertaste'),
+      if (m.size != WsSize.phone) ShortcutBadge(l.spaceKey),
     ];
     final volume = _Volume(value: s.volume, onChanged: actions.volume);
     return Wrap(
@@ -1011,7 +1023,7 @@ class _Volume extends StatelessWidget {
     final m = WsLayout.of(context);
     return Semantics(
       key: const Key('volume'),
-      label: 'Lautstärke',
+      label: context.l10n.volume,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1050,6 +1062,7 @@ class _ThumbBar extends StatelessWidget {
     final ws = WsTheme.of(context);
     final m = WsLayout.of(context);
     final h = max(56.0, m.target);
+    final l = context.l10n;
     Widget btn(
       Key key,
       String tip,
@@ -1096,25 +1109,25 @@ class _ThumbBar extends StatelessWidget {
         children: [
           btn(
             const Key('here:Anfang'),
-            'Aktuelle Wiedergabeposition als Anfang übernehmen',
-            const Text('S hier'),
+            l.setStartHereTooltip,
+            Text(l.setStartHere),
             () => actions.loopStart(state.position),
           ),
           btn(
             const Key('playPause'),
-            state.playing ? 'Pause' : 'Wiedergabe',
+            state.playing ? l.pause : l.play,
             Icon(
               state.playing ? WsIcons.pause : WsIcons.play,
               size: 22,
-              semanticLabel: state.playing ? 'Pause' : 'Wiedergabe',
+              semanticLabel: state.playing ? l.pause : l.play,
             ),
             actions.playPause,
             strong: true,
           ),
           btn(
             const Key('here:Ende'),
-            'Aktuelle Wiedergabeposition als Ende übernehmen',
-            const Text('E hier'),
+            l.setEndHereTooltip,
+            Text(l.setEndHere),
             () => actions.loopEnd(state.position),
           ),
         ],

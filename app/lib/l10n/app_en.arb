@@ -1,0 +1,359 @@
+{
+  "@@locale": "en",
+  "ok": "OK",
+  "cancel": "Cancel",
+  "library": "Library",
+  "backToLibrary": "Back to library",
+  "practiceMetronome": "Practice · Metronome",
+  "noFolder": "No folder",
+  "noTracksWithoutFolder": "No tracks without a folder",
+  "addMp3Ellipsis": "Add MP3 …",
+  "renameFolder": "Rename folder",
+  "renameEllipsis": "Rename …",
+  "deleteNamedTitle": "Delete “{name}”?",
+  "@deleteNamedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteFolderText": "The tracks stay in the library and appear under “No folder”.",
+  "deleteFolder": "Delete folder",
+  "emptyFolder": "Empty – drag tracks here",
+  "newFolder": "New folder",
+  "newFolderEllipsis": "New folder …",
+  "moveToFolder": "Move to folder",
+  "delete": "Delete",
+  "deleteTrackText": "The track is removed from the app. The original file stays unchanged.",
+  "nameHint": "Name",
+  "addMp3Shortcut": "Add MP3 ({shortcut})",
+  "@addMp3Shortcut": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "newFolderShortcut": "New folder ({shortcut})",
+  "@newFolderShortcut": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "sort": "Sort",
+  "sortAlphabetical": "Alphabetical",
+  "sortDateAdded": "Date added",
+  "sortCustom": "Custom order",
+  "noTracks": "No tracks",
+  "emptyLibraryHintDrop": "Add MP3, WAV or FLAC files with + or drag them here.",
+  "emptyLibraryHint": "Add MP3, WAV or FLAC files with +.",
+  "addMp3": "Add MP3",
+  "folderActions": "Folder actions",
+  "trackActions": "Actions",
+  "storageUsed": "{size} used",
+  "@storageUsed": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageFree": "{size} free",
+  "@storageFree": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storagePersisted": "stored permanently",
+  "storageNotPersisted": "not stored permanently",
+  "recording": "Record",
+  "recordingFileName": "Recording {stamp}",
+  "@recordingFileName": {
+    "placeholders": {
+      "stamp": {
+        "type": "String"
+      }
+    }
+  },
+  "recordingFailed": "Recording not possible: {detail}",
+  "@recordingFailed": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "recordingSilent": "Only silence is coming in. Is music playing? Otherwise grant the permission: System Settings › Privacy & Security › Screen & System Audio Recording.",
+  "recordingTooltip": "Records the system audio (without microphone). The recording is only stored locally and then added to the library.",
+  "noTrackSelected": "No track selected",
+  "openFileHintDrop": "Open an MP3, WAV or FLAC file or drag it into the window.",
+  "openFileHintFiles": "Open an MP3, WAV or FLAC file from “Files”.",
+  "openFile": "Open file",
+  "loopLength": "{seconds} s",
+  "@loopLength": {
+    "placeholders": {
+      "seconds": {
+        "type": "double",
+        "format": "decimalPatternDigits",
+        "optionalParameters": {
+          "decimalDigits": 1
+        }
+      }
+    }
+  },
+  "loopPass": "pass {current} of {total}",
+  "@loopPass": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "loopOn": "Loop on",
+  "loopOff": "Loop off",
+  "loopLabel": "LOOP",
+  "setStartHere": "S here",
+  "setStartHereTooltip": "Use the current playback position as start",
+  "setEndHere": "E here",
+  "setEndHereTooltip": "Use the current playback position as end",
+  "toLoopStart": "To loop start",
+  "jumpToLoopStart": "Jump to loop start",
+  "wholeTrack": "Whole track",
+  "loopTooShort": "The end must be at least 1 second after the start.",
+  "speed": "Speed",
+  "speedTooltip": "The pitch stays the same.",
+  "rate": "{rate}×",
+  "@rate": {
+    "placeholders": {
+      "rate": {
+        "type": "double",
+        "format": "decimalPatternDigits",
+        "optionalParameters": {
+          "decimalDigits": 2
+        }
+      }
+    }
+  },
+  "percent": "{value}%",
+  "@percent": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "rampTitle": "Ramp-up",
+  "rampSettingsOpen": "Settings",
+  "rampSettingsClose": "Close settings",
+  "rampSummary": "+{step}% after {passes, plural, =1{1 pass} other{{passes} passes}}",
+  "@rampSummary": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "passes": {
+        "type": "int"
+      }
+    }
+  },
+  "rampStartLevel": "Start level",
+  "rampTargetLevel": "Target level",
+  "rampStepSize": "Step size",
+  "rampStepOption": "+{step}%",
+  "@rampStepOption": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      }
+    }
+  },
+  "rampPassesPerLevel": "Passes per level",
+  "rampNotCountingHint": "Passes only count with speed on and an active loop.",
+  "rampHint": "A pass counts at the jump from the loop end to the start. Changing loop or speed by hand resets the counter.",
+  "rampStatus": "{percent}% · {passes} of {total}",
+  "@rampStatus": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      },
+      "passes": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "rampStatusTarget": "{percent}% · target reached · {passes, plural, =1{1 pass} other{{passes} passes}}",
+  "@rampStatusTarget": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      },
+      "passes": {
+        "type": "int"
+      }
+    }
+  },
+  "back15": "15 seconds back",
+  "forward15": "15 seconds forward",
+  "play": "Play",
+  "pause": "Pause",
+  "spaceKey": "Space",
+  "volume": "Volume",
+  "metronome": "Metronome",
+  "subdivisionQuarter": "Quarters",
+  "subdivisionEighth": "Eighths",
+  "subdivisionTriplet": "Triplets",
+  "subdivisionSixteenth": "Sixteenths",
+  "metronomeStartKey": "Start (M)",
+  "metronomeStopKey": "Stop (M)",
+  "start": "Start",
+  "stop": "Stop",
+  "slower": "Slower (↓)",
+  "faster": "Faster (↑)",
+  "bpm": "{bpm} BPM",
+  "@bpm": {
+    "placeholders": {
+      "bpm": {
+        "type": "int"
+      }
+    }
+  },
+  "tap": "Tap",
+  "tapKey": "Tap (T)",
+  "metronomeKeysHint": "Keys: M = start/stop, ↑ / ↓ = tempo ±1 (with Shift ±10), T = tap tempo. Track and metronome never play at the same time.",
+  "meterAndSound": "Meter and sound",
+  "autoTempoRamp": "Automatic tempo increase",
+  "rampByTimeHint": "The tempo changes evenly in 1 BPM steps over the duration, each time at the start of a bar. Once the target is reached, it stays for one step and then starts again at the start BPM.",
+  "rampByBarsHint": "The tempo rises at the start of a bar. Once the target is reached, it stays for as many bars and then starts again at the start BPM.",
+  "bars": "Bars",
+  "time": "Time",
+  "startBpm": "Start BPM",
+  "targetBpm": "Target BPM",
+  "durationMinutes": "Duration (minutes)",
+  "step": "Step",
+  "bpmStep": "+{step} BPM",
+  "@bpmStep": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      }
+    }
+  },
+  "everyBars": "Every … bars",
+  "done": "Done",
+  "settings": "Settings",
+  "moduleRampTime": "Auto {start}→{target} BPM in {minutes} min",
+  "@moduleRampTime": {
+    "placeholders": {
+      "start": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "moduleRampBars": "Auto +{step} BPM / {bars, plural, =1{1 bar} other{{bars} bars}}",
+  "@moduleRampBars": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "bars": {
+        "type": "int"
+      }
+    }
+  },
+  "moduleDetails": "BPM · {meter} · {subdivision}",
+  "@moduleDetails": {
+    "placeholders": {
+      "meter": {
+        "type": "String"
+      },
+      "subdivision": {
+        "type": "String"
+      }
+    }
+  },
+  "loadNotFound": "The file “{file}” was not found. Was it moved or deleted?",
+  "@loadNotFound": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "loadUnsupported": "The file “{file}” is not a supported audio format (MP3, WAV, FLAC) or is damaged.",
+  "@loadUnsupported": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "loadUnreadable": "The file “{file}” cannot be read. Are access rights missing?",
+  "@loadUnreadable": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "loadNoDevice": "No audio device available. Please check headphones or speakers and try again.",
+  "loadOutOfMemory": "The file “{file}” is too large for the free memory.",
+  "@loadOutOfMemory": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "loadCancelled": "Loading was cancelled.",
+  "loadBusy": "The audio core is busy right now. Please try again.",
+  "loadInvalid": "Invalid file reference.",
+  "loadUnknown": "Unknown error while loading (code {code}).",
+  "@loadUnknown": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryCorrupt": "The library was damaged and was kept as “{backup}”.",
+  "@libraryCorrupt": {
+    "placeholders": {
+      "backup": {
+        "type": "String"
+      }
+    }
+  },
+  "librarySaveFailed": "The library could not be saved: {detail}",
+  "@librarySaveFailed": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "importFailed": "The following files could not be imported:\n{files}",
+  "@importFailed": {
+    "placeholders": {
+      "files": {
+        "type": "String"
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui' show Locale;
 
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:web/web.dart' as web;
@@ -19,6 +20,7 @@ import 'package:woodshed_player/app/file_platform_web.dart';
 import 'package:woodshed_player/app/file_store_web.dart';
 import 'package:woodshed_player/app/platform_web.dart';
 import 'package:woodshed_player/player/audio_core_web.dart';
+import 'package:woodshed_player/ui/messages.dart';
 
 /// 16-bit mono WAV, [seconds] of 440 Hz at level 0.5.
 Uint8List sineWav({double seconds = 2, int rate = 44100}) {
@@ -76,6 +78,9 @@ late final WebAudioCore core;
 
 /// Result of part 1 and the track ID, kept across the reload.
 const _key = 'wp-store-check';
+
+/// The storage line is checked in German (#43).
+final de = lookupAppLocalizations(const Locale('de'));
 
 /// Loads [id], plays briefly and measures the level.
 Future<(bool, double, double)> playBriefly(String id) async {
@@ -150,7 +155,7 @@ Future<List<Check>> part1() async {
   add(
     'AK5 persist() requested, storage shown',
     s != null && s.quota != null && s.persisted != null && s.used > 0,
-    'line: «${s?.label}»',
+    'line: «${s == null ? null : storageLabel(de, s)}»',
   );
 
   web.window.localStorage.setItem(
@@ -187,8 +192,10 @@ Future<List<Check>> part2() async {
   final s = app.library.storage;
   add(
     'AK5 storage line',
-    s != null && s.label.contains('belegt') && s.label.contains('frei'),
-    'line: «${s?.label}»',
+    s != null &&
+        storageLabel(de, s).contains('belegt') &&
+        storageLabel(de, s).contains('frei'),
+    'line: «${s == null ? null : storageLabel(de, s)}»',
   );
   return checks;
 }

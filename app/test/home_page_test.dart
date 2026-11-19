@@ -43,6 +43,9 @@ Future<TestApp> pumpApp(
   });
   await tester.pumpWidget(
     MaterialApp(
+      locale: testLocale,
+      localizationsDelegates: testDelegates,
+      supportedLocales: testLocales,
       theme: woodshedTheme(Brightness.light),
       home: HomePage(controller: app.controller),
     ),

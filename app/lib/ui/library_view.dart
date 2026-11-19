@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import '../app/app_controller.dart';
 import '../library/library.dart';
 import '../time_format.dart';
+import 'messages.dart';
 import 'style.dart';
 
 class LibraryView extends StatefulWidget {
@@ -68,21 +69,22 @@ class _LibraryViewState extends State<LibraryView> {
                         if (folders.isNotEmpty)
                           _SectionHeader(
                             key: const Key('section:none'),
-                            label: 'Ohne Ordner',
+                            label: context.l10n.noFolder,
                             icon: WsIcons.tray,
                             onDrop: (id) => lib.placeTrack(id, null),
                           ),
                         for (final t in loose) _row(t),
                         if (loose.isEmpty && folders.isNotEmpty)
                           _Placeholder(
-                            'Keine Titel ohne Ordner',
+                            context.l10n.noTracksWithoutFolder,
                             onDrop: (id) => lib.placeTrack(id, null),
                           ),
                         for (final f in folders) ..._folder(f),
                       ],
                     ),
             ),
-            if (lib.storage case final s?) _StorageLine(s.label),
+            if (lib.storage case final s?)
+              _StorageLine(storageLabel(context.l10n, s)),
           ],
         );
       },
@@ -90,6 +92,7 @@ class _LibraryViewState extends State<LibraryView> {
   }
 
   List<Widget> _folder(TrackFolder f) {
+    final l = context.l10n;
     final open = !_collapsed.contains(f.id);
     final tracks = lib.sortedTracksIn(f.id);
     return [
@@ -106,93 +109,95 @@ class _LibraryViewState extends State<LibraryView> {
           MenuItemButton(
             leadingIcon: const Icon(WsIcons.add, size: 16),
             onPressed: () => c.pickAndImport(folderId: f.id),
-            child: const Text('MP3 hinzufügen …'),
+            child: Text(l.addMp3Ellipsis),
           ),
           MenuItemButton(
             leadingIcon: const Icon(WsIcons.pencil, size: 16),
             onPressed: () async {
               final name = await askName(
                 context,
-                'Ordner umbenennen',
+                l.renameFolder,
                 initial: f.name,
               );
               if (name != null) lib.renameFolder(f.id, name);
             },
-            child: const Text('Umbenennen …'),
+            child: Text(l.renameEllipsis),
           ),
           MenuItemButton(
             leadingIcon: const Icon(WsIcons.trash, size: 16),
             onPressed: () async {
               if (await confirm(
                 context,
-                title: '«${f.name}» löschen?',
-                text: 'Die Titel bleiben in der Bibliothek und erscheinen unter «Ohne Ordner».',
-                action: 'Ordner löschen',
+                title: l.deleteNamedTitle(f.name),
+                text: l.deleteFolderText,
+                action: l.deleteFolder,
               )) {
                 lib.deleteFolder(f.id);
               }
             },
-            child: const Text('Ordner löschen'),
+            child: Text(l.deleteFolder),
           ),
         ],
       ),
       if (open) ...[
         for (final t in tracks) _row(t, indent: true),
         if (tracks.isEmpty)
-          _Placeholder(
-            'Leer – Titel hierher ziehen',
-            onDrop: (id) => lib.placeTrack(id, f.id),
-          ),
+          _Placeholder(l.emptyFolder, onDrop: (id) => lib.placeTrack(id, f.id)),
       ],
     ];
   }
 
-  Widget _row(Track t, {bool indent = false}) => _TrackRow(
-    key: Key('track:${t.title}'),
-    track: t,
-    artwork: lib.artworkPath(t),
-    selected: c.player.trackId == t.id,
-    indent: indent,
-    touch: widget.touch,
-    onTap: () => _select(t),
-    onDrop: (id) => lib.placeTrack(id, t.folderId, beforeId: t.id),
-    menu: (context) => [
-      SubmenuButton(
-        leadingIcon: const Icon(WsIcons.folder, size: 16),
-        menuChildren: [
-          MenuItemButton(
-            onPressed: t.folderId == null
-                ? null
-                : () => lib.moveTracks({t.id}, null),
-            child: const Text('Ohne Ordner'),
-          ),
-          for (final f in lib.sortedFolders)
+  Widget _row(Track t, {bool indent = false}) {
+    final l = context.l10n;
+    return _TrackRow(
+      key: Key('track:${t.title}'),
+      track: t,
+      artwork: lib.artworkPath(t),
+      selected: c.player.trackId == t.id,
+      indent: indent,
+      touch: widget.touch,
+      onTap: () => _select(t),
+      onDrop: (id) => lib.placeTrack(id, t.folderId, beforeId: t.id),
+      menu: (context) => [
+        SubmenuButton(
+          leadingIcon: const Icon(WsIcons.folder, size: 16),
+          menuChildren: [
             MenuItemButton(
-              onPressed: t.folderId == f.id
+              onPressed: t.folderId == null
                   ? null
-                  : () => lib.moveTracks({t.id}, f.id),
-              child: Text(f.name),
+                  : () => lib.moveTracks({t.id}, null),
+              child: Text(l.noFolder),
             ),
-          const Divider(height: 1),
-          MenuItemButton(
-            onPressed: () async {
-              final name = await askName(context, 'Neuer Ordner');
-              if (name != null) {
-                lib.moveTracks({t.id}, lib.createFolder(name).id);
-              }
-            },
-            child: const Text('Neuer Ordner …'),
-          ),
-        ],
-        child: const Text('In Ordner verschieben'),
-      ),
-      MenuItemButton(
-        leadingIcon: const Icon(WsIcons.trash, size: 16),
-        onPressed: () => confirmDeleteTrack(context, c, t),
-        child: const Text('Löschen'),
-      ),
-    ],
-  );
+            for (final f in lib.sortedFolders)
+              MenuItemButton(
+                onPressed: t.folderId == f.id
+                    ? null
+                    : () => lib.moveTracks({t.id}, f.id),
+                child: Text(f.name),
+              ),
+            const Divider(height: 1),
+            MenuItemButton(
+              onPressed: () async {
+                final name = await askName(context, l.newFolder);
+                if (name != null) {
+                  lib.moveTracks({
+                    t.id,
+                  }, lib.createFolder(name, fallback: l.newFolder).id);
+                }
+              },
+              child: Text(l.newFolderEllipsis),
+            ),
+          ],
+          child: Text(l.moveToFolder),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(WsIcons.trash, size: 16),
+          onPressed: () => confirmDeleteTrack(context, c, t),
+          child: Text(l.delete),
+        ),
+      ],
+    );
+  }
 }
 
 /// Löschen mit Rückfrage (Kontextmenü, Entf-Taste).
@@ -201,11 +206,12 @@ Future<void> confirmDeleteTrack(
   AppController c,
   Track t,
 ) async {
+  final l = context.l10n;
   if (await confirm(
     context,
-    title: '«${t.title}» löschen?',
-    text: 'Der Titel wird aus der App entfernt. Die Originaldatei bleibt unverändert.',
-    action: 'Löschen',
+    title: l.deleteNamedTitle(t.title),
+    text: l.deleteTrackText,
+    action: l.delete,
   )) {
     c.deleteTracks({t.id});
   }
@@ -225,7 +231,7 @@ Future<bool> confirm(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Abbrechen'),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
             key: const Key('confirm'),
@@ -255,18 +261,18 @@ Future<String?> askName(
         key: const Key('nameField'),
         controller: text,
         autofocus: true,
-        decoration: const InputDecoration(hintText: 'Name'),
+        decoration: InputDecoration(hintText: context.l10n.nameHint),
         onSubmitted: (v) => Navigator.pop(context, v),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Abbrechen'),
+          child: Text(context.l10n.cancel),
         ),
         TextButton(
           key: const Key('nameOk'),
           onPressed: () => Navigator.pop(context, text.text),
-          child: const Text('OK'),
+          child: Text(context.l10n.ok),
         ),
       ],
     ),
@@ -280,34 +286,38 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lib = controller.library;
+    final l = context.l10n;
+    final platform = Theme.of(context).platform;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
       child: Row(
         children: [
           Expanded(
             child: Text(
-              'Bibliothek',
+              l.library,
               style: Theme.of(context).textTheme.titleLarge
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           IconButton(
             key: const Key('addFiles'),
-            tooltip:
-                'MP3 hinzufügen (${shortcutLabel(Theme.of(context).platform, 'O', command: true)})',
+            tooltip: l.addMp3Shortcut(
+              shortcutLabel(platform, 'O', command: true),
+            ),
             icon: const Icon(WsIcons.add),
             onPressed: () => controller.pickAndImport(),
           ),
           IconButton(
             key: const Key('newFolder'),
-            tooltip:
-                'Neuer Ordner (${shortcutLabel(Theme.of(context).platform, 'N', command: true, shift: true)})',
+            tooltip: l.newFolderShortcut(
+              shortcutLabel(platform, 'N', command: true, shift: true),
+            ),
             icon: const Icon(WsIcons.folderBadgePlus),
             onPressed: () => newFolder(context, lib),
           ),
           PopupMenuButton<TrackSortOrder>(
             key: const Key('sortMenu'),
-            tooltip: 'Sortieren',
+            tooltip: l.sort,
             icon: const Icon(WsIcons.sort),
             onSelected: (o) => lib.sortOrder = o,
             itemBuilder: (_) => [
@@ -315,7 +325,7 @@ class _Header extends StatelessWidget {
                 CheckedPopupMenuItem(
                   value: o,
                   checked: lib.sortOrder == o,
-                  child: Text(o.label),
+                  child: Text(sortOrderLabel(l, o)),
                 ),
             ],
           ),
@@ -326,8 +336,9 @@ class _Header extends StatelessWidget {
 }
 
 Future<void> newFolder(BuildContext context, Library lib) async {
-  final name = await askName(context, 'Neuer Ordner');
-  if (name != null) lib.createFolder(name);
+  final l = context.l10n;
+  final name = await askName(context, l.newFolder);
+  if (name != null) lib.createFolder(name, fallback: l.newFolder);
 }
 
 class _EmptyLibrary extends StatelessWidget {
@@ -337,6 +348,7 @@ class _EmptyLibrary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grey = Theme.of(context).colorScheme.onSurfaceVariant;
+    final l = context.l10n;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -345,12 +357,12 @@ class _EmptyLibrary extends StatelessWidget {
           children: [
             Icon(WsIcons.musicNoteList, size: 40, color: grey),
             const SizedBox(height: 10),
-            Text('Keine Titel', style: Theme.of(context).textTheme.titleMedium),
+            Text(l.noTracks, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
               !kIsWeb && Platform.isMacOS
-                  ? 'Füge MP3-, WAV- oder FLAC-Dateien mit + hinzu oder zieh sie hierher.'
-                  : 'Füge MP3-, WAV- oder FLAC-Dateien mit + hinzu.',
+                  ? l.emptyLibraryHintDrop
+                  : l.emptyLibraryHint,
               textAlign: TextAlign.center,
               style: TextStyle(color: grey),
             ),
@@ -358,7 +370,7 @@ class _EmptyLibrary extends StatelessWidget {
             FilledButton(
               key: const Key('addFirst'),
               onPressed: onAdd,
-              child: const Text('MP3 hinzufügen'),
+              child: Text(l.addMp3),
             ),
           ],
         ),
@@ -425,7 +437,7 @@ class _SectionHeader extends StatelessWidget {
                   ),
                   if (openMenu != null)
                     IconButton(
-                      tooltip: 'Ordner-Aktionen',
+                      tooltip: context.l10n.folderActions,
                       visualDensity: VisualDensity.compact,
                       iconSize: 16,
                       icon: const Icon(WsIcons.ellipsis),
@@ -441,7 +453,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// Storage usage in the library footer (#35/AK5), e.g. «1,2 GB belegt».
+/// Storage usage in the library footer (#35/AK5), e.g. «1.2 GB used».
 class _StorageLine extends StatelessWidget {
   const _StorageLine(this.text);
   final String text;
@@ -586,7 +598,7 @@ class _TrackRow extends StatelessWidget {
                       children: [
                         Expanded(child: _LoopStrip(loop: loop)),
                         Text(
-                          formatRate(speed),
+                          context.l10n.rate(speed),
                           style: ws.number(
                             11,
                             color: (speed - 1).abs() < 0.001
@@ -603,7 +615,7 @@ class _TrackRow extends StatelessWidget {
               if (openMenu != null)
                 IconButton(
                   key: Key('menu:${track.title}'),
-                  tooltip: 'Aktionen',
+                  tooltip: context.l10n.trackActions,
                   visualDensity: touch ? null : VisualDensity.compact,
                   iconSize: 16,
                   icon: const Icon(WsIcons.ellipsis),

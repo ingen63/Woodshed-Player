@@ -11,6 +11,8 @@ import 'package:woodshed_player/metronome/practice_shortcuts.dart';
 import 'package:woodshed_player/metronome/repeat_button.dart';
 import 'package:woodshed_player/metronome/tap_tempo.dart';
 
+import 'fakes.dart';
+
 /// Attrappe des Audio-Kerns: merkt sich Aufrufe, Steigerung wie im Kern (Einschalten im Stand -> Start-BPM).
 class FakeBackend implements MetronomeBackend {
   bool isRunning = false;
@@ -337,6 +339,9 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         MaterialApp(
+          locale: testLocale,
+          localizationsDelegates: testDelegates,
+          supportedLocales: testLocales,
           home: Scaffold(
             body: SingleChildScrollView(child: MetronomePanel(controller: c)),
           ),
@@ -424,6 +429,9 @@ void main() {
       playPause = 0;
       await tester.pumpWidget(
         MaterialApp(
+          locale: testLocale,
+          localizationsDelegates: testDelegates,
+          supportedLocales: testLocales,
           home: PracticeShortcuts(
             metronome: c,
             onPlayPause: () => playPause++,
@@ -483,6 +491,9 @@ void main() {
     var steps = 0;
     await tester.pumpWidget(
       MaterialApp(
+        locale: testLocale,
+        localizationsDelegates: testDelegates,
+        supportedLocales: testLocales,
         home: Scaffold(
           body: Center(
             child: RepeatButton(icon: Icons.add, onStep: () => steps++),

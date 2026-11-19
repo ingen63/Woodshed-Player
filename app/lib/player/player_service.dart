@@ -42,7 +42,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
   double _position = 0, _duration = 0, _volume = 1.0, _loadProgress = 0;
   bool _playing = false, _loading = false;
   PlaybackSettings _settings = const PlaybackSettings();
-  String? _error;
+  LoadError? _error;
 
   String? get title => _title;
   String? get path => _path;
@@ -56,7 +56,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
   double get loadProgress => _loadProgress;
   bool get hasTrack => _path != null;
   PlaybackSettings get settings => _settings;
-  String? get error => _error;
+  LoadError? get error => _error;
 
   /// Wellenform des geladenen Titels (#28, #30); null ohne Titel oder solange sie fehlt.
   WpWaveform? waveform(double start, double end, int count) =>
@@ -79,9 +79,6 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
 
   /// Durchgänge auf der aktuellen Stufe.
   int get rampPasses => _ramp.passes;
-
-  /// #29/AK8: «75 % · 7 von 10».
-  String get rampLabel => _ramp.label(_settings);
 
   void _countLoopPasses() {
     final total = core.loopPasses;
@@ -138,7 +135,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
     final code = core.loadAsync(path);
     if (code != WpCode.ok) {
       _loading = false;
-      _error = loadErrorMessage(code, file: file);
+      _error = LoadError(code, file);
       notifyListeners();
       return Future.value(false);
     }
@@ -174,10 +171,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
       core.volume = _volume;
       p.completer.complete(true);
     } else {
-      _error = loadErrorMessage(
-        state < 0 ? state : WpCode.invalidArgument,
-        file: p.title,
-      );
+      _error = LoadError(state < 0 ? state : WpCode.invalidArgument, p.title);
       p.completer.complete(false);
     }
   }

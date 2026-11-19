@@ -39,6 +39,9 @@ dependencies:
     path: packages/wp_core
   web: ^1.1.2
   crypto: ^3.0.6 # SHA-256 der Titel (#35), BSD-3
+  flutter_localizations: # UI languages (#43), part of the Flutter SDK
+    sdk: flutter
+  intl: any # gen-l10n and locale number formats (#43), BSD-3; version pinned by flutter_localizations
 
 dev_dependencies:
   flutter_test:
@@ -58,6 +61,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true # gen-l10n (#43), see l10n.yaml
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

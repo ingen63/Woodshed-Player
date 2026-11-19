@@ -26,16 +26,16 @@ class AppController extends ChangeNotifier {
   final FilePlatform files;
   final PracticeSession session;
 
-  /// Meldung für einen Dialog (Fehler oder Ergebnis); die Oberfläche zeigt sie und ruft [clearMessage].
-  String? message;
+  /// Message for a dialog (error or result); the UI words and shows it, then calls [clearMessage].
+  LibraryMessage? message;
 
   void clearMessage() {
     message = null;
     notifyListeners();
   }
 
-  void _show(String text) {
-    message = text;
+  void _show(LibraryMessage m) {
+    message = m;
     notifyListeners();
   }
 

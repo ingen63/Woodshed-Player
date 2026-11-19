@@ -6,6 +6,10 @@ import 'package:woodshed_player/metronome/loop_ramp.dart';
 import 'package:woodshed_player/ui/player_view.dart';
 import 'package:woodshed_player/ui/style.dart';
 
+import 'fakes.dart';
+
+import 'package:woodshed_player/ui/messages.dart';
+
 PlaybackSettings at(
   int percent, {
   int target = 100,
@@ -106,12 +110,15 @@ void main() {
   group('#29/AK8 Anzeige', () {
     test('«75 % · 7 von 10»', () {
       final r = LoopRamp()..addPasses(7, at(75));
-      expect(r.label(at(75)), '75 % · 7 von 10');
+      expect(rampStatus(de, at(75), r.passes), '75 % · 7 von 10');
     });
 
     test('an der Zielstufe mit Zahl der Durchgänge', () {
       final r = LoopRamp()..addPasses(14, at(100));
-      expect(r.label(at(100)), '100 % · Ziel erreicht · 14 Durchgänge');
+      expect(
+        rampStatus(de, at(100), r.passes),
+        '100 % · Ziel erreicht · 14 Durchgänge',
+      );
     });
 
     testWidgets('Karte zeigt Stufe und Durchgänge, Knöpfe ändern die Werte', (
@@ -123,6 +130,9 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         MaterialApp(
+          locale: testLocale,
+          localizationsDelegates: testDelegates,
+          supportedLocales: testLocales,
           theme: woodshedTheme(Brightness.light),
           home: Scaffold(
             body: PlayerView(
@@ -135,7 +145,7 @@ void main() {
                 loopStart: 5,
                 loopEnd: 15,
                 ramp: at(75),
-                rampLabel: '75 % · 7 von 10',
+                rampPasses: 7,
               ),
               actions: PlayerViewActions(
                 open: () {},

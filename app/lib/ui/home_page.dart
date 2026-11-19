@@ -10,6 +10,7 @@ import '../app/app_controller.dart';
 import '../metronome/metronome_panel.dart';
 import '../metronome/practice_shortcuts.dart';
 import 'library_view.dart';
+import 'messages.dart';
 import 'player_view.dart';
 import 'style.dart';
 
@@ -64,19 +65,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showMessage() {
-    final text = c.message;
-    if (text == null) return;
+    final m = c.message;
+    if (m == null) return;
     c.clearMessage();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          content: Text(text, key: const Key('message')),
+          content: Text(
+            libraryMessageText(context.l10n, m),
+            key: const Key('message'),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
+              child: Text(context.l10n.ok),
             ),
           ],
         ),
@@ -184,7 +188,7 @@ class _HomePageState extends State<HomePage> {
       child: _player(
         leading: BorderedButton(
           key: const Key('libraryToggle'),
-          label: 'Bibliothek',
+          label: context.l10n.library,
           icon: WsIcons.sidebar,
           onPressed: () => _scaffold.currentState?.openDrawer(),
         ),
@@ -210,7 +214,7 @@ class _HomePageState extends State<HomePage> {
                       dimension: WsLayout.of(context).target,
                       child: IconButton(
                         key: const Key('backToLibrary'),
-                        tooltip: 'Zurück zur Bibliothek',
+                        tooltip: context.l10n.backToLibrary,
                         icon: const Icon(WsIcons.chevronLeft),
                         onPressed: () => setState(() => _phonePlayer = false),
                       ),
@@ -269,7 +273,6 @@ class _HomePageState extends State<HomePage> {
                 loopStart: s.loopStart,
                 loopEnd: s.loopEnd,
                 ramp: s,
-                rampLabel: p.rampLabel,
                 rampPasses: p.rampPasses,
                 error: p.error,
                 waveform: p.isLoading ? null : p.waveform,
@@ -337,7 +340,9 @@ class _NowPlayingBar extends StatelessWidget {
                   ),
                   Expanded(
                     child: Text(
-                      p.hasTrack ? p.title ?? '' : 'Üben · Metronom',
+                      p.hasTrack
+                          ? p.title ?? ''
+                          : context.l10n.practiceMetronome,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w600),

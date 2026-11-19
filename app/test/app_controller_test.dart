@@ -125,7 +125,7 @@ void main() {
   test('Importfehler werden als Meldung gezeigt', () async {
     final a = await app();
     await a.controller.importFiles(['${tmp.path}/fehlt.mp3']);
-    expect(a.controller.message, contains('fehlt.mp3'));
+    expect((a.controller.message! as ImportFailed).files, ['fehlt.mp3']);
     a.controller.clearMessage();
     expect(a.controller.message, isNull);
   });

@@ -25,6 +25,29 @@ typedef DurationProbe = double? Function(String path);
 /// Contents of a picked or dropped file (import source); null if it is missing.
 typedef SourceReader = Future<Uint8List?> Function(String source);
 
+/// Problem the library reports to the UI (#43: data, worded by the UI in the user's language).
+sealed class LibraryMessage {
+  const LibraryMessage();
+}
+
+/// `library.json` was unreadable and was kept under [backupName].
+class LibraryCorrupt extends LibraryMessage {
+  const LibraryCorrupt(this.backupName);
+  final String backupName;
+}
+
+/// Saving `library.json` failed.
+class LibrarySaveFailed extends LibraryMessage {
+  const LibrarySaveFailed(this.detail);
+  final String detail;
+}
+
+/// These files (names) could not be imported.
+class ImportFailed extends LibraryMessage {
+  const ImportFailed(this.files);
+  final List<String> files;
+}
+
 class ImportResult {
   const ImportResult(this.imported, this.failed, [this.duplicates = const []]);
   final List<Track> imported;
@@ -71,7 +94,9 @@ class Library extends ChangeNotifier {
   TrackSortOrder _sortOrder = TrackSortOrder.dateAdded;
   bool _importing = false;
   int _droppedMissing = 0;
-  String? lastError;
+
+  /// Problem for the UI (#43: as data, the UI words it); the UI clears it after showing it.
+  LibraryMessage? lastError;
   Timer? _pendingSave;
   Future<void>? _hashing;
   StorageInfo? _storage;
@@ -116,8 +141,7 @@ class Library extends ChangeNotifier {
       try {
         await store.rename(indexName, '$indexName.defekt-$stamp');
       } catch (_) {}
-      lastError =
-          'Die Bibliothek war beschädigt und wurde als «library.json.defekt-$stamp» aufgehoben.';
+      lastError = LibraryCorrupt('$indexName.defekt-$stamp');
       notifyListeners();
       return _afterLoad();
     }
@@ -212,7 +236,7 @@ class Library extends ChangeNotifier {
     _pendingSave = null;
     final bytes = Uint8List.fromList(utf8.encode(swiftPrettyJson(indexJson())));
     return store.write(indexName, bytes).catchError((Object e) {
-      lastError = 'Bibliothek konnte nicht gespeichert werden: $e';
+      lastError = LibrarySaveFailed('$e');
       notifyListeners();
     });
   }
@@ -330,8 +354,7 @@ class Library extends ChangeNotifier {
     }
     _importing = false;
     if (failed.isNotEmpty) {
-      lastError =
-          'Folgende Dateien konnten nicht importiert werden:\n${failed.join('\n')}';
+      lastError = ImportFailed(List.unmodifiable(failed));
     }
     save();
     notifyListeners();
@@ -446,18 +469,22 @@ class Library extends ChangeNotifier {
 
   // ---- Ordner ----
 
-  TrackFolder createFolder(String name) {
-    final f = TrackFolder(id: newUuid(_random), name: _cleanName(name));
+  /// New folder; a blank [name] becomes [fallback] (the UI passes the localized «New folder»).
+  TrackFolder createFolder(String name, {String fallback = ''}) {
+    final t = name.trim();
+    final f = TrackFolder(id: newUuid(_random), name: t.isEmpty ? fallback : t);
     _folders.add(f);
     save();
     notifyListeners();
     return f;
   }
 
+  /// Renames the folder; a blank [name] keeps the old one.
   void renameFolder(String id, String name) {
     final i = _folders.indexWhere((f) => f.id == id);
-    if (i < 0) return;
-    _folders[i] = TrackFolder(id: id, name: _cleanName(name));
+    final t = name.trim();
+    if (i < 0 || t.isEmpty) return;
+    _folders[i] = TrackFolder(id: id, name: t);
     save();
     notifyListeners();
   }
@@ -514,11 +541,6 @@ class Library extends ChangeNotifier {
     final at = others.indexWhere((t) => t.id == beforeId);
     moveTracks({id}, folderId, at: at < 0 ? others.length : at);
     sortOrder = TrackSortOrder.custom;
-  }
-
-  static String _cleanName(String name) {
-    final t = name.trim();
-    return t.isEmpty ? 'Neuer Ordner' : t;
   }
 
   // ---- Einstellungen pro Titel ----

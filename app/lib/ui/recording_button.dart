@@ -8,6 +8,7 @@ import 'package:wp_core/wp_core.dart';
 
 import '../app/app_controller.dart';
 import '../time_format.dart';
+import 'messages.dart';
 import 'style.dart';
 
 class RecordingButton extends StatefulWidget {
@@ -23,7 +24,10 @@ class _RecordingButtonState extends State<RecordingButton> {
   bool _recording = false;
   double _seconds = 0, _level = 0;
   bool _silent = false;
-  String? _path, _error;
+  String? _path;
+
+  /// Detail of the core when recording could not start.
+  String? _error;
 
   @override
   void dispose() {
@@ -44,9 +48,10 @@ class _RecordingButtonState extends State<RecordingButton> {
       }
       return;
     }
+    final name = context.l10n.recordingFileName(fileStamp(DateTime.now()));
     final dir = await widget.controller.files.recordingsDir();
     if (dir == null) return;
-    final path = '$dir/Aufnahme ${fileStamp(DateTime.now())}.wav';
+    final path = '$dir/$name.wav';
     try {
       WpRecorder.start(path);
       setState(() {
@@ -64,7 +69,7 @@ class _RecordingButtonState extends State<RecordingButton> {
         });
       });
     } on WpException catch (e) {
-      setState(() => _error = 'Aufnahme nicht möglich: ${e.message}');
+      setState(() => _error = e.message);
     }
   }
 
@@ -75,21 +80,21 @@ class _RecordingButtonState extends State<RecordingButton> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('OK'),
+          child: Text(context.l10n.ok),
         ),
       ],
     ),
   );
 
-  static const _silentText =
-      'Es kommt nur Stille an. Läuft gerade Musik? Sonst die Berechtigung erteilen: '
-      'Systemeinstellungen › Datenschutz & Sicherheit › Bildschirm- & Systemaudioaufnahme.';
-
   @override
   Widget build(BuildContext context) {
     final ws = WsTheme.of(context);
     final m = WsLayout.of(context);
-    final problem = _error ?? (_silent ? _silentText : null);
+    final l = context.l10n;
+    final error = _error;
+    final problem = error != null
+        ? l.recordingFailed(error)
+        : (_silent ? l.recordingSilent : null);
     return ExcludeFocus(
       child: Row(
         key: const Key('recordingButton'),
@@ -114,9 +119,7 @@ class _RecordingButtonState extends State<RecordingButton> {
               ),
             ),
           Tooltip(
-            message:
-                'Nimmt den Systemton auf (ohne Mikrofon). Die Aufnahme wird nur lokal '
-                'gespeichert und danach in die Bibliothek übernommen.',
+            message: l.recordingTooltip,
             child: TextButton(
               onPressed: _toggle,
               style: TextButton.styleFrom(
@@ -152,7 +155,7 @@ class _RecordingButtonState extends State<RecordingButton> {
                           formatTime(_seconds),
                           style: ws.number(12, weight: FontWeight.w600),
                         )
-                      : const Text('Aufnahme'),
+                      : Text(l.recording),
                 ],
               ),
             ),

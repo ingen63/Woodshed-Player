@@ -7,6 +7,10 @@ import 'package:wp_core/wp_core.dart';
 
 import 'fakes.dart';
 
+import 'package:woodshed_player/ui/messages.dart';
+
+import 'dart:ui' show Locale;
+
 class Harness {
   Harness() {
     service = PlayerService(
@@ -283,7 +287,14 @@ void main() {
         h.service.play();
         h.core.immediateErrors['/neu.mp3'] = WpCode.deviceUnavailable;
         expect(await h.service.load('/neu.mp3'), isFalse);
-        expect(h.service.error, contains('Kein Audiogerät'));
+        expect(
+          h.service.error,
+          const LoadError(WpCode.deviceUnavailable, 'neu.mp3'),
+        );
+        expect(
+          loadErrorMessage(de, h.service.error!),
+          contains('Kein Audiogerät'),
+        );
         expect(h.service.title, 'alt.mp3');
         expect(h.service.duration, 60);
         expect(h.service.isPlaying, isTrue);
@@ -299,7 +310,7 @@ void main() {
       h.fire();
       expect(await f, isFalse);
       expect(
-        h.service.error,
+        loadErrorMessage(de, h.service.error!),
         'Die Datei «kaputt.flac» ist kein unterstütztes Audioformat (MP3, WAV, FLAC) oder beschädigt.',
       );
       expect(h.service.title, 'alt.mp3');
@@ -322,12 +333,12 @@ void main() {
       final h = Harness();
       h.core.immediateErrors['/x.mp3'] = WpCode.fileNotFound;
       await h.service.load('/x.mp3');
-      expect(h.service.error, contains('nicht gefunden'));
+      expect(h.service.error?.code, WpCode.fileNotFound);
       await h.loadReady('/y.mp3', 3);
       expect(h.service.error, isNull);
     });
 
-    test('jeder Fehlercode hat eine eigene deutsche Meldung', () {
+    test('jeder Fehlercode hat eine eigene Meldung (Deutsch und Englisch)', () {
       const codes = [
         WpCode.invalidArgument,
         WpCode.fileNotFound,
@@ -338,14 +349,20 @@ void main() {
         WpCode.cancelled,
         WpCode.busy,
       ];
-      final texts = codes
-          .map((c) => loadErrorMessage(c, file: 'x.mp3'))
-          .toSet();
-      expect(texts.length, codes.length);
-      for (final t in texts) {
-        expect(t, isNot(contains('Code')));
+      for (final l in [de, lookupAppLocalizations(const Locale('en'))]) {
+        final texts = codes
+            .map((c) => loadErrorMessage(l, LoadError(c, 'x.mp3')))
+            .toSet();
+        expect(texts.length, codes.length);
+        for (final t in texts) {
+          expect(t, isNot(contains('Code')));
+          expect(t, isNot(contains('code')));
+        }
       }
-      expect(loadErrorMessage(-99), contains('Unbekannter Fehler'));
+      expect(
+        loadErrorMessage(de, const LoadError(-99, 'x.mp3')),
+        contains('Unbekannter Fehler'),
+      );
     });
   });
 
@@ -377,7 +394,10 @@ void main() {
       expect(h.service.settings.speedEnabled, isTrue);
       expect(h.service.settings.speed, 0.6);
       expect(h.core.rateValue, 0.6);
-      expect(h.service.rampLabel, '60 % · 0 von 10');
+      expect(
+        rampStatus(de, h.service.settings, h.service.rampPasses),
+        '60 % · 0 von 10',
+      );
     });
 
     test(
@@ -386,7 +406,10 @@ void main() {
         final h = await rampHarness();
         passes(h, 7);
         expect(h.service.rampPasses, 7);
-        expect(h.service.rampLabel, '60 % · 7 von 10');
+        expect(
+          rampStatus(de, h.service.settings, h.service.rampPasses),
+          '60 % · 7 von 10',
+        );
         passes(h, 3);
         expect(h.service.settings.speed, 0.65);
         expect(h.core.rateValue, 0.65);
@@ -434,7 +457,10 @@ void main() {
         passes(h, 23);
         expect(h.service.settings.speed, 0.65);
         expect(h.service.rampPasses, 23);
-        expect(h.service.rampLabel, '65 % · Ziel erreicht · 23 Durchgänge');
+        expect(
+          rampStatus(de, h.service.settings, h.service.rampPasses),
+          '65 % · Ziel erreicht · 23 Durchgänge',
+        );
       },
     );
 

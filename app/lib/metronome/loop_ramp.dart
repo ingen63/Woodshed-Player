@@ -31,13 +31,4 @@ class LoopRamp {
     }
     return changed ? percent / 100 : null;
   }
-
-  /// #29/AK8: «75 % · 7 von 10», an der Zielstufe «100 % · Ziel erreicht · 14 Durchgänge».
-  String label(PlaybackSettings s) {
-    final p = s.speedPercent;
-    if (atTarget(s)) {
-      return '$p % · Ziel erreicht · $_passes ${_passes == 1 ? 'Durchgang' : 'Durchgänge'}';
-    }
-    return '$p % · $_passes von ${s.rampPasses}';
-  }
 }

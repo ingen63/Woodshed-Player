@@ -32,22 +32,23 @@ abstract class AudioCore {
   WpWaveform? waveform(double start, double end, int count);
 }
 
-/// #15/AK3: verständliche deutsche Meldung zu einem Fehlercode des Kerns.
-String loadErrorMessage(int code, {String? file}) {
-  final name = file == null ? 'Die Datei' : 'Die Datei «$file»';
-  return switch (code) {
-    WpCode.fileNotFound =>
-      '$name wurde nicht gefunden. Wurde sie verschoben oder gelöscht?',
-    WpCode.unsupportedFormat =>
-      '$name ist kein unterstütztes Audioformat (MP3, WAV, FLAC) oder beschädigt.',
-    WpCode.fileUnreadable =>
-      '$name kann nicht gelesen werden. Fehlen die Zugriffsrechte?',
-    WpCode.deviceUnavailable => 'Kein Audiogerät verfügbar. Bitte Kopfhörer oder Lautsprecher prüfen und erneut versuchen.',
-    WpCode.outOfMemory => '$name ist zu gross für den freien Arbeitsspeicher.',
-    WpCode.cancelled => 'Das Laden wurde abgebrochen.',
-    WpCode.busy =>
-      'Der Audio-Kern ist gerade ausgelastet. Bitte erneut versuchen.',
-    WpCode.invalidArgument => 'Ungültige Datei-Angabe.',
-    _ => 'Unbekannter Fehler beim Laden (Code $code).',
-  };
+/// #15/AK3: load error of the core; the UI turns it into a message in the user's language (#43).
+class LoadError {
+  const LoadError(this.code, this.file);
+
+  /// Error code of the core (`WpCode`, < 0).
+  final int code;
+
+  /// Title or file name of the track that failed to load.
+  final String file;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LoadError && other.code == code && other.file == file;
+
+  @override
+  int get hashCode => Object.hash(code, file);
+
+  @override
+  String toString() => 'LoadError($code, $file)';
 }

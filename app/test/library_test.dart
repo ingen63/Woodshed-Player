@@ -197,7 +197,11 @@ void main() {
             .writeAsStringSync('{ "tracks": [ kaputt');
         final l = await loaded(base);
         expect(l.tracks, isEmpty);
-        expect(l.lastError, contains('beschädigt'));
+        expect(l.lastError, isA<LibraryCorrupt>());
+        expect(
+          (l.lastError! as LibraryCorrupt).backupName,
+          startsWith('library.json.defekt-'),
+        );
         final kept = base.listSync().whereType<File>().where(
           (f) => f.path.contains('library.json.defekt-'),
         );
@@ -293,7 +297,10 @@ void main() {
         ]);
         expect(r.imported.length, 1);
         expect(r.failed, ['kaputt.mp3', 'gibts-nicht.mp3']);
-        expect(l.lastError, contains('kaputt.mp3'));
+        expect((l.lastError! as ImportFailed).files, [
+          'kaputt.mp3',
+          'gibts-nicht.mp3',
+        ]);
         expect(l.tracksDir.listSync().length, 1);
       },
     );
@@ -361,10 +368,15 @@ void main() {
       () async {
         final f = l.createFolder('  Swing ');
         expect(f.name, 'Swing');
-        expect(l.createFolder('   ').name, 'Neuer Ordner');
+        expect(
+          l.createFolder('   ', fallback: 'Neuer Ordner').name,
+          'Neuer Ordner',
+        );
         l.moveTracks({ids['Bossa']!, ids['Zebra']!}, f.id);
         expect(titles(f.id), ['Zebra', 'Bossa']);
         expect(titles().length, 3);
+        l.renameFolder(f.id, '  ');
+        expect(l.folders.firstWhere((x) => x.id == f.id).name, 'Swing');
         l.renameFolder(f.id, 'Jazz');
         expect(l.folders.firstWhere((x) => x.id == f.id).name, 'Jazz');
         l.deleteFolder(f.id);

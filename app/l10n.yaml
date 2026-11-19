@@ -1,0 +1,6 @@
+# UI texts (#43): English is the template and fallback, German the second language.
+# A new language only needs another lib/l10n/app_<code>.arb.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+nullable-getter: false
