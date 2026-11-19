@@ -18,7 +18,7 @@ int checks = 0;
         ++checks;                                                                \
         if (!(cond)) {                                                           \
             ++failures;                                                          \
-            std::printf("  FEHLER %s:%d: %s\n", __FILE__, __LINE__, #cond);      \
+            std::printf("  FAILED %s:%d: %s\n", __FILE__, __LINE__, #cond);      \
         }                                                                        \
     } while (0)
 
@@ -107,7 +107,7 @@ void overviewIsFast() {  // #28/AK5: 5 Minuten, 1000 Werte, auf dem Mac unter 20
     const auto t2 = std::chrono::steady_clock::now();
     const double build = std::chrono::duration<double, std::milli>(t1 - t0).count();
     const double query = std::chrono::duration<double, std::milli>(t2 - t1).count();
-    std::printf("  5 min: Berechnung beim Laden %.1f ms, Übersicht 1000 Werte %.2f ms\n", build, query);
+    std::printf("  5 min: computed while loading %.1f ms, overview of 1000 values %.2f ms\n", build, query);
     CHECK(build < 200.0);
     CHECK(query < 20.0);
 }
@@ -128,6 +128,6 @@ int main() {
         fn();
         std::printf("%s %s\n", failures == before ? "ok  " : "FAIL", name.c_str());
     }
-    std::printf("%d Prüfungen, %d Fehler\n", checks, failures);
+    std::printf("%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

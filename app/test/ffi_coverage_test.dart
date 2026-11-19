@@ -15,7 +15,7 @@ void main() {
         .toSet();
     expect(functions.length, greaterThan(30));
     final missing = functions.where((f) => !binding.contains("'$f'")).toList();
-    expect(missing, isEmpty, reason: 'nicht angebunden: $missing');
+    expect(missing, isEmpty, reason: 'not bound: $missing');
   });
 
   test('Fehlercodes und Ladezustände wie in wp_core.h', () {
@@ -38,7 +38,7 @@ void main() {
     expect(
       errDefines,
       8,
-      reason: 'neuer Fehlercode in wp_core.h: WpCode und loadErrorMessage nachführen',
+      reason: 'new WP_ERR_* in wp_core.h: update WpCode and loadErrorMessage',
     );
   });
 

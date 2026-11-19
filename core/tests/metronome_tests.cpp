@@ -17,7 +17,7 @@ int checks = 0;
         ++checks;                                                           \
         if (!(cond)) {                                                      \
             ++failures;                                                     \
-            std::printf("  FEHLER %s:%d: %s\n", __FILE__, __LINE__, #cond); \
+            std::printf("  FAILED %s:%d: %s\n", __FILE__, __LINE__, #cond); \
         }                                                                   \
     } while (0)
 
@@ -103,7 +103,7 @@ void beatsAreSampleExactWithoutDrift() {  // #3/AK9
             ok = ok && k.frame == beats * 22050;  // 0,5 s bei 120 BPM
             ++beats;
         }
-        std::printf("  Unterteilung %d: %lld Schläge, %zu Klicks\n", sub, beats, t.size());
+        std::printf("  subdivision %d: %lld beats, %zu clicks\n", sub, beats, t.size());
         CHECK(ok);
         CHECK(beats == 600);
         CHECK(static_cast<long long>(t.size()) == 600 * sub);
@@ -152,7 +152,7 @@ void subdivisionsAndQuieterSubClicks() {  // #3/AK8
         return p;
     };
     const float beat = peak(22050), sub = peak(22050 + 11025);
-    std::printf("  Spitze Schlag %.3f, Unterteilung %.3f\n", beat, sub);
+    std::printf("  peak beat %.3f, subdivision %.3f\n", beat, sub);
     CHECK(sub < beat * 0.8f);
     CHECK(beat > 0.1f);
 }
@@ -180,7 +180,7 @@ void volumeChangeWithoutCrackle() {  // #3/AK12
     m.renderAdd(out.data() + 200, 44100 - 100, 2);
     float maxStep = 0;
     for (int i = 1; i < 2000; ++i) maxStep = std::max(maxStep, std::fabs(out[i * 2] - out[(i - 1) * 2]));
-    std::printf("  grösster Sprung zwischen Samples: %.4f\n", maxStep);
+    std::printf("  largest step between samples: %.4f\n", maxStep);
     CHECK(maxStep < 0.25f);  // Klick bei 1600 Hz hat Steigung ~0,16 pro Sample
     float tail = 0;
     for (int i = 4410; i < 44100; ++i) tail = std::max(tail, std::fabs(out[i * 2]));
@@ -292,7 +292,7 @@ bool stepsWithinOneBar(const std::vector<BarStart>& bars, int start, int target,
         if (i == 0 || i == bars.size()) return false;
         const double barLen = bars[i].seconds - bars[i - 1].seconds;
         if (bars[i].seconds < ideal - 1e-6 || bars[i].seconds - ideal > barLen + 1e-6) {
-            std::printf("  Stufe %d: %.3f s statt %.3f s\n", k, bars[i].seconds, ideal);
+            std::printf("  step %d: %.3f s instead of %.3f s\n", k, bars[i].seconds, ideal);
             return false;
         }
     }
@@ -440,6 +440,6 @@ int main() {
         fn();
         std::printf("%s %s\n", failures == before ? "ok  " : "FAIL", name.c_str());
     }
-    std::printf("%d Prüfungen, %d Fehler\n", checks, failures);
+    std::printf("%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

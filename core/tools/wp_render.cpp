@@ -9,7 +9,7 @@
 
 int main(int argc, char** argv) {
     if (argc < 4) {
-        std::fprintf(stderr, "Aufruf: %s <eingabe> <ausgabe.wav> <tempo> [sekunden]\n", argv[0]);
+        std::fprintf(stderr, "Usage: %s <input> <output.wav> <tempo> [seconds]\n", argv[0]);
         return 2;
     }
     const double rate = std::atof(argv[3]);
@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     ma_decoder_config dc = ma_decoder_config_init(ma_format_f32, 2, 0);
     ma_decoder dec;
     if (ma_decoder_init_file(argv[1], &dc, &dec) != MA_SUCCESS) {
-        std::fprintf(stderr, "Datei nicht lesbar: %s\n", argv[1]);
+        std::fprintf(stderr, "File not readable: %s\n", argv[1]);
         return 1;
     }
     const int ch = static_cast<int>(dec.outputChannels);
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
     ma_encoder_config ec = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, ch, sr);
     ma_encoder enc;
     if (ma_encoder_init_file(argv[2], &ec, &enc) != MA_SUCCESS) {
-        std::fprintf(stderr, "Ausgabe nicht schreibbar: %s\n", argv[2]);
+        std::fprintf(stderr, "Output not writable: %s\n", argv[2]);
         return 1;
     }
     std::vector<float> out(1024 * ch);
@@ -54,6 +54,6 @@ int main(int argc, char** argv) {
         ma_encoder_write_pcm_frames(&enc, out.data(), 1024, nullptr);
     } while (engine.playing());
     ma_encoder_uninit(&enc);
-    std::printf("%s: %.2f s Quelle, Tempo %.2f\n", argv[2], engine.duration(), engine.rate());
+    std::printf("%s: %.2f s source, tempo %.2f\n", argv[2], engine.duration(), engine.rate());
     return 0;
 }

@@ -14,9 +14,9 @@ const SR = 48000;
 let checks = 0, failures = 0, testFailed = false;
 function check(cond, what) {
   checks++;
-  if (!cond) { failures++; testFailed = true; console.log(`  FEHLER: ${what}`); }
+  if (!cond) { failures++; testFailed = true; console.log(`  FAILED: ${what}`); }
 }
-const near = (a, b, tol, what) => check(Math.abs(a - b) <= tol, `${what}: ${a} statt ${b} ± ${tol}`);
+const near = (a, b, tol, what) => check(Math.abs(a - b) <= tol, `${what}: ${a} instead of ${b} ± ${tol}`);
 
 // 16-Bit-Stereo-WAV mit Frame-Index als Inhalt (wie writeIndexWav in player_tests.cpp).
 function indexWav(frames, sr = SR) {
@@ -55,34 +55,34 @@ const rms = (v, from, count) => {
 };
 
 async function sineChecks(core, what) {
-  near(core.duration, 1.0, 0.06, `${what} Dauer`);
+  near(core.duration, 1.0, 0.06, `${what} duration`);
   core.play();
   const { L, R } = render(core, SR / 2);
-  near(zeroCrossingFreq(L, SR / 10, SR / 4), 440, 8, `${what} Frequenz`);
-  near(rms(L, SR / 10, SR / 4), 0.5 / Math.SQRT2, 0.05, `${what} Pegel`);
-  check(L.every((x, i) => x === R[i]), `${what} Mono auf beiden Kanälen`);
+  near(zeroCrossingFreq(L, SR / 10, SR / 4), 440, 8, `${what} frequency`);
+  near(rms(L, SR / 10, SR / 4), 0.5 / Math.SQRT2, 0.05, `${what} level`);
+  check(L.every((x, i) => x === R[i]), `${what} mono on both channels`);
 }
 
 const tests = {
   async decodesMp3AndFlac() { // #33/AK3
     for (const f of ['sine440.mp3', 'sine440.flac']) {
       const core = await createCore(wasm, SR);
-      check(core.loadEncoded(readFileSync(join(audioDir, f))) === WP_OK, `${f} geladen`);
+      check(core.loadEncoded(readFileSync(join(audioDir, f))) === WP_OK, `${f} loaded`);
       await sineChecks(core, f);
     }
   },
   async wavSeekSampleExact() { // #33/AK2 Seek, #33/AK3 WAV
     const core = await createCore(wasm, SR);
-    check(core.loadEncoded(indexWav(2 * SR)) === WP_OK, 'WAV geladen');
-    near(core.duration, 2.0, 1e-9, 'WAV Dauer');
+    check(core.loadEncoded(indexWav(2 * SR)) === WP_OK, 'WAV loaded');
+    near(core.duration, 2.0, 1e-9, 'WAV duration');
     core.seek(1.25);
     core.play();
     const { L, R } = render(core, 2, 2);
-    check(frameIndex(L[0], R[0]) === 60000 && frameIndex(L[1], R[1]) === 60001, 'Seek sample-genau');
+    check(frameIndex(L[0], R[0]) === 60000 && frameIndex(L[1], R[1]) === 60001, 'seek sample-exact');
   },
   async loopBounds() { // #33/AK2 Loop-Grenzen (wie loopBoundsWithLoadedFile)
     const core = await createCore(wasm, SR);
-    check(core.loadEncoded(indexWav(3 * SR)) === WP_OK, 'WAV geladen');
+    check(core.loadEncoded(indexWav(3 * SR)) === WP_OK, 'WAV loaded');
     core.setLoop(0.5, 1.75);
     core.seek(1.7);
     core.play();
@@ -92,9 +92,9 @@ const tests = {
       ok = frameIndex(L[i], R[i]) === expected;
       if (++expected >= 1.75 * SR) expected = SR / 2;
     }
-    check(ok, 'Loop lückenlos und sample-genau');
-    check(core.loopPasses === 4, `Loop-Durchgänge ${core.loopPasses} statt 4`);
-    check(core.playing, 'spielt im Loop weiter');
+    check(ok, 'loop gapless and sample-exact');
+    check(core.loopPasses === 4, `loop passes ${core.loopPasses} instead of 4`);
+    check(core.playing, 'keeps playing in the loop');
   },
   async endOfFile() { // Dateiende
     const core = await createCore(wasm, SR);
@@ -102,10 +102,10 @@ const tests = {
     core.seek(0.99);
     core.play();
     const { L, R } = render(core, SR / 50, SR / 50);
-    check(frameIndex(L[SR / 100 - 1], R[SR / 100 - 1]) === SR - 1, 'letzter Frame');
-    check(L[SR / 100] === 0 && R[SR / 100] === 0, 'danach Stille');
-    check(!core.playing, 'hält am Ende an');
-    near(core.position, 1.0, 1e-9, 'Position am Ende');
+    check(frameIndex(L[SR / 100 - 1], R[SR / 100 - 1]) === SR - 1, 'last frame');
+    check(L[SR / 100] === 0 && R[SR / 100] === 0, 'silence afterwards');
+    check(!core.playing, 'stops at the end');
+    near(core.position, 1.0, 1e-9, 'position at the end');
   },
   async tempoKeepsPitch() { // #33/AK2 Tempo
     const core = await createCore(wasm, SR);
@@ -115,8 +115,8 @@ const tests = {
       core.setRate(rate);
       core.play();
       const { L } = render(core, SR / 2);
-      near(core.position, 0.5 * rate, 0.01, `Position bei ${rate}x`);
-      near(zeroCrossingFreq(L, SR / 5, SR / 4), 440, 10, `Tonhöhe bei ${rate}x`);
+      near(core.position, 0.5 * rate, 0.01, `position at ${rate}x`);
+      near(zeroCrossingFreq(L, SR / 5, SR / 4), 440, 10, `pitch at ${rate}x`);
       core.pause();
     }
   },
@@ -125,40 +125,40 @@ const tests = {
     const mono = new Float32Array(44100).map((_, i) => 0.5 * Math.sin((2 * Math.PI * 440 * i) / 44100));
     const fakeDecode = async () => ({ numberOfChannels: 1, sampleRate: 44100, getChannelData: () => mono });
     const m4a = readFileSync(join(audioDir, 'sine440.m4a'));
-    check(core.loadEncoded(m4a) === WP_ERR_UNSUPPORTED_FORMAT, 'M4A nicht im Kern');
-    check(await loadFile(core, m4a, fakeDecode) === WP_OK, 'M4A über decodeAudioData');
-    await sineChecks(core, 'PCM aus dem Browser');
+    check(core.loadEncoded(m4a) === WP_ERR_UNSUPPORTED_FORMAT, 'M4A not in the core');
+    check(await loadFile(core, m4a, fakeDecode) === WP_OK, 'M4A via decodeAudioData');
+    await sineChecks(core, 'PCM from the browser');
     const stereo = [new Float32Array(SR).fill(0.25), new Float32Array(SR).fill(-0.25)];
-    check(core.loadPcm(stereo, SR) === WP_OK, 'Stereo-PCM');
+    check(core.loadPcm(stereo, SR) === WP_OK, 'stereo PCM');
     core.play();
     const { L, R } = render(core, 256);
-    check(L.every((x) => x === 0.25) && R.every((x) => x === -0.25), 'Stereo-PCM unverändert');
-    check(core.loadPcm([], SR) === WP_ERR_INVALID_ARGUMENT, 'leeres PCM abgelehnt');
+    check(L.every((x) => x === 0.25) && R.every((x) => x === -0.25), 'stereo PCM unchanged');
+    check(core.loadPcm([], SR) === WP_ERR_INVALID_ARGUMENT, 'empty PCM rejected');
   },
   async errorsKeepTitle() {
     const core = await createCore(wasm, SR);
     core.loadEncoded(indexWav(2 * SR));
-    check(core.loadEncoded(new TextEncoder().encode('kein Audio')) === WP_ERR_UNSUPPORTED_FORMAT, 'kein Audio');
+    check(core.loadEncoded(new TextEncoder().encode('no audio')) === WP_ERR_UNSUPPORTED_FORMAT, 'no audio');
     check(await loadFile(core, new Uint8Array(4), async () => { throw new Error('x'); }) === WP_ERR_UNSUPPORTED_FORMAT,
-      'Browser kann es auch nicht');
-    check(core.errorMessage(WP_ERR_UNSUPPORTED_FORMAT) === 'Unsupported format or corrupt file', 'Fehlertext');
-    near(core.duration, 2.0, 1e-9, 'bisheriger Titel bleibt');
+      'browser cannot decode it either');
+    check(core.errorMessage(WP_ERR_UNSUPPORTED_FORMAT) === 'Unsupported format or corrupt file', 'error text');
+    near(core.duration, 2.0, 1e-9, 'previous title stays');
   },
   async waveformAndMetronome() {
     const core = await createCore(wasm, SR);
-    check(core.waveform(0, 1, 10) === null, 'ohne Titel keine Wellenform');
+    check(core.waveform(0, 1, 10) === null, 'no waveform without a title');
     core.loadEncoded(readFileSync(join(audioDir, 'sine440.flac')));
     const w = core.waveform(0, 1, 10);
-    near(w.maxs[5], 0.5, 0.01, 'Wellenform Maximum');
-    near(w.mins[5], -0.5, 0.01, 'Wellenform Minimum');
+    near(w.maxs[5], 0.5, 0.01, 'waveform maximum');
+    near(w.mins[5], -0.5, 0.01, 'waveform minimum');
     core.pause();
     core.metroSetBpm(120);
     core.metroStart();
-    check(core.metroRunning && core.metroBpm === 120, 'Metronom läuft');
+    check(core.metroRunning && core.metroBpm === 120, 'metronome running');
     const { L } = render(core, SR);
     let clicks = 0;
     for (let i = 1; i < SR; i++) if (L[i - 1] === 0 && L[i] !== 0) clicks++;
-    check(clicks === 2, `${clicks} Klicks in 1 s bei 120 BPM statt 2`);
+    check(clicks === 2, `${clicks} clicks in 1 s at 120 BPM instead of 2`);
   },
   async decoderInWorkerTakenOverInPieces() { // #42/AK1, #42/AK2: decode elsewhere, old title plays on
     const decoder = await createDecoder(wasm);
@@ -224,8 +224,8 @@ const tests = {
 
 for (const [name, fn] of Object.entries(tests)) {
   testFailed = false;
-  try { await fn(); } catch (e) { failures++; testFailed = true; console.log(`  AUSNAHME: ${e.stack}`); }
+  try { await fn(); } catch (e) { failures++; testFailed = true; console.log(`  EXCEPTION: ${e.stack}`); }
   console.log(`${testFailed ? 'FAIL' : 'ok  '} ${name}`);
 }
-console.log(`${checks} Prüfungen, ${failures} Fehler`);
+console.log(`${checks} checks, ${failures} failures`);
 process.exit(failures ? 1 : 0);

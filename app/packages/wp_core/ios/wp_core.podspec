@@ -3,8 +3,8 @@
 Pod::Spec.new do |s|
   s.name             = 'wp_core'
   s.version          = '0.0.1'
-  s.summary          = 'Woodshed Player Audio-Kern'
-  s.description      = 'Wiedergabe mit Tempo ohne Tonhöhenänderung und Loop.'
+  s.summary          = 'Woodshed Player audio core'
+  s.description      = 'Playback with tempo change without pitch change and loop.'
   s.homepage         = 'https://github.com/ingen63/Woodshed-Player'
   s.license          = { :type => 'MIT' }
   s.author           = { 'Woodshed Player' => 'noreply@github.com' }

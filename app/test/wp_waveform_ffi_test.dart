@@ -47,7 +47,7 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('wp_waveform_');
     final player = WpPlayer();
     try {
-      expect(player.waveform(0, 1, 10), isNull, reason: 'noch kein Titel');
+      expect(player.waveform(0, 1, 10), isNull, reason: 'no title yet');
       final r = player.loadAsync(_sineWav(dir, 2, 0.5).path);
       if (r == WpCode.deviceUnavailable) {
         markTestSkipped('kein Audiogerät');

@@ -102,18 +102,18 @@ Future<List<Check>> run() async {
   final p = app.player;
 
   // Laden (WAV, Kern dekodiert im Worklet)
-  final wav = files.register('sinus-dann-stille.wav', toneThenSilenceWav());
+  final wav = files.register('sine-then-silence.wav', toneThenSilenceWav());
   await app.importFiles([wav]);
   add(
-    'Laden WAV',
+    'Load WAV',
     p.hasTrack && (p.duration - 6).abs() < 0.02 && p.error == null,
-    'Dauer ${f(p.duration)} s (erwartet 6), Titel «${p.title}»',
+    'Duration ${f(p.duration)} s (expected 6), title "${p.title}"',
   );
 
   // Wellenform: erste Hälfte ~0,5, zweite Hälfte still
   final w = p.waveform(0, p.duration, 60);
   if (w == null) {
-    add('Wellenform', false, 'keine Wellenform');
+    add('Waveform', false, 'no waveform');
   } else {
     final loud = [for (var i = 1; i < 29; i++) w.max[i]];
     final quiet = [for (var i = 31; i < 60; i++) max(w.max[i], -w.min[i])];
@@ -124,10 +124,10 @@ Future<List<Check>> run() async {
         detail != null &&
         detail.length == 300;
     add(
-      'Wellenform',
+      'Waveform',
       ok,
-      'Ton: ${f(loud.reduce(min))}–${f(loud.reduce(max))}, Stille bis ${f(quiet.reduce(max))}, '
-          'Ausschnitt 1–2 s mit ${detail?.length} Abschnitten',
+      'Tone: ${f(loud.reduce(min))}–${f(loud.reduce(max))}, silence up to ${f(quiet.reduce(max))}, '
+          'detail 1–2 s with ${detail?.length} sections',
     );
   }
 
@@ -138,9 +138,9 @@ Future<List<Check>> run() async {
   var s = await record(1000);
   final rate1 = positionRate(s);
   add(
-    'Wiedergabe/Position',
+    'Playback/position',
     (rate1 - 1).abs() < 0.05 && p.isPlaying && p.position > 0.9,
-    'Position ${f(rate1)} s pro Sekunde, PlayerService.position ${f(p.position)} s',
+    'Position ${f(rate1)} s per second, PlayerService.position ${f(p.position)} s',
   );
   final peak1 = maxPeak(s);
   p.setVolume(0.5);
@@ -148,9 +148,9 @@ Future<List<Check>> run() async {
   final peakHalf = maxPeak(await record(300));
   p.setVolume(1);
   add(
-    'Pegel',
+    'Level',
     (peak1 - 0.5).abs() < 0.06 && (peakHalf - 0.25).abs() < 0.04,
-    'Spitze ${f(peak1)} bei Lautstärke 1 (erwartet 0,5), ${f(peakHalf)} bei 0,5 (erwartet 0,25)',
+    'Peak ${f(peak1)} at volume 1 (expected 0.5), ${f(peakHalf)} at 0.5 (expected 0.25)',
   );
 
   // Tempo 0,5×: Position halb so schnell, Pegel bleibt
@@ -161,9 +161,9 @@ Future<List<Check>> run() async {
   s = await record(1000);
   final rateHalf = positionRate(s);
   add(
-    'Tempo 0,5×',
+    'Tempo 0.5×',
     (rateHalf - 0.5).abs() < 0.04 && maxPeak(s) > 0.4,
-    'Position ${f(rateHalf)} s pro Sekunde (erwartet 0,5), Spitze ${f(maxPeak(s))}',
+    'Position ${f(rateHalf)} s per second (expected 0.5), peak ${f(maxPeak(s))}',
   );
   p.setSpeed(1.5);
   p.seek(0.2);
@@ -171,9 +171,9 @@ Future<List<Check>> run() async {
   s = await record(800);
   final rateFast = positionRate(s);
   add(
-    'Tempo 1,5×',
+    'Tempo 1.5×',
     (rateFast - 1.5).abs() < 0.08,
-    'Position ${f(rateFast)} s pro Sekunde (erwartet 1,5)',
+    'Position ${f(rateFast)} s per second (expected 1.5)',
   );
   p.setSpeedEnabled(false);
 
@@ -188,9 +188,9 @@ Future<List<Check>> run() async {
   final lo = positions.reduce(min), hi = positions.reduce(max);
   final passes = core.loopPasses - passes0;
   add(
-    'Loop-Sprung',
+    'Loop jump',
     lo >= 0.49 && hi <= 1.51 && passes >= 2 && p.activeLoop != null,
-    'Position zwischen ${f(lo)} und ${f(hi)} s (Loop 0,5–1,5), $passes Durchgänge in 2,6 s',
+    'Position between ${f(lo)} and ${f(hi)} s (loop 0.5–1.5), $passes passes in 2.6 s',
   );
   p.setLoopEnabled(false);
 
@@ -215,8 +215,8 @@ Future<List<Check>> run() async {
         afterSeek < 4.8 &&
         silentPeak < 0.01 &&
         tonePeak > 0.45,
-    'pausiert bei ${f(pausedAt)} s, danach ${f(afterSeek)} s mit Spitze ${f(silentPeak)} (Stille), '
-        'nach Seek auf 1 s Spitze ${f(tonePeak)}',
+    'paused at ${f(pausedAt)} s, then ${f(afterSeek)} s with peak ${f(silentPeak)} (silence), '
+        'after seek to 1 s peak ${f(tonePeak)}',
   );
 
   // Metronom 120 BPM: Klicks alle 0,5 s, still nach dem Stopp
@@ -240,20 +240,20 @@ Future<List<Check>> run() async {
   await wait(200);
   final afterStop = maxPeak(await record(300));
   add(
-    'Metronom',
+    'Metronome',
     running &&
         gaps.length >= 3 &&
         gaps.every((g) => (g - 0.5).abs() < 0.03) &&
         afterStop < 0.01 &&
         !m.running,
-    '${onsets.length} Klicks, Abstände ${gaps.map(f).join(', ')} s (erwartet 0,5), '
-        'nach Stopp Spitze ${f(afterStop)}',
+    '${onsets.length} clicks, intervals ${gaps.map(f).join(', ')} s (expected 0.5), '
+        'after stop peak ${f(afterStop)}',
   );
 
   // AAC/M4A: der Browser dekodiert im Hauptthread, das PCM geht ins Worklet
   final response = await web.window.fetch('sine440.m4a'.toJS).toDart;
   if (!response.ok) {
-    add('Laden M4A', false, 'sine440.m4a fehlt');
+    add('Load M4A', false, 'sine440.m4a missing');
   } else {
     final bytes = (await response.arrayBuffer().toDart).toDart.asUint8List();
     final r = await app.library.importFiles([
@@ -265,9 +265,9 @@ Future<List<Check>> run() async {
     final peak = maxPeak(await record(500));
     p.pause();
     add(
-      'Laden M4A',
+      'Load M4A',
       loaded && p.duration > 0.5 && peak > 0.1,
-      'geladen: $loaded, Dauer ${f(p.duration)} s, Spitze ${f(peak)}',
+      'loaded: $loaded, duration ${f(p.duration)} s, peak ${f(peak)}',
     );
   }
   await loadChecks(add);
@@ -275,7 +275,7 @@ Future<List<Check>> run() async {
 }
 
 /// Name of the 6-second file whose duration is checked again after the reload (#42/AK5).
-const sixSeconds = 'sinus-dann-stille.wav';
+const sixSeconds = 'sine-then-silence.wav';
 
 /// Wall-clock times of the clicks in [s] (peak after at least 5 quiet states).
 List<double> clickWalls(List<WebCoreState> s) {
@@ -324,9 +324,9 @@ Future<void> loadChecks(void Function(String, bool, String) add) async {
       .where((t) => t.originalFileName == sixSeconds)
       .firstOrNull;
   add(
-    '#42/AK5 Dauer in der Titelliste',
+    '#42/AK5 duration in the track list',
     six != null && (six.duration - 6).abs() < 0.02,
-    'Dauer ${six == null ? '–' : '${f(six.duration)} s, angezeigt ${formatTime(six.duration)}'} (erwartet 00:06)',
+    'Duration ${six == null ? '–' : '${f(six.duration)} s, shown ${formatTime(six.duration)}'} (expected 00:06)',
   );
 
   // #42/AK1: metronome at 120 BPM while a 3-minute WAV loads
@@ -338,7 +338,7 @@ Future<void> loadChecks(void Function(String, bool, String) add) async {
     freq: 330,
   );
   final a = await app.library.importFiles([
-    files.register('lang-a.wav', longA),
+    files.register('long-a.wav', longA),
   ]);
   m.setBpm(120);
   m.setSubdivision(1);
@@ -355,14 +355,14 @@ Future<void> loadChecks(void Function(String, bool, String) add) async {
   var clicks = clickWalls(s);
   var gaps = gapsOf(clicks);
   add(
-    '#42/AK1 Metronom beim Laden',
+    '#42/AK1 metronome while loading',
     loaded &&
         (p.duration - 180).abs() < 0.05 &&
         gaps.length >= 4 &&
         gaps.every((g) => (g - 0.5).abs() <= 0.03),
-    'Laden $loadMs ms (geladen: $loaded, Dauer ${f(p.duration)} s), ${clicks.length} Klicks, '
-        'Abstände (Wanduhr) ${gaps.map(f).join(', ')} s (erwartet 0,5 ± 0,03), Worklet höchstens '
-        '${busiest(s)} ms am Stück beschäftigt',
+    'Load $loadMs ms (loaded: $loaded, duration ${f(p.duration)} s), ${clicks.length} clicks, '
+        'intervals (wall clock) ${gaps.map(f).join(', ')} s (expected 0.5 ± 0.03), worklet busy at most '
+        '${busiest(s)} ms in a row',
   );
 
   // #42/AK2: playback goes on without a jump while another title loads
@@ -373,7 +373,7 @@ Future<void> loadChecks(void Function(String, bool, String) add) async {
     freq: 550,
   );
   final b = await app.library.importFiles([
-    files.register('lang-b.wav', longB),
+    files.register('long-b.wav', longB),
   ]);
   p.seek(10);
   p.play();
@@ -396,7 +396,7 @@ Future<void> loadChecks(void Function(String, bool, String) add) async {
   }
   final ran = old.isEmpty ? 0.0 : old.last.position - old.first.position;
   add(
-    '#42/AK2 Wiedergabe beim Laden',
+    '#42/AK2 playback while loading',
     loaded &&
         switchAt > 60 &&
         worst <= 0.03 &&
@@ -404,9 +404,9 @@ Future<void> loadChecks(void Function(String, bool, String) add) async {
         p.trackId == b.imported.first.id &&
         p.position < 0.01 &&
         !p.isPlaying,
-    'Laden $loadMs ms, alter Titel lief ${f(ran)} s bis zur Übernahme, grösste Abweichung Position zu '
-        'Wanduhr ${f(worst)} s, grösste Lücke ${f(longestWall)} s, Worklet höchstens ${busiest(s)} ms am Stück '
-        'beschäftigt; danach neuer Titel bei ${f(p.position)} s',
+    'Load $loadMs ms, old track ran ${f(ran)} s until the takeover, largest deviation of position from '
+        'wall clock ${f(worst)} s, largest gap ${f(longestWall)} s, worklet busy at most ${busiest(s)} ms in a row'
+        '; then new track at ${f(p.position)} s',
   );
 
   // #42/AK3: MP3, WAV, FLAC and M4A load; a broken file keeps the previous title playable
@@ -427,14 +427,14 @@ Future<void> loadChecks(void Function(String, bool, String) add) async {
     final good = ok && p.duration > 0.5 && peak > 0.1;
     allOk = allOk && good;
     results.add(
-      '${t?.originalFileName}: ${good ? 'ok' : 'FEHLER'} (Dauer ${f(p.duration)} s, Spitze ${f(peak)})',
+      '${t?.originalFileName}: ${good ? 'ok' : 'FAILED'} (duration ${f(p.duration)} s, peak ${f(peak)})',
     );
   }
   final before = p.trackId;
   final broken = await app.library.importFiles([
     files.register(
-      'kaputt.mp3',
-      Uint8List.fromList(utf8.encode('kein Audio ' * 100)),
+      'broken.mp3',
+      Uint8List.fromList(utf8.encode('no audio ' * 100)),
     ),
   ]);
   final brokenLoaded = await app.select(broken.imported.first);
@@ -444,14 +444,14 @@ Future<void> loadChecks(void Function(String, bool, String) add) async {
   final afterError = maxPeak(await record(400));
   p.pause();
   add(
-    '#42/AK3 Formate und Fehler',
+    '#42/AK3 formats and errors',
     allOk &&
         !brokenLoaded &&
         p.error != null &&
         p.trackId == before &&
         afterError > 0.1,
-    '${results.join('; ')}; kaputte Datei: geladen $brokenLoaded, Fehler ${p.error?.code}, '
-        'bisheriger Titel spielt weiter mit Spitze ${f(afterError)}',
+    '${results.join('; ')}; broken file: loaded $brokenLoaded, error ${p.error?.code}, '
+        'previous track keeps playing with peak ${f(afterError)}',
   );
   p.clearError();
 
@@ -465,9 +465,9 @@ Future<void> loadChecks(void Function(String, bool, String) add) async {
   clicks = clickWalls(s);
   gaps = gapsOf(clicks);
   add(
-    'Kontrolle: Laden im Worklet (vor #42) blockiert es messbar',
+    'Control: loading in the worklet (before #42) blocks it measurably',
     s.any((x) => x.busy > 0.01),
-    'Worklet ${busiest(s)} ms am Stück beschäftigt (ein Block dauert 2,7 ms), Klickabstände (Wanduhr) '
+    'Worklet busy ${busiest(s)} ms in a row (one block takes 2.7 ms), click intervals (wall clock) '
         '${gaps.map(f).join(', ')} s',
   );
 }
@@ -484,9 +484,9 @@ Future<Check> durationAfterReload() async {
       .where((t) => t.originalFileName == sixSeconds)
       .firstOrNull;
   return Check(
-    '#42/AK5 Dauer nach Neuladen der Seite',
+    '#42/AK5 duration after reloading the page',
     t != null && (t.duration - 6).abs() < 0.02,
-    'Dauer ${t == null ? '–' : '${f(t.duration)} s, angezeigt ${formatTime(t.duration)}'} (erwartet 00:06)',
+    'Duration ${t == null ? '–' : '${f(t.duration)} s, shown ${formatTime(t.duration)}'} (expected 00:06)',
   );
 }
 
@@ -495,24 +495,24 @@ const _resultKey = 'wp-web-check';
 void show(List<Map<String, Object?>> checks) {
   final passed = checks.where((c) => c['ok'] == true).length;
   web.document
-      .querySelector('#ergebnis')!
+      .querySelector('#result')!
       .textContent = const JsonEncoder.withIndent('  ')
       .convert(checks);
   web.document.querySelector('#status')!.textContent =
-      '$passed von ${checks.length} bestanden';
-  web.document.title = 'Prüfung: $passed von ${checks.length} bestanden';
+      '$passed of ${checks.length} passed';
+  web.document.title = 'Check: $passed of ${checks.length} passed';
 }
 
 Future<void> main() async {
   final body = web.document.body!;
   final status = web.HTMLParagraphElement()
     ..id = 'status'
-    ..textContent = 'Kern wird geladen …';
+    ..textContent = 'Loading core …';
   final button = web.HTMLButtonElement()
     ..id = 'start'
-    ..textContent = 'Prüfung starten'
+    ..textContent = 'Run checks'
     ..disabled = true;
-  final out = web.HTMLPreElement.pre()..id = 'ergebnis';
+  final out = web.HTMLPreElement.pre()..id = 'result';
   // Über der (leeren) Flutter-Ansicht, sonst fängt sie die Klicks ab.
   final page = web.HTMLDivElement()
     ..style.position = 'relative'
@@ -520,7 +520,7 @@ Future<void> main() async {
     ..style.padding = '16px'
     ..style.background = '#fff';
   page
-    ..append(web.HTMLHeadingElement.h1()..textContent = 'Web-Anbindung #34')
+    ..append(web.HTMLHeadingElement.h1()..textContent = 'Web binding #34')
     ..append(status)
     ..append(button)
     ..append(out);
@@ -533,19 +533,19 @@ Future<void> main() async {
     show(checks);
     return;
   }
-  web.document.title = 'Prüfung bereit';
+  web.document.title = 'Check ready';
   await OpfsFileStore.clear(
     libraryDir,
   ); // every check starts with an empty library
   app = await createAppController();
   files = app.files as WebFilePlatform;
   core = app.player.core as WebAudioCore;
-  status.textContent = 'Bereit.';
+  status.textContent = 'Ready.';
   button.disabled = false;
   button.onclick = ((web.Event _) {
     core.wake(); // in der Bedienung, sonst bleibt der AudioContext stumm
     button.disabled = true;
-    status.textContent = 'läuft …';
+    status.textContent = 'running …';
     run().then(
       (checks) {
         final json = [for (final c in checks) c.toJson()];
@@ -555,8 +555,8 @@ Future<void> main() async {
         web.window.location.search = 'after-reload';
       },
       onError: (Object e, StackTrace st) {
-        out.textContent = 'Fehler: $e\n$st';
-        web.document.title = 'Prüfung: Fehler';
+        out.textContent = 'Error: $e\n$st';
+        web.document.title = 'Check: error';
       },
     );
   }).toJS;

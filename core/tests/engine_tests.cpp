@@ -46,7 +46,7 @@ int checks = 0;
         ++checks;                                                                \
         if (!(cond)) {                                                           \
             ++failures;                                                          \
-            std::printf("  FEHLER %s:%d: %s\n", __FILE__, __LINE__, #cond);      \
+            std::printf("  FAILED %s:%d: %s\n", __FILE__, __LINE__, #cond);      \
         }                                                                        \
     } while (0)
 
@@ -256,12 +256,12 @@ void stretchKeepsPitchAndChangesLength() {  // #5/AK3
             rendered += 512;
         } while (e.playing() && rendered < sr * 20);
         const double seconds = double(rendered) / sr;
-        std::printf("  Tempo %.2f: %.3f s gespielt (erwartet %.3f)\n", rate, seconds, 2.0 / rate);
+        std::printf("  tempo %.2f: %.3f s played (expected %.3f)\n", rate, seconds, 2.0 / rate);
         CHECK_NEAR(seconds, 2.0 / rate, 0.05);
         // Tonhöhe in der Mitte (weg von Ein-/Ausschwingen): 440 Hz ± 1 %.
         const long long mid = rendered / 2 - sr / 4;
         const double f = zeroCrossingFreq(all, mid, sr / 2, sr);
-        std::printf("  Tempo %.2f: %.1f Hz\n", rate, f);
+        std::printf("  tempo %.2f: %.1f Hz\n", rate, f);
         CHECK_NEAR(f, 440.0, 4.4);
     }
 }
@@ -280,7 +280,7 @@ void stretchLoopHasNoGap() {  // #5/AK4 (gedehnter Pfad)
     const long long win = sr / 100;  // 10 ms
     double minRms = 1;
     for (long long i = sr / 2; i + win < n; i += win) minRms = std::min(minRms, rms(out, i, win));
-    std::printf("  kleinster 10-ms-Pegel: %.3f (Referenz %.3f)\n", minRms, ref);
+    std::printf("  lowest 10 ms level: %.3f (reference %.3f)\n", minRms, ref);
     CHECK(minRms > ref * 0.7);  // keine Lücke, kein Einbruch über 3 dB
     CHECK(e.position() >= 1.0 && e.position() < 2.0);
 }
@@ -346,7 +346,7 @@ void rateChangeKeepsPositionAndSignal() {
     double maxStep = 0;
     for (auto* v : {&b, &c})
         for (long long i = sr / 20; i + 1 < sr; ++i) maxStep = std::max(maxStep, double(std::fabs((*v)[2 * (i + 1)] - (*v)[2 * i])));
-    std::printf("  grösster Sprung: %.4f\n", maxStep);
+    std::printf("  largest step: %.4f\n", maxStep);
     CHECK(maxStep < 0.1);
 }
 
@@ -474,7 +474,7 @@ void renderDoesNotAllocate() {  // #14/AK1: Audio-Thread reserviert keinen Speic
     block(20);
     tCountAllocs = false;
     CHECK(gAllocs.load() == 0);
-    if (gAllocs.load() != 0) std::printf("  %ld Reservierungen im Audio-Thread\n", gAllocs.load());
+    if (gAllocs.load() != 0) std::printf("  %ld allocations on the audio thread\n", gAllocs.load());
     e.collectGarbage();
     CHECK_NEAR(e.duration(), 3.0, 1e-9);
     CHECK(e.playing());
@@ -534,7 +534,7 @@ void seeksAreCoalescedPerBlock() {  // #14/AK1: viele Seeks in einem Block koste
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     CHECK_NEAR(e.position(), 4.0, 1e-3);
     CHECK(ms < 50.0);
-    if (ms >= 50.0) std::printf("  Block mit 1001 Seeks: %.1f ms\n", ms);
+    if (ms >= 50.0) std::printf("  block with 1001 seeks: %.1f ms\n", ms);
 
     // Seek vor einem Titelwechsel gilt dem alten Titel und verfällt.
     auto next = std::make_unique<wp::Source>();
@@ -582,6 +582,6 @@ int main(int argc, char** argv) {
         fn();
         std::printf("%s %s\n", failures == before ? "ok  " : "FAIL", name.c_str());
     }
-    std::printf("%d Prüfungen, %d Fehler\n", checks, failures);
+    std::printf("%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

@@ -619,7 +619,7 @@ class Library extends ChangeNotifier {
       written = true;
       final duration = probe(store.locate(dest));
       if (duration != null && duration <= 0) {
-        throw const FormatException('kein lesbares Audio');
+        throw const FormatException('no readable audio');
       }
       final meta = readMetadata(bytes);
       var hasArtwork = false;

@@ -48,7 +48,7 @@ class WebAudioCore implements AudioCore {
         .toDart;
     if (!response.ok) {
       throw StateError(
-        'Audio-Kern fehlt (${base}wp_core_web.wasm). Erst app/tool/build_web_core.sh ausführen.',
+        'Audio core missing (${base}wp_core_web.wasm). Run app/tool/build_web_core.sh first.',
       );
     }
     final module = await _wasmCompile(await response.arrayBuffer().toDart)

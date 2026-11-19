@@ -25,7 +25,7 @@ Future<void> until(bool Function() done) async {
   for (var i = 0; i < 200 && !done(); i++) {
     await Future<void>.delayed(const Duration(milliseconds: 5));
   }
-  expect(done(), isTrue, reason: 'Zeitüberschreitung');
+  expect(done(), isTrue, reason: 'timeout');
 }
 
 void main() {

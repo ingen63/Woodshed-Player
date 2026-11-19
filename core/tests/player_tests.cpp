@@ -27,10 +27,10 @@ static_assert(WP_OK == wp::kOk && WP_ERR_INVALID_ARGUMENT == wp::kErrInvalidArgu
                   WP_ERR_DEVICE_UNAVAILABLE == wp::kErrDeviceUnavailable &&
                   WP_ERR_OUT_OF_MEMORY == wp::kErrOutOfMemory && WP_ERR_FILE_UNREADABLE == wp::kErrFileUnreadable &&
                   WP_ERR_CANCELLED == wp::kErrCancelled && WP_ERR_BUSY == wp::kErrBusy,
-              "Fehlercodes in wp_core.h und player_core.hpp müssen gleich sein");
+              "error codes in wp_core.h and player_core.hpp must match");
 static_assert(WP_LOAD_IDLE == wp::kLoadIdle && WP_LOAD_RUNNING == wp::kLoadRunning &&
                   WP_LOAD_READY == wp::kLoadReady,
-              "Ladezustände in wp_core.h und player_core.hpp müssen gleich sein");
+              "load states in wp_core.h and player_core.hpp must match");
 
 namespace {
 
@@ -42,7 +42,7 @@ int checks = 0;
         ++checks;                                                                \
         if (!(cond)) {                                                           \
             ++failures;                                                          \
-            std::printf("  FEHLER %s:%d: %s\n", __FILE__, __LINE__, #cond);      \
+            std::printf("  FAILED %s:%d: %s\n", __FILE__, __LINE__, #cond);      \
         }                                                                        \
     } while (0)
 
@@ -206,18 +206,18 @@ void loadErrorsHaveCodeAndText() {  // #14/AK2, #14/AK5 Fehlerfälle
     wp::Player p(kSr);
     CHECK(p.load(writeIndexWav("good.wav", 2 * kSr).string()) == wp::kOk);
 
-    const int missing = p.load((tempDir() / "fehlt.mp3").string());
+    const int missing = p.load((tempDir() / "missing.mp3").string());
     CHECK(missing == wp::kErrFileNotFound);
     CHECK(std::strcmp(wp::errorMessage(missing), "File not found") == 0);
     CHECK(p.loadState() == wp::kErrFileNotFound);
     checkStillPlayable(p, 2.0);
 
-    const int garbage = p.load(writeBytes("kein-audio.mp3", std::string(4096, 'x')).string());
+    const int garbage = p.load(writeBytes("no-audio.mp3", std::string(4096, 'x')).string());
     CHECK(garbage == wp::kErrUnsupportedFormat);
     CHECK(std::strcmp(wp::errorMessage(garbage), "Unsupported format or corrupt file") == 0);
     checkStillPlayable(p, 2.0);
 
-    CHECK(p.load(writeBytes("leer.wav", "").string()) == wp::kErrUnsupportedFormat);
+    CHECK(p.load(writeBytes("empty.wav", "").string()) == wp::kErrUnsupportedFormat);
     checkStillPlayable(p, 2.0);
 
     CHECK(p.load("") == wp::kErrInvalidArgument);
@@ -240,7 +240,7 @@ void errorDuringPlaybackKeepsPlaying() {  // #14/AK2
     CHECK(p.load(writeIndexWav("play.wav", 3 * kSr).string()) == wp::kOk);
     p.engine().play();
     renderFrames(p, kSr / 2);
-    CHECK(p.load((tempDir() / "fehlt.flac").string()) == wp::kErrFileNotFound);
+    CHECK(p.load((tempDir() / "missing.flac").string()) == wp::kErrFileNotFound);
     float frame[2];
     p.render(frame, 1);
     CHECK(frameIndex(frame) == kSr / 2);
@@ -298,7 +298,7 @@ void fileDurationWithoutLoading() {  // #16/AK4 (Dauer beim Import)
     CHECK_NEAR(wp::fileDuration(writeIndexWav("dur.wav", 3 * kSr / 2).string()), 1.5, 1e-9);
     CHECK_NEAR(wp::fileDuration((kAudio / "sine440.flac").string()), 1.0, 1e-6);
     CHECK_NEAR(wp::fileDuration((kAudio / "sine440.mp3").string()), 1.0, 0.06);
-    CHECK(wp::fileDuration((tempDir() / "fehlt.mp3").string()) == wp::kErrFileNotFound);
+    CHECK(wp::fileDuration((tempDir() / "missing.mp3").string()) == wp::kErrFileNotFound);
     CHECK(wp::fileDuration(writeBytes("nix.mp3", std::string(512, 'x')).string()) == wp::kErrUnsupportedFormat);
     CHECK(wp::fileDuration("") == wp::kErrInvalidArgument);
 }
@@ -333,7 +333,7 @@ void waveformOfLoadedFile() {  // #28/AK1–AK4 über den Player
     CHECK(p.waveform(1.0, 0.5, 10, mins, maxs) == wp::kErrInvalidArgument);
     CHECK(p.waveform(1.0, 3.0, 10, mins, maxs) == wp::kErrInvalidArgument);
     // Ein fehlgeschlagenes Laden behält die Wellenform des bisherigen Titels.
-    CHECK(p.load((tempDir() / "fehlt.wav").string()) == wp::kErrFileNotFound);
+    CHECK(p.load((tempDir() / "missing.wav").string()) == wp::kErrFileNotFound);
     CHECK(p.waveform(0.0, 2.0, 10, mins, maxs) == wp::kOk);
     // Ein neuer Titel ersetzt sie.
     CHECK(p.load(writeSineWav("silence.wav", 1.0, 0.0).string()) == wp::kOk);
@@ -354,7 +354,7 @@ void deviceChangePausesAndKeepsPosition() {  // #14/AK4
     for (auto ev : {wp::DeviceEvent::Rerouted, wp::DeviceEvent::InterruptionBegan, wp::DeviceEvent::Stopped}) {
         wp::Player p(kSr);
         const int lr = p.load(writeIndexWav("device.wav", 3 * kSr).string());
-        if (lr != wp::kOk) std::printf("  Ladefehler %d bei Ereignis %d\n", lr, int(ev));
+        if (lr != wp::kOk) std::printf("  load error %d at event %d\n", lr, int(ev));
         CHECK(lr == wp::kOk);
         p.engine().setRate(0.75);  // auch im gedehnten Pfad
         p.engine().play();
@@ -408,7 +408,7 @@ void decodeMemoryMatchesFile() {
         CHECK(renderFrames(fromFile, n) == renderFrames(fromMemory, n));
     }
     wp::Source out;
-    CHECK(wp::decodeMemory("kein Audio", 10, kSr, out) == wp::kErrUnsupportedFormat);
+    CHECK(wp::decodeMemory("no audio!!", 10, kSr, out) == wp::kErrUnsupportedFormat);
     CHECK(wp::decodeMemory("", 0, kSr, out) == wp::kErrUnsupportedFormat);
     CHECK(wp::decodeMemory(nullptr, 10, kSr, out) == wp::kErrInvalidArgument);
 }
@@ -528,6 +528,6 @@ int main() {
         std::printf("%s %s\n", failures == before ? "ok  " : "FAIL", name.c_str());
     }
     fs::remove_all(tempDir());
-    std::printf("%d Prüfungen, %d Fehler\n", checks, failures);
+    std::printf("%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

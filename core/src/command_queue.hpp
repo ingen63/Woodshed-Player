@@ -67,7 +67,7 @@ public:
     }
 
 private:
-    static_assert(std::atomic<size_t>::is_always_lock_free, "atomic<size_t> muss lock-free sein");
+    static_assert(std::atomic<size_t>::is_always_lock_free, "atomic<size_t> must be lock-free");
 
     struct Cell {
         std::atomic<size_t> seq{0};

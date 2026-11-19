@@ -1,5 +1,5 @@
 name: wp_core
-description: "Dart-Anbindung des Woodshed-Player-Audio-Kerns (core/) über dart:ffi."
+description: "Dart binding of the Woodshed Player audio core (core/) via dart:ffi."
 version: 0.0.1
 publish_to: none
 

@@ -24,7 +24,7 @@ final DynamicLibrary _lib = () {
   if (Platform.isMacOS || Platform.isIOS) return DynamicLibrary.open('wp_core.framework/wp_core');
   if (Platform.isAndroid || Platform.isLinux) return DynamicLibrary.open('libwp_core.so');
   if (Platform.isWindows) return DynamicLibrary.open('wp_core.dll');
-  throw UnsupportedError('Plattform nicht unterstützt: ${Platform.operatingSystem}');
+  throw UnsupportedError('Platform not supported: ${Platform.operatingSystem}');
 }();
 
 final class _Player extends Opaque {}

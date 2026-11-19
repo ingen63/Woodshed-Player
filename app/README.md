@@ -14,5 +14,5 @@ Im Browser (#34): erst den WASM-Kern bauen und nach `web/wp_core/` legen, dann w
 ```
 tool/build_web_core.sh
 flutter build web          # oder: flutter run -d chrome
-tool/web_core_check.sh     # Prüfseite nach build/web_check, im Browser «Prüfung starten»
+tool/web_core_check.sh     # Prüfseite nach build/web_check, im Browser «Run checks»
 ```
