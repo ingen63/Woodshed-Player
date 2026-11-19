@@ -1,0 +1,220 @@
+# Plan: Web-App für iOS/Android und optionaler Cloud-Sync
+
+Stand: 19.11.2026 · Status: freigegeben, Issues #32 bis #41 · Ergänzt `UMBAUPLAN-FLUTTER.md`
+
+## Ziel
+
+| Plattform | Form | Aufnahme |
+|---|---|---|
+| macOS, Windows, Linux | native Flutter-App, wie bisher | ja |
+| iPhone/iPad, Android | **Web-App (PWA) im Browser**, aus Safari bzw. Chrome auf den Home-Bildschirm installiert | nie |
+
+1. Bibliothek und Konfiguration sind auf allen Plattformen dieselben Daten.
+2. Änderungen gleichen sich über einen **optionalen** Cloudspeicher ab: Google Drive, Dropbox oder OneDrive.
+3. **Ohne Cloud-Konto bleibt alles lokal.** Die App öffnet dann keine Netzverbindung zu einem Cloud-Anbieter und synchronisiert nichts.
+
+## Entscheidungen (aus der Klärung vom 19.11.2026)
+
+| Thema | Entscheidung |
+|---|---|
+| Cloud-Anbieter | Google Drive, Dropbox, OneDrive; später weitere über dieselbe Schnittstelle (z. B. WebDAV) |
+| Umfang | Metadaten **und** Audiodateien |
+| Zugriffsrechte | nur ein app-eigener Ordner (Google `drive.appdata`, Dropbox «App folder», OneDrive «App folder»); die App sieht sonst nichts |
+| Konflikte | pro Titel und Feld zusammenführen, neuester Zeitstempel gewinnt, kein Dialog |
+| Verschlüsselung | keine eigene; Anmeldung per OAuth mit PKCE im Systembrowser bzw. im Browser |
+| Hosting der Web-App | GitHub Pages |
+| Native iOS/Android | gestrichen (Phase 6 des Umbauplans, Issue #25) |
+| Handy-Speicher | einstellbare Obergrenze (Standard 2 GB), älteste Titel zuerst entfernen, «Offline halten» pro Titel |
+| Hochladen pro Titel | Schalter «nicht hochladen» je Titel schon in W5 |
+| Desktop-Ordner | nur auf Wunsch: beim Anmelden wählst Du, welche Ordner synchronisiert werden; neue Titel in gewählten Ordnern laden automatisch hoch |
+| Sicherung | die Cloud behält die letzten 5 Stände von `state.json` |
+| Adresse | GitHub-Pages-Adresse (`<konto>.github.io/<repo>`), keine eigene Domain |
+
+## Architektur
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Flutter-Oberfläche (Dart), eine Codebasis                  │
+├────────────────────────────────────────────────────────────┤
+│ Bibliothek, Einstellungen (Dart, plattformneutral)         │
+│  Änderungsstempel, Grabsteine, Gerät-ID                    │
+├────────────────────────────────────────────────────────────┤
+│ Sync-Engine (reines Dart)                                  │  nur aktiv mit Konto,
+│  Zusammenführen · Warteschlange · Wiederholen              │  sonst NoSync
+├───────────────┬──────────────┬─────────────────────────────┤
+│ GoogleDrive   │ Dropbox      │ OneDrive   (CloudProvider)  │  REST über `http`
+├───────────────┴──────────────┴─────────────────────────────┤
+│ Speicher-Schicht (FileStore)                               │
+│  Desktop: Dateisystem · Web: OPFS (Origin Private FS)      │
+├───────────────────────────┬────────────────────────────────┤
+│ Audio-Kern (C++), C-API   │ Audio-Kern als WASM            │
+│  dart:ffi, Desktop        │  AudioWorklet, Web             │
+│  + Aufnahme (nur Desktop) │  dart:js_interop               │
+└───────────────────────────┴────────────────────────────────┘
+```
+
+Grundsätze:
+- **Ein Kern, zwei Ziele.** Derselbe C++-Code (`core/`) wird für Desktop nativ und für das Web mit Emscripten gebaut. `audio_core.dart` bekommt eine Schnittstelle mit zwei Implementierungen (FFI bzw. JS-Interop, per bedingtem Import).
+- **Sync ist reines Dart** und läuft unverändert auf Desktop und im Browser. Nur die Anmeldung (OAuth) und die Token-Ablage unterscheiden sich je Plattform.
+- **Anbieter hinter einer kleinen Schnittstelle** `CloudProvider` (`list`, `get`, `put` mit Versionskennung, `delete`, `quota`). Der Sync-Code kennt keinen Anbieter.
+- **Ohne Konto:** `SyncService` ist ein `NoSync`, es werden keine Anbieter-Module geladen und keine Anfragen gesendet.
+
+## Cloud-Layout (im app-eigenen Ordner)
+
+```
+state.json              Bibliothek und geteilte Konfiguration (Stempel, Grabsteine)
+backup/state-<n>.json   die letzten 5 früheren Stände (rotierend, n = 1..5)
+audio/<hash>.<ext>      Audiodateien, benannt nach Inhalts-Hash (SHA-256)
+```
+
+- **Titel-ID = Inhalts-Hash** der Audiodatei. So erkennt jedes Gerät denselben Titel ohne Pfade, und doppelte Dateien werden nur einmal hochgeladen.
+- `state.json` wird bedingt geschrieben (ETag / `rev`), bei Fehlschlag neu laden, zusammenführen, wiederholen. Es gibt keinen Server und keine Sperren.
+- Audio ist unveränderlich (Name = Hash). Hochladen ist daher idempotent und wiederaufnehmbar.
+
+## Daten und Zusammenführen
+
+**Geteilt (wandert in die Cloud):** Titel (ID, Titel, Artist, Ordnerzuordnung, Sortierung), Loops und Marker, Tempo je Titel, Ordnerbaum, Metronom- und Tempo-Steigerungs-Voreinstellungen, Darstellung (Hell/Dunkel/System).
+
+**Gerätelokal (bleibt lokal):** Cloud-Konto und Tokens, Cache-Obergrenze, Fensterlage, Ausgabegerät, Dateipfade auf dem Desktop.
+
+Regeln:
+- Jedes Feld trägt einen **hybriden Zeitstempel** (Zeit plus Zähler plus Gerät-ID). Je Feld gewinnt der höhere Stempel. Das ist unabhängig von Uhrabweichungen eindeutig.
+- **Grabsteine:** Gelöschte Titel und Ordner bleiben mit Stempel in `state.json`. Eine jüngere Änderung am Titel «belebt» ihn wieder. Grabsteine werden nach 90 Tagen entfernt.
+- **Mengen** (Loops je Titel) werden elementweise zusammengeführt (Loop-ID als Schlüssel), nicht als Ganzes.
+- **Migration:** Das heutige `library.json` (Swift-kompatibel) wird beim ersten Start mit neuer Version in das Format mit Stempeln überführt, ohne Datenverlust, mit Sicherungskopie.
+- Format hat eine **Versionsnummer**. Ein älteres Gerät schreibt eine neuere Datei nicht zurück, sondern meldet «App aktualisieren».
+
+## Phasen
+
+Aufwand in Arbeitstagen, grob, mit KI-Unterstützung. Grösste Unsicherheit: W0 und W6.
+
+### W0 – Machbarkeitstest auf dem iPhone (2–3 Tage) · **Go/No-Go**
+- Kern nach WASM bauen (Emscripten, `-sAUDIO_WORKLET`, geteilter Speicher), kleine Testseite auf GitHub Pages mit **COOP/COEP** (bei Pages über Service-Worker-Verfahren, da keine eigenen Header möglich).
+- Auf einem echten iPhone und einem Android-Handy prüfen:
+  1. Spielt Audio weiter, wenn der Bildschirm sich sperrt oder die App im Hintergrund ist?
+  2. Spielt es bei aktivem Stummschalter?
+  3. Tempo 0,5x/0,25x, Loop lückenlos, Metronom-Latenz im Rahmen?
+  4. Bleiben 500 MB OPFS-Daten nach einer Woche erhalten?
+  5. Läuft die Seite mit `SharedArrayBuffer` auf iOS Safari?
+- Ergebnis wird in diesem Plan dokumentiert. **Fällt 1 oder 2 durch und lässt sich nicht umgehen** (z. B. Ausgabe über ein `<audio>`-Element mit Media Session), entscheiden wir neu, bevor weitergebaut wird. Die Hörqualität prüft `tools/hoervergleich.sh` gegen die nativen Builds.
+
+### W1 – Audio-Kern für das Web (4–6 Tage)
+- CMake-Ziel für Emscripten, C-API exportieren, Decodieren (MP3, WAV, FLAC) über miniaudio im Worklet.
+- AAC/M4A: im Browser mit `decodeAudioData` vorab in PCM wandeln, dann an den Kern geben (Plattform-Decoder, wie im Umbauplan vorgesehen).
+- Gleiche `ctest`-Fälle laufen auch gegen das WASM-Ziel (Node.js), damit Tempo, Loop-Grenzen und Seek identisch bleiben.
+
+### W2 – Dart-Anbindung Web (3–4 Tage)
+- `audio_core.dart`: Schnittstelle mit `AudioCoreFfi` und `AudioCoreWeb` (`dart:js_interop`, Paket `web`).
+- Wellenform, Pegel, Position als Nachrichten vom Worklet; Steuerung in Gegenrichtung.
+- Flutter-Web-Build (WASM-Rendering) startet, Oberfläche ist mit der Desktop-Version identisch einspaltig/zweispaltig nach Breite.
+
+### W3 – Speicher-Schicht und Bibliothek ohne Pfade (3–4 Tage)
+- `FileStore`-Schnittstelle (`file_platform.dart` wird dazu ausgebaut): Desktop = Dateisystem, Web = OPFS. Import im Web über Dateiauswahl.
+- Titel verweisen über ID (Hash) auf Dateien, nicht über Pfade. Auf dem Desktop bleibt der Pfad als gerätelokale Zusatzinfo.
+- `navigator.storage.persist()` anfordern, Speicherverbrauch und Obergrenze anzeigen.
+
+### W4 – Datenmodell für den Abgleich (3–4 Tage)
+- Stempel, Grabsteine, Gerät-ID, Versionsnummer, Migration von `library.json`.
+- Trennung geteilt/gerätelokal bei den Einstellungen.
+- Reine Dart-Logik, deshalb gut testbar (siehe Tests).
+
+### W5 – Sync-Engine (4–5 Tage)
+- `CloudProvider`-Schnittstelle, `InMemoryProvider` für Tests, `NoSync` ohne Konto.
+- Zusammenführen, bedingtes Schreiben, Wiederholung mit Backoff, Offline-Warteschlange, Fortschritt je Datei.
+- Auslöser: Start, Rückkehr in den Vordergrund, Änderung (verzögert zusammengefasst), Knopf «Jetzt abgleichen».
+- Audio: bei Bedarf laden (Handy), im Hintergrund hochladen (Desktop). Schutz vor Endlosschleifen bei Teilfehlern.
+- **Pro Titel «nicht hochladen»:** gemeinsames Feld mit Stempel; der Titel bleibt in der Bibliothek der anderen Geräte sichtbar, mit «Datei nur auf einem Gerät».
+- **Pro Ordner «synchronisieren»:** Feld am Ordner (geteilt); Titel in nicht gewählten Ordnern werden nicht hochgeladen, ihre Metadaten wandern trotzdem mit.
+- **Sicherung:** Vor jedem Schreiben von `state.json` wird der bisherige Stand nach `backup/state-<n>.json` (rotierend, 5 Stück) kopiert. Wiederherstellen über Einstellungen → Cloud.
+
+### W6 – Anbieter und Anmeldung (6–9 Tage)
+- Je Anbieter ein Modul über die REST-API mit dem Paket `http`, ohne grosse SDKs:
+  - **Google Drive:** Bereich `drive.appdata`, Ordner `appDataFolder`.
+  - **Dropbox:** App-Ordner, Upload-Sitzungen für grosse Dateien.
+  - **OneDrive:** Microsoft Graph, Bereich `Files.ReadWrite.AppFolder`, Sitzungen für grosse Dateien.
+- OAuth mit PKCE: Desktop im Systembrowser mit lokalem Loopback-Empfänger, Web per Weiterleitung auf die Pages-Adresse.
+- **App-Registrierung** bei den drei Anbietern (öffentliche Client-IDs, kein Geheimnis im Code). Das legst Du an, die IDs kommen in die Konfiguration.
+- Token-Ablage: Desktop im Schlüsselbund bzw. Credential Store, Web in IndexedDB. Ziel sind Refresh-Tokens, wo der Anbieter sie für Web-Apps ausgibt (Dropbox, OneDrive). Bei Google gibt es ohne eigenen Server nur kurzlebige Zugriffstokens, deshalb stille Neuanmeldung, im Zweifel ein Tippen.
+- Kontingent anzeigen, Warnung bei fast vollem Speicher.
+
+### W7 – PWA und Handy-Bedienung (4–6 Tage)
+- Manifest, Icons, Service Worker (Offline-Start der App-Hülle), Hinweis «Zum Home-Bildschirm» für iOS.
+- Audio-Freischaltung per Berührung, Media Session (Sperrbildschirm, Kopfhörertasten), Wake Lock beim Üben.
+- Cache-Verwaltung: Obergrenze, Entfernen der ältesten Titel, «Offline halten», Anzeige «nur in der Cloud».
+- Aufnahme-Knopf bleibt unsichtbar; Datei-Import über Auswahl.
+
+### W8 – Einstellungen, Oberfläche, Desktop (3–4 Tage)
+- Bereich «Cloud» in den Einstellungen: Anbieter wählen, anmelden, abmelden, Status, letzter Abgleich, Fehler.
+- Abmelden entfernt Tokens, lässt alle lokalen Daten stehen und beendet jeden Netzverkehr.
+- Desktop: Audio aus der Cloud wird in den Datenordner der App geladen; vorhandene lokale Ordner werden nur hochgeladen, nicht verschoben.
+- Beim ersten Anmelden fragt die App, welche Ordner synchronisiert werden (Auswahlliste mit Grösse); später je Ordner umschaltbar. Zeigt vorab die Datenmenge und das freie Kontingent.
+
+### W9 – Auslieferung, CI, Dokumente (2–3 Tage)
+- GitHub Actions: Web-Build, Tests, Veröffentlichung auf GitHub Pages bei Tag; Windows und Linux laufen wie im Umbauplan.
+- `README.md`: Funktionstabelle, Plattformen, Datenschutz (neuer Abschnitt Cloud und Hosting).
+- `UMBAUPLAN-FLUTTER.md` nachführen: Zieltabelle, Phase 6 und Abschnitt «Android» ersetzen durch Verweis hierher.
+- `CLAUDE.md`: Regel «Kein Netzwerk» um die Ausnahme erweitern (siehe unten).
+
+**Gesamt:** ca. 35–50 Arbeitstage. Nach W0 lässt sich der Rest sicherer schätzen.
+
+## Datenschutz und Regeln
+
+- Neue Ausnahme für «Kein Netzwerk», Vorschlag: *«Netzwerkzugriff nur für den Cloud-Sync und nur nach ausdrücklicher Anmeldung durch die Nutzerin oder den Nutzer, ausschliesslich zum gewählten Anbieter, und für das Laden der Web-App selbst. Kein Tracking.»*
+- Beim Laden der Web-App sieht GitHub die IP-Adresse (wie bei jeder Webseite). Die App selbst sendet nichts ausser an den gewählten Anbieter.
+- **Neue Abhängigkeiten (nur nach Rückfrage, alle MIT-verträglich):** `http` (BSD-3), `web` (BSD-3), `flutter_secure_storage` (BSD-3), `crypto` (BSD-3, SHA-256), ggf. `url_launcher` (BSD-3). Emscripten (MIT/UIQ) ist nur Werkzeug.
+- Testdaten ohne echte Namen, Titel oder Konten. Cloud-Tests laufen gegen den `InMemoryProvider` und aufgezeichnete Antworten, nie gegen echte Konten.
+
+## Tests (je Issue mit `#Nr/AKn`)
+
+| Bereich | Art | Beispiele |
+|---|---|---|
+| Zusammenführen | Unit, auch zufällig (Fuzzing, Reihenfolge der Eingaben vertauscht) | gleiche Eingaben → gleiches Ergebnis, Idempotenz, Grabstein gegen jüngere Änderung, Loops elementweise |
+| Migration | Unit | altes `library.json` → neues Format, nichts geht verloren, Rückwärts-Version wird abgelehnt |
+| Sync-Engine | Unit mit `InMemoryProvider` | Offline-Warteschlange, ETag-Konflikt, Abbruch mitten im Upload, kein Netz ohne Konto |
+| Anbieter | Unit mit aufgezeichneten Antworten | Seitenweises Auflisten, Fehlercodes, Token abgelaufen |
+| Kern (WASM) | `ctest` über Node.js | Tempo, Loop-Grenzen, Seek wie nativ |
+| Web | Flutter-Tests plus Test auf echten Geräten | Handy-Layout, Cache-Obergrenze; Sperrbildschirm und Stummschalter von Hand |
+
+## Risiken
+
+| Risiko | Wirkung | Gegenmassnahme |
+|---|---|---|
+| iOS beendet oder pausiert Web Audio bei Sperrbildschirm oder Hintergrund | Übe-Player unbrauchbar auf dem iPhone | W0 zuerst; Umweg über `<audio>` und Media Session; sonst neu entscheiden (z. B. natives iOS) |
+| Stummschalter macht Web Audio stumm | Wirkt wie Fehler | Umweg über `<audio>`-Element, in W0 prüfen |
+| COOP/COEP auf GitHub Pages | Kein `SharedArrayBuffer`, Kern läuft nicht | Service-Worker-Verfahren, sonst Wechsel zu Cloudflare Pages/Netlify (gleiche Dateien) |
+| iOS räumt PWA-Speicher | Titel lokal weg | `persist()`, Titel aus der Cloud nachladen, Hinweis bei Löschung |
+| Google ohne Server: nur kurzlebige Tokens | Gelegentliche Neuanmeldung | Stille Erneuerung, klare Anzeige; Dropbox/OneDrive als Alternativen |
+| Grosse Audiodateien im Browser | Speicher- und Zeitlimits beim Dekodieren | Streaming-Dekodierung im Kern, Dateien in Blöcken hochladen |
+| Cloud-Kontingent knapp (z. B. 15 GB bei Google) | Upload schlägt fehl | Anzeige, Warnung, später Schalter «nicht hochladen» pro Titel |
+| Kernänderungen brechen Web oder Desktop | Doppelte Fehler | `ctest` gegen beide Ziele in CI |
+| Anbieterregeln ändern sich (OAuth, API) | Wartungsaufwand | Dünne Provider-Module, je Anbieter austauschbar |
+
+## Folgen für bestehende Issues (zur Freigabe)
+
+| Issue | Vorschlag |
+|---|---|
+| #25 Android-Plattform mit Hintergrundwiedergabe | schliessen als «not planned», ersetzt durch die Web-App |
+| #18 Plattform-Integration | iOS/Android-Teile streichen, Desktop-Teile behalten |
+| #16 Bibliothek und Datenmodell | bleibt, W4 baut darauf auf |
+
+## Issues (Reihenfolge)
+
+1. #32 Machbarkeitstest Web-Audio auf iPhone und Android (W0)
+2. #33 Audio-Kern als WASM (W1)
+3. #34 Dart-Anbindung für das Web (W2)
+4. #35 Speicher-Schicht mit OPFS, Titel-ID statt Pfad (W3)
+5. #36 Datenmodell mit Änderungsstempeln und Migration (W4)
+6. #37 Sync-Engine mit Zusammenführen (W5)
+7. #38 Cloud-Anbieter Google Drive, Dropbox, OneDrive (W6; ggf. je Anbieter ein Issue)
+8. #39 PWA und Handy-Bedienung (W7)
+9. #40 Cloud-Einstellungen in der Oberfläche (W8)
+10. #41 Auslieferung auf GitHub Pages, README und Regeln (W9)
+
+Jedes Issue bekommt Abnahmekriterien als Häkchen-Liste (Skill `issue`). Die Abnahmekriterien von W0 sind die fünf Prüfpunkte oben.
+
+## Offene Punkte
+
+Entschieden am 19.11.2026: Schalter pro Titel in W5, Desktop-Ordner nur auf Wunsch, 5 Sicherungsstände, GitHub-Pages-Adresse (siehe Entscheidungen).
+
+1. **Anbieter-Registrierungen** (Google Cloud, Dropbox, Microsoft Entra) legst Du an, bevor W6 beginnt. Die OAuth-Weiterleitung zeigt auf die GitHub-Pages-Adresse; sie muss deshalb vorher feststehen (Kontoname und Repo-Name).
+2. **Veröffentlichung:** GitHub Pages braucht ein öffentliches Repo (oder bezahlten Plan). Das Repo ist MIT-lizenziert; vor der Veröffentlichung prüfen, dass keine privaten Daten drin sind.

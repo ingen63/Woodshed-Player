@@ -41,7 +41,7 @@ tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitT
 
 ## Regeln
 
-- **Kein Netzwerk** in der App ausser für beschlossene Funktionen mit eigenem Issue (z. B. Cloud-Sync). Kein Tracking.
+- **Kein Netzwerk** in der App ausser für beschlossene Funktionen mit eigenem Issue. Erlaubt: Cloud-Sync nur nach ausdrücklicher Anmeldung, ausschliesslich zum gewählten Anbieter (`docs/PLAN-WEB-UND-SYNC.md`), und das Laden der Web-App selbst. Ohne Konto keine Verbindung. Kein Tracking.
 - **Keine privaten Daten** in Code, Tests, Issues, Commits, Screenshots (keine echten Namen, E-Mails, Titel oder Künstler). Commits mit der GitHub-noreply-Adresse.
 - **Keine fremden Audiodateien.** Testaudio erzeugen (Sinus, Klicks) oder CC0 mit Quelle.
 - **Lizenzen:** nur MIT-verträglich (MIT, BSD, Apache-2.0, Public Domain/MIT-0), keine GPL/AGPL. Schriften zusätzlich unter SIL OFL 1.1 (unverändert einbinden, Lizenztext und Copyright-Hinweis ins Repo). Neue Abhängigkeiten nur nach Rückfrage.
