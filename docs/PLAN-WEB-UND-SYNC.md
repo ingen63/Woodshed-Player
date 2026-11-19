@@ -98,6 +98,27 @@ Aufwand in Arbeitstagen, grob, mit KI-Unterstützung. Grösste Unsicherheit: W0 
   5. Läuft die Seite mit `SharedArrayBuffer` auf iOS Safari?
 - Ergebnis wird in diesem Plan dokumentiert. **Fällt 1 oder 2 durch und lässt sich nicht umgehen** (z. B. Ausgabe über ein `<audio>`-Element mit Media Session), entscheiden wir neu, bevor weitergebaut wird. Die Hörqualität prüft `tools/hoervergleich.sh` gegen die nativen Builds.
 
+#### Prototyp W0
+
+- **Kern:** `core/web/w0_bridge.cpp` stellt Engine und Metronom als WebAssembly bereit (`core/web/build_w0.sh`, Emscripten, `STANDALONE_WASM`, SIMD, 112 KB). Abweichend vom Plan läuft der Kern **ohne** `-sAUDIO_WORKLET` direkt im `AudioWorkletProcessor`: keine JS-Hülle, keine Threads nötig. Der Status geht über einen `SharedArrayBuffer` an die Seite, damit Punkt 5 echt geprüft wird.
+- **Testseite:** `web/w0/` (Worklet, OPFS-Worker, Service Worker für COOP/COEP und Offline, Manifest). Testsignal wird erzeugt (Töne über 110-Hz-Grundton, Loop 4–8 s im Signal nahtlos); eigene Dateien lassen sich lokal laden. Die Seite misst selbst: Klickabweichung, Rechenlast, ob Audio im Hintergrund weiterlief (Zeit des AudioContext gegen Wanduhr), OPFS-Inhalt Byte für Byte.
+- **Veröffentlichung:** `.github/workflows/w0-pages.yml` prüft den Kern mit Node.js und stellt `web/` auf GitHub Pages (Adresse `…/w0/`). Das Repo ist privat: Pages braucht dafür ein kostenpflichtiges GitHub-Konto, sonst Repo öffentlich machen oder Ausweichen laut Risiken.
+- **Lokal:** `python3 -m http.server 8732 --directory web/w0`, dann `http://localhost:8732` (localhost gilt als sicher, Service Worker und Isolation funktionieren).
+
+#### Ergebnis W0
+
+Stand: 19.11.2026. «offen» = Prüfung auf echtem Gerät steht aus.
+
+| # | Prüfpunkt | Desktop-Chrome / Node.js | iPhone (Safari, installiert) | Android (Chrome, installiert) | Go/No-Go |
+|---|---|---|---|---|---|
+| 1 | Weiter bei Sperrbildschirm und Hintergrund | – | offen (direkt / `<audio>`) | offen (direkt / `<audio>`) | offen |
+| 2 | Weiter bei Stummschalter | – | offen (direkt / `<audio>`, `audioSession`) | entfällt | offen |
+| 3 | 0,5x/0,25x ohne Knackser, Loop lückenlos, Metronom < 20 ms | Node.js: keine Sprünge bei 0,5x/0,25x, Loop 1x/0,5x lückenlos, Klickabweichung 0,000 ms, ~88x schneller als Echtzeit; Chrome: Last 4–7 % | offen (Hören, Last) | offen (Hören, Last) | offen |
+| 4 | 500 MB OPFS nach 7 Tagen | Chrome: Schreiben und Prüfen von 20 MB ok | offen (bis frühestens 7 Tage nach Schreiben) | offen | offen |
+| 5 | `SharedArrayBuffer` auf der Pages-Testseite | Chrome lokal: isoliert über Service Worker, SAB im Worklet ja | offen | offen | offen |
+
+Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Titel gemischt, die Abweichung zum Raster ist daher unter einem Sample. Die Ausgabelatenz des Geräts (auf der Seite angezeigt) verschiebt Klick und Titel gleich.
+
 ### W1 – Audio-Kern für das Web (4–6 Tage)
 - CMake-Ziel für Emscripten, C-API exportieren, Decodieren (MP3, WAV, FLAC) über miniaudio im Worklet.
 - AAC/M4A: im Browser mit `decodeAudioData` vorab in PCM wandeln, dann an den Kern geben (Plattform-Decoder, wie im Umbauplan vorgesehen).
