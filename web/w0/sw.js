@@ -4,7 +4,7 @@
 // 2. Hält die Seite offline verfügbar (erst Netz, sonst Cache).
 // Die Seite lädt nur Dateien vom eigenen Ursprung; fremde Anfragen gibt es nicht.
 
-const CACHE = 'w0-v2';
+const CACHE = 'w0-v3';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));

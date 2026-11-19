@@ -188,6 +188,20 @@ function setupMediaSession() {
   navigator.mediaSession.setActionHandler('pause', () => pause());
 }
 
+function releaseSession() {
+  try {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
+      navigator.mediaSession.metadata = null;
+      ['play', 'pause'].forEach((a) => navigator.mediaSession.setActionHandler(a, null));
+    }
+    const sink = $('sink');
+    sink.pause();
+    sink.srcObject = null;
+    if (ctx && ctx.state !== 'closed') ctx.close();
+  } catch (_) { /* beim Schliessen egal */ }
+}
+
 async function play() {
   await startAudio();
   await ctx.resume();
@@ -375,6 +389,8 @@ function wire() {
     navigator.clipboard.writeText(text).then(() => log('In die Zwischenablage kopiert'), (err) => log(`Kopieren: ${err}`));
   };
   document.addEventListener('visibilitychange', onVisibility);
+  // Beim Schliessen den Sperrbildschirm-Eintrag freigeben.
+  window.addEventListener('pagehide', releaseSession);
   $('sink').onpause = () => log('<audio> pausiert');
   setInterval(() => { showStatus(); showEnv(); if (ctx) showLife(); }, 250);
 }
