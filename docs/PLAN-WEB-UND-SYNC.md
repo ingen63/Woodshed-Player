@@ -107,13 +107,13 @@ Aufwand in Arbeitstagen, grob, mit KI-Unterstützung. Grösste Unsicherheit: W0 
 
 #### Ergebnis W0
 
-Stand: 19.11.2026. «offen» = Prüfung auf echtem Gerät steht aus.
+Stand: 19.11.2026. «offen» = Prüfung auf echtem Gerät steht aus. Punkte 1–3 auf den Geräten von Dir bestätigt.
 
 | # | Prüfpunkt | Desktop-Chrome / Node.js | iPhone (Safari, installiert) | Android (Chrome, installiert) | Go/No-Go |
 |---|---|---|---|---|---|
-| 1 | Weiter bei Sperrbildschirm und Hintergrund | – | offen (direkt / `<audio>`) | offen (direkt / `<audio>`) | offen |
-| 2 | Weiter bei Stummschalter | – | offen (direkt / `<audio>`, `audioSession`) | entfällt | offen |
-| 3 | 0,5x/0,25x ohne Knackser, Loop lückenlos, Metronom < 20 ms | Node.js: keine Sprünge bei 0,5x/0,25x, Loop 1x/0,5x lückenlos, Klickabweichung 0,000 ms, ~88x schneller als Echtzeit; Chrome: Last 4–7 % | offen (Hören, Last) | offen (Hören, Last) | offen |
+| 1 | Weiter bei Sperrbildschirm und Hintergrund | – | ok, direkt und `<audio>` | ok, direkt und `<audio>` | **Go** |
+| 2 | Weiter bei Stummschalter | – | ok, direkt und `<audio>` | entfällt | **Go** |
+| 3 | 0,5x/0,25x ohne Knackser, Loop lückenlos, Metronom < 20 ms | Node.js: keine Sprünge bei 0,5x/0,25x, Loop 1x/0,5x lückenlos, Klickabweichung 0,000 ms, ~88x schneller als Echtzeit; Chrome: Last 4–7 % | ok (gehört) | ok (gehört) | **Go** |
 | 4 | 500 MB OPFS nach 7 Tagen | Chrome: Schreiben und Prüfen von 20 MB ok | offen (bis frühestens 7 Tage nach Schreiben) | offen | offen |
 | 5 | `SharedArrayBuffer` auf der Pages-Testseite | Chrome lokal: isoliert über Service Worker, SAB im Worklet ja | offen | offen | offen |
 

@@ -4,7 +4,7 @@
 // 2. Hält die Seite offline verfügbar (erst Netz, sonst Cache).
 // Die Seite lädt nur Dateien vom eigenen Ursprung; fremde Anfragen gibt es nicht.
 
-const CACHE = 'w0-v1';
+const CACHE = 'w0-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
@@ -25,7 +25,10 @@ self.addEventListener('fetch', (e) => {
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
-      const res = await fetch(req);
+      // Am HTTP-Cache vorbei nachfragen, sonst liefert Pages bis zu 10 min alte Dateien.
+      const res = req.method === 'GET'
+        ? await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+        : await fetch(req);
       if (req.method === 'GET' && res.ok) cache.put(req, res.clone());
       return isolate(res);
     } catch (err) {

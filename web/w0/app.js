@@ -94,6 +94,7 @@ function makeTestSignal(sr) {
 let starting = null;
 let coreReady = null;
 let userFile = false;
+let titleName = 'Testsignal';  // nur auf der Seite angezeigt, nie im Protokoll
 function startAudio() {
   starting = starting || doStartAudio().catch((err) => { starting = null; throw err; });
   return starting;
@@ -122,6 +123,11 @@ async function doStartAudio() {
   connectRoute();
   setupMediaSession();
   await ready;
+  // Sichtbar machen, dass Audio läuft und es mit «Abspielen» weitergeht.
+  $('start').disabled = true;
+  $('start').textContent = 'Audio bereit';
+  $('start').classList.remove('primary');
+  $('play').classList.add('primary');
 }
 
 function onWorklet(m) {
@@ -216,6 +222,7 @@ function sendMetronome() {
 
 async function loadFile(file) {
   userFile = true;
+  titleName = file.name;
   log(`Datei gewählt: ${(file.size / 1e6).toFixed(1)} MB, Typ «${file.type || 'unbekannt'}»`);
   await startAudio();
   let buf;
@@ -236,6 +243,7 @@ function showStatus() {
   const devOk = s.ticks > 1 ? (s.tickDevMs < 20 ? 'ok' : 'bad') : '';
   const loadCls = s.loadPeak > 0.8 ? 'bad' : s.loadPeak > 0 ? 'ok' : '';
   dl($('status'), [
+    ['Titel', titleName],
     ['Position', s.duration ? `${mmss(s.position)} / ${mmss(s.duration)}` : '–'],
     ['Läuft', s.playing ? 'ja' : 'nein'],
     ['Loop-Durchgänge', s.loopPasses ?? '–'],
@@ -361,7 +369,9 @@ function wire() {
   $('verify').onclick = () => opfsWorker().postMessage({ type: 'verify' });
   $('remove').onclick = () => opfsWorker().postMessage({ type: 'remove' });
   $('copy').onclick = () => {
-    const text = [$('env').innerText, $('status').innerText, $('life').innerText, $('store').innerText, '', ...lines].join('\n');
+    // Ohne die Zeile «Titel»: der Dateiname bleibt auf dem Gerät.
+    const status = $('status').innerText.split('\n').slice(2).join('\n');
+    const text = [$('env').innerText, status, $('life').innerText, $('store').innerText, '', ...lines].join('\n');
     navigator.clipboard.writeText(text).then(() => log('In die Zwischenablage kopiert'), (err) => log(`Kopieren: ${err}`));
   };
   document.addEventListener('visibilitychange', onVisibility);
