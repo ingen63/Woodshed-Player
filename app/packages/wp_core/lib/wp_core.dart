@@ -98,7 +98,7 @@ final _recError = _lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Fu
 /// Ein Player mit eigenem Audiogerät.
 class WpPlayer {
   WpPlayer() : _p = _create() {
-    if (_p == nullptr) throw WpException('Audio-Kern konnte nicht angelegt werden');
+    if (_p == nullptr) throw WpException('Could not create audio core');
   }
 
   final Pointer<_Player> _p;
@@ -108,7 +108,7 @@ class WpPlayer {
     final c = path.toNativeUtf8();
     try {
       final r = _load(_p, c);
-      if (r != 0) throw WpException('Datei konnte nicht geladen werden: ${_errorMessage(r).toDartString()}');
+      if (r != 0) throw WpException('Could not load file: ${_errorMessage(r).toDartString()}');
     } finally {
       malloc.free(c);
     }
@@ -133,7 +133,7 @@ class WpPlayer {
   /// Wartet, bis das laufende Laden fertig ist. [WpCode.ok] oder Fehlercode.
   int loadWait() => _loadWait(_p);
 
-  /// Text des Kerns zu einem Fehlercode.
+  /// English text of the core for an error code, for logs only (UI: `loadErrorMessage`).
   static String errorMessage(int code) => _errorMessage(code).toDartString();
 
   void play() => _play(_p);

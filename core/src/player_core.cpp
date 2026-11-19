@@ -10,16 +10,16 @@ namespace wp {
 
 const char* errorMessage(int code) {
     switch (code) {
-        case kOk: return "Kein Fehler";
-        case kErrInvalidArgument: return "Ungültiger Aufruf";
-        case kErrFileNotFound: return "Datei nicht gefunden";
-        case kErrUnsupportedFormat: return "Format unbekannt oder Datei beschädigt";
-        case kErrDeviceUnavailable: return "Audiogerät nicht verfügbar";
-        case kErrOutOfMemory: return "Nicht genug Speicher für diese Datei";
-        case kErrFileUnreadable: return "Datei kann nicht gelesen werden";
-        case kErrCancelled: return "Laden abgebrochen";
-        case kErrBusy: return "Audio-Kern ausgelastet, bitte erneut versuchen";
-        default: return "Unbekannter Fehler";
+        case kOk: return "No error";
+        case kErrInvalidArgument: return "Invalid argument";
+        case kErrFileNotFound: return "File not found";
+        case kErrUnsupportedFormat: return "Unsupported format or corrupt file";
+        case kErrDeviceUnavailable: return "Audio device unavailable";
+        case kErrOutOfMemory: return "Out of memory for this file";
+        case kErrFileUnreadable: return "File cannot be read";
+        case kErrCancelled: return "Loading cancelled";
+        case kErrBusy: return "Audio core busy, try again";
+        default: return "Unknown error";
     }
 }
 

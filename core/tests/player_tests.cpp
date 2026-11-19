@@ -1,6 +1,7 @@
 // Tests des Player-Kerns (#14) ohne Audiogerät: Laden von WAV/FLAC/MP3, Fehlerfälle, Laden im Hintergrund,
 // Gerätewechsel, Dateiende, Seek und Loop-Grenzen mit geladenen Dateien.
 // WAV-Dateien werden hier erzeugt; FLAC/MP3 stammen aus core/tools/make_test_audio.sh (Sinus 440 Hz, 1 s).
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -207,13 +208,13 @@ void loadErrorsHaveCodeAndText() {  // #14/AK2, #14/AK5 Fehlerfälle
 
     const int missing = p.load((tempDir() / "fehlt.mp3").string());
     CHECK(missing == wp::kErrFileNotFound);
-    CHECK(std::strcmp(wp::errorMessage(missing), "Datei nicht gefunden") == 0);
+    CHECK(std::strcmp(wp::errorMessage(missing), "File not found") == 0);
     CHECK(p.loadState() == wp::kErrFileNotFound);
     checkStillPlayable(p, 2.0);
 
     const int garbage = p.load(writeBytes("kein-audio.mp3", std::string(4096, 'x')).string());
     CHECK(garbage == wp::kErrUnsupportedFormat);
-    CHECK(std::strcmp(wp::errorMessage(garbage), "Format unbekannt oder Datei beschädigt") == 0);
+    CHECK(std::strcmp(wp::errorMessage(garbage), "Unsupported format or corrupt file") == 0);
     checkStillPlayable(p, 2.0);
 
     CHECK(p.load(writeBytes("leer.wav", "").string()) == wp::kErrUnsupportedFormat);
@@ -225,7 +226,7 @@ void loadErrorsHaveCodeAndText() {  // #14/AK2, #14/AK5 Fehlerfälle
     p.setDeviceAvailable(false);
     const int device = p.load(writeIndexWav("good2.wav", kSr).string());
     CHECK(device == wp::kErrDeviceUnavailable);
-    CHECK(std::strcmp(wp::errorMessage(device), "Audiogerät nicht verfügbar") == 0);
+    CHECK(std::strcmp(wp::errorMessage(device), "Audio device unavailable") == 0);
     checkStillPlayable(p, 2.0);
     p.setDeviceAvailable(true);
 
@@ -470,6 +471,35 @@ void setSourceWithoutPeaks() {
     CHECK(out[10] == 0.25f);
 }
 
+void errorMessagesAreEnglishAscii() {  // #46/AK1
+    const int codes[] = {WP_OK,
+                         WP_ERR_INVALID_ARGUMENT,
+                         WP_ERR_FILE_NOT_FOUND,
+                         WP_ERR_UNSUPPORTED_FORMAT,
+                         WP_ERR_DEVICE_UNAVAILABLE,
+                         WP_ERR_OUT_OF_MEMORY,
+                         WP_ERR_FILE_UNREADABLE,
+                         WP_ERR_CANCELLED,
+                         WP_ERR_BUSY,
+                         -100};
+    const char* german[] = {"datei", "fehler", "nicht", "kein", "unbekannt", "laden", "speicher",
+                            "aufruf", "audiog", "abgebrochen", "bitte", "erneut", "ausgelastet",
+                            "gelesen", "gefunden", "format unbekannt"};
+    for (int c : codes) {
+        const char* m = wp::errorMessage(c);  // wp_error_message forwards here (player.cpp, wp_core_web.cpp)
+        CHECK(m != nullptr && *m != '\0');
+        std::string lower;
+        bool ascii = true;
+        for (const char* q = m; *q; ++q) {
+            const auto u = static_cast<unsigned char>(*q);
+            if (u < 0x20 || u > 0x7e) ascii = false;
+            lower += static_cast<char>(std::tolower(u));
+        }
+        CHECK(ascii);
+        for (const char* w : german) CHECK(lower.find(w) == std::string::npos);
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -480,6 +510,7 @@ int main() {
         {"endOfFileStopsWithLoadedFile", endOfFileStopsWithLoadedFile},
         {"loopBoundsWithLoadedFile", loopBoundsWithLoadedFile},
         {"loadErrorsHaveCodeAndText", loadErrorsHaveCodeAndText},
+        {"errorMessagesAreEnglishAscii", errorMessagesAreEnglishAscii},
         {"errorDuringPlaybackKeepsPlaying", errorDuringPlaybackKeepsPlaying},
         {"loadRunsInBackground", loadRunsInBackground},
         {"newerLoadReplacesRunningLoad", newerLoadReplacesRunningLoad},

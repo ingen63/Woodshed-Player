@@ -141,7 +141,7 @@ const tests = {
     check(core.loadEncoded(new TextEncoder().encode('kein Audio')) === WP_ERR_UNSUPPORTED_FORMAT, 'kein Audio');
     check(await loadFile(core, new Uint8Array(4), async () => { throw new Error('x'); }) === WP_ERR_UNSUPPORTED_FORMAT,
       'Browser kann es auch nicht');
-    check(core.errorMessage(WP_ERR_UNSUPPORTED_FORMAT) === 'Format unbekannt oder Datei beschädigt', 'Fehlertext');
+    check(core.errorMessage(WP_ERR_UNSUPPORTED_FORMAT) === 'Unsupported format or corrupt file', 'Fehlertext');
     near(core.duration, 2.0, 1e-9, 'bisheriger Titel bleibt');
   },
   async waveformAndMetronome() {

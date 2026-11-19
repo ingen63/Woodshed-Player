@@ -28,7 +28,8 @@ typedef struct wp_player wp_player;
 #define WP_ERR_CANCELLED -7          /* durch ein neueres Laden abgebrochen */
 #define WP_ERR_BUSY -8               /* Befehls-Queue voll */
 
-/* Deutscher Text zu einem Fehlercode, statisch, nie NULL. */
+/* English text for an error code, static, never NULL. For logs only: the UI shows its own
+ * localized text per code (ARB files in the app). */
 WP_API const char* wp_error_message(int code);
 
 /* ---- Wiedergabe ---- */

@@ -41,7 +41,7 @@ export class WpCore {
   constructor(x, sampleRate) {
     this.x = x;
     this.p = x.wp_web_create(sampleRate);
-    if (!this.p) throw new Error('Kein Speicher für den Audio-Kern');
+    if (!this.p) throw new Error('Out of memory for the audio core');
     this.sampleRate = sampleRate;
   }
 
