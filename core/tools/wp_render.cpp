@@ -12,8 +12,8 @@ int main(int argc, char **argv) {
     std::fprintf(stderr, "Usage: %s <input> <output.wav> <tempo> [seconds]\n", argv[0]);
     return 2;
   }
-  const double rate = std::atof(argv[3]);
-  const double seconds = argc > 4 ? std::atof(argv[4]) : 0;
+  const double rate = std::strtod(argv[3], nullptr);
+  const double seconds = argc > 4 ? std::strtod(argv[4], nullptr) : 0;
 
   ma_decoder_config dc = ma_decoder_config_init(ma_format_f32, 2, 0);
   ma_decoder dec;

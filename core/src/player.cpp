@@ -14,7 +14,8 @@ struct wp_player {
   std::unique_ptr<wp::Player> core;
   std::mutex deviceMutex; // nur Steuer-Threads
   ma_context context{};
-  ma_device device{};
+  ma_device
+      device{}; // NOLINT(bugprone-invalid-enum-default-initialization): zeroed miniaudio struct
   bool contextReady = false;
   bool deviceReady = false;
 };

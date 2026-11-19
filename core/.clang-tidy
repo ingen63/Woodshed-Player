@@ -1,0 +1,35 @@
+# Slim clang-tidy setup for our own code in core/ (#7). Run with `make lint`; every finding is an error.
+# Third-party headers are excluded by HeaderFilterRegex (only core/src, core/include, core/tests).
+# Disabled on purpose:
+#  - bugprone-easily-swappable-parameters, -narrowing-conversions, -implicit-widening-...:
+#    audio code converts between frames, samples and doubles everywhere; too noisy to be useful.
+#  - bugprone-macro-parentheses: the C API error codes are plain negative literals (wp_core.h),
+#    read as such by the Dart binding test (ffi_coverage_test.dart).
+#  - bugprone-signed-bitwise (alias hicpp-signed-bitwise): byte packing in the WAV helpers of the tests.
+#  - bugprone-exception-escape, bugprone-throwing-static-initialization: main() of tests and tools.
+#  - clang-analyzer-optin.*: padding of the lock-free queue is intentional (cache lines).
+#  - performance-enum-size: enums of the C API keep int size.
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-macro-parentheses,
+  -bugprone-signed-bitwise,
+  -bugprone-exception-escape,
+  -bugprone-throwing-static-initialization,
+  clang-analyzer-*,
+  -clang-analyzer-optin.*,
+  performance-*,
+  -performance-enum-size,
+  misc-redundant-expression,
+  misc-unused-using-decls,
+  modernize-use-nullptr,
+  modernize-use-override,
+  readability-misleading-indentation
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*/core/(src|include|tests)/.*'
+CheckOptions:
+  # `(void)ptr.release()` marks an intended ownership hand-over (engine.cpp).
+  bugprone-unused-return-value.AllowCastToVoid: true

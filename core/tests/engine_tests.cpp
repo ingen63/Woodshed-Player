@@ -400,6 +400,7 @@ void queueManyProducersDeliverEachCommandOnce() { // #14/AK1
   wp::CommandQueue<int> q(64);
   constexpr int kThreads = 4, kPerThread = 20000;
   std::vector<std::thread> producers;
+  producers.reserve(kThreads);
   for (int t = 0; t < kThreads; ++t) {
     producers.emplace_back([&q, t] {
       for (int i = 0; i < kPerThread; ++i)
@@ -507,6 +508,7 @@ void commandsFromManyThreadsWhileRendering() { // #14/AK1
   e.play();
   std::atomic<bool> stop{false};
   std::vector<std::thread> controllers;
+  controllers.reserve(3);
   for (int t = 0; t < 3; ++t) {
     controllers.emplace_back([&e, &stop, t] {
       int i = 0;

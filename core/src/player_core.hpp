@@ -112,7 +112,7 @@ public:
 
 private:
   void cancelLoad();
-  void runLoad(std::string path);
+  void runLoad(const std::string &path);
 
   const int sampleRate_;
   Engine engine_;

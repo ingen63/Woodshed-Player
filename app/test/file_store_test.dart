@@ -66,7 +66,7 @@ Directory swiftFolder(String golden) {
   File(golden).copySync('${d.path}/library.json');
   final json = jsonDecode(File(golden).readAsStringSync());
   final tracks = json is List ? json : (json as Map)['tracks'] as List;
-  for (final t in tracks.cast<Map>()) {
+  for (final t in tracks.cast<Map<String, Object?>>()) {
     File('${d.path}/Tracks/${t['fileName']}')
       ..createSync(recursive: true)
       ..writeAsStringSync('inhalt ${t['fileName']}');

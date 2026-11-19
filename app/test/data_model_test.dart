@@ -435,7 +435,7 @@ void main() {
         final old = jsonDecode(
           File('test/golden/library_swift_legacy.json').readAsStringSync(),
         ) as List;
-        for (final t in old.cast<Map>()) {
+        for (final t in old.cast<Map<String, Object?>>()) {
           await store.write(
             'Tracks/${t['fileName']}',
             utf8.encode('x${t['id']}'),
@@ -577,9 +577,9 @@ void main() {
 
 /// Sorted keys, so two equal states encode the same.
 Object? _sorted(Object? v) => switch (v) {
-  Map m => {
+  Map<Object?, Object?> m => {
     for (final k in (m.keys.cast<String>().toList()..sort())) k: _sorted(m[k]),
   },
-  List l => l.map(_sorted).toList(),
+  List<Object?> l => l.map(_sorted).toList(),
   _ => v,
 };

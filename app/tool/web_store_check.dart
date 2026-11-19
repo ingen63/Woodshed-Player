@@ -63,7 +63,7 @@ class Check {
     'measurement': detail,
   };
 
-  static Check fromJson(Map j) => Check(
+  static Check fromJson(Map<String, Object?> j) => Check(
     j['criterion'] as String,
     j['ok'] as bool,
     j['measurement'] as String,
@@ -170,7 +170,7 @@ Future<List<Check>> part2() async {
       jsonDecode(web.window.localStorage.getItem(_key) ?? '{}') as Map;
   final checks = [
     for (final c in (saved['checks'] as List? ?? const []))
-      Check.fromJson(c as Map),
+      Check.fromJson(c as Map<String, Object?>),
   ];
   void add(String name, bool ok, String detail) =>
       checks.add(Check(name, ok, detail));

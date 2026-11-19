@@ -30,9 +30,12 @@ Jede Änderung hat ein Issue mit **Abnahmekriterien als Häkchen-Liste**; jedes 
 
 ## Bauen und Testen
 
-Ausgaben immer kurz halten (`-quiet`, `--reporter failures-only`, `| tail -30`). Nichts aus `core/third_party/` lesen (u. a. `miniaudio.h`, 4 MB).
+Ausgaben immer kurz halten (`-quiet`, `--reporter failures-only`, `| tail -30`). Nichts aus `core/third_party/` lesen (u. a. `miniaudio.h`, 4 MB). Teststrategie, Schichten und Testmatrix: `docs/TESTS.md`.
 
 ```
+make test                  # ctest (Kern), flutter test (App), Tests des Hooks
+make format-check          # dart format und clang-format, ohne Änderungen
+make lint                  # flutter analyze (streng), C++ mit -Wall -Wextra -Werror, clang-tidy
 cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release && cmake --build core/build 2>&1 | tail -20 && ctest --test-dir core/build --output-on-failure
 cd app && flutter analyze --no-pub && flutter test --reporter failures-only
 cd app && flutter build macos --debug && flutter build ios --simulator --debug
@@ -43,6 +46,8 @@ tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitT
 
 - Kern: C-API `core/include/wp_core.h`, Dart-Anbindung als FFI-Plugin `app/packages/wp_core/`, Bibliotheken in `core/third_party/` (Versionen dort im README).
 - **Hook nach dem Commit** baut und testet die betroffenen Teile selbst. Nur bei Fehlern oder geänderter Logik ohne Tests meldet er sich; dann Fehler beheben bzw. den `test-agent` (Schnellmodus) starten. Testdetails stehen im Agenten.
+- Flutter-App und Kern werden mit `flutter test` und `ctest` geprüft; `xcodebuild` nur noch für das Swift-Altprojekt.
+- Neuer Code ist formatiert (`make format`) und ohne Warnungen (`make lint`); Ausnahmen nur mit Begründung (`core/.clang-tidy`, `NOLINT(<Prüfung>)`).
 - Tests zu Abnahmekriterien nennen Issue und Kriterium (`#22/AK2`). Audio-Logik (Tempo, Loop-Grenzen, Seek, `mm:ss`) und Bibliothek (`library.json`, Sortierung, Ordner) brauchen Unit-Tests, Oberfläche nur, wo sinnvoll. Tests berühren nie die echte Bibliothek.
 
 ## Regeln

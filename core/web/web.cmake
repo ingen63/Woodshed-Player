@@ -4,7 +4,8 @@
 #    (Tempo, Loop-Grenzen, Seek, Laden). Node.js führt sie über CMAKE_CROSSCOMPILING_EMULATOR aus.
 #  - wp_core_web.wasm ohne Threads und ohne JS-Hülle (STANDALONE_WASM) fürs AudioWorklet.
 set(WP_ENGINE_SOURCES src/engine.cpp src/metronome.cpp src/waveform.cpp)
-set(WP_ENGINE_INCLUDES src ${WP_THIRD_PARTY}/signalsmith-stretch/include ${WP_THIRD_PARTY}/signalsmith-linear/include)
+set(WP_ENGINE_INCLUDES src)
+set(WP_ENGINE_SYSTEM_INCLUDES ${WP_THIRD_PARTY}/signalsmith-stretch/include ${WP_THIRD_PARTY}/signalsmith-linear/include)
 # Im Browser nur Dekodieren: kein Audiogerät (das ist das AudioWorklet), keine Threads in miniaudio.
 set(WP_MINIAUDIO_DEFS MA_NO_DEVICE_IO MA_NO_THREADING)
 
@@ -15,32 +16,44 @@ set(WP_TEST_LINK -pthread -sPROXY_TO_PTHREAD -sEXIT_RUNTIME=1 -sNODERAWFS=1 -sAL
 
 add_library(wp_engine STATIC ${WP_ENGINE_SOURCES})
 target_include_directories(wp_engine PUBLIC ${WP_ENGINE_INCLUDES})
+target_include_directories(wp_engine SYSTEM PUBLIC ${WP_ENGINE_SYSTEM_INCLUDES})
+wp_strict_warnings(wp_engine)
 target_compile_options(wp_engine PUBLIC ${WP_TEST_COMPILE})
 target_link_options(wp_engine PUBLIC ${WP_TEST_LINK})
 
 add_library(wp_miniaudio STATIC src/miniaudio_impl.c)
-target_include_directories(wp_miniaudio PUBLIC ${WP_THIRD_PARTY}/miniaudio src)
+target_include_directories(wp_miniaudio SYSTEM PUBLIC ${WP_THIRD_PARTY}/miniaudio)
+target_include_directories(wp_miniaudio PUBLIC src)
 target_compile_definitions(wp_miniaudio PUBLIC MA_NO_DEVICE_IO)
 target_compile_options(wp_miniaudio PUBLIC ${WP_TEST_COMPILE})
 
 add_library(wp_playercore STATIC src/player_core.cpp)
 target_link_libraries(wp_playercore PUBLIC wp_engine wp_miniaudio)
+wp_strict_warnings(wp_playercore)
 
 enable_testing()
 foreach(t engine metronome waveform)
   add_executable(${t}_tests tests/${t}_tests.cpp)
   target_link_libraries(${t}_tests PRIVATE wp_engine)
+  wp_strict_warnings(${t}_tests)
   add_test(NAME ${t}_tests COMMAND ${t}_tests)
 endforeach()
 add_executable(player_tests tests/player_tests.cpp)
 target_link_libraries(player_tests PRIVATE wp_playercore)
 target_include_directories(player_tests PRIVATE include)
 target_compile_definitions(player_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
+wp_strict_warnings(player_tests)
 add_test(NAME player_tests COMMAND player_tests)
 
 # ---- Kern fürs AudioWorklet ----
 add_executable(wp_core_web web/wp_core_web.cpp src/player_core.cpp src/miniaudio_impl.c ${WP_ENGINE_SOURCES})
-target_include_directories(wp_core_web PRIVATE include web ${WP_ENGINE_INCLUDES} ${WP_THIRD_PARTY}/miniaudio)
+target_include_directories(wp_core_web PRIVATE include web ${WP_ENGINE_INCLUDES})
+target_include_directories(wp_core_web SYSTEM PRIVATE ${WP_ENGINE_SYSTEM_INCLUDES} ${WP_THIRD_PARTY}/miniaudio)
+# #7: strict warnings for our own sources only, not for miniaudio_impl.c (compiles miniaudio itself).
+if(WP_STRICT_WARNINGS)
+  set_source_files_properties(web/wp_core_web.cpp src/player_core.cpp ${WP_ENGINE_SOURCES}
+    TARGET_DIRECTORY wp_core_web PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
+endif()
 target_compile_definitions(wp_core_web PRIVATE ${WP_MINIAUDIO_DEFS})
 target_compile_options(wp_core_web PRIVATE -msimd128 -O3)
 target_link_options(wp_core_web PRIVATE -O3 -sSTANDALONE_WASM --no-entry -sFILESYSTEM=0

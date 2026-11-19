@@ -49,7 +49,7 @@ Map<String, String> _storedHashes(Object? json) {
       ? json
       : (json as Map)['tracks'] as List? ?? const [];
   return {
-    for (final e in list.cast<Map>())
+    for (final e in list.cast<Map<String, Object?>>())
       if (e['contentHash'] case final String h
           when _hex64.hasMatch(h.toLowerCase()))
         (e['id'] as String).toUpperCase(): h.toLowerCase(),

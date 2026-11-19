@@ -60,7 +60,8 @@ OSStatus getProperty(AudioObjectID obj, AudioObjectPropertySelector sel, T &valu
   AudioObjectPropertyAddress addr{sel, kAudioObjectPropertyScopeGlobal,
                                   kAudioObjectPropertyElementMain};
   UInt32 size = sizeof(T);
-  return AudioObjectGetPropertyData(obj, &addr, qualifierSize, qualifier, &size, &value);
+  return AudioObjectGetPropertyData(obj, &addr, qualifierSize, qualifier, &size,
+                                    static_cast<void *>(&value));
 }
 
 // Stores the English log text and the OSStatus of a failed start and returns the error code.
@@ -182,7 +183,8 @@ int startTap(Recorder &r, const char *path) API_AVAILABLE(macos(14.2)) {
     return fail(r, WP_REC_ERR_TAP, "System audio tap could not be created", st);
 
   AudioStreamBasicDescription fmt{};
-  if ((st = getProperty(r.tap, kAudioTapPropertyFormat, fmt)) != noErr) {
+  st = getProperty(r.tap, kAudioTapPropertyFormat, fmt);
+  if (st != noErr) {
     return fail(r, WP_REC_ERR_TAP_FORMAT, "Tap format unknown", st);
   }
   if (!(fmt.mFormatFlags & kAudioFormatFlagIsFloat) || fmt.mBitsPerChannel != 32) {
@@ -216,8 +218,8 @@ int startTap(Recorder &r, const char *path) API_AVAILABLE(macos(14.2)) {
         @kAudioSubTapUIDKey : desc.UUID.UUIDString}
     ],
   };
-  if ((st = AudioHardwareCreateAggregateDevice((__bridge CFDictionaryRef)agg, &r.aggregate)) !=
-      noErr) {
+  st = AudioHardwareCreateAggregateDevice((__bridge CFDictionaryRef)agg, &r.aggregate);
+  if (st != noErr) {
     return fail(r, WP_REC_ERR_AGGREGATE, "Aggregate device could not be created", st);
   }
   // Die Daten kommen im Takt des Aggregate-Devices (Ausgabegerät, z. B. 44,1 kHz), auch wenn das
@@ -256,7 +258,8 @@ int startTap(Recorder &r, const char *path) API_AVAILABLE(macos(14.2)) {
                                           });
   if (st != noErr)
     return fail(r, WP_REC_ERR_IO_PROC, "IOProc could not be created", st);
-  if ((st = AudioDeviceStart(r.aggregate, r.ioProc)) != noErr) {
+  st = AudioDeviceStart(r.aggregate, r.ioProc);
+  if (st != noErr) {
     return fail(r, WP_REC_ERR_START, "Recording could not be started", st);
   }
   return 0;

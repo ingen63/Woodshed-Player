@@ -110,9 +110,9 @@ bool sameJson(Object? a, Object? b) {
 
 /// JSON with sorted keys, used only to break ties deterministically.
 String _canonical(Object? v) => switch (v) {
-  Map m =>
+  Map<Object?, Object?> m =>
     '{${(m.keys.map((k) => '$k').toList()..sort()).map((k) => '${jsonEncode(k)}:${_canonical(m[k])}').join(',')}}',
-  List l => '[${l.map(_canonical).join(',')}]',
+  List<Object?> l => '[${l.map(_canonical).join(',')}]',
   num n => jsonEncode(n.toDouble()),
   _ => jsonEncode(v),
 };

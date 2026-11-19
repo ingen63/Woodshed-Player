@@ -281,7 +281,7 @@ int Player::loadAsync(const std::string &path) {
   return kOk;
 }
 
-void Player::runLoad(std::string path) {
+void Player::runLoad(const std::string &path) {
   int result = kOk;
   try {
     auto source = std::make_unique<Source>();

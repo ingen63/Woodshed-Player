@@ -282,7 +282,7 @@ void loadRunsInBackground() { // #14/AK3
   double lastProgress = 0;
   bool monotonic = true, sawRunning = false;
   std::vector<float> out(480 * 2);
-  int state = p.loadState();
+  int state = 0;
   while ((state = p.loadState()) == wp::kLoadRunning) {
     sawRunning = true;
     p.render(out.data(), 480);

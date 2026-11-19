@@ -34,6 +34,21 @@ const _allowed = <(String, String)>{
   ('app/tool/screenshots_test.dart', "'Übungsband'"),
   ('app/tool/screenshots_test.dart', "'Etüde in A-Moll'"),
   ('app/tool/screenshots_test.dart', "'Arpeggio-Übung 14'"),
+  // Messages of the hook after a commit, which talks to Claude in German (#7/AK7).
+  ('app/tool/after_commit_hook_test.dart', "'grün'"),
+  (
+    'app/tool/after_commit_hook_test.dart',
+    "'ändert Logik ohne Tests (app/lib/main.dart)'",
+  ),
+  (
+    'app/tool/after_commit_hook_test.dart',
+    "'«flutter test» ist fehlgeschlagen'",
+  ),
+  (
+    'app/tool/after_commit_hook_test.dart',
+    "'«C++-Kern bauen» ist fehlgeschlagen'",
+  ),
+  ('app/tool/after_commit_hook_test.dart', "'nicht das Format «Titel (#22)»'"),
   // German words that the English error texts must not contain (#46).
   ('core/tests/player_tests.cpp', '"datei"'),
   ('core/tests/player_tests.cpp', '"fehler"'),

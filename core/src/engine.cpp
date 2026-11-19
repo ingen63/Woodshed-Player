@@ -62,7 +62,7 @@ bool Engine::submitSource(std::unique_ptr<Source> source) {
   c.source = source.get();
   if (!send(c))
     return false;
-  source.release(); // gehört jetzt der Queue bzw. dem Audio-Thread
+  (void)source.release(); // gehört jetzt der Queue bzw. dem Audio-Thread
   // Sofort sichtbar, auch bevor der Audio-Thread den Titel übernimmt.
   publishedFrames_.store(frames);
   publishedPosition_.store(0.0);

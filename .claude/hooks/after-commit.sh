@@ -63,6 +63,11 @@ if [ -n "$non_test" ] || [ -n "$code" ]; then
   fi
 fi
 
+# The hook itself or its tests changed (#7/AK7): run the hook tests.
+if has '^(\.claude/hooks/after-commit\.sh|app/tool/after_commit_hook_test\.dart)$'; then
+  steps+=("Hook-Tests|cd app && flutter test --reporter failures-only tool/after_commit_hook_test.dart")
+fi
+
 logdir="${TMPDIR:-/tmp}/woodshed-hook"
 mkdir -p "$logdir"
 ok=()
