@@ -74,6 +74,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nameHint => 'Name';
 
   @override
+  String get editTrackEllipsis => 'Edit title and artist …';
+
+  @override
+  String get editTrackTitle => 'Edit track';
+
+  @override
+  String get titleLabel => 'Title';
+
+  @override
+  String get artistLabel => 'Artist';
+
+  @override
+  String get save => 'Save';
+
+  @override
   String addMp3Shortcut(String shortcut) {
     return 'Add MP3 ($shortcut)';
   }

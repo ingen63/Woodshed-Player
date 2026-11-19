@@ -75,6 +75,7 @@ class Track {
 
   Track copyWith({
     String? title,
+    String? Function()? artist,
     double? duration,
     bool? hasArtwork,
     int? customOrder,
@@ -86,7 +87,7 @@ class Track {
     fileName: fileName,
     originalFileName: originalFileName,
     title: title ?? this.title,
-    artist: artist,
+    artist: artist != null ? artist() : this.artist,
     album: album,
     duration: duration ?? this.duration,
     hasArtwork: hasArtwork ?? this.hasArtwork,

@@ -260,7 +260,7 @@ class _HomePageState extends State<HomePage> {
               headerTrailing: trailing,
               metronome: MetronomeModule(controller: c.metronome),
               state: PlayerViewState(
-                title: p.hasTrack ? p.title : null,
+                title: p.hasTrack ? c.currentTitle : null,
                 artist: track?.artist,
                 artwork: c.currentArtwork,
                 position: p.position,
@@ -316,7 +316,7 @@ class _NowPlayingBar extends StatelessWidget {
     final ws = WsTheme.of(context);
     final m = WsLayout.of(context);
     return ListenableBuilder(
-      listenable: controller.player,
+      listenable: Listenable.merge([controller.player, controller.library]),
       builder: (context, _) {
         final p = controller.player;
         return Material(
@@ -341,7 +341,7 @@ class _NowPlayingBar extends StatelessWidget {
                   Expanded(
                     child: Text(
                       p.hasTrack
-                          ? p.title ?? ''
+                          ? controller.currentTitle ?? ''
                           : context.l10n.practiceMetronome,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

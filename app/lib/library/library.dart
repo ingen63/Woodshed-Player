@@ -543,6 +543,24 @@ class Library extends ChangeNotifier {
     sortOrder = TrackSortOrder.custom;
   }
 
+  // ---- Title and artist (#24) ----
+
+  /// Changes title and artist in `library.json` only; the audio file and its tags stay untouched. Both are
+  /// trimmed; a blank [title] is rejected (returns false), a blank [artist] removes it.
+  bool editMetadata(String id, {required String title, String? artist}) {
+    final i = _tracks.indexWhere((t) => t.id == id);
+    final newTitle = title.trim();
+    if (i < 0 || newTitle.isEmpty) return false;
+    final a = artist?.trim();
+    final newArtist = a == null || a.isEmpty ? null : a;
+    final t = _tracks[i];
+    if (t.title == newTitle && t.artist == newArtist) return true;
+    _tracks[i] = t.copyWith(title: newTitle, artist: () => newArtist);
+    save();
+    notifyListeners();
+    return true;
+  }
+
   // ---- Einstellungen pro Titel ----
 
   void updateSettings(String id, PlaybackSettings settings) {

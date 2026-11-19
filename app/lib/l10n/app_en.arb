@@ -27,6 +27,11 @@
   "delete": "Delete",
   "deleteTrackText": "The track is removed from the app. The original file stays unchanged.",
   "nameHint": "Name",
+  "editTrackEllipsis": "Edit title and artist …",
+  "editTrackTitle": "Edit track",
+  "titleLabel": "Title",
+  "artistLabel": "Artist",
+  "save": "Save",
   "addMp3Shortcut": "Add MP3 ({shortcut})",
   "@addMp3Shortcut": {
     "placeholders": {

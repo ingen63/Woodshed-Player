@@ -159,6 +159,12 @@ class _LibraryViewState extends State<LibraryView> {
       onTap: () => _select(t),
       onDrop: (id) => lib.placeTrack(id, t.folderId, beforeId: t.id),
       menu: (context) => [
+        MenuItemButton(
+          key: const Key('editTrack'),
+          leadingIcon: const Icon(WsIcons.pencil, size: 16),
+          onPressed: () => editTrack(context, lib, t),
+          child: Text(l.editTrackEllipsis),
+        ),
         SubmenuButton(
           leadingIcon: const Icon(WsIcons.folder, size: 16),
           menuChildren: [
@@ -194,6 +200,83 @@ class _LibraryViewState extends State<LibraryView> {
           leadingIcon: const Icon(WsIcons.trash, size: 16),
           onPressed: () => confirmDeleteTrack(context, c, t),
           child: Text(l.delete),
+        ),
+      ],
+    );
+  }
+}
+
+/// Edits title and artist of an imported or recorded track (#24); the audio file stays unchanged.
+Future<void> editTrack(BuildContext context, Library lib, Track t) async {
+  final r = await showDialog<(String, String)>(
+    context: context,
+    builder: (context) => TrackEditDialog(track: t),
+  );
+  if (r != null) lib.editMetadata(t.id, title: r.$1, artist: r.$2);
+}
+
+/// Dialog for title and artist; «Save» is disabled while the title is blank (#24/AK5).
+/// Pops (title, artist) or null on cancel.
+class TrackEditDialog extends StatefulWidget {
+  const TrackEditDialog({super.key, required this.track});
+  final Track track;
+
+  @override
+  State<TrackEditDialog> createState() => _TrackEditDialogState();
+}
+
+class _TrackEditDialogState extends State<TrackEditDialog> {
+  late final _title = TextEditingController(text: widget.track.title);
+  late final _artist = TextEditingController(text: widget.track.artist ?? '');
+
+  bool get _valid => _title.text.trim().isNotEmpty;
+
+  void _save() {
+    if (_valid) Navigator.pop(context, (_title.text, _artist.text));
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _artist.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    return AlertDialog(
+      title: Text(l.editTrackTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            key: const Key('titleField'),
+            controller: _title,
+            autofocus: true,
+            decoration: InputDecoration(labelText: l.titleLabel),
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _save(),
+          ),
+          const SizedBox(height: WsSpace.s),
+          TextField(
+            key: const Key('artistField'),
+            controller: _artist,
+            decoration: InputDecoration(labelText: l.artistLabel),
+            onSubmitted: (_) => _save(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          key: const Key('editCancel'),
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
+        TextButton(
+          key: const Key('editSave'),
+          onPressed: _valid ? _save : null,
+          child: Text(l.save),
         ),
       ],
     );

@@ -53,6 +53,9 @@ class AppController extends ChangeNotifier {
     return id == null ? null : library.track(id);
   }
 
+  /// Title of the loaded track as the library has it now (edited titles show at once, #24).
+  String? get currentTitle => currentTrack?.title ?? player.title;
+
   String? get currentArtwork {
     final t = currentTrack;
     return t == null ? null : library.artworkPath(t);

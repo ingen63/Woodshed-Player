@@ -218,6 +218,36 @@ abstract class AppLocalizations {
   /// **'Name'**
   String get nameHint;
 
+  /// No description provided for @editTrackEllipsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit title and artist …'**
+  String get editTrackEllipsis;
+
+  /// No description provided for @editTrackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit track'**
+  String get editTrackTitle;
+
+  /// No description provided for @titleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get titleLabel;
+
+  /// No description provided for @artistLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Artist'**
+  String get artistLabel;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
   /// No description provided for @addMp3Shortcut.
   ///
   /// In en, this message translates to:
