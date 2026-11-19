@@ -1,0 +1,73 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "w0",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8732",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "web/w0"
+      ],
+      "port": 8732
+    },
+    {
+      "name": "kern-web",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8733",
+        "--bind",
+        "127.0.0.1"
+      ],
+      "port": 8733
+    },
+    {
+      "name": "web-check",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8734",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "app/build/web_check"
+      ],
+      "port": 8734
+    },
+    {
+      "name": "web-app",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8735",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "app/build/web"
+      ],
+      "port": 8735
+    },
+    {
+      "name": "web-store-check",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8736",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "app/build/web_store_check"
+      ],
+      "port": 8736
+    }
+  ]
+}

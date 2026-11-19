@@ -13,7 +13,7 @@
 #   Android  assets/icons/generated/android/                    (mipmap + Adaptive-Icon-Ebenen)
 #   Windows  assets/icons/generated/windows/app_icon.ico
 #   Linux    assets/icons/generated/linux/app_icon_<px>.png
-#   Web      web/favicon.png, web/icons/Icon-{192,512}.png, Icon-maskable-{192,512}.png
+#   Web      web/favicon.png, web/icons/Icon-{120,192,512}.png, Icon-maskable-{192,512}.png
 #
 # Android, Windows und Linux haben im Projekt noch keinen Ordner. Die Dateien landen
 # deshalb unter assets/icons/generated/ und werden beim Anlegen dieser Plattformen
@@ -146,6 +146,7 @@ WEB="$APP_DIR/web"
 resize "$FLAT" 16 "$WEB/favicon.png"
 resize "$FLAT" 192 "$WEB/icons/Icon-192.png"
 resize "$FLAT" 512 "$WEB/icons/Icon-512.png"
+resize "$FLAT" 120 "$WEB/icons/Icon-120.png"
 # Maskable: Motiv innerhalb der Sicherheitszone (80 %), voller Hintergrund ohne Rundung.
 for px in 192 512; do
   magick "$FLAT" -resize 820x820 -gravity center -background "$BG" -extent 1024x1024 \
