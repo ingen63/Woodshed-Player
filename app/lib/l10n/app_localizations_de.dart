@@ -605,4 +605,20 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sourceCode => 'Quelltext';
+
+  @override
+  String aboutTag(String tag) {
+    return 'Tag $tag';
+  }
+
+  @override
+  String get aboutNoTag => 'Ohne Tag';
+
+  @override
+  String aboutBuildDate(DateTime date) {
+    final intl.DateFormat dateDateFormat = intl.DateFormat.yMd(localeName);
+    final String dateString = dateDateFormat.format(date);
+
+    return 'Gebaut am $dateString';
+  }
 }

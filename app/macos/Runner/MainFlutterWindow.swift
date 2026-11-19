@@ -85,6 +85,10 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
           NSWorkspace.shared.open(url)
         }
         result(nil)
+      case "buildInfo":
+        // #50/AK6: written by tool/stamp_build_info.sh at build time.
+        let info = Bundle.main.infoDictionary ?? [:]
+        result(["tag": info["WPGitTag"] as? String ?? "", "date": info["WPBuildDate"] as? String ?? ""])
       case "setAboutMenuTitle":
         if let title = call.arguments as? String { self.routeAboutMenu(title: title) }
         result(nil)

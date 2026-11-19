@@ -248,6 +248,7 @@
 				33CC110E2044A8840003C045 /* Bundle Framework */,
 				3399D490228B24CF009A79C7 /* ShellScript */,
 				34C097E5FDD7087DB882E1FC /* [CP] Embed Pods Frameworks */,
+				5750B1D0A1B2C3D4E5F60718 /* Stamp Build Info */,
 			);
 			buildRules = (
 			);
@@ -338,6 +339,25 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		5750B1D0A1B2C3D4E5F60718 /* Stamp Build Info */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp Build Info";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$SRCROOT/../tool/stamp_build_info.sh\"\n";
+		};
 		20B7A20267A0AA1ACD6ECCD0 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;

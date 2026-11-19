@@ -29,6 +29,10 @@ import UniformTypeIdentifiers
         // Bildschirm bleibt an, solange das Metronom läuft (FEA-3).
         UIApplication.shared.isIdleTimerDisabled = (call.arguments as? Bool) ?? false
         result(nil)
+      case "buildInfo":
+        // #50/AK6: written by tool/stamp_build_info.sh at build time.
+        let info = Bundle.main.infoDictionary ?? [:]
+        result(["tag": info["WPGitTag"] as? String ?? "", "date": info["WPBuildDate"] as? String ?? ""])
       case "openUrl":
         // #50/AK6: links of the About dialog open in the browser.
         if let text = call.arguments as? String, let url = URL(string: text),

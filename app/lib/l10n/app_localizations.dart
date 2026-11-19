@@ -1045,6 +1045,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Source code'**
   String get sourceCode;
+
+  /// About dialog (#50): latest Git tag of this build.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag {tag}'**
+  String aboutTag(String tag);
+
+  /// About dialog (#50): the build has no Git tag.
+  ///
+  /// In en, this message translates to:
+  /// **'No tag'**
+  String get aboutNoTag;
+
+  /// No description provided for @aboutBuildDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Built on {date}'**
+  String aboutBuildDate(DateTime date);
 }
 
 class _AppLocalizationsDelegate

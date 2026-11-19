@@ -424,5 +424,27 @@
     "description": "About dialog link (#50): opens the published privacy policy in the browser."
   },
   "termsOfUse": "Terms of use",
-  "sourceCode": "Source code"
+  "sourceCode": "Source code",
+  "aboutTag": "Tag {tag}",
+  "@aboutTag": {
+    "description": "About dialog (#50): latest Git tag of this build.",
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "aboutNoTag": "No tag",
+  "@aboutNoTag": {
+    "description": "About dialog (#50): the build has no Git tag."
+  },
+  "aboutBuildDate": "Built on {date}",
+  "@aboutBuildDate": {
+    "placeholders": {
+      "date": {
+        "type": "DateTime",
+        "format": "yMd"
+      }
+    }
+  }
 }

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_info.dart';
+import 'package:woodshed_player/app/file_platform.dart';
 import 'package:woodshed_player/main.dart';
 
 import 'fakes.dart';
@@ -157,6 +158,34 @@ void main() {
       app.files.showAbout!();
       await tester.pumpAndSettle();
       expect(find.byType(AboutDialog), findsOneWidget);
+    });
+
+    test('#50/AK6 build info: empty values mean unknown', () {
+      final none = BuildInfo.parse('', '');
+      expect(none.tag, isNull);
+      expect(none.date, isNull);
+      final some = BuildInfo.parse('v1.2.0', '2026-11-19');
+      expect(some.tag, 'v1.2.0');
+      expect(some.date, DateTime(2026, 11, 19));
+    });
+
+    testWidgets('#50/AK6 About shows Git tag and build date', (tester) async {
+      final app = await pump(tester);
+      app.files.build = BuildInfo.parse('v1.2.0', '2026-11-19');
+      await tester.tap(find.byKey(const Key('aboutButton')));
+      await tester.pumpAndSettle();
+      expect(find.text(de.aboutTag('v1.2.0')), findsOneWidget);
+      expect(find.text('Gebaut am 19.11.2026'), findsOneWidget);
+    });
+
+    testWidgets('#50/AK6 About without tag says so and hides an unknown date', (
+      tester,
+    ) async {
+      await pump(tester);
+      await tester.tap(find.byKey(const Key('aboutButton')));
+      await tester.pumpAndSettle();
+      expect(find.text(de.aboutNoTag), findsOneWidget);
+      expect(find.byKey(const Key('aboutBuildDate')), findsNothing);
     });
 
     test('#50/AK6 links point to the published pages', () {

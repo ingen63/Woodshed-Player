@@ -157,5 +157,8 @@
   "aboutLicense": "Open Source unter der MIT-Lizenz. Der Name «Woodshed Player» ist davon nicht umfasst.",
   "privacyPolicy": "Datenschutzerklärung",
   "termsOfUse": "Nutzungsbedingungen",
-  "sourceCode": "Quelltext"
+  "sourceCode": "Quelltext",
+  "aboutTag": "Tag {tag}",
+  "aboutNoTag": "Ohne Tag",
+  "aboutBuildDate": "Gebaut am {date}"
 }

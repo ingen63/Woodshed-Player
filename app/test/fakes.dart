@@ -200,6 +200,11 @@ class FakeFiles implements FilePlatform {
   @override
   set onDropFiles(void Function(List<String> paths)? handler) => drop = handler;
 
+  /// Tag and build date this fake build reports (#50/AK6).
+  BuildInfo build = const BuildInfo();
+  @override
+  Future<BuildInfo> buildInfo() async => build;
+
   /// URLs handed to the system browser (#50).
   final opened = <String>[];
   @override

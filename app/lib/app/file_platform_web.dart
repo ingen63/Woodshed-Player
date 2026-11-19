@@ -78,4 +78,11 @@ class WebFilePlatform implements FilePlatform {
 
   @override
   void setAboutMenuTitle(String title) {}
+
+  /// In the browser from `--dart-define=WP_GIT_TAG=… --dart-define=WP_BUILD_DATE=YYYY-MM-DD` (#50/AK6).
+  @override
+  Future<BuildInfo> buildInfo() async => BuildInfo.parse(
+    const String.fromEnvironment('WP_GIT_TAG'),
+    const String.fromEnvironment('WP_BUILD_DATE'),
+  );
 }

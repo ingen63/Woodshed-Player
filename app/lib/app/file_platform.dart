@@ -49,6 +49,23 @@ abstract class FileStore {
   Future<bool?> requestPersistence() async => null;
 }
 
+/// Git tag and build date of this build (#50/AK6), stamped in at build time.
+class BuildInfo {
+  const BuildInfo({this.tag, this.date});
+
+  /// Latest Git tag; null if the build had none.
+  final String? tag;
+
+  /// Build date (UTC day); null if unknown.
+  final DateTime? date;
+
+  /// From the strings the build wrote (empty means unknown); the date as YYYY-MM-DD.
+  factory BuildInfo.parse(String? tag, String? date) => BuildInfo(
+    tag: (tag ?? '').trim().isEmpty ? null : tag!.trim(),
+    date: DateTime.tryParse((date ?? '').trim()),
+  );
+}
+
 abstract class FilePlatform {
   /// Audiodateien wählen (mehrere). Leer bei Abbruch.
   Future<List<String>> pickAudioFiles();
@@ -64,6 +81,9 @@ abstract class FilePlatform {
 
   /// Dateien wurden ins Fenster gezogen (macOS).
   set onDropFiles(void Function(List<String> paths)? handler);
+
+  /// Git tag and build date of this build (#50/AK6).
+  Future<BuildInfo> buildInfo();
 
   /// Opens [url] in the system browser (#50/AK6); the app itself loads nothing from the network.
   Future<void> openUrl(String url);
@@ -122,4 +142,14 @@ class ChannelFilePlatform implements FilePlatform {
   void setAboutMenuTitle(String title) => _channel
       .invokeMethod<void>('setAboutMenuTitle', title)
       .catchError((_) {});
+
+  @override
+  Future<BuildInfo> buildInfo() async {
+    try {
+      final m = await _channel.invokeMapMethod<String, Object?>('buildInfo');
+      return BuildInfo.parse(m?['tag'] as String?, m?['date'] as String?);
+    } catch (_) {
+      return const BuildInfo();
+    }
+  }
 }
