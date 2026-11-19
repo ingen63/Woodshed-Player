@@ -44,7 +44,15 @@ const _allowed = <(String, String)>{
   ('core/tests/player_tests.cpp', '"bitte"'),
 };
 
-const _roots = ['lib', 'packages', 'tool', 'web/index.html', 'web/manifest.json', 'pubspec.yaml', '../core'];
+const _roots = [
+  'lib',
+  'packages',
+  'tool',
+  'web/index.html',
+  'web/manifest.json',
+  'pubspec.yaml',
+  '../core',
+];
 const _extensions = [
   '.dart',
   '.cpp',
@@ -107,7 +115,9 @@ List<Literal> literals(String source, String path) {
       final stop = end < 0 ? source.length : end + 3;
       line += '\n'.allMatches(source.substring(i, stop)).length;
       i = stop;
-    } else if (hashComments && c == '#' && (i == 0 || RegExp(r'\s').hasMatch(source[i - 1]))) {
+    } else if (hashComments &&
+        c == '#' &&
+        (i == 0 || RegExp(r'\s').hasMatch(source[i - 1]))) {
       while (i < source.length && source[i] != '\n') {
         i++;
       }
@@ -121,14 +131,20 @@ List<Literal> literals(String source, String path) {
       while (i < source.length && !source.startsWith(quote, i)) {
         if (source[i] == '\\' && !hashComments) i++;
         if (i < source.length && source[i] == '\n') {
-          if (!multiline) break; // unterminated: apostrophe in prose, not a literal
+          if (!multiline) {
+            break; // unterminated: apostrophe in prose, not a literal
+          }
           line++;
         }
         i++;
       }
       if (i < source.length && source.startsWith(quote, i)) {
         i += quote.length;
-        out.add((line: startLine, offset: start, text: source.substring(start, i)));
+        out.add((
+          line: startLine,
+          offset: start,
+          text: source.substring(start, i),
+        ));
       }
     } else {
       i++;
@@ -137,7 +153,8 @@ List<Literal> literals(String source, String path) {
   return out;
 }
 
-bool isGerman(String text) => _umlauts.hasMatch(text) || _germanWords.hasMatch(text);
+bool isGerman(String text) =>
+    _umlauts.hasMatch(text) || _germanWords.hasMatch(text);
 
 Iterable<File> _files(String root) {
   if (File(root).existsSync()) return [File(root)];
@@ -147,7 +164,8 @@ Iterable<File> _files(String root) {
       .where((f) => _extensions.any(f.path.endsWith) && !_skipped(f.path));
 }
 
-String _repoPath(String path) => path.startsWith('../') ? path.substring(3) : 'app/$path';
+String _repoPath(String path) =>
+    path.startsWith('../') ? path.substring(3) : 'app/$path';
 
 void main() {
   test('#45/AK5: no German string literals in app/lib, app/packages, app/tool and core/', () {
@@ -156,7 +174,9 @@ void main() {
       for (final file in _files(root)) {
         final path = _repoPath(file.path);
         for (final l in literals(file.readAsStringSync(), path)) {
-          if (isGerman(l.text) && !_allowed.contains((path, l.text))) hits.add('$path:${l.line}: ${l.text}');
+          if (isGerman(l.text) && !_allowed.contains((path, l.text))) {
+            hits.add('$path:${l.line}: ${l.text}');
+          }
         }
       }
     }
@@ -181,7 +201,10 @@ void main() {
     expect(isGerman('"%d Prüfungen, %d Fehler"'), isTrue);
     expect(isGerman("'File not readable'"), isFalse);
     expect(isGerman("'MIT'"), isFalse);
-    final found = literals("// 'kein Audio'\nfinal a = 'no audio'; /* \"Fehler\" */\nb = `x\ny`;", 'x.dart');
+    final found = literals(
+      "// 'kein Audio'\nfinal a = 'no audio'; /* \"Fehler\" */\nb = `x\ny`;",
+      'x.dart',
+    );
     expect(found.map((l) => l.text), ["'no audio'", '`x\ny`']);
     expect(found.map((l) => l.line), [2, 3]);
   });

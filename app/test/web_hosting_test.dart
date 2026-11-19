@@ -25,11 +25,14 @@ void main() {
       expect(workflow, contains("if: github.ref_type != 'tag'"));
     });
 
-    test('builds the app from the latest tag and leaves it out without one', () {
-      expect(workflow, contains('git describe --tags --abbrev=0'));
-      expect(workflow, contains('ref: \${{ steps.tag.outputs.tag }}'));
-      expect(workflow, contains("if: steps.tag.outputs.tag != ''"));
-    });
+    test(
+      'builds the app from the latest tag and leaves it out without one',
+      () {
+        expect(workflow, contains('git describe --tags --abbrev=0'));
+        expect(workflow, contains('ref: \${{ steps.tag.outputs.tag }}'));
+        expect(workflow, contains("if: steps.tag.outputs.tag != ''"));
+      },
+    );
 
     test('runs the tests before the build and builds the WASM core', () {
       final core = workflow.indexOf('build_web_core.sh');
@@ -61,7 +64,10 @@ void main() {
       expect(index, contains('crossOriginIsolated'));
       expect(index, contains('location.reload()'));
       // Only one service worker: Flutter's loader must not register its own.
-      expect(read('web/flutter_bootstrap.js'), isNot(contains('serviceWorkerSettings')));
+      expect(
+        read('web/flutter_bootstrap.js'),
+        isNot(contains('serviceWorkerSettings')),
+      );
     });
   });
 
@@ -103,7 +109,10 @@ void main() {
       final r = build([]);
       expect(r.exitCode, 0, reason: '${r.stderr}');
       expect(Directory('${tmp.path}/out/app').existsSync(), isFalse);
-      expect(read('${tmp.path}/out/index.html'), isNot(contains('href="app/"')));
+      expect(
+        read('${tmp.path}/out/index.html'),
+        isNot(contains('href="app/"')),
+      );
     }, skip: !python);
 
     test('fails when the app folder has no index.html', () {
@@ -120,7 +129,10 @@ void main() {
       expect(readme, contains('OneDrive'));
       expect(readme, contains('direkte Verbindung'));
       expect(readme, contains('GitHub Pages'));
-      expect(readme, contains('https://ingen63.github.io/Woodshed-Player/app/'));
+      expect(
+        readme,
+        contains('https://ingen63.github.io/Woodshed-Player/app/'),
+      );
       expect(readme, isNot(contains('Dropbox')));
     });
 
@@ -131,12 +143,15 @@ void main() {
       expect(plan, isNot(contains('Foreground-Service')));
     });
 
-    test('#41/AK5 CLAUDE.md has the network exception with relays and STUN', () {
-      final rules = read('../CLAUDE.md');
-      expect(rules, contains('Google Drive oder OneDrive'));
-      expect(rules, contains('Relays'));
-      expect(rules, contains('STUN'));
-      expect(rules, contains('Laden der Web-App'));
-    });
+    test(
+      '#41/AK5 CLAUDE.md has the network exception with relays and STUN',
+      () {
+        final rules = read('../CLAUDE.md');
+        expect(rules, contains('Google Drive oder OneDrive'));
+        expect(rules, contains('Relays'));
+        expect(rules, contains('STUN'));
+        expect(rules, contains('Laden der Web-App'));
+      },
+    );
   });
 }

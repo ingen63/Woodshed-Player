@@ -25,9 +25,9 @@ const _iosIcons = 'ios/Runner/Assets.xcassets/AppIcon.appiconset';
 
 /// Expected pixel edge per Contents.json entry ("size" in points × "scale").
 List<({String file, int px})> _expectedIcons(String dir) {
-  final json =
-      jsonDecode(File('$dir/Contents.json').readAsStringSync())
-          as Map<String, dynamic>;
+  final json = jsonDecode(
+    File('$dir/Contents.json').readAsStringSync(),
+  ) as Map<String, dynamic>;
   return [
     for (final e in (json['images'] as List).cast<Map<String, dynamic>>())
       (
@@ -42,9 +42,8 @@ List<({String file, int px})> _expectedIcons(String dir) {
 
 /// Value of a string key in an Info.plist (flat lookup, enough for these files).
 String? _plistString(String path, String key) {
-  final match = RegExp(
-    '<key>$key</key>\\s*<string>([^<]*)</string>',
-  ).firstMatch(File(path).readAsStringSync());
+  final match = RegExp('<key>$key</key>\\s*<string>([^<]*)</string>')
+      .firstMatch(File(path).readAsStringSync());
   return match?.group(1);
 }
 
@@ -83,31 +82,32 @@ void main() {
     });
   });
 
-  testWidgets('#6/AK1 icons show the Waveform Loop motif, not Flutter default', (
-    tester,
-  ) async {
-    Future<List<int>> pixel(String path, int x, int y) async {
-      final codec = await ui.instantiateImageCodec(
-        File(path).readAsBytesSync(),
-      );
-      final image = (await codec.getNextFrame()).image;
-      final data = (await image.toByteData())!;
-      final i = (y * image.width + x) * 4;
-      return [data.getUint8(i), data.getUint8(i + 1), data.getUint8(i + 2)];
-    }
-
-    await tester.runAsync(() async {
-      for (final path in [
-        '$_macIcons/app_icon_1024.png',
-        '$_iosIcons/Icon-App-1024x1024@1x.png',
-      ]) {
-        // Centre: amber middle third of the waveform (#FF9F0A).
-        expect(await pixel(path, 512, 512), [0xFF, 0x9F, 0x0A], reason: path);
-        // Left of the loop bracket: studio background (#121214).
-        expect(await pixel(path, 100, 512), [0x12, 0x12, 0x14], reason: path);
+  testWidgets(
+    '#6/AK1 icons show the Waveform Loop motif, not Flutter default',
+    (tester) async {
+      Future<List<int>> pixel(String path, int x, int y) async {
+        final codec = await ui.instantiateImageCodec(
+          File(path).readAsBytesSync(),
+        );
+        final image = (await codec.getNextFrame()).image;
+        final data = (await image.toByteData())!;
+        final i = (y * image.width + x) * 4;
+        return [data.getUint8(i), data.getUint8(i + 1), data.getUint8(i + 2)];
       }
-    });
-  });
+
+      await tester.runAsync(() async {
+        for (final path in [
+          '$_macIcons/app_icon_1024.png',
+          '$_iosIcons/Icon-App-1024x1024@1x.png',
+        ]) {
+          // Centre: amber middle third of the waveform (#FF9F0A).
+          expect(await pixel(path, 512, 512), [0xFF, 0x9F, 0x0A], reason: path);
+          // Left of the loop bracket: studio background (#121214).
+          expect(await pixel(path, 100, 512), [0x12, 0x12, 0x14], reason: path);
+        }
+      });
+    },
+  );
 
   test('#6/AK3 icon source documented as own work under MIT', () {
     final readme = File('assets/icons/README.md');
@@ -145,9 +145,9 @@ void main() {
     });
 
     test('web manifest', () {
-      final manifest =
-          jsonDecode(File('web/manifest.json').readAsStringSync())
-              as Map<String, dynamic>;
+      final manifest = jsonDecode(
+        File('web/manifest.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
       expect(manifest['name'], 'Woodshed Player');
     });
   });

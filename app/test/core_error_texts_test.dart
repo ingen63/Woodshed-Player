@@ -25,8 +25,9 @@ const _germanWords = [
 
 void main() {
   test('#46/AK2: WpException texts in wp_core.dart are English', () {
-    final binding = File('packages/wp_core/lib/wp_core.dart').readAsStringSync();
-    final texts = RegExp(r"WpException\('([^']*)'\)")
+    final binding = File('packages/wp_core/lib/wp_core.dart')
+        .readAsStringSync();
+    final texts = RegExp(r"WpException\(\s*'([^']*)'")
         .allMatches(binding)
         .map((m) => m.group(1)!)
         .toList();
@@ -39,22 +40,27 @@ void main() {
     }
   });
 
-  test('#46/AK3: the UI never shows core error texts or WpException.message', () {
-    final offenders = <String>[];
-    for (final f in Directory('lib').listSync(recursive: true).whereType<File>()) {
-      if (!f.path.endsWith('.dart')) continue;
-      final src = f.readAsStringSync();
-      for (final pattern in [
-        'WpException',
-        'WpPlayer.errorMessage',
-        'wp_error_message',
-        '.errorMessage(',
-      ]) {
-        if (src.contains(pattern)) offenders.add('${f.path}: $pattern');
+  test(
+    '#46/AK3: the UI never shows core error texts or WpException.message',
+    () {
+      final offenders = <String>[];
+      for (final f in Directory(
+        'lib',
+      ).listSync(recursive: true).whereType<File>()) {
+        if (!f.path.endsWith('.dart')) continue;
+        final src = f.readAsStringSync();
+        for (final pattern in [
+          'WpException',
+          'WpPlayer.errorMessage',
+          'wp_error_message',
+          '.errorMessage(',
+        ]) {
+          if (src.contains(pattern)) offenders.add('${f.path}: $pattern');
+        }
       }
-    }
-    expect(offenders, isEmpty);
-  });
+      expect(offenders, isEmpty);
+    },
+  );
 
   testWidgets('#46/AK3: a load error shows the ARB text, not the core text', (
     tester,

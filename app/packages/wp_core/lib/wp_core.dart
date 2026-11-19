@@ -21,79 +21,211 @@ set wpCoreLibraryPath(String path) => _libraryPath = path;
 
 final DynamicLibrary _lib = () {
   if (_libraryPath != null) return DynamicLibrary.open(_libraryPath!);
-  if (Platform.isMacOS || Platform.isIOS) return DynamicLibrary.open('wp_core.framework/wp_core');
-  if (Platform.isAndroid || Platform.isLinux) return DynamicLibrary.open('libwp_core.so');
+  if (Platform.isMacOS || Platform.isIOS) {
+    return DynamicLibrary.open('wp_core.framework/wp_core');
+  }
+  if (Platform.isAndroid || Platform.isLinux) {
+    return DynamicLibrary.open('libwp_core.so');
+  }
   if (Platform.isWindows) return DynamicLibrary.open('wp_core.dll');
   throw UnsupportedError('Platform not supported: ${Platform.operatingSystem}');
 }();
 
 final class _Player extends Opaque {}
 
-final _create = _lib.lookupFunction<Pointer<_Player> Function(), Pointer<_Player> Function()>('wp_create');
-final _destroy = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_destroy');
-final _load = _lib.lookupFunction<Int32 Function(Pointer<_Player>, Pointer<Utf8>),
-    int Function(Pointer<_Player>, Pointer<Utf8>)>('wp_load');
-final _loadAsync = _lib.lookupFunction<Int32 Function(Pointer<_Player>, Pointer<Utf8>),
-    int Function(Pointer<_Player>, Pointer<Utf8>)>('wp_load_async');
-final _loadState =
-    _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_load_state');
-final _loadProgress =
-    _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_load_progress');
-final _loadWait =
-    _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_load_wait');
-final _fileDuration =
-    _lib.lookupFunction<Double Function(Pointer<Utf8>), double Function(Pointer<Utf8>)>('wp_file_duration');
-final _errorMessage =
-    _lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('wp_error_message');
-final _play = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_play');
-final _pause = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_pause');
-final _isPlaying =
-    _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_is_playing');
-final _seek = _lib.lookupFunction<Void Function(Pointer<_Player>, Double), void Function(Pointer<_Player>, double)>(
-    'wp_seek');
-final _setRate = _lib.lookupFunction<Void Function(Pointer<_Player>, Double),
-    void Function(Pointer<_Player>, double)>('wp_set_rate');
-final _setLoop = _lib.lookupFunction<Void Function(Pointer<_Player>, Double, Double),
-    void Function(Pointer<_Player>, double, double)>('wp_set_loop');
-final _setVolume = _lib.lookupFunction<Void Function(Pointer<_Player>, Float),
-    void Function(Pointer<_Player>, double)>('wp_set_volume');
-final _position =
-    _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_position');
-final _duration =
-    _lib.lookupFunction<Double Function(Pointer<_Player>), double Function(Pointer<_Player>)>('wp_duration');
-final _loopPasses =
-    _lib.lookupFunction<Int64 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_loop_passes');
-final _waveform = _lib.lookupFunction<
-    Int32 Function(Pointer<_Player>, Double, Double, Int32, Pointer<Float>, Pointer<Float>),
-    int Function(Pointer<_Player>, double, double, int, Pointer<Float>, Pointer<Float>)>('wp_waveform');
+final _create = _lib
+    .lookupFunction<Pointer<_Player> Function(), Pointer<_Player> Function()>(
+      'wp_create',
+    );
+final _destroy = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>),
+      void Function(Pointer<_Player>)
+    >('wp_destroy');
+final _load = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<_Player>, Pointer<Utf8>),
+      int Function(Pointer<_Player>, Pointer<Utf8>)
+    >('wp_load');
+final _loadAsync = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<_Player>, Pointer<Utf8>),
+      int Function(Pointer<_Player>, Pointer<Utf8>)
+    >('wp_load_async');
+final _loadState = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<_Player>),
+      int Function(Pointer<_Player>)
+    >('wp_load_state');
+final _loadProgress = _lib
+    .lookupFunction<
+      Double Function(Pointer<_Player>),
+      double Function(Pointer<_Player>)
+    >('wp_load_progress');
+final _loadWait = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<_Player>),
+      int Function(Pointer<_Player>)
+    >('wp_load_wait');
+final _fileDuration = _lib
+    .lookupFunction<
+      Double Function(Pointer<Utf8>),
+      double Function(Pointer<Utf8>)
+    >('wp_file_duration');
+final _errorMessage = _lib
+    .lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>(
+      'wp_error_message',
+    );
+final _play = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>),
+      void Function(Pointer<_Player>)
+    >('wp_play');
+final _pause = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>),
+      void Function(Pointer<_Player>)
+    >('wp_pause');
+final _isPlaying = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<_Player>),
+      int Function(Pointer<_Player>)
+    >('wp_is_playing');
+final _seek = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Double),
+      void Function(Pointer<_Player>, double)
+    >('wp_seek');
+final _setRate = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Double),
+      void Function(Pointer<_Player>, double)
+    >('wp_set_rate');
+final _setLoop = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Double, Double),
+      void Function(Pointer<_Player>, double, double)
+    >('wp_set_loop');
+final _setVolume = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Float),
+      void Function(Pointer<_Player>, double)
+    >('wp_set_volume');
+final _position = _lib
+    .lookupFunction<
+      Double Function(Pointer<_Player>),
+      double Function(Pointer<_Player>)
+    >('wp_position');
+final _duration = _lib
+    .lookupFunction<
+      Double Function(Pointer<_Player>),
+      double Function(Pointer<_Player>)
+    >('wp_duration');
+final _loopPasses = _lib
+    .lookupFunction<
+      Int64 Function(Pointer<_Player>),
+      int Function(Pointer<_Player>)
+    >('wp_loop_passes');
+final _waveform = _lib
+    .lookupFunction<
+      Int32 Function(
+        Pointer<_Player>,
+        Double,
+        Double,
+        Int32,
+        Pointer<Float>,
+        Pointer<Float>,
+      ),
+      int Function(
+        Pointer<_Player>,
+        double,
+        double,
+        int,
+        Pointer<Float>,
+        Pointer<Float>,
+      )
+    >('wp_waveform');
 
-final _mStart = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_metro_start');
-final _mStop = _lib.lookupFunction<Void Function(Pointer<_Player>), void Function(Pointer<_Player>)>('wp_metro_stop');
-final _mIsRunning =
-    _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_metro_is_running');
-final _mSetBpm = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32), void Function(Pointer<_Player>, int)>(
-    'wp_metro_set_bpm');
-final _mBpm = _lib.lookupFunction<Int32 Function(Pointer<_Player>), int Function(Pointer<_Player>)>('wp_metro_bpm');
-final _mSetMeter = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32), void Function(Pointer<_Player>, int)>(
-    'wp_metro_set_meter');
-final _mSetSub = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32), void Function(Pointer<_Player>, int)>(
-    'wp_metro_set_subdivision');
-final _mSetVolume = _lib.lookupFunction<Void Function(Pointer<_Player>, Float),
-    void Function(Pointer<_Player>, double)>('wp_metro_set_volume');
-final _mSetRamp = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32, Int32, Int32, Int32, Int32),
-    void Function(Pointer<_Player>, int, int, int, int, int)>('wp_metro_set_ramp');
-final _mSetRampTimed = _lib.lookupFunction<Void Function(Pointer<_Player>, Int32, Int32, Int32, Int32),
-    void Function(Pointer<_Player>, int, int, int, int)>('wp_metro_set_ramp_timed');
+final _mStart = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>),
+      void Function(Pointer<_Player>)
+    >('wp_metro_start');
+final _mStop = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>),
+      void Function(Pointer<_Player>)
+    >('wp_metro_stop');
+final _mIsRunning = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<_Player>),
+      int Function(Pointer<_Player>)
+    >('wp_metro_is_running');
+final _mSetBpm = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Int32),
+      void Function(Pointer<_Player>, int)
+    >('wp_metro_set_bpm');
+final _mBpm = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<_Player>),
+      int Function(Pointer<_Player>)
+    >('wp_metro_bpm');
+final _mSetMeter = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Int32),
+      void Function(Pointer<_Player>, int)
+    >('wp_metro_set_meter');
+final _mSetSub = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Int32),
+      void Function(Pointer<_Player>, int)
+    >('wp_metro_set_subdivision');
+final _mSetVolume = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Float),
+      void Function(Pointer<_Player>, double)
+    >('wp_metro_set_volume');
+final _mSetRamp = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Int32, Int32, Int32, Int32, Int32),
+      void Function(Pointer<_Player>, int, int, int, int, int)
+    >('wp_metro_set_ramp');
+final _mSetRampTimed = _lib
+    .lookupFunction<
+      Void Function(Pointer<_Player>, Int32, Int32, Int32, Int32),
+      void Function(Pointer<_Player>, int, int, int, int)
+    >('wp_metro_set_ramp_timed');
 
-final _recAvailable = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_available');
-final _recStart = _lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('wp_rec_start');
-final _recStop = _lib.lookupFunction<Void Function(), void Function()>('wp_rec_stop');
-final _recIsRecording = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_is_recording');
-final _recSeconds = _lib.lookupFunction<Double Function(), double Function()>('wp_rec_seconds');
-final _recLevel = _lib.lookupFunction<Float Function(), double Function()>('wp_rec_level');
-final _recOnlySilence = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_only_silence');
-final _recOsStatus = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_os_status');
-final _recError = _lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('wp_rec_error');
+final _recAvailable = _lib.lookupFunction<Int32 Function(), int Function()>(
+  'wp_rec_available',
+);
+final _recStart = _lib
+    .lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>(
+      'wp_rec_start',
+    );
+final _recStop = _lib.lookupFunction<Void Function(), void Function()>(
+  'wp_rec_stop',
+);
+final _recIsRecording = _lib.lookupFunction<Int32 Function(), int Function()>(
+  'wp_rec_is_recording',
+);
+final _recSeconds = _lib.lookupFunction<Double Function(), double Function()>(
+  'wp_rec_seconds',
+);
+final _recLevel = _lib.lookupFunction<Float Function(), double Function()>(
+  'wp_rec_level',
+);
+final _recOnlySilence = _lib.lookupFunction<Int32 Function(), int Function()>(
+  'wp_rec_only_silence',
+);
+final _recOsStatus = _lib.lookupFunction<Int32 Function(), int Function()>(
+  'wp_rec_os_status',
+);
+final _recError = _lib
+    .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+      'wp_rec_error',
+    );
 
 /// Ein Player mit eigenem Audiogerät.
 class WpPlayer {
@@ -108,7 +240,11 @@ class WpPlayer {
     final c = path.toNativeUtf8();
     try {
       final r = _load(_p, c);
-      if (r != 0) throw WpException('Could not load file: ${_errorMessage(r).toDartString()}');
+      if (r != 0) {
+        throw WpException(
+          'Could not load file: ${_errorMessage(r).toDartString()}',
+        );
+      }
     } finally {
       malloc.free(c);
     }
@@ -162,7 +298,9 @@ class WpPlayer {
     final mins = malloc<Float>(count);
     final maxs = malloc<Float>(count);
     try {
-      if (_waveform(_p, start, end, count, mins, maxs) != WpCode.ok) return null;
+      if (_waveform(_p, start, end, count, mins, maxs) != WpCode.ok) {
+        return null;
+      }
       return WpWaveform(
         Float32List.fromList(mins.asTypedList(count)),
         Float32List.fromList(maxs.asTypedList(count)),
@@ -190,13 +328,21 @@ class WpPlayer {
   /// Klicks pro Schlag 1–4.
   set metronomeSubdivision(int clicks) => _mSetSub(_p, clicks);
   set metronomeVolume(double v) => _mSetVolume(_p, v);
-  void metronomeRamp({required bool enabled, required int start, required int target, required int step,
-          required int everyBars}) =>
-      _mSetRamp(_p, enabled ? 1 : 0, start, target, step, everyBars);
+  void metronomeRamp({
+    required bool enabled,
+    required int start,
+    required int target,
+    required int step,
+    required int everyBars,
+  }) => _mSetRamp(_p, enabled ? 1 : 0, start, target, step, everyBars);
 
   /// Steigerung nach Zeit (#23): 1-BPM-Stufen gleichmässig über [seconds], Wechsel am Taktanfang.
-  void metronomeTimedRamp({required bool enabled, required int start, required int target, required int seconds}) =>
-      _mSetRampTimed(_p, enabled ? 1 : 0, start, target, seconds);
+  void metronomeTimedRamp({
+    required bool enabled,
+    required int start,
+    required int target,
+    required int seconds,
+  }) => _mSetRampTimed(_p, enabled ? 1 : 0, start, target, seconds);
 }
 
 /// Dauer einer Datei in Sekunden, ohne sie zu laden. Negativ = Fehlercode ([WpCode]).
@@ -218,7 +364,13 @@ abstract final class WpRecorder {
     final c = wavPath.toNativeUtf8();
     try {
       final code = _recStart(c);
-      if (code != 0) throw WpRecordingException(code, _recOsStatus(), _recError().toDartString());
+      if (code != 0) {
+        throw WpRecordingException(
+          code,
+          _recOsStatus(),
+          _recError().toDartString(),
+        );
+      }
     } finally {
       malloc.free(c);
     }

@@ -1,0 +1,3 @@
+# Formatting of our own C/C++/Objective-C++ code in core/ (#7). core/third_party/ is never formatted.
+BasedOnStyle: LLVM
+ColumnLimit: 100
