@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Woodshed Player – Time-Stretch-Play</title>
+  <rect width="1024" height="1024" rx="224" fill="#121214"/>
+  <rect x="1" y="1" width="1022" height="1022" rx="223" fill="none" stroke="#2C2C30" stroke-width="2"/>
+  <g>
+    <rect x="320" y="232" width="26" height="560" rx="4" fill="#0A84FF"/>
+    <rect x="360" y="256" width="26" height="512" rx="4" fill="#3389D6"/>
+    <rect x="406" y="284" width="26" height="456" rx="4" fill="#5C8DAD"/>
+    <rect x="458" y="316" width="26" height="392" rx="4" fill="#859285"/>
+    <rect x="516" y="352" width="26" height="320" rx="4" fill="#AD965C"/>
+    <rect x="580" y="394" width="26" height="236" rx="4" fill="#D69B33"/>
+    <rect x="650" y="432" width="26" height="160" rx="4" fill="#FF9F0A"/>
+  </g>
+</svg>

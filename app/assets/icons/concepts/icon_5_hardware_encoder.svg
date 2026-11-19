@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Woodshed Player – Hardware-Encoder</title>
+  <rect width="1024" height="1024" rx="224" fill="#121214"/>
+  <rect x="1" y="1" width="1022" height="1022" rx="223" fill="none" stroke="#2C2C30" stroke-width="2"/>
+  <circle cx="512" cy="512" r="330" fill="none" stroke="#2C2C30" stroke-width="26" stroke-dasharray="80 6.39"/>
+  <path d="M342 795 A330 330 0 0 1 283 749 M275 741 A330 330 0 0 1 229 682" fill="none" stroke="#FF9F0A" stroke-width="26"/>
+  <circle cx="512" cy="512" r="260" fill="#1C1C1F" stroke="#2C2C30" stroke-width="4"/>
+  <circle cx="512" cy="512" r="248" fill="none" stroke="#2C2C30" stroke-width="22" stroke-dasharray="4 7"/>
+  <line x1="347" y1="607" x2="308" y2="630" stroke="#FF9F0A" stroke-width="18" stroke-linecap="round"/>
+</svg>

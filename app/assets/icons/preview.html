@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Icon-Vorschau</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 24px 16px; background: #121214; color: #C8C8CC; font: 14px -apple-system, system-ui, sans-serif; }
+  h1 { font-size: 18px; font-weight: 500; margin: 0 0 16px; }
+  h2 { font-size: 14px; font-weight: 500; margin: 32px 0 12px; color: #8E8E93; }
+  .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; }
+  figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  figcaption { font-size: 12px; color: #8E8E93; }
+  img { display: block; }
+  .mask-round { border-radius: 50%; }
+  .mask-square { border-radius: 22%; }
+  .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 24px; }
+  .size-1024 img { width: 1024px; max-width: 100%; height: auto; }
+  img.size-128 { width: 128px; height: 128px; }
+  img.size-64 { width: 64px; height: 64px; }
+  img.size-32 { width: 32px; height: 32px; }
+  .dock { background: rgba(255,255,255,.06); border-radius: 18px; padding: 8px 14px; display: inline-flex; gap: 12px; }
+</style>
+</head>
+<body>
+<h1>Woodshed Player – App-Icon-Konzepte</h1>
+
+<h2>Originalgrösse (1024 px)</h2>
+<div class="row size-1024">
+  <figure style="width:100%"><img src="concepts/icon_1_waveform_loop.svg" alt="Konzept 1: Waveform Loop"><figcaption>icon_1_waveform_loop</figcaption></figure>
+</div>
+
+<h2>Alle Konzepte: 128, 64 und 32 px</h2>
+<div class="strip">
+  <figure><img class="size-128" src="concepts/icon_1_waveform_loop.svg" alt=""><figcaption>1 Waveform Loop</figcaption></figure>
+  <figure><img class="size-128" src="concepts/icon_2_w_fader.svg" alt=""><figcaption>2 W-Fader</figcaption></figure>
+  <figure><img class="size-128" src="concepts/icon_3_timestretch_play.svg" alt=""><figcaption>3 Time-Stretch</figcaption></figure>
+  <figure><img class="size-128" src="concepts/icon_4_woodshed_pendulum.svg" alt=""><figcaption>4 Woodshed-Pendel</figcaption></figure>
+  <figure><img class="size-128" src="concepts/icon_5_hardware_encoder.svg" alt=""><figcaption>5 Hardware-Encoder</figcaption></figure>
+</div>
+
+<h2>Kleine Grössen im Vergleich (64 und 32 px)</h2>
+<div class="row">
+  <div class="dock">
+    <img class="size-64" src="concepts/icon_1_waveform_loop.svg" alt="">
+    <img class="size-64" src="concepts/icon_2_w_fader.svg" alt="">
+    <img class="size-64" src="concepts/icon_3_timestretch_play.svg" alt="">
+    <img class="size-64" src="concepts/icon_4_woodshed_pendulum.svg" alt="">
+    <img class="size-64" src="concepts/icon_5_hardware_encoder.svg" alt="">
+  </div>
+  <div class="dock">
+    <img class="size-32" src="concepts/icon_1_waveform_loop.svg" alt="">
+    <img class="size-32" src="concepts/icon_2_w_fader.svg" alt="">
+    <img class="size-32" src="concepts/icon_3_timestretch_play.svg" alt="">
+    <img class="size-32" src="concepts/icon_4_woodshed_pendulum.svg" alt="">
+    <img class="size-32" src="concepts/icon_5_hardware_encoder.svg" alt="">
+  </div>
+</div>
+
+<h2>Masken: rund (Android) und eckig (iOS/macOS-Vorschau), 128 px</h2>
+<div class="strip">
+  <figure><img class="size-128 mask-round" src="concepts/icon_1_waveform_loop.svg" alt=""><figcaption>1 rund</figcaption></figure>
+  <figure><img class="size-128 mask-round" src="concepts/icon_2_w_fader.svg" alt=""><figcaption>2 rund</figcaption></figure>
+  <figure><img class="size-128 mask-round" src="concepts/icon_3_timestretch_play.svg" alt=""><figcaption>3 rund</figcaption></figure>
+  <figure><img class="size-128 mask-round" src="concepts/icon_4_woodshed_pendulum.svg" alt=""><figcaption>4 rund</figcaption></figure>
+  <figure><img class="size-128 mask-round" src="concepts/icon_5_hardware_encoder.svg" alt=""><figcaption>5 rund</figcaption></figure>
+</div>
+<div class="strip" style="margin-top:24px">
+  <figure><img class="size-128 mask-square" src="concepts/icon_1_waveform_loop.svg" alt=""><figcaption>1 eckig</figcaption></figure>
+  <figure><img class="size-128 mask-square" src="concepts/icon_2_w_fader.svg" alt=""><figcaption>2 eckig</figcaption></figure>
+  <figure><img class="size-128 mask-square" src="concepts/icon_3_timestretch_play.svg" alt=""><figcaption>3 eckig</figcaption></figure>
+  <figure><img class="size-128 mask-square" src="concepts/icon_4_woodshed_pendulum.svg" alt=""><figcaption>4 eckig</figcaption></figure>
+  <figure><img class="size-128 mask-square" src="concepts/icon_5_hardware_encoder.svg" alt=""><figcaption>5 eckig</figcaption></figure>
+</div>
+</body>
+</html>

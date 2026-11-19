@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Woodshed Player – Woodshed-Pendel</title>
+  <rect width="1024" height="1024" rx="224" fill="#121214"/>
+  <rect x="1" y="1" width="1022" height="1022" rx="223" fill="none" stroke="#2C2C30" stroke-width="2"/>
+  <path d="M236 790 V446 L512 252 L788 446 V790 Z" fill="none" stroke="#FF9F0A" stroke-width="28" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="512" y1="690" x2="612" y2="404" stroke="#0A84FF" stroke-width="12" stroke-linecap="round"/>
+  <rect x="588" y="456" width="48" height="56" rx="6" fill="#0A84FF" transform="rotate(20 612 484)"/>
+  <circle cx="512" cy="690" r="18" fill="#0A84FF"/>
+</svg>

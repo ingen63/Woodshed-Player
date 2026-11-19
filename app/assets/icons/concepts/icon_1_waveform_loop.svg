@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Woodshed Player – Waveform Loop</title>
+  <rect width="1024" height="1024" rx="224" fill="#121214"/>
+  <rect x="1" y="1" width="1022" height="1022" rx="223" fill="none" stroke="#2C2C30" stroke-width="2"/>
+  <g fill="#2C2C30">
+    <rect x="226" y="352" width="14" height="320" rx="2"/>
+    <rect x="254" y="332" width="14" height="360" rx="2"/>
+    <rect x="282" y="312" width="14" height="400" rx="2"/>
+    <rect x="310" y="292" width="14" height="440" rx="2"/>
+    <rect x="338" y="272" width="14" height="480" rx="2"/>
+    <rect x="366" y="252" width="14" height="520" rx="2"/>
+    <rect x="394" y="232" width="14" height="560" rx="2"/>
+  </g>
+  <g fill="#FF9F0A">
+    <rect x="422" y="212" width="14" height="600" rx="2"/>
+    <rect x="450" y="192" width="14" height="640" rx="2"/>
+    <rect x="478" y="172" width="14" height="680" rx="2"/>
+    <rect x="506" y="172" width="14" height="680" rx="2"/>
+    <rect x="534" y="172" width="14" height="680" rx="2"/>
+    <rect x="562" y="192" width="14" height="640" rx="2"/>
+    <rect x="590" y="212" width="14" height="600" rx="2"/>
+  </g>
+  <g fill="#2C2C30">
+    <rect x="618" y="232" width="14" height="560" rx="2"/>
+    <rect x="646" y="252" width="14" height="520" rx="2"/>
+    <rect x="674" y="272" width="14" height="480" rx="2"/>
+    <rect x="702" y="292" width="14" height="440" rx="2"/>
+    <rect x="730" y="312" width="14" height="400" rx="2"/>
+    <rect x="758" y="332" width="14" height="360" rx="2"/>
+    <rect x="786" y="352" width="14" height="320" rx="2"/>
+  </g>
+  <g fill="none" stroke="#FF9F0A" stroke-width="12" stroke-linejoin="miter">
+    <path d="M190 292 H160 V732 H190"/>
+    <path d="M834 292 H864 V732 H834"/>
+  </g>
+</svg>
