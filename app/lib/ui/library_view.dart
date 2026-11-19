@@ -2,6 +2,7 @@
 // in Ordner, Kontextmenüs (Rechtsklick bzw. «⋯»), Bestätigung vor dem Löschen.
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app/app_controller.dart';
@@ -17,7 +18,9 @@ class LibraryView extends StatefulWidget {
     bool? touch,
   }) : touch =
            touch ??
-           !(Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+           (kIsWeb
+               ? !isDesktopPlatform(defaultTargetPlatform)
+               : !(Platform.isMacOS || Platform.isWindows || Platform.isLinux));
 
   final AppController controller;
 
@@ -344,7 +347,7 @@ class _EmptyLibrary extends StatelessWidget {
             Text('Keine Titel', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
-              Platform.isMacOS
+              !kIsWeb && Platform.isMacOS
                   ? 'Füge MP3-, WAV- oder FLAC-Dateien mit + hinzu oder zieh sie hierher.'
                   : 'Füge MP3-, WAV- oder FLAC-Dateien mit + hinzu.',
               textAlign: TextAlign.center,

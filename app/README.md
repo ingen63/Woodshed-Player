@@ -8,3 +8,11 @@ angebunden über das FFI-Plugin `packages/wp_core`.
 flutter run -d macos      # oder: flutter run -d <iOS-Simulator>
 flutter test
 ```
+
+Im Browser (#34): erst den WASM-Kern bauen und nach `web/wp_core/` legen, dann wie gewohnt:
+
+```
+tool/build_web_core.sh
+flutter build web          # oder: flutter run -d chrome
+tool/web_core_check.sh     # Prüfseite nach build/web_check, im Browser «Prüfung starten»
+```

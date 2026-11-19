@@ -69,6 +69,7 @@ Die Screenshots zeigen erfundene Titel und eine erzeugte Wellenform (`cd app && 
   Ladefehler kommen mit Code und Text (`wp_error_message`). Tests mit `ctest`, Testaudio aus `core/tools/make_test_audio.sh`.
 - `app/` (Flutter-App): `lib/library/` (`library.json` byte-gleich zur Swift-App, eigener Metadaten-Leser für ID3/FLAC/WAV), `lib/player/` (Player-Service über FFI), `lib/app/` (Zusammenspiel, Dateiauswahl), `lib/ui/`. Rauchtest mit echtem Kern: `cd app && flutter test integration_test -d macos`.
 - `core/web/`: Kern fürs Web (#33): `emcmake cmake -S core -B core/build-wasm` baut `wp_core_web.wasm` fürs AudioWorklet (C-API wie `wp_core.h`, ergänzt um `wp_core_web.h`) und lässt dieselben `ctest`-Fälle unter Node.js laufen. MP3, WAV und FLAC dekodiert der Kern, AAC/M4A der Browser (`decodeAudioData`). JS-Hülle `wp_core_web.mjs`, Worklet `wp_worklet.js`, Browser-Test `browser_test.html`.
+- Flutter-App im Browser (#34): `AudioCore` hat zwei Implementierungen, per bedingtem Import gewählt: FFI auf Desktop und Handy, im Browser der WASM-Kern im AudioWorklet (`app/lib/player/audio_core_web.dart`, Steuerung und Zustand als Nachrichten). Bau: `app/tool/build_web_core.sh`, dann `cd app && flutter build web`. Bis #35 lädt eine vorläufige Dateiauswahl die Dateien nur für die Sitzung, gespeichert wird nichts. Prüfung im Browser: `app/tool/web_core_check.sh` (misst Position, Pegel, Wellenform, Tempo, Loop, Seek, Metronom).
 - `web/w0/`: Machbarkeitstest für die Web-App (#32): Engine und Metronom als WebAssembly im AudioWorklet (`core/web/build_w0.sh`, Prüfung mit `node core/web/w0_test.mjs`). Ergebnis in `docs/PLAN-WEB-UND-SYNC.md`.
 
 ## Datenschutz
@@ -81,6 +82,7 @@ Woodshed Player arbeitet **vollständig lokal**:
 - Die App läuft in der macOS-App-Sandbox und liest nur Dateien, die du selbst auswählst.
 - Flutter-App: Die Metronom-Einstellungen liegen in `metronome.json` im App-Ordner. Aufnahmen des Systemtons (Mac) werden nur lokal im App-Ordner gespeichert; die Aufnahme startet nur auf Knopfdruck.
 - Löschst du die App (und ihren Datenordner), sind alle gespeicherten Daten weg.
+- Flutter-App im Browser (#34): lädt alles von der eigenen Seite (auch CanvasKit, keine Schriften von Google). Gewählte Audiodateien bleiben im Speicher des Browsers und sind nach dem Schliessen weg.
 - Testseite W0 (`web/w0/`): lädt nur ihre eigenen Dateien, sendet nichts; gewählte Audiodateien und die OPFS-Testdaten bleiben im Browser des Geräts. Beim Laden der Seite sieht der Webhost (GitHub Pages) die IP-Adresse.
 
 ## Lizenz

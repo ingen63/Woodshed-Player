@@ -3,7 +3,7 @@
 import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:wp_core/wp_core.dart';
+import 'package:wp_core/wp_types.dart';
 
 import '../time_format.dart';
 import 'style.dart';

@@ -138,6 +138,15 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - Wellenform, Pegel, Position als Nachrichten vom Worklet; Steuerung in Gegenrichtung.
 - Flutter-Web-Build (WASM-Rendering) startet, Oberfläche ist mit der Desktop-Version identisch einspaltig/zweispaltig nach Breite.
 
+#### Umsetzung W2 (#34)
+
+- **Schnittstelle:** `AudioCore` mit `WpAudioCore` (FFI, `audio_core_ffi.dart`) und `WebAudioCore` (`audio_core_web.dart`, `dart:js_interop`, Paket `web`). `main.dart` wählt per bedingtem Import `platform_native.dart` oder `platform_web.dart`. Die reinen Typen (`WpCode`, `WpWaveform`) liegen in `wp_types.dart` ohne `dart:ffi`.
+- **Nachrichten:** Befehle gehen mit fortlaufender id ans Worklet. Das Worklet meldet alle 10 ms Position, Loop-Durchgänge, Metronom, Spitzenpegel und die id des letzten Befehls (ältere Zustände nach einem Seek werden verworfen). Die Wellenform holt die Anbindung einmal nach dem Laden (200 Abschnitte pro Sekunde) und beantwortet jede Abfrage daraus.
+- **Dateien:** Bis W3 vorläufige Dateiauswahl (`<input type=file>`), Bibliothek nur für die Sitzung (`Library.session`).
+- **Bau:** `app/tool/build_web_core.sh` legt Kern, Hülle und Worklet nach `app/web/wp_core/`, dann `flutter build web`. CanvasKit kommt von der eigenen Seite (`web/flutter_bootstrap.js`).
+- **Prüfung:** `app/tool/web_core_check.sh` baut eine Prüfseite mit den Diensten der Web-App, die eine erzeugte Sinusdatei und `sine440.m4a` lädt und Position, Pegel, Wellenform, Tempo (0,5× und 1,5×), Loop-Sprung, Seek und Metronom misst.
+- **Noch offen:** Dekodieren blockiert weiterhin das Worklet (siehe W1).
+
 ### W3 – Speicher-Schicht und Bibliothek ohne Pfade (3–4 Tage)
 - `FileStore`-Schnittstelle (`file_platform.dart` wird dazu ausgebaut): Desktop = Dateisystem, Web = OPFS. Import im Web über Dateiauswahl.
 - Titel verweisen über ID (Hash) auf Dateien, nicht über Pfade. Auf dem Desktop bleibt der Pfad als gerätelokale Zusatzinfo.

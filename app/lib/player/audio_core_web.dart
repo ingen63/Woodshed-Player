@@ -1,0 +1,384 @@
+// AudioCore im Browser (#34): der WASM-Kern (core/web, #33) läuft im AudioWorklet «wp-core». Steuerung geht
+// als Nachricht ans Worklet, Zustand (Position, Pegel, Loop-Durchgänge, Metronom) kommt etwa alle 10 ms als
+// Nachricht zurück. Die Getter der Schnittstelle sind synchron und lesen deshalb den zuletzt gemeldeten
+// Zustand. Die Wellenform holt die Anbindung einmal nach dem Laden (siehe WaveformSummary).
+// MP3, WAV und FLAC dekodiert der Kern im Worklet, AAC/M4A der Browser im Hauptthread (decodeAudioData).
+// Die Dateien liefert app/tool/build_web_core.sh nach web/wp_core/.
+import 'dart:async';
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
+import 'dart:typed_data';
+
+import 'package:web/web.dart' as web;
+import 'package:wp_core/wp_types.dart';
+
+import '../metronome/metronome_controller.dart';
+import 'audio_core.dart';
+import 'waveform_summary.dart';
+
+@JS('WebAssembly.compile')
+external JSPromise<JSObject> _wasmCompile(JSArrayBuffer bytes);
+
+/// Bytes einer Datei zum Pfad, den die Dateiauswahl im Browser vergeben hat; null, wenn unbekannt.
+typedef WebFileBytes = Uint8List? Function(String path);
+
+class WebAudioCore implements AudioCore {
+  WebAudioCore._(this._ctx, this._node, this._bytesOf) {
+    _node.port.onmessage = ((web.MessageEvent e) => _onMessage(e.data)).toJS;
+  }
+
+  /// Ordner mit wp_core_web.wasm, wp_core_web.mjs und wp_worklet.js, relativ zur Seite.
+  static const assetDir = 'wp_core/';
+
+  /// Zustand etwa alle 10 ms (Position flüssig, Klicks des Metronoms messbar).
+  static const stateEvery = 0.01;
+
+  /// Lädt den Kern und hängt das Worklet an die Lautsprecher. Der AudioContext startet erst mit der
+  /// ersten Bedienung (Play, Laden, Metronom), wie es die Browser verlangen.
+  static Future<WebAudioCore> create({
+    required WebFileBytes bytesOf,
+    String base = assetDir,
+  }) async {
+    final response = await web.window
+        .fetch('${base}wp_core_web.wasm'.toJS)
+        .toDart;
+    if (!response.ok) {
+      throw StateError(
+        'Audio-Kern fehlt (${base}wp_core_web.wasm). Erst app/tool/build_web_core.sh ausführen.',
+      );
+    }
+    final module = await _wasmCompile(await response.arrayBuffer().toDart)
+        .toDart;
+    final ctx = web.AudioContext();
+    await ctx.audioWorklet.addModule('${base}wp_worklet.js').toDart;
+    final options = JSObject()
+      ..['module'] = module
+      ..['stateEvery'] = stateEvery.toJS;
+    final node = web.AudioWorkletNode(
+      ctx,
+      'wp-core',
+      web.AudioWorkletNodeOptions(
+        numberOfInputs: 0,
+        numberOfOutputs: 1,
+        outputChannelCount: [2.toJS].toJS,
+        processorOptions: options,
+      ),
+    );
+    node.connect(ctx.destination);
+    return WebAudioCore._(ctx, node, bytesOf);
+  }
+
+  final web.AudioContext _ctx;
+  final web.AudioWorkletNode _node;
+  final WebFileBytes _bytesOf;
+
+  // ---- Nachrichten ----
+
+  int _lastId = 0;
+  final _replies = <int, Completer<JSAny?>>{};
+  final _states = StreamController<WebCoreState>.broadcast();
+
+  /// Jeder Zustand, den das Worklet meldet (für Messungen, z. B. Pegel und Klicks des Metronoms).
+  Stream<WebCoreState> get states => _states.stream;
+
+  /// Spitzenpegel der Ausgabe (0–1) im zuletzt gemeldeten Abschnitt von etwa 10 ms.
+  double get outputLevel => _peak;
+
+  /// Läuft der AudioContext (nach der ersten Bedienung)?
+  bool get audioRunning => _ctx.state == 'running';
+
+  Future<JSAny?> _call(
+    String cmd, [
+    List<JSAny?> args = const [],
+    List<JSObject> transfer = const [],
+  ]) {
+    final id = ++_lastId;
+    final reply = Completer<JSAny?>();
+    _replies[id] = reply;
+    final msg = JSObject()
+      ..['id'] = id.toJS
+      ..['cmd'] = cmd.toJS
+      ..['args'] = args.toJS;
+    if (transfer.isEmpty) {
+      _node.port.postMessage(msg);
+    } else {
+      _node.port.postMessage(msg, transfer.toJS);
+    }
+    return reply.future;
+  }
+
+  void _send(String cmd, [List<JSAny?> args = const []]) =>
+      _call(cmd, args).ignore();
+
+  void _onMessage(JSAny? data) {
+    if (data == null || !data.isA<JSObject>()) return;
+    final m = data as JSObject;
+    final state = m['state'];
+    if (state != null && state.isA<JSObject>()) {
+      _applyState(state as JSObject);
+      return;
+    }
+    final id = (m['id'] as JSNumber?)?.toDartInt;
+    final reply = _replies.remove(id);
+    if (reply == null) return;
+    final error = m['error'];
+    if (error != null) {
+      reply.completeError(StateError((error as JSString).toDart));
+    } else {
+      reply.complete(m['result']);
+    }
+  }
+
+  void _applyState(JSObject s, {bool force = false}) {
+    final peak = (s['peak'] as JSNumber?)?.toDartDouble;
+    if (peak != null) _peak = peak;
+    final time = (s['time'] as JSNumber?)?.toDartDouble ?? 0;
+    final ack = (s['ack'] as JSNumber?)?.toDartInt ?? 0;
+    // Älter als der letzte Befehl (z. B. Position vor einem Seek): nur den Pegel übernehmen.
+    if (force || ack >= _lastId) {
+      _playing = (s['playing'] as JSBoolean).toDart;
+      _position = (s['position'] as JSNumber).toDartDouble;
+      _duration = (s['duration'] as JSNumber).toDartDouble;
+      _loopPasses = (s['loopPasses'] as JSNumber).toDartInt;
+      _metroRunning = (s['metroRunning'] as JSBoolean).toDart;
+      _metroBpm = (s['metroBpm'] as JSNumber).toDartInt;
+    }
+    if (_states.hasListener) {
+      _states.add(
+        WebCoreState(
+          time: time,
+          peak: _peak,
+          position: _position,
+          playing: _playing,
+          loopPasses: _loopPasses,
+          metroRunning: _metroRunning,
+        ),
+      );
+    }
+  }
+
+  /// Startet den AudioContext; muss in einer Bedienung des Nutzers liegen. Play, Laden und Metronom
+  /// rufen es selbst.
+  void wake() {
+    if (_ctx.state != 'running') _ctx.resume().toDart.ignore();
+  }
+
+  // ---- Zustand ----
+
+  bool _playing = false, _metroRunning = false;
+  double _position = 0, _duration = 0, _peak = 0, _loadProgress = 0;
+  int _loopPasses = 0, _metroBpm = 120, _loadState = WpCode.loadIdle;
+  int _loadGeneration = 0;
+  WaveformSummary? _summary;
+
+  // ---- Laden ----
+
+  @override
+  int loadAsync(String path) {
+    final bytes = _bytesOf(path);
+    if (bytes == null) return WpCode.fileNotFound;
+    wake();
+    _loadState = WpCode.loadRunning;
+    _loadProgress = 0;
+    _load(bytes, ++_loadGeneration);
+    return WpCode.ok;
+  }
+
+  Future<void> _load(Uint8List bytes, int generation) async {
+    int code;
+    try {
+      // Eigene Kopie, deren Speicher ans Worklet übergeht; die Bytes der Dateiauswahl bleiben.
+      final copy = Uint8List.fromList(bytes).buffer.toJS;
+      code =
+          ((await _call('loadEncoded', [copy], [copy])) as JSNumber).toDartInt;
+      if (code == WpCode.unsupportedFormat) {
+        code = await _decodeInBrowser(bytes);
+      }
+      if (generation != _loadGeneration) return;
+      if (code != WpCode.ok) {
+        _loadState = code;
+        return;
+      }
+      _loadProgress = 0.5;
+      _applyState((await _call('state')) as JSObject, force: true);
+      final count = WaveformSummary.binsFor(_duration);
+      final wave = (await _call('waveform', [
+        0.toJS,
+        _duration.toJS,
+        count.toJS,
+      ])) as JSObject?;
+      if (generation != _loadGeneration) return;
+      _summary = wave == null
+          ? null
+          : WaveformSummary(
+              _duration,
+              (wave['mins'] as JSFloat32Array).toDart,
+              (wave['maxs'] as JSFloat32Array).toDart,
+            );
+      _loadProgress = 1;
+      _loadState = WpCode.loadReady;
+    } catch (_) {
+      if (generation == _loadGeneration) _loadState = WpCode.unsupportedFormat;
+    }
+  }
+
+  /// AAC/M4A u. a.: der Browser dekodiert, das PCM geht ans Worklet (wie loadFile in wp_core_web.mjs).
+  Future<int> _decodeInBrowser(Uint8List bytes) async {
+    final web.AudioBuffer buffer;
+    try {
+      buffer = await _ctx
+          .decodeAudioData(Uint8List.fromList(bytes).buffer.toJS)
+          .toDart;
+    } catch (_) {
+      return WpCode.unsupportedFormat;
+    }
+    final channels = <JSAny?>[
+      for (var c = 0; c < buffer.numberOfChannels; c++)
+        buffer.getChannelData(c),
+    ];
+    final r = await _call('loadPcm', [channels.toJS, buffer.sampleRate.toJS]);
+    return (r as JSNumber).toDartInt;
+  }
+
+  @override
+  int get loadState => _loadState;
+  @override
+  double get loadProgress => _loadProgress;
+
+  // ---- Wiedergabe ----
+
+  @override
+  void play() {
+    wake();
+    _playing = true;
+    _send('play');
+  }
+
+  @override
+  void pause() {
+    _playing = false;
+    _send('pause');
+  }
+
+  @override
+  bool get isPlaying => _playing;
+
+  @override
+  void seek(double seconds) {
+    _position = seconds;
+    _send('seek', [seconds.toJS]);
+  }
+
+  @override
+  set rate(double rate) => _send('setRate', [rate.toJS]);
+
+  @override
+  void setLoop(double a, double b) => _send('setLoop', [a.toJS, b.toJS]);
+
+  @override
+  void clearLoop() => setLoop(0, 0);
+
+  @override
+  set volume(double volume) => _send('setVolume', [volume.toJS]);
+
+  @override
+  double get position => _position;
+  @override
+  double get duration => _duration;
+  @override
+  int get loopPasses => _loopPasses;
+
+  @override
+  WpWaveform? waveform(double start, double end, int count) =>
+      _summary?.query(start, end, count);
+
+  /// Das Metronom desselben Kerns (rendert im selben Worklet).
+  late final MetronomeBackend metronome = _WebMetronome(this);
+}
+
+/// Metronom im Worklet, wie _PlayerMetronome auf dem Desktop.
+class _WebMetronome implements MetronomeBackend {
+  _WebMetronome(this._core);
+  final WebAudioCore _core;
+
+  @override
+  void start() {
+    _core.wake();
+    _core._metroRunning = true;
+    _core._send('metroStart');
+  }
+
+  @override
+  void stop() {
+    _core._metroRunning = false;
+    _core._send('metroStop');
+  }
+
+  @override
+  bool get running => _core._metroRunning;
+
+  @override
+  int get bpm => _core._metroBpm;
+
+  @override
+  set bpm(int value) {
+    _core._metroBpm = value;
+    _core._send('metroSetBpm', [value.toJS]);
+  }
+
+  @override
+  set meter(int value) => _core._send('metroSetMeter', [value.toJS]);
+
+  @override
+  set subdivision(int value) =>
+      _core._send('metroSetSubdivision', [value.toJS]);
+
+  @override
+  set volume(double value) => _core._send('metroSetVolume', [value.toJS]);
+
+  @override
+  void ramp({
+    required bool enabled,
+    required int start,
+    required int target,
+    required int step,
+    required int everyBars,
+  }) => _core._send('metroSetRamp', [
+    enabled.toJS,
+    start.toJS,
+    target.toJS,
+    step.toJS,
+    everyBars.toJS,
+  ]);
+
+  @override
+  void timedRamp({
+    required bool enabled,
+    required int start,
+    required int target,
+    required int seconds,
+  }) => _core._send('metroSetTimedRamp', [
+    enabled.toJS,
+    start.toJS,
+    target.toJS,
+    seconds.toJS,
+  ]);
+}
+
+/// Ein vom Worklet gemeldeter Zustand.
+class WebCoreState {
+  const WebCoreState({
+    required this.time,
+    required this.peak,
+    required this.position,
+    required this.playing,
+    required this.loopPasses,
+    required this.metroRunning,
+  });
+
+  /// Audiozeit am Ende des gemeldeten Blocks (Sekunden) und Spitzenpegel seit der letzten Meldung.
+  final double time, peak;
+  final double position;
+  final bool playing, metroRunning;
+  final int loopPasses;
+}

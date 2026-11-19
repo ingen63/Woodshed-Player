@@ -10,6 +10,10 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import 'wp_types.dart';
+
+export 'wp_types.dart';
+
 String? _libraryPath;
 
 /// Nur für Tests: Pfad der Kern-Bibliothek (z. B. `core/build/libwp_core.dylib`), vor dem ersten Aufruf setzen.
@@ -89,23 +93,6 @@ final _recSeconds = _lib.lookupFunction<Double Function(), double Function()>('w
 final _recLevel = _lib.lookupFunction<Float Function(), double Function()>('wp_rec_level');
 final _recOnlySilence = _lib.lookupFunction<Int32 Function(), int Function()>('wp_rec_only_silence');
 final _recError = _lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('wp_rec_error');
-
-/// Fehlercodes und Ladezustände wie in wp_core.h (`WP_ERR_*`, `WP_LOAD_*`).
-abstract final class WpCode {
-  static const ok = 0;
-  static const invalidArgument = -1;
-  static const fileNotFound = -2;
-  static const unsupportedFormat = -3;
-  static const deviceUnavailable = -4;
-  static const outOfMemory = -5;
-  static const fileUnreadable = -6;
-  static const cancelled = -7;
-  static const busy = -8;
-
-  static const loadIdle = 0;
-  static const loadRunning = 1;
-  static const loadReady = 2;
-}
 
 /// Ein Player mit eigenem Audiogerät.
 class WpPlayer {
@@ -211,14 +198,6 @@ class WpPlayer {
       _mSetRampTimed(_p, enabled ? 1 : 0, start, target, seconds);
 }
 
-/// Minimum und Maximum je Abschnitt einer Wellenform, gleich lang, Werte −1…1.
-class WpWaveform {
-  WpWaveform(this.min, this.max);
-  final Float32List min;
-  final Float32List max;
-  int get length => min.length;
-}
-
 /// Dauer einer Datei in Sekunden, ohne sie zu laden. Negativ = Fehlercode ([WpCode]).
 double wpFileDuration(String path) {
   final c = path.toNativeUtf8();
@@ -252,11 +231,4 @@ abstract final class WpRecorder {
 
   /// Bisher kam nur Stille an (keine Berechtigung oder es läuft nichts).
   static bool get onlySilence => _recOnlySilence() != 0;
-}
-
-class WpException implements Exception {
-  WpException(this.message);
-  final String message;
-  @override
-  String toString() => message;
 }

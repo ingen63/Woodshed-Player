@@ -3,7 +3,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:wp_core/wp_core.dart';
+import 'package:wp_core/wp_types.dart';
 
 import '../library/playback_settings.dart';
 import '../metronome/loop_ramp.dart';

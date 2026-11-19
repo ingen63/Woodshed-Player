@@ -4,6 +4,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../library/playback_settings.dart';
@@ -307,7 +308,7 @@ class _EmptyCard extends StatelessWidget {
             ),
           ),
           Text(
-            Platform.isMacOS
+            !kIsWeb && Platform.isMacOS
                 ? 'Öffne eine MP3-, WAV- oder FLAC-Datei oder zieh sie ins Fenster.'
                 : 'Öffne eine MP3-, WAV- oder FLAC-Datei aus «Dateien».',
             textAlign: TextAlign.center,

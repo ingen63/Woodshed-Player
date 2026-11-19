@@ -1,5 +1,7 @@
-// Austauschbare Schnittstelle zum Audio-Kern (#15): in der App der C++-Kern über FFI, in Tests eine Attrappe.
-import 'package:wp_core/wp_core.dart';
+// Austauschbare Schnittstelle zum Audio-Kern (#15): auf Desktop und Handy der C++-Kern über FFI
+// (audio_core_ffi.dart), im Browser der WASM-Kern im AudioWorklet (audio_core_web.dart, #34), in Tests
+// eine Attrappe. Welche Implementierung die App nimmt, entscheidet der bedingte Import in main.dart.
+import 'package:wp_core/wp_types.dart';
 
 /// Was der [PlayerService] vom Audio-Kern braucht. Zeiten in Sekunden der Originaldatei.
 abstract class AudioCore {
@@ -28,44 +30,6 @@ abstract class AudioCore {
 
   /// Wellenform (#28) von [start] bis [end] Sekunden in [count] Abschnitten; null, solange keine da ist.
   WpWaveform? waveform(double start, double end, int count);
-}
-
-/// Der echte Kern.
-class WpAudioCore implements AudioCore {
-  WpAudioCore(this.player);
-  final WpPlayer player;
-
-  @override
-  int loadAsync(String path) => player.loadAsync(path);
-  @override
-  int get loadState => player.loadState;
-  @override
-  double get loadProgress => player.loadProgress;
-  @override
-  void play() => player.play();
-  @override
-  void pause() => player.pause();
-  @override
-  bool get isPlaying => player.isPlaying;
-  @override
-  void seek(double seconds) => player.seek(seconds);
-  @override
-  set rate(double rate) => player.rate = rate;
-  @override
-  void setLoop(double a, double b) => player.setLoop(a, b);
-  @override
-  void clearLoop() => player.clearLoop();
-  @override
-  set volume(double volume) => player.volume = volume;
-  @override
-  double get position => player.position;
-  @override
-  double get duration => player.duration;
-  @override
-  int get loopPasses => player.loopPasses;
-  @override
-  WpWaveform? waveform(double start, double end, int count) =>
-      player.waveform(start, end, count);
 }
 
 /// #15/AK3: verständliche deutsche Meldung zu einem Fehlercode des Kerns.

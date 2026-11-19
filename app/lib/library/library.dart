@@ -28,15 +28,28 @@ class ImportResult {
 class Library extends ChangeNotifier {
   /// [base] enthält `library.json`, `preferences.json` und den Ordner `Tracks/`.
   Library(
-    this.base, {
+    Directory base, {
     required this.probe,
     DateTime Function()? now,
     this.saveDelay = const Duration(milliseconds: 400),
     Random? random,
-  }) : _now = now ?? DateTime.now,
+  }) : _base = base,
+       _now = now ?? DateTime.now,
        _random = random; // ignore: prefer_initializing_formals
 
-  final Directory base;
+  /// Vorläufige Bibliothek im Browser (#34, bis #35): Titel gelten nur für die Sitzung, nichts wird
+  /// gespeichert oder kopiert. Der Dateiname des Titels ist der Pfad, den die Dateiauswahl liefert.
+  Library.session({required this.probe, DateTime Function()? now})
+    : _base = null,
+      saveDelay = Duration.zero,
+      _now = now ?? DateTime.now,
+      _random = null;
+
+  final Directory? _base;
+  Directory get base => _base!;
+
+  /// Nur für die Sitzung (Browser bis #35), ohne Dateien.
+  bool get isSession => _base == null;
   final DurationProbe probe;
   final Duration saveDelay;
   final DateTime Function() _now;
@@ -72,6 +85,7 @@ class Library extends ChangeNotifier {
   // ---- Laden und Speichern ----
 
   Future<void> load() async {
+    if (isSession) return notifyListeners();
     tracksDir.createSync(recursive: true);
     _readPrefs();
     _droppedMissing = 0;
@@ -120,6 +134,7 @@ class Library extends ChangeNotifier {
   void save() {
     _pendingSave?.cancel();
     _pendingSave = null;
+    if (isSession) return;
     try {
       base.createSync(recursive: true);
       final tmp = File('${indexFile.path}.tmp');
@@ -159,6 +174,7 @@ class Library extends ChangeNotifier {
   }
 
   void _savePrefs() {
+    if (isSession) return;
     try {
       base.createSync(recursive: true);
       _prefsFile.writeAsStringSync(jsonEncode({'sortOrder': _sortOrder.name}));
@@ -195,10 +211,11 @@ class Library extends ChangeNotifier {
 
   Track? track(String id) => _tracks.where((t) => t.id == id).firstOrNull;
 
-  String filePath(Track t) => '${tracksDir.path}/${t.fileName}';
+  String filePath(Track t) =>
+      isSession ? t.fileName : '${tracksDir.path}/${t.fileName}';
 
   String? artworkPath(Track t) =>
-      t.hasArtwork ? '${tracksDir.path}/${t.id}.artwork' : null;
+      t.hasArtwork && !isSession ? '${tracksDir.path}/${t.id}.artwork' : null;
 
   int get _nextOrder => _tracks.fold(-1, (m, t) => max(m, t.customOrder)) + 1;
 
@@ -213,9 +230,11 @@ class Library extends ChangeNotifier {
     notifyListeners();
     final imported = <Track>[];
     final failed = <String>[];
-    tracksDir.createSync(recursive: true);
+    if (!isSession) tracksDir.createSync(recursive: true);
     for (final path in paths) {
-      final t = await _importFile(path, folderId);
+      final t = isSession
+          ? _sessionTrack(path, folderId)
+          : await _importFile(path, folderId);
       if (t == null) {
         failed.add(_baseName(path));
       } else {
@@ -271,10 +290,30 @@ class Library extends ChangeNotifier {
     }
   }
 
+  /// Titel nur für die Sitzung: nichts kopieren, Titel aus dem Dateinamen, Dauer vom [probe] (0 = noch
+  /// unbekannt, < 0 = Datei fehlt).
+  Track? _sessionTrack(String path, String? folderId) {
+    final duration = probe(path);
+    if (duration < 0) return null;
+    final name = _baseName(path);
+    final dot = name.lastIndexOf('.');
+    return Track(
+      id: newUuid(_random),
+      fileName: path,
+      originalFileName: name,
+      title: dot > 0 ? name.substring(0, dot) : name,
+      duration: duration,
+      hasArtwork: false,
+      dateAdded: _now().toUtc(),
+      customOrder: _nextOrder,
+      folderId: folderId,
+    );
+  }
+
   static String _baseName(String path) => path.split(RegExp(r'[/\\]')).last;
 
   void delete(Set<String> ids) {
-    for (final t in _tracks.where((t) => ids.contains(t.id))) {
+    for (final t in _tracks.where((t) => !isSession && ids.contains(t.id))) {
       _tryDelete(File(filePath(t)));
       _tryDelete(File('${tracksDir.path}/${t.id}.artwork'));
     }

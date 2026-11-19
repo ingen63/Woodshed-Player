@@ -126,6 +126,13 @@ export class WpCore {
   metroSetMeter(beats) { this.x.wp_metro_set_meter(this.p, beats); }
   metroSetSubdivision(clicks) { this.x.wp_metro_set_subdivision(this.p, clicks); }
   metroSetVolume(v) { this.x.wp_metro_set_volume(this.p, v); }
+  // Steigerung nach Takten bzw. nach Zeit (#34, wie wp_metro_set_ramp und wp_metro_set_ramp_timed).
+  metroSetRamp(enabled, start, target, step, every) {
+    this.x.wp_metro_set_ramp(this.p, enabled ? 1 : 0, start, target, step, every);
+  }
+  metroSetTimedRamp(enabled, start, target, seconds) {
+    this.x.wp_metro_set_ramp_timed(this.p, enabled ? 1 : 0, start, target, seconds);
+  }
 }
 
 // Lädt eine Datei: zuerst der Kern (MP3, WAV, FLAC), sonst der Browser (AAC/M4A u. a.) über

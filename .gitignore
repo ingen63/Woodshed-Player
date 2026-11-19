@@ -14,3 +14,6 @@ Bildschirmfoto*.png
 
 # Emscripten- und weitere Kern-Builds (#33)
 core/build-*/
+
+# WASM-Kern für die Flutter-Web-App, erzeugt von app/tool/build_web_core.sh (#34)
+app/web/wp_core/
