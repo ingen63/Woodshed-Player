@@ -28,12 +28,12 @@ VivaPlan.
 | 3 Invarianten und Zufallstests | `app/test/property/` (`property.dart`, Regressionsfälle in `regressions.json`) | Eigenschaften über viele zufällige Fälle mit festem, ausgegebenem Startwert: Bibliothek, Loop-Grenzen, Zeitformat, Abgleich auf 2–4 Geräten | vorhanden (#10) |
 | 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler, abgeschnittene Dateien), `library_files_property_test.dart`, `sync_property_test.dart`, `core/tests/fuzz/` (`make fuzz`); alle Kerntests unter ASan/UBSan und TSan (`make sanitize`, `make sanitize-thread`) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | vorhanden (#57, #10) |
 | 5 Golden-Dateien | `app/test/golden/` (`library.json` jeder Version: Swift alt und neu, Format 2 von #36 und #37), `golden_files_test.dart`, `core/tests/golden/metronome_positions.txt` | jede Version liest alle alten Stände; Klickpositionen des Metronoms (#9) | vorhanden (#9, #10) |
-| 6 Oberfläche | Widget-Tests in `app/test/`, Rauchtest `app/integration_test/app_smoke_test.dart`, Prüfseiten im Browser `app/tool/web_*_check.dart` | Layout je Grösse, Bedienung, Texte, Tastenkürzel | teilweise, #13 |
+| 6 Oberfläche | Widget-Tests in `app/test/`, Oberflächentests mit echtem Kern in `app/integration_test/` (Rauchtest, Tastenkürzel, Pseudo-Sprache), Web-Tests im Chrome `app/test/web/`, Rauchtest der gebauten App `tools/smoke_app.sh`, Prüfseiten im Browser `app/tool/web_*_check.dart` | Layout je Grösse, Bedienung, Texte, Tastenkürzel, OPFS und WASM-Anbindung im Browser | vorhanden (#13) |
 | Werkzeuge | `app/tool/after_commit_hook_test.dart`, `coverage_test.dart`, `pre_push_hook_test.dart` | Hook nach dem Commit, Abdeckung je Teil, `coverage-diff`, `pre-push` | vorhanden (#7, #8) |
 
 ## Testmatrix und QA-Abgleich
 
-Stand 19.11.2026, abgeglichen gegen `app/test/`, `app/integration_test/` und `core/tests/` (dazu die Web-Prüfungen in
+Stand 20.11.2026, abgeglichen gegen `app/test/`, `app/integration_test/` und `core/tests/` (dazu die Web-Prüfungen in
 `core/web/` und `app/tool/`). «vorhanden» nennt die Datei und, wo hilfreich, den Fall; jede Lücke ist einem Issue
 zugeordnet.
 
@@ -123,9 +123,9 @@ zugeordnet.
 | `wp_core_web.wasm` fürs AudioWorklet: Dekodieren, Seek, Loop, Dateiende, Tempo, PCM für AAC/M4A | vorhanden: `core/web/wp_core_web_test.mjs` (#33) | – |
 | Dart-Anbindung per bedingtem Import, Wellenform im Browser | vorhanden: `web_binding_test.dart` (#34) | – |
 | Auslieferung auf GitHub Pages, Service Worker für COOP/COEP | vorhanden: `web_hosting_test.dart` (#41) | – |
-| Im echten Browser: Position, Pegel, Tempo, Loop, Metronom, Laden ohne Aussetzer, OPFS | vorhanden, von Hand: `app/tool/web_core_check.sh`, `app/tool/web_store_check.sh` (#34, #35, #42); Lücke: automatischer Lauf im Browser | #13 |
+| Im echten Browser: Position, Pegel, Tempo, Loop, Metronom, Laden ohne Aussetzer, OPFS | automatisch: `app/test/web/web_core_test.dart`, `web_storage_test.dart` (#13/AK4, Laden, Play/Pause, Tempo, Loop, Metronom, OPFS); Pegel und Aussetzer weiter von Hand: `app/tool/web_core_check.sh`, `app/tool/web_store_check.sh` (#34, #35, #42) | – |
 | Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6), jede Funktion der C-API in einem Referenzfall | vorhanden: `reference_tests` (nativ `--dump`, WASM `--compare`), `reference_api_coverage` (#9/AK7), `core_build_flags_test.dart` (ohne FMA) | – |
-| `flutter build web` und `flutter test --platform chrome` bei jedem Push | Lücke | #13 |
+| `flutter build web` und `flutter test --platform chrome` bei jedem Push mit Web-Änderung | vorhanden: Job `web` in `test-quality.yml`, `make test-web` (#13/AK4) | – |
 | Content-Security-Policy mit erlaubten Hosts | vorhanden: `app/web/index.html`, `app/tool/network_free_test.dart` (#58/AK4), im Browser von Hand geprüft | – |
 | Web-Audio auf iPhone und Android | vorhanden unter Node.js: `core/web/w0_test.mjs`; Lücke: auf echten Geräten nur von Hand | #32 |
 
@@ -150,8 +150,10 @@ zugeordnet.
 | Layout Desktop/Tablet/Phone, Bibliothek, Player, Tempo, Loop, Tastatur und Dateien | vorhanden: `home_page_test.dart` (#17), `studio_design_test.dart` (#30), `player_view_test.dart` (#19) | – |
 | Darstellung Hell/Dunkel/System, Info-Dialog, App-Icon, Schriftlizenzen | vorhanden: `appearance_test.dart` (#31), `about_test.dart` (#50), `app_icon_test.dart` (#6), `font_licenses_test.dart` | – |
 | Jeder Schlüssel in jeder ARB-Datei, kein fester Text im Code, Zahlen nach Gebietsschema, Entwicklermeldungen englisch | vorhanden: `l10n_test.dart` (#43), `english_dev_texts_test.dart` (#45) | – |
-| Rauchtest mit echtem Kern je Grösse | vorhanden, nur von Hand (`flutter test integration_test -d macos`): `app_smoke_test.dart` (#17/AK7, #30/AK13) | #13 |
-| Tastenkürzel und Import im `integration_test`, Pseudo-Sprache ohne Überlauf | Lücke | #13 |
+| Rauchtest mit echtem Kern je Grösse: Start, Import, Play/Pause, Loop, Tempo | vorhanden: `app_smoke_test.dart` (#13/AK1, #17/AK7, #30/AK13), nächtlich im Job `macos`, lokal `make test-ui` | – |
+| Tastenkürzel im `integration_test` (Leertaste, S, E, ←/→, M, T, ↑/↓) | vorhanden: `shortcuts_test.dart` (#13/AK1) | – |
+| Pseudo-Sprache: nichts abgeschnitten, nichts läuft über | vorhanden: `pseudo_locale_test.dart`, `pseudo_l10n_test.dart` (#13/AK7) | – |
+| Regeln der Oberflächentests: auf Zustände warten, feste Sprache | vorhanden: `ui_test_rules_test.dart` (#13/AK2, AK7) | – |
 
 ### Plattformen
 
@@ -161,7 +163,8 @@ zugeordnet.
 | Swift-Altprojekt: Tests und iOS-Build | vorhanden: `WoodshedPlayerTests/` über den Hook (`xcodebuild`) | – |
 | Workflow `test-quality.yml`: Sanitizer-Läufe des Kerns auf Linux | vorhanden: `test-quality.yml` (Jobs `sanitize`, `sanitize-thread`), `test_quality_workflow_test.dart` (#57) | – |
 | Workflow `test-quality.yml`: Fuzzing und Zufallstests nächtlich | vorhanden: Jobs `fuzz` und `property`, `test_quality_workflow_test.dart` (#10); beobachtbar erst nach dem Push | – |
-| Workflow `test-quality.yml`: übrige Tests auf Linux, macOS/iOS nächtlich, Rauchtest der gebauten App | Lücke | #13 |
+| Workflow `test-quality.yml`: Format, Lint, Tests, Abdeckung auf Linux je Push; macOS/iOS-Build, Oberflächentests und Rauchtest der gebauten App nächtlich | vorhanden: Jobs `checks`, `web`, `macos`, `test_quality_workflow_test.dart`, `smoke_test.dart` (#13); beobachtbar erst nach dem Push | – |
+| Rauchtest der gebauten App auf Windows und Linux | Lücke | #60 |
 | Windows und Linux: Build, Tests, Windows-Pfade | Lücke | #60 |
 
 ### Hygiene und Werkzeuge
@@ -174,7 +177,7 @@ zugeordnet.
 | Abdeckung je Teil mit Untergrenze, `coverage-diff`, `pre-push` mit eigenen Tests | vorhanden: `tools/coverage-min`, `tools/git-hooks/pre-push`, `app/tool/coverage_test.dart`, `app/tool/pre_push_hook_test.dart` (#8) | – |
 | C-API (`player.cpp`) über die geteilte Bibliothek: Nullzeiger, Laden, Seek, Tempo, Loop, Wellenform, Metronom, Aufnahme im Ruhezustand | vorhanden: `core/tests/capi_tests.cpp` (#8) | – |
 | Mutationstests | Lücke | #11 |
-| Übersichtsseite Testqualität | Lücke | #12 |
+| Übersichtsseite Testqualität | Lücke; Platz im Workflow (Artefakt `test-quality-report` aus `build/report/`) ist vorbereitet | #12 |
 | Netzwerkfreiheit bei jedem Push: Prüfung mit eigenen Tests | vorhanden: `make network-free`, Job `network-free` in `test-quality.yml`, `test_quality_workflow_test.dart` (#58/AK6) | – |
 
 ## Ausführen
@@ -193,7 +196,10 @@ make network-free   # kein Netzwerkcode ausserhalb der Anbietermodule, Sperrlist
 make format         # dart format (app/) und clang-format (core/, ohne third_party)
 make format-check   # schlägt fehl, wenn eine Datei nicht formatiert ist
 make lint           # flutter analyze (streng), C++ mit -Werror, clang-tidy
-cd app && flutter test integration_test -d macos   # Rauchtest mit echtem Kern
+make test-ui        # Oberflächentests mit echtem Kern auf macOS; ohne Audiogerät WP_AUDIO_BACKEND=null
+make test-web       # Web-Tests in Chrome: OPFS und WASM-Kern (braucht Emscripten)
+make smoke-app      # macOS-App bauen (Release) und ihren Rauchtest ausführen
+make pseudo-l10n    # Pseudo-Sprache der Oberflächentests nach einer Änderung an den ARB-Dateien
 ```
 
 Noch nicht eingerichtet; die Ziele melden «noch nicht eingerichtet» mit Issue und brechen ab: `make mutants` (#11),
@@ -238,7 +244,7 @@ ein Test zählt nur, wenn er konkrete Werte prüft (siehe Grundsatz).
 | Erzeugt | `app/lib/l10n/app_localizations*.dart` (`gen-l10n`) | nicht gezählt, aufgelistet | nein |
 
 Die Untergrenze (80 %) steht nur in `tools/coverage-min`. `app/tool/coverage_check.dart` liest sie dort; der
-pre-push-Hook und später der Workflow `test-quality.yml` (#13) rufen dieses Werkzeug auf. Jeder Teil mit Untergrenze
+pre-push-Hook und der Job `checks` des Workflows `test-quality.yml` (#13) rufen dieses Werkzeug auf. Jeder Teil mit Untergrenze
 muss sie für sich erreichen. Eine Datei der Dart-Logik, die kein Test lädt, lässt die Prüfung ebenfalls scheitern
 (`flutter test --coverage` kennt nur geladene Dateien); ausgenommen sind Dateien ohne ausführbaren Code (nur
 Konstanten, z. B. `app_info.dart`).
@@ -273,8 +279,8 @@ genannt):
 - **Code nur fürs Web** (`file_platform_web.dart`, `file_store_web.dart`, `platform_web.dart`,
   `audio_core_web.dart`): Diese Dateien importieren `package:web` bzw. `dart:js_interop` und lassen sich in der
   Dart-VM von `flutter test` nicht laden; `flutter test --platform chrome` liefert keine Abdeckung. Sie werden bei jeder
-  Prüfung aufgelistet. Geprüft werden sie im Browser (`app/tool/web_*_check.sh`, von Hand) und über
-  `web_binding_test.dart`; ein automatischer Lauf im Browser folgt mit #13.
+  Prüfung aufgelistet. Geprüft werden sie im Browser mit `flutter test --platform chrome` (`app/test/web/`, `make test-web`, Job `web`,
+  #13), von Hand mit `app/tool/web_*_check.sh`, und über `web_binding_test.dart`.
 - **Erzeugte Übersetzungen** (`app_localizations*.dart`): von `gen-l10n` aus den ARB-Dateien erzeugt, nicht von
   Hand geschrieben. Ihre Vollständigkeit prüft `l10n_test.dart`.
 - **Aufnahme `recorder_mac.mm`** zählt zum Kern, obwohl sie grösstenteils nur mit echtem Systemton und der
@@ -534,6 +540,95 @@ dynamisch zusammengesetzter Name) findet sie nicht; dafür prüfen die Sperrlist
 Die direkte Verbindung (#56) braucht im Browser ihre Relay-Hosts in `connect-src`; sie kommen mit #56 dazu. Der Job im
 Workflow lässt sich erst nach dem Push beobachten.
 
+## Oberflächentests, Web-Tests und GitHub-Workflow (#13)
+
+**Oberflächentests** (`app/integration_test/`, Flutter `integration_test`, echte App mit echtem Kern, `make test-ui`):
+
+| Datei | Prüft |
+|---|---|
+| `app_smoke_test.dart` | Start, Import einer erzeugten Audiodatei (wie Ziehen ins Fenster, Kanal `woodshed/files`), Play/Pause, Loop mit den Knöpfen «hier», Tempo (Schalter und 0,75×); danach Play/Pause je Grösse (#13/AK1, #17/AK7, #30/AK13) |
+| `shortcuts_test.dart` | Leertaste, S, E, ←/→, M, T, ↑/↓ (mit Shift ±10) gegen den Zustand von Player und Metronom (#13/AK1) |
+| `pseudo_locale_test.dart` | Pseudo-Sprache in allen drei Grössen: kein Überlauf, kein abgeschnittener Text (#13/AK7) |
+
+Regeln (#13/AK2, aus VivaPlan), geprüft in `app/test/ui_test_rules_test.dart`:
+
+- **Auf Zustände warten, nie auf Zeit.** Jedes Warten geht über `pumpUntil` (`ui_helpers.dart`): Bild für Bild, bis
+  der Zustand erreicht ist (z. B. «spielt und Position > 0,2 s»). Keine `pump(Duration)`, kein `Future.delayed`,
+  kein `sleep`.
+- **Kein eigenes Zeitlimit** ausser `hangGuard` (60 s) gegen Hänger; ein bestandener Test kommt nie in dessen Nähe,
+  auch nicht auf einem ausgelasteten Rechner. Wo die Zeit selbst die Regel ist (Tap-Tempo), setzt der Test die Uhr
+  (`createAppController(tapTempo: …)`).
+- **Die Sprache ist fest:** Englisch über `startApp`, im Pseudo-Test die Pseudo-Sprache. Testaudio wird erzeugt
+  (`sineWav` in `app/lib/app/smoke.dart`), jeder Test arbeitet in einem eigenen temporären Ordner.
+- **Ohne Audiogerät** (GitHubs macOS-Runner) läuft der Kern mit `WP_AUDIO_BACKEND=null` auf dem stummen Null-Gerät von
+  miniaudio, im Echtzeittakt (`core/src/player.cpp`). Dieselben C-API-Fälle laufen in `ctest` auch so
+  (`capi_null_backend_tests`), dort wird nichts übersprungen. Lokal nehmen die Tests das echte Gerät.
+
+**Pseudo-Sprache** (#13/AK7): `app/integration_test/pseudo.dart` setzt jeden Text zwischen `⟦ ⟧`, ersetzt Buchstaben
+durch Akzentbuchstaben und verlängert um 40 %. Die Test-Lokalisierung `pseudo_localizations.dart` erzeugt
+`app/tool/pseudo_l10n.dart` aus den englischen Texten (`make pseudo-l10n`); `pseudo_l10n_test.dart` schlägt fehl,
+wenn sie veraltet ist, und prüft die Erkennung abgeschnittener Texte. Für Nutzer gibt es keine ARB-Datei dieser
+Sprache; `WoodshedApp(localizationsDelegate: …)` nimmt sie nur im Test. Abgeschnitten heisst: mehr Zeilen als erlaubt
+(auch Auslassungspunkte), eine nicht umbrechende Zeile breiter als ihr Platz oder ein Wort breiter als sein Platz.
+
+**Web-Tests** (#13/AK4, `app/test/web/`, `@TestOn('browser')`, `make test-web`): OPFS (Schreiben, Lesen, Umbenennen,
+Löschen, SHA-256, Speicherzeile), Übergabe gewählter Dateien und die Web-App mit WASM-Kern im AudioWorklet und
+Lade-Worker (Laden, Dauer, Wellenform, Play/Pause, Tempo, Loop, Metronom). IndexedDB nutzt die App nicht. Der WASM-Kern
+liegt für den Test neben der Testseite (`app/test/web/wp_core/`, nicht eingecheckt); Chrome startet über
+`tools/chrome_autoplay.sh` mit erlaubter Wiedergabe, weil der AudioContext sonst einen Klick bräuchte. Der Lauf in der
+Dart-VM (`flutter test`) überspringt diese Dateien.
+
+**Rauchtest der gebauten App** (#13/AK5, `make smoke-app`, `tools/smoke_app.sh`): Mit `WP_SMOKE=1` öffnet die
+Release-App ihr Fenster, erzeugt eine Sinusdatei in einem temporären Ordner, importiert und spielt sie (lokal, ohne
+Netzwerk), bis die Position 0,5 s überschreitet, pausiert und endet mit Code 0 und «smoke: ok» (sonst Code 1 mit dem
+gescheiterten Schritt). Keine Bedienung nötig, nie die echte Bibliothek. Ablauf in `app/lib/app/smoke.dart`, geprüft
+in `smoke_test.dart`. Windows und Linux folgen mit #60.
+
+**Workflow** `.github/workflows/test-quality.yml`:
+
+| Job | Läuft | Inhalt |
+|---|---|---|
+| `checks` | Linux, jeder Push mit Code-Änderung (`core/`, `app/`, `tools/`, `Makefile`, Workflow), von Hand | `make format-check`, `make lint`, `make coverage-run`, Prüfung gegen `tools/coverage-min`, `coverage-diff`, Zusammenfassung |
+| `web` | Linux, jeder Push mit Web-Änderung (`app/web/`, `*_web.dart`, Kern, Web-Build), von Hand | WASM-Kern, `make test-web` in Chrome, `flutter build web` |
+| `sanitize` | Linux, Push mit Änderung am Kern, von Hand | ASan/UBSan (#57) |
+| `network-free` | Linux, jeder Push, von Hand | Netzwerkfreiheit (#58) |
+| `macos` | macOS, nächtlich nach neuem Commit, von Hand mit `nightly=true` | macOS- und iOS-Build, Oberflächentests, Rauchtest der gebauten App |
+| `sanitize-thread`, `fuzz`, `property` | Linux, nächtlich nach neuem Commit, von Hand mit `nightly=true` | TSan (#57), Fuzzing und Zufallstests (#10) |
+
+- **Nächtlich** (02:17 UTC) entscheidet `nightly-gate`: Läufe nur, wenn `main` seit dem letzten erfolgreichen
+  nächtlichen Lauf einen neuen Commit hat. **Von Hand** (`workflow_dispatch`) laufen die Push-Jobs; mit `nightly=true`
+  zusätzlich alle nächtlichen Jobs zusammen, ohne Sperre.
+- **Concurrency** (#13/AK8): nächtliche Läufe (Zeitplan oder `nightly=true`) teilen die Gruppe `test-quality-nightly`
+  und werden nie abgebrochen; ein Push bricht nur einen älteren Push-Lauf derselben Branch ab.
+- **Zusammenfassung** (#13/AK9): Der Job `checks` schreibt die Abdeckung je Teil, `coverage-diff` (Basis: Commit vor
+  dem Push) und den Stand der Übersichtsseite in die Zusammenfassung des Laufs; die lcov-Dateien sind ein Artefakt.
+  Die Übersichtsseite kommt mit #12: Sobald `make report` eingerichtet ist und nach `build/report/` schreibt, lädt der
+  Job sie als Artefakt `test-quality-report` hoch.
+- **Werkzeuge:** Flutter in derselben Version wie `pages.yml` (`FLUTTER_VERSION`, `dart format` hängt davon ab),
+  `clang-format` und `clang-tidy` in Hauptversion 23 wie Homebrew `llvm` (über `pipx`), der Kern mit clang-18 und
+  passendem `llvm-cov-18`. Mutationstests auf dem Diff kommen mit #11 als weiterer nächtlicher Job dazu.
+- **Lokal geprüft** ist der Workflow nur als YAML (Aufbau, Bedingungen, Skripte mit `bash -n`, Pfadfilter mit
+  Beispielen) und über `test_quality_workflow_test.dart`; `actionlint` ist nicht installiert. Ob alle Jobs auf den
+  Runnern laufen, zeigen erst die Läufe nach dem Push.
+
+**Verbrauch an Minuten** (#13/AK10, Schätzung vom 20.11.2026, nach den ersten Läufen nachführen). Annahmen: ungefähr
+20 Nächte im Monat mit neuem Commit, 60 Pushes mit Code-Änderung, davon 20 mit Web-Änderung, 2 Läufe von Hand mit
+`nightly=true`. Lokal gemessen: Oberflächentests 0:45 min, Release-Build 0:50 min (warm); auf dem Runner ohne Cache
+deutlich länger angesetzt.
+
+| Job | Minuten je Lauf | Läufe im Monat | Minuten im Monat |
+|---|---|---|---|
+| `macos` (Flutter einrichten 2, macOS-Build 4, iOS-Build 4, Oberflächentests 4, Release-Build und Rauchtest 4) | ≈ 18 | 22 | ≈ 400 **macOS** |
+| `checks` | ≈ 15 | 60 | ≈ 900 Linux |
+| `web` | ≈ 10 | 20 | ≈ 200 Linux |
+| `sanitize`, `network-free` | ≈ 8 und 3 | 30 und 80 | ≈ 480 Linux |
+| `sanitize-thread`, `fuzz` (2 × 20 min), `property` | ≈ 10, 45, 10 | 22 | ≈ 1430 Linux |
+
+Das sind rund **400 macOS-Minuten** und rund **3000 Linux-Minuten** im Monat. Bei einem privaten Repository zählt
+GitHub macOS-Minuten zehnfach: 400 × 10 = 4000 von 2000 Gratis-Minuten (GitHub Free), also über dem Kontingent; dann
+müssten die macOS-Läufe seltener werden (z. B. nur wöchentlich). Das Repository ist öffentlich (GitHub Pages), dort
+sind Standard-Runner kostenlos; die Grenze entfällt, die Schätzung bleibt als Richtwert.
+
 ## Hook nach dem Commit
 
 `.claude/hooks/after-commit.sh` läuft nach jedem `git commit` aus Claude Code. Er prüft das Format der Nachricht
@@ -612,3 +707,12 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     «one message per damaged version».
 16. 19.11.2026, #10: Im vollen Lauf von `flutter test` schlug `home_page_test.dart` («#17/AK1 Liste Sortierung
     umstellen») erneut einmal fehl, einzeln grün; wie Fall 3, noch nicht behoben.
+17. 20.11.2026, #13/AK4, Web-Test in Chrome: In Debug-Builds der Web-App (`flutter run -d chrome`, DDC) scheiterte
+    jedes Laden eines Titels mit «Format nicht unterstützt». `postMessage` konnte die konstante leere Argumentliste
+    (`const []` mit `toJS`) nicht klonen (`DataCloneError`); im Release-Build (dart2js) trat es nicht auf. Behoben in
+    `audio_core_web.dart` (`_plain`: neue, einfache JS-Liste je Nachricht). Test `web_core_test.dart`.
+18. 20.11.2026, #13, Oberflächentest ohne Audiogerät: Nach einem Seek im Pausenzustand fragt `PlayerService` die
+    Position nur einmal ab und hört dann auf. Antwortet das Gerät langsamer als ein Abfragetakt (33 ms, so beim
+    Null-Gerät), bleibt die alte Position stehen, bis wieder gespielt wird; Knöpfe wie «Anfang hier» nehmen dann die
+    alte Position. Mit echtem Gerät nicht beobachtet. Die Tests setzen den Loop deshalb aus dem Zustand nach Pause
+    und während der Wiedergabe; Behebung als eigenes Issue vorgeschlagen.

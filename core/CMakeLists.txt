@@ -169,6 +169,8 @@ target_link_libraries(capi_tests PRIVATE wp_core)
 target_compile_definitions(capi_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
 wp_strict_warnings(capi_tests)
 add_test(NAME capi_tests COMMAND capi_tests)
+# #13: the same cases on miniaudio's null device (WP_AUDIO_BACKEND=null), never skipped
+add_test(NAME capi_null_backend_tests COMMAND capi_tests --null-backend)
 
 # #57/AK4: no allocation and no blocking lock in the render path (Player::render)
 add_executable(realtime_tests tests/realtime_tests.cpp)

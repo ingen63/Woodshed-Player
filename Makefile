@@ -3,7 +3,8 @@
 # (clang-format, clang-tidy). core/third_party/ is never formatted, linted or read.
 .PHONY: help test test-core test-wasm test-app test-hook test-tools format format-check lint lint-dart \
         lint-core coverage coverage-run coverage-core coverage-app coverage-diff mutants fuzz report \
-        sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property
+        sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
+        test-ui test-web smoke-app pseudo-l10n
 
 SHELL := /bin/bash
 # A failing build must not be hidden by `| tail` (GNU Make 3.81 on macOS has no .SHELLFLAGS).
@@ -38,6 +39,10 @@ help:
 	@echo "make coverage       all tests with line coverage, checked per part against tools/coverage-min"
 	@echo "make coverage-diff  coverage of the lines changed since BASE (default origin/main), a hint"
 	@echo "make network-free   no network code outside the provider modules, blocked packages, core, CSP"
+	@echo "make test-ui        UI tests with the real core on macOS (integration_test)"
+	@echo "make test-web       web tests in Chrome: OPFS and the WASM core (needs Emscripten)"
+	@echo "make smoke-app      builds the macOS app (release) and runs its smoke test"
+	@echo "make pseudo-l10n    regenerates the pseudo language of the UI tests after an ARB change"
 
 # ---- Tests ----
 test: test-core test-app test-tools
@@ -199,6 +204,29 @@ network-free:
 	cd app && flutter pub get >/dev/null
 	dart app/tool/network_free.dart
 	cd app && flutter test --reporter failures-only tool/network_free_test.dart test/sync_app_test.dart
+
+# ---- UI tests, web tests and the app smoke test (#13), docs/TESTS.md ----
+# UI tests with the real core: start, import, play/pause, loop, tempo, shortcuts, pseudo language.
+# Without an audio device: make test-ui WP_AUDIO_BACKEND=null (miniaudio's null device).
+test-ui:
+	cd app && $(if $(WP_AUDIO_BACKEND),WP_AUDIO_BACKEND=$(WP_AUDIO_BACKEND) )flutter test integration_test -d macos
+
+# Web code in a real browser (#13/AK4): the WASM core next to the test page (test/web/wp_core/, not
+# checked in), Chrome with autoplay allowed (the AudioContext needs no click then).
+test-web:
+	app/tool/build_web_core.sh
+	mkdir -p app/test/web/wp_core && cp app/web/wp_core/* app/test/web/wp_core/
+	cd app && CHROME_EXECUTABLE="$(CURDIR)/tools/chrome_autoplay.sh" \
+	  flutter test --platform chrome --reporter failures-only test/web/
+
+# #13/AK5: smoke test of the built app (release): start, play a generated file, exit code 0.
+smoke-app:
+	cd app && $(PIPEFAIL) flutter build macos --release 2>&1 | tail -2
+	tools/smoke_app.sh
+
+# #13/AK7: the pseudo language follows the English texts (checked by test/pseudo_l10n_test.dart).
+pseudo-l10n:
+	cd app && flutter gen-l10n && dart run tool/pseudo_l10n.dart
 
 # ---- Not set up yet ----
 define not_yet

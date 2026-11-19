@@ -1,93 +1,96 @@
-// #17/AK7, #30/AK13: Rauchtest der echten App mit echtem Audio-Kern: Start, Datei laden, Play/Pause,
-// je Grösse (Desktop, Tablet, Phone).
-// Läuft in einem eigenen temporären Ordner, nie in der echten Bibliothek. Testaudio wird erzeugt (Sinus).
-// Aufruf: cd app && flutter test integration_test -d macos
-import 'dart:io';
-import 'dart:math';
-import 'dart:typed_data';
-
+// #17/AK7, #30/AK13, #13/AK1: smoke test of the real app with the real audio core: start, import of a
+// generated audio file (dropped onto the window), play/pause, set a loop, change the tempo; then
+// play/pause in every size (desktop, tablet, phone). Rules in ui_helpers.dart (#13/AK2): waits for
+// states, no fixed waiting time.
+// Run: cd app && flutter test integration_test -d macos
+// Without an audio device (CI): WP_AUDIO_BACKEND=null (core plays to miniaudio's null device).
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:woodshed_player/main.dart';
 
-/// 16-Bit-Mono-WAV, 440 Hz.
-Uint8List sineWav(double seconds, {int rate = 44100}) {
-  final n = (seconds * rate).round();
-  final b = ByteData(44 + n * 2);
-  void str(int at, String s) {
-    for (var i = 0; i < s.length; i++) {
-      b.setUint8(at + i, s.codeUnitAt(i));
-    }
-  }
-
-  str(0, 'RIFF');
-  b.setUint32(4, 36 + n * 2, Endian.little);
-  str(8, 'WAVEfmt ');
-  b.setUint32(16, 16, Endian.little);
-  b.setUint16(20, 1, Endian.little);
-  b.setUint16(22, 1, Endian.little);
-  b.setUint32(24, rate, Endian.little);
-  b.setUint32(28, rate * 2, Endian.little);
-  b.setUint16(32, 2, Endian.little);
-  b.setUint16(34, 16, Endian.little);
-  str(36, 'data');
-  b.setUint32(40, n * 2, Endian.little);
-  for (var i = 0; i < n; i++) {
-    b.setInt16(
-      44 + i * 2,
-      (sin(2 * pi * 440 * i / rate) * 8000).round(),
-      Endian.little,
-    );
-  }
-  return b.buffer.asUint8List();
-}
+import 'ui_helpers.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  late Directory dir;
-  late File wav;
-  setUpAll(() {
-    dir = Directory.systemTemp.createTempSync('wp_smoke');
-    wav = File('${dir.path}/Sinus Testton.wav')..writeAsBytesSync(sineWav(3));
-  });
-  tearDownAll(() => dir.deleteSync(recursive: true));
+  testWidgets('#13/AK1, #17/AK7 start, import, play/pause, loop, tempo', (
+    tester,
+  ) async {
+    final t = testFolder(seconds: 4);
+    final c = await startApp(tester, t.dir);
+    final p = c.player;
+    expect(find.text(en.library), findsWidgets); // started
+    expect(p.hasTrack, isFalse);
 
-  testWidgets('#17/AK7 Start, Datei laden, Play/Pause', (tester) async {
-    final controller = await createAppController(
-      baseDir: Directory('${dir.path}/app'),
-    );
-    controller.player.setVolume(0); // leise testen
-    tester.view.physicalSize = const Size(1280, 800); // Desktop
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(
-      WoodshedApp(controller: controller, locale: const Locale('de')),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Bibliothek'), findsWidgets); // Start
-
-    await controller.importFiles([wav.path]); // wie Ziehen ins Fenster
-    for (var i = 0; i < 100 && !controller.player.hasTrack; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    expect(find.byKey(const Key('track:Sinus Testton')), findsOneWidget);
-    expect(controller.player.hasTrack, isTrue);
-    expect(controller.player.duration, closeTo(3.0, 0.01));
+    // Import: the generated file dropped onto the window
+    await dropFiles(tester, c, [t.wav]);
+    await tester.pump();
+    expect(find.byKey(const Key('track:Sine test tone')), findsOneWidget);
+    // 4 s at 44.1 kHz, resampled to the device rate: still 4 s
+    expect(p.duration, closeTo(4.0, 0.01));
     expect(find.byKey(const Key('card:loop')), findsOneWidget);
 
-    // #30/AK13: Rauchtest je Grösse mit echtem Kern und echter Wellenform (#28).
+    // Play/pause with the button
+    await tester.tap(find.byKey(const Key('playPause')));
+    await pumpUntil(tester, () => p.isPlaying && p.position > 0.2, 'playing');
+    await tester.tap(find.byKey(const Key('playPause')));
+    await pumpUntil(tester, () => !p.isPlaying, 'paused');
+
+    // Loop with the «here» buttons: start where playback was paused, end while playing at least 1 s
+    // later (a loop needs 1 s, #22); playback then jumps back to the start.
+    final start = p.position;
+    await tester.tap(find.byKey(const Key('here:Anfang')));
+    await tester.pump();
+    expect(p.settings.loopEnabled, isTrue);
+    expect(p.settings.loopStart, start);
+    await tester.tap(find.byKey(const Key('playPause')));
+    await pumpUntil(tester, () => p.position >= start + 1.2, 'start + 1.2 s');
+    await tester.tap(find.byKey(const Key('here:Ende')));
+    await tester.pump();
+    final end = p.settings.loopEnd;
+    expect(end, greaterThanOrEqualTo(start + 1.2));
+    expect(p.activeLoop, (start, end));
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('loopInfo')))
+          .textSpan!
+          .toPlainText(),
+      startsWith(en.loopLength(end - start)),
+    );
+    await pumpUntil(tester, () => p.position < start + 0.5, 'jump back');
+    expect(p.isPlaying, isTrue);
+    expect(p.position, greaterThanOrEqualTo(start));
+    await tester.tap(find.byKey(const Key('playPause')));
+    await pumpUntil(tester, () => !p.isPlaying, 'paused in the loop');
+
+    // Tempo: switch the speed card on, preset 0.75×
+    expect(p.settings.speedEnabled, isFalse);
+    await tester.tap(find.byKey(Key('switch:${en.speed}')));
+    await pumpUntil(tester, () => p.settings.speedEnabled, 'speed on');
+    await tester.tap(find.byKey(const Key('preset:0.75')));
+    await tester.pump();
+    expect(p.settings.speedEnabled, isTrue);
+    expect(p.settings.speed, 0.75);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('speedValue'))).data,
+      en.rate(0.75),
+    );
+  });
+
+  testWidgets('#30/AK13 play/pause with the real core in every size', (
+    tester,
+  ) async {
+    final t = testFolder(seconds: 3);
+    final c = await startApp(tester, t.dir);
+    final p = c.player;
+    await dropFiles(tester, c, [t.wav]);
+
     for (final (name, size) in [
-      ('desktop', const Size(1280, 800)),
-      ('tablet', const Size(820, 1100)),
-      ('phone', const Size(390, 844)),
+      ('desktop', desktopSize),
+      ('tablet', tabletSize),
+      ('phone', phoneSize),
     ]) {
-      tester.view.physicalSize = size;
-      tester.view.devicePixelRatio = 1;
+      setSize(tester, size);
       await tester.pumpAndSettle();
       if (name == 'phone') {
         await tester.tap(find.byKey(const Key('openPlayer')));
@@ -97,20 +100,17 @@ void main() {
       expect(find.byKey(const Key('waveformOverview')), findsOneWidget);
       expect(find.byKey(const Key('waveformDetail')), findsOneWidget);
 
-      controller.player.seek(0);
+      p.seek(0);
+      await pumpUntil(tester, () => p.position == 0, '$name: at 0');
       await tester.tap(find.byKey(const Key('playPause')));
-      for (var i = 0; i < 20; i++) {
-        await tester.pump(const Duration(milliseconds: 50));
-      }
-      expect(controller.player.isPlaying, isTrue, reason: name);
-      expect(controller.player.position, greaterThan(0.2), reason: name);
-
+      await pumpUntil(
+        tester,
+        () => p.isPlaying && p.position > 0.2,
+        '$name: playing',
+      );
       await tester.tap(find.byKey(const Key('playPause')));
-      await tester.pump(const Duration(milliseconds: 200));
-      final stopped = controller.player.position;
-      expect(controller.player.isPlaying, isFalse, reason: name);
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(controller.player.position, stopped, reason: name);
+      await pumpUntil(tester, () => !p.isPlaying, '$name: paused');
+      expect(p.position, greaterThan(0.2), reason: name);
     }
   });
 }

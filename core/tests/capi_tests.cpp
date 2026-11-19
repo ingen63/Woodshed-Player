@@ -3,10 +3,14 @@
 // handle, and the calls are checked to reach the player core: load, seek, rate, loop, waveform,
 // metronome. wp_create opens the real audio device; without a device (e.g. a headless runner) the
 // load reports WP_ERR_DEVICE_UNAVAILABLE and the checks that need a loaded title are skipped.
-// Volumes are 0, so nothing is audible. Test audio: core/tests/audio/sine440.flac (440 Hz, 1 s).
+// With --null-backend (#13, second ctest case) the tests run on miniaudio's null device
+// (WP_AUDIO_BACKEND=null), which every machine has: then the load must succeed and nothing is
+// skipped. Volumes are 0, so nothing is audible. Test audio: core/tests/audio/sine440.flac (440 Hz,
+// 1 s).
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <functional>
@@ -23,6 +27,7 @@ namespace {
 
 int failures = 0;
 int checks = 0;
+bool nullBackend = false; // --null-backend: a device is guaranteed
 
 #define CHECK(cond)                                                                                \
   do {                                                                                             \
@@ -105,7 +110,7 @@ void loadAndTransport() {
   CHECK(wp_waveform(p, 0.0, 1.0, 10, mins, maxs) == WP_ERR_INVALID_ARGUMENT);
 
   const int r = wp_load(p, kSine.c_str());
-  CHECK(r == WP_OK || r == WP_ERR_DEVICE_UNAVAILABLE);
+  CHECK(r == WP_OK || (!nullBackend && r == WP_ERR_DEVICE_UNAVAILABLE));
   if (r == WP_ERR_DEVICE_UNAVAILABLE) {
     std::printf("  note: no audio device, load checks skipped\n");
     wp_destroy(p);
@@ -137,6 +142,8 @@ void loadAndTransport() {
   const long long passes = wp_loop_passes(p);
   wp_play(p);
   CHECK(eventually([&] { return wp_is_playing(p) == 1; }));
+  // The device consumes audio: the position moves on from 0.5 s (also on the null device).
+  CHECK(eventually([&] { return wp_position(p) > 0.55; }));
   wp_pause(p);
   CHECK(eventually([&] { return wp_is_playing(p) == 0; }));
   CHECK(wp_loop_passes(p) == passes);
@@ -193,7 +200,12 @@ void recorderStartsIdle() {
 
 } // namespace
 
-int main() {
+int main(int argc, char **argv) {
+  if (argc > 1 && std::strcmp(argv[1], "--null-backend") == 0) {
+    nullBackend = true;
+    setenv("WP_AUDIO_BACKEND", "null", 1); // NOLINT(concurrency-mt-unsafe): before any thread
+    std::printf("WP_AUDIO_BACKEND=null\n");
+  }
   const std::vector<std::pair<std::string, std::function<void()>>> tests = {
       {"nullHandleIsSafe", nullHandleIsSafe},
       {"errorMessagesAndFileDuration", errorMessagesAndFileDuration},

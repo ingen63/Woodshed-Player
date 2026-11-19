@@ -19,6 +19,12 @@ export 'app/platform_native.dart'
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerFontLicenses();
+  if (smokeRequested) {
+    // #13/AK5: smoke test of the built app, fixed language, ends the process
+    await runSmokeApp(
+      (c) => WoodshedApp(controller: c, locale: const Locale('en')),
+    );
+  }
   final controller = await createAppController();
   runApp(
     WoodshedApp(controller: controller, recordingButton: recordingButtonFor),
@@ -31,8 +37,12 @@ class WoodshedApp extends StatelessWidget {
     required this.controller,
     this.recordingButton,
     this.locale,
+    this.localizationsDelegate = AppLocalizations.delegate,
   });
   final AppController controller;
+
+  /// The app's texts; tests swap in a pseudo language (#13/AK7).
+  final LocalizationsDelegate<AppLocalizations> localizationsDelegate;
 
   /// Fixed UI language (tests); null follows the system language, falling back to English (#43).
   final Locale? locale;
@@ -54,8 +64,8 @@ class WoodshedApp extends StatelessWidget {
       title: 'Woodshed Player',
       locale: locale,
       // Material, Cupertino and widget texts from material_ui (Flutter's own copies are deprecated).
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
+      localizationsDelegates: [
+        localizationsDelegate,
         ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,

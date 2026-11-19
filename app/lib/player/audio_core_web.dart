@@ -110,11 +110,11 @@ class WebAudioCore implements AudioCore {
     final msg = JSObject()
       ..['id'] = id.toJS
       ..['cmd'] = cmd.toJS
-      ..['args'] = args.toJS;
+      ..['args'] = _plain(args);
     if (transfer.isEmpty) {
       _node.port.postMessage(msg);
     } else {
-      _node.port.postMessage(msg, transfer.toJS);
+      _node.port.postMessage(msg, _plain(transfer));
     }
     return reply.future;
   }
@@ -138,8 +138,8 @@ class WebAudioCore implements AudioCore {
     final msg = JSObject()
       ..['id'] = id.toJS
       ..['cmd'] = cmd.toJS
-      ..['args'] = args.toJS;
-    _loader.postMessage(msg, transfer.toJS);
+      ..['args'] = _plain(args);
+    _loader.postMessage(msg, _plain(transfer));
     return reply.future;
   }
 
@@ -442,6 +442,17 @@ class _WebMetronome implements MetronomeBackend {
     target.toJS,
     seconds.toJS,
   ]);
+}
+
+/// [items] as a new, plain JS array for postMessage. In debug builds (DDC) `toJS` hands over the Dart
+/// list itself, and a constant list (e.g. the default `const []`) carries Dart data that postMessage
+/// cannot clone (DataCloneError). Found by the web tests in Chrome (#13/AK4).
+JSArray<T> _plain<T extends JSAny?>(List<T> items) {
+  final a = JSArray<T>.withLength(items.length);
+  for (var i = 0; i < items.length; i++) {
+    a[i] = items[i];
+  }
+  return a;
 }
 
 /// Ein vom Worklet gemeldeter Zustand.

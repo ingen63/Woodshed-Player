@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../library/library.dart';
 import '../metronome/metronome_controller.dart';
+import '../metronome/tap_tempo.dart';
 import '../player/audio_core_web.dart';
 import '../player/player_service.dart';
 import 'app_controller.dart';
@@ -15,7 +16,11 @@ import 'library_settings_store.dart';
 const libraryDir = 'WoodshedPlayer';
 
 /// [baseDir] exists only on desktop and mobile; in the browser the library lives in the OPFS.
-Future<AppController> createAppController({Object? baseDir}) async {
+/// [tapTempo] lets tests set the tap clock (#13).
+Future<AppController> createAppController({
+  Object? baseDir,
+  TapTempo? tapTempo,
+}) async {
   final files = WebFilePlatform();
   final store = await OpfsFileStore.open(libraryDir);
   final core = await WebAudioCore.create(bytesOf: store.read);
@@ -24,6 +29,7 @@ Future<AppController> createAppController({Object? baseDir}) async {
   await library.load();
   final metronome = MetronomeController(
     core.metronome,
+    tapTempo: tapTempo,
     store: LibrarySettingsStore(library),
     onRunningChanged: files.keepAwake,
   );
@@ -41,3 +47,9 @@ Future<AppController> createAppController({Object? baseDir}) async {
 
 /// Aufnahme gibt es im Browser nicht.
 Widget? recordingButtonFor(AppController controller) => null;
+
+/// The smoke test of the built app (#13/AK5) exists only on desktop.
+bool get smokeRequested => false;
+
+Future<Never> runSmokeApp(Widget Function(AppController c) app) =>
+    throw UnsupportedError('smoke test on desktop only');

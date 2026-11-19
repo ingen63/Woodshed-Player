@@ -7,6 +7,7 @@ import 'package:wp_core/wp_core.dart';
 
 import '../library/library.dart';
 import '../metronome/metronome_controller.dart';
+import '../metronome/tap_tempo.dart';
 import '../player/audio_core_ffi.dart';
 import '../player/player_service.dart';
 import '../ui/recording_button.dart';
@@ -14,10 +15,14 @@ import 'app_controller.dart';
 import 'file_platform.dart';
 import 'file_store_io.dart';
 import 'library_settings_store.dart';
+import 'smoke.dart';
 
-/// Dienste der App. [baseDir] ersetzt den App-Ordner (Bibliothek, Metronom-Einstellungen), z. B. im
-/// Rauchtest, damit nie die echte Bibliothek berührt wird.
-Future<AppController> createAppController({Directory? baseDir}) async {
+/// App services. [baseDir] replaces the app folder (library, metronome settings), e.g. in the smoke
+/// test, so the real library is never touched. [tapTempo] lets UI tests set the tap clock (#13).
+Future<AppController> createAppController({
+  Directory? baseDir,
+  TapTempo? tapTempo,
+}) async {
   final files = ChannelFilePlatform();
   final support =
       baseDir?.path ?? await files.supportDir() ?? Directory.systemTemp.path;
@@ -30,6 +35,7 @@ Future<AppController> createAppController({Directory? baseDir}) async {
   await library.load();
   final metronome = MetronomeController(
     _PlayerMetronome(player),
+    tapTempo: tapTempo,
     store: LibrarySettingsStore(
       library,
       legacy: FileSettingsStore(File('$support/metronome.json')),
@@ -99,4 +105,30 @@ class _PlayerMetronome implements MetronomeBackend {
     target: target,
     seconds: seconds,
   );
+}
+
+/// #13/AK5: WP_SMOKE=1 starts the smoke test of the built app (smoke.dart, tools/smoke_app.sh).
+bool get smokeRequested => Platform.environment['WP_SMOKE'] == '1';
+
+/// Runs the smoke test in a temporary folder with a generated sine file, shows the app built by [app]
+/// and ends the process with 0 (passed) or 1 (failed, reason on stdout).
+Future<Never> runSmokeApp(Widget Function(AppController c) app) async {
+  final dir = Directory.systemTemp.createTempSync('wp_smoke');
+  var failure = 'not started';
+  try {
+    final wav = File('${dir.path}/Smoke sine.wav')..writeAsBytesSync(sineWav());
+    final c = await createAppController(baseDir: Directory('${dir.path}/app'));
+    runApp(app(c));
+    failure = await smokeRun(c, wav.path) ?? '';
+  } catch (e) {
+    failure = 'exception: $e';
+  }
+  stdout.writeln(failure.isEmpty ? 'smoke: ok' : 'smoke: FAILED, $failure');
+  await stdout.flush();
+  try {
+    dir.deleteSync(recursive: true);
+  } on FileSystemException {
+    // left for the system to clean up
+  }
+  exit(failure.isEmpty ? 0 : 1);
 }

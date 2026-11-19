@@ -2,6 +2,8 @@
 // Laden). Das Gerät läuft ab wp_create mit seiner eigenen Samplerate; Titel werden beim Laden auf
 // diese Rate gewandelt. Der Audio-Callback sperrt nicht und reserviert nichts; Befehle erreichen
 // ihn über eine Lock-free-Queue (#14).
+#include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -52,13 +54,25 @@ void notificationCallback(const ma_device_notification *n) {
   }
 }
 
+// #13: WP_AUDIO_BACKEND=null selects miniaudio's null device (silent, consumes audio at real-time
+// pace) for test runners without an audio device, e.g. the UI tests and the app smoke test on
+// GitHub's macOS runners. Unset, the platform's real device is used.
+bool nullBackendRequested() {
+  // NOLINTNEXTLINE(concurrency-mt-unsafe): read on a control thread, nobody sets it at run time
+  const char *v = std::getenv("WP_AUDIO_BACKEND");
+  return v != nullptr && std::strcmp(v, "null") == 0;
+}
+
 // Kontext und Gerät anlegen, falls noch nicht geschehen. sampleRate 0 = Samplerate des Geräts.
 bool initDevice(wp_player *p, ma_uint32 sampleRate) {
   if (!p->contextReady) {
     ma_context_config cc = ma_context_config_init();
     // iPhone/iPad: Wiedergabe auch bei eingeschaltetem Stummschalter.
     cc.coreaudio.sessionCategory = ma_ios_session_category_playback;
-    if (ma_context_init(nullptr, 0, &cc, &p->context) != MA_SUCCESS)
+    const ma_backend nullBackend[] = {ma_backend_null};
+    const bool useNull = nullBackendRequested();
+    if (ma_context_init(useNull ? nullBackend : nullptr, useNull ? 1 : 0, &cc, &p->context) !=
+        MA_SUCCESS)
       return false;
     p->contextReady = true;
   }

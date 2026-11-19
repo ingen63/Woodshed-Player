@@ -22,3 +22,6 @@ __pycache__/
 
 # Coverage profiles of instrumented runs (#8)
 *.profraw
+
+# Copy of the WASM core for the web tests (make test-web, #13)
+app/test/web/wp_core/
