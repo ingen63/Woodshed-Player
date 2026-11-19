@@ -109,13 +109,13 @@ void main() {
     });
   });
 
-  test('#6/AK3 icon source and rights are documented', () {
+  test('#6/AK3 icon source documented as own work under MIT', () {
     final readme = File('assets/icons/README.md');
     expect(readme.existsSync(), isTrue);
     final text = readme.readAsStringSync();
     expect(text, contains('icon_1_waveform_loop.svg'));
     expect(text, contains('selbst erstellt'));
-    expect(text, contains('README.md'));
+    expect(text, contains('MIT'));
     expect(text, contains('#48'));
   });
 

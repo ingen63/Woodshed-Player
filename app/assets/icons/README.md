@@ -6,9 +6,9 @@ Das App-Icon von Woodshed Player ist Konzept 1 «Waveform Loop»: ein Ausschnitt
 
 - **Vorlage:** [`concepts/icon_1_waveform_loop.svg`](concepts/icon_1_waveform_loop.svg)
 - **Herkunft:** selbst erstellt für dieses Projekt, entstanden in Issue #48 (Konzepte) und ausgewählt in #6. Keine fremden Grafiken, Schriften oder Vorlagen.
-- **Rechte:** liegen beim Projekt Woodshed Player. Die Vorlage und das Skript sind Teil des Repositorys; wie im Abschnitt «Lizenz» der [README](../../../README.md) festgehalten, ist das App-Icon (wie der Name «Woodshed Player») von der [MIT-Lizenz](../../../LICENSE) des Quellcodes ausgenommen.
+- **Lizenz:** [MIT](../../../LICENSE) wie der Quellcode (siehe Abschnitt «Lizenz» der [README](../../../README.md)). Der Name «Woodshed Player» ist davon nicht umfasst.
 
-Die übrigen Konzepte in `concepts/` (#48) sind ebenfalls selbst erstellt. Sie werden nicht verwendet.
+Die übrigen Konzepte in `concepts/` (#48) sind ebenfalls selbst erstellt und stehen unter MIT. Sie werden nicht verwendet.
 
 ## Erzeugen
 

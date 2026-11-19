@@ -94,6 +94,6 @@ Woodshed Player arbeitet **vollständig lokal**:
 
 ## Lizenz
 
-Der Quellcode steht unter der [MIT-Lizenz](LICENSE). Der Name „Woodshed Player“ und das App-Icon sind davon nicht umfasst.
+Der Quellcode und das App-Icon ([Quelle](app/assets/icons/README.md)) stehen unter der [MIT-Lizenz](LICENSE). Der Name „Woodshed Player“ ist davon nicht umfasst.
 
 Die mitgelieferten Schriften Inter und JetBrains Mono stehen unter der [SIL Open Font License 1.1](app/assets/fonts/README.md) (Lizenztexte und Quellen dort, in der App unter «Lizenzen»).
