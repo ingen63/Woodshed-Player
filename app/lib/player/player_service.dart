@@ -1,6 +1,7 @@
 // Player-Service (#15): Zustand der Wiedergabe für die Oberfläche. Spricht den Audio-Kern nur über
 // [AudioCore] an und lässt sich deshalb in Tests ohne Audiogerät prüfen.
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:wp_core/wp_types.dart';
@@ -366,15 +367,24 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
           .toDouble();
 
   /// Gespeicherte Einstellungen an die Dauer anpassen; «Ende nicht gesetzt» wird zum Titelende.
+  /// #10 (found by the random tests): stored bounds closer than 1 s (e.g. a loop end beyond this
+  /// device's duration, clamped to it) are widened like a new loop end: the end moves to start + 1 s, or
+  /// the start back to end − 1 s at the end of the title. Before, such a loop stayed «on» without
+  /// reaching the core.
   static PlaybackSettings _normalized(PlaybackSettings s, double duration) {
-    final end = s.loopEnd <= 0
+    var end = s.loopEnd <= 0
         ? duration
         : s.loopEnd.clamp(0, duration).toDouble();
+    var start = s.loopStart.clamp(0, duration).toDouble();
+    if (duration >= minLoopSeconds && end - start < minLoopSeconds) {
+      end = max(end, min(duration, start + minLoopSeconds));
+      start = min(start, end - minLoopSeconds);
+    }
     return s.copyWith(
       speed: s.speed
           .clamp(PlaybackSettings.minSpeed, PlaybackSettings.maxSpeed)
           .toDouble(),
-      loopStart: s.loopStart.clamp(0, duration).toDouble(),
+      loopStart: start,
       loopEnd: end,
     );
   }

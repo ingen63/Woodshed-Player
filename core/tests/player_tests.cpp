@@ -255,6 +255,56 @@ void loadErrorsHaveCodeAndText() { // #14/AK2, #14/AK5 Fehlerfälle
     CHECK(std::strcmp(wp::errorMessage(c), wp::errorMessage(-100)) != 0);
 }
 
+// #10/AK3: truncated or wrong audio files never crash; the load ends with kOk (the readable part)
+// or kErrUnsupportedFormat, whose text the app shows in the user's language (loadUnsupported in
+// the ARB files). After a failed load the previous title stays playable. The cut points cover the
+// empty file, a part of the header, the header alone and parts of the audio data.
+void truncatedAndWrongAudioFiles() {
+  wp::Player p(kSr);
+  CHECK(p.load(writeIndexWav("previous.wav", 2 * kSr).string()) == wp::kOk);
+  const auto readAll = [](const fs::path &f) {
+    std::ifstream in(f, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  };
+  const std::string wav = readAll(writeIndexWav("whole.wav", kSr / 2));
+  const struct {
+    const char *ext;
+    std::string bytes;
+  } files[] = {{"wav", wav},
+               {"flac", readAll(kAudio / "sine440.flac")},
+               {"mp3", readAll(kAudio / "sine440.mp3")}};
+  int ok = 0, unsupported = 0;
+  for (const auto &f : files) {
+    const size_t n = f.bytes.size();
+    for (const size_t cut : {size_t{0}, size_t{1}, size_t{4}, size_t{12}, size_t{44}, size_t{100},
+                             n / 4, n / 2, 3 * n / 4, n - 1}) {
+      const std::string name = std::string("cut_") + std::to_string(cut) + "." + f.ext;
+      const fs::path path = writeBytes(name, f.bytes.substr(0, cut));
+      const int r = p.load(path.string());
+      CHECK(r == wp::kOk || r == wp::kErrUnsupportedFormat);
+      const double d = wp::fileDuration(path.string());
+      CHECK(d > 0 || d == wp::kErrUnsupportedFormat);
+      if (r == wp::kOk) {
+        ++ok;
+        CHECK(p.engine().duration() > 0 && p.engine().duration() <= 1.1); // at most the whole file
+        CHECK(p.load(writeIndexWav("previous.wav", 2 * kSr).string()) == wp::kOk);
+      } else {
+        ++unsupported;
+        checkStillPlayable(p, 2.0);
+      }
+    }
+  }
+  CHECK(ok > 0 && unsupported > 0); // both outcomes occur
+  // Wrong contents behind a known extension, and a known format behind a wrong extension.
+  CHECK(p.load(writeBytes("text.flac", "fLaC but not really a FLAC stream").string()) ==
+        wp::kErrUnsupportedFormat);
+  CHECK(p.load(writeBytes("riff.wav", std::string("RIFF\x10\0\0\0WAVEfmt ", 16)).string()) ==
+        wp::kErrUnsupportedFormat);
+  checkStillPlayable(p, 2.0);
+  CHECK(p.load(writeBytes("flac_named.mp3", files[1].bytes).string()) == wp::kOk);
+  CHECK_NEAR(p.engine().duration(), 1.0, 2e-3);
+}
+
 void errorDuringPlaybackKeepsPlaying() { // #14/AK2
   wp::Player p(kSr);
   CHECK(p.load(writeIndexWav("play.wav", 3 * kSr).string()) == wp::kOk);
@@ -662,6 +712,7 @@ int main() {
       {"endOfFileStopsWithLoadedFile", endOfFileStopsWithLoadedFile},
       {"loopBoundsWithLoadedFile", loopBoundsWithLoadedFile},
       {"loadErrorsHaveCodeAndText", loadErrorsHaveCodeAndText},
+      {"truncatedAndWrongAudioFiles", truncatedAndWrongAudioFiles},
       {"errorMessagesAreEnglishAscii", errorMessagesAreEnglishAscii},
       {"errorDuringPlaybackKeepsPlaying", errorDuringPlaybackKeepsPlaying},
       {"loadRunsInBackground", loadRunsInBackground},

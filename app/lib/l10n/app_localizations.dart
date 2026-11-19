@@ -1004,6 +1004,18 @@ abstract class AppLocalizations {
   /// **'File only on one device'**
   String get fileOnOneDevice;
 
+  /// Sync (#10/AK7): state.json in the cloud is damaged; nothing was merged, local data unchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The library in the cloud is damaged and was not applied. Your data on this device are unchanged; syncing waits until the cloud holds a readable library again.'**
+  String get cloudStateUnreadable;
+
+  /// Sync (#10/AK7): state.json in the cloud has a newer format version.
+  ///
+  /// In en, this message translates to:
+  /// **'The library in the cloud was saved by a newer version of Woodshed Player. Please update the app. Until then, nothing is synced.'**
+  String get cloudStateTooNew;
+
   /// No description provided for @trackNotOnDevice.
   ///
   /// In en, this message translates to:

@@ -82,9 +82,19 @@ bool Engine::play() { return send({Command::Play}); }
 
 bool Engine::pause() { return send({Command::Pause}); }
 
-bool Engine::seek(double seconds) { return send({Command::Seek, std::max(0.0, seconds)}); }
+// #10 (found by fuzz_capi): arguments come through the C API and may be NaN, infinite or huge. A
+// NaN seek or rate is ignored (true: nothing to do), a seek beyond the end goes to the end (seekTo
+// clamps), and the volume is limited to 0–1 like the metronome's; NaN volume means silence. Without
+// this a NaN rate or volume made every following sample NaN.
+bool Engine::seek(double seconds) {
+  if (std::isnan(seconds))
+    return true;
+  return send({Command::Seek, std::clamp(seconds, 0.0, kMaxSeconds)});
+}
 
 bool Engine::setRate(double rate) {
+  if (std::isnan(rate))
+    return true;
   const double r = std::clamp(rate, kMinRate, kMaxRate);
   requestedRate_.store(r);
   return send({Command::Rate, r});
@@ -92,7 +102,10 @@ bool Engine::setRate(double rate) {
 
 bool Engine::setLoop(double a, double b) { return send({Command::Loop, a, b}); }
 
-bool Engine::setVolume(float v) { return send({Command::Volume, static_cast<double>(v)}); }
+bool Engine::setVolume(float v) {
+  const float vol = std::isnan(v) ? 0.0f : std::clamp(v, 0.0f, 1.0f);
+  return send({Command::Volume, static_cast<double>(vol)});
+}
 
 double Engine::position() const { return publishedPosition_.load(); }
 
@@ -143,9 +156,10 @@ void Engine::apply(const Command &c, double &seekTarget) {
   case Command::Loop: {
     const double a = c.a, b = c.b;
     long long fa = 0, fb = 0;
-    if (b >= a + kMinLoopSeconds && a >= 0) {
+    if (b >= a + kMinLoopSeconds && a >= 0 && a <= kMaxSeconds) {
       fa = static_cast<long long>(std::llround(a * sampleRate_));
-      fb = std::min(static_cast<long long>(std::llround(b * sampleRate_)), frames_);
+      fb = std::min(static_cast<long long>(std::llround(std::min(b, kMaxSeconds) * sampleRate_)),
+                    frames_);
       if (fb - fa < static_cast<long long>(kMinLoopSeconds * sampleRate_))
         fa = fb = 0;
     }

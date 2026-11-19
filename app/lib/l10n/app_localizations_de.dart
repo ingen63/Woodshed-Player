@@ -581,6 +581,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get fileOnOneDevice => 'Datei nur auf einem Gerät';
 
   @override
+  String get cloudStateUnreadable =>
+      'Die Bibliothek in der Cloud ist beschädigt und wurde nicht übernommen. Deine Daten auf diesem Gerät sind unverändert; der Abgleich wartet, bis die Cloud wieder eine lesbare Bibliothek enthält.';
+
+  @override
+  String get cloudStateTooNew =>
+      'Die Bibliothek in der Cloud wurde mit einer neueren Version von Woodshed Player gespeichert. Bitte aktualisiere die App. Bis dahin wird nichts abgeglichen.';
+
+  @override
   String trackNotOnDevice(String title) {
     return 'Die Audiodatei von «$title» liegt nur auf einem anderen Gerät und nicht in der Cloud.';
   }

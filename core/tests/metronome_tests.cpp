@@ -239,6 +239,8 @@ void volumeChangeWithoutCrackle() { // #3/AK12
   CHECK(m.running());
   m.setVolume(2.0f);
   CHECK(m.volume() == 1.0f);
+  m.setVolume(std::nanf("")); // #10/AK4, found by fuzz_capi: NaN is silence, not NaN samples
+  CHECK(m.volume() == 0.0f);
 }
 
 void rampExampleFromIssue() { // #3/AK16

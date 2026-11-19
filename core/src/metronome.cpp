@@ -52,7 +52,10 @@ void Metronome::setSubdivision(int clicksPerBeat) {
   subdivision_.store(std::clamp(clicksPerBeat, 1, 4));
 }
 
-void Metronome::setVolume(float volume) { volume_.store(std::clamp(volume, 0.0f, 1.0f)); }
+// #10 (found by fuzz_capi): NaN volume means silence; std::clamp would pass NaN on.
+void Metronome::setVolume(float volume) {
+  volume_.store(std::isnan(volume) ? 0.0f : std::clamp(volume, 0.0f, 1.0f));
+}
 
 void Metronome::setRamp(bool enabled, int startBpm, int targetBpm, int stepBpm, int everyBars) {
   const bool changed = rampTimed_.exchange(false);

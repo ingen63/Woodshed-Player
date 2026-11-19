@@ -26,6 +26,9 @@ public:
   static constexpr double kMinRate = 0.1;
   static constexpr double kMaxRate = 2.0;
   static constexpr double kMinLoopSeconds = 1.0;
+  // Upper bound for seek and loop times (about 11.6 days): llround of a larger time times the
+  // sample rate would leave the range of long long (#10).
+  static constexpr double kMaxSeconds = 1e6;
   static constexpr size_t kQueueCapacity = 1024;
 
   Engine();

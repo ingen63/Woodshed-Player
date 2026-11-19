@@ -1,0 +1,204 @@
+{
+  "formatVersion": 2,
+  "settings": {
+    "values": {
+      "sortOrder": "custom",
+      "appearance": "dark",
+      "metronome.meter": 3,
+      "metronome.subdivision": 2,
+      "metronome.volume": 0.8,
+      "metronome.rampEnabled": false,
+      "metronome.rampStart": 80,
+      "metronome.rampTarget": 120,
+      "metronome.rampStep": 5,
+      "metronome.rampEveryBars": 4,
+      "metronome.rampByTime": false,
+      "metronome.rampMinutes": 10
+    },
+    "stamps": {
+      "sortOrder": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "appearance": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.meter": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.subdivision": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.volume": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.rampEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.rampStart": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.rampTarget": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.rampStep": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.rampEveryBars": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.rampByTime": "1794301200000-0-3f2a9c1e5b7d4a60",
+      "metronome.rampMinutes": "1794301200000-0-3f2a9c1e5b7d4a60"
+    }
+  },
+  "folders": {
+    "11111111-2222-3333-4444-555555555555": {
+      "values": {
+        "name": "Etüden",
+        "sync": false
+      },
+      "stamps": {
+        "name": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "sync": "1794301200000-0-3f2a9c1e5b7d4a60"
+      }
+    },
+    "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE": {
+      "values": {
+        "name": "Alt",
+        "sync": true
+      },
+      "stamps": {
+        "name": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "sync": "1794301200000-0-3f2a9c1e5b7d4a60"
+      },
+      "deleted": "1794467700000-1-b07c0ffee0000001"
+    }
+  },
+  "tracks": {
+    "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": {
+      "values": {
+        "fileName": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1.mp3",
+        "originalFileName": "Übung in G.mp3",
+        "title": "Übung in G (langsam)",
+        "artist": "Testband",
+        "album": "Testalbum",
+        "duration": 183.5,
+        "hasArtwork": true,
+        "dateAdded": "2026-11-10T09:00:00.000Z",
+        "customOrder": 1,
+        "folderId": "11111111-2222-3333-4444-555555555555",
+        "speedEnabled": true,
+        "speed": 0.75,
+        "loopEnabled": true,
+        "activeLoop": "5e1f0a2b",
+        "loops.5e1f0a2b": {
+          "start": 12.5,
+          "end": 47.0
+        },
+        "loops.0f0f0f0f": null,
+        "noUpload": false,
+        "rampEnabled": true,
+        "rampStart": 60,
+        "rampTarget": 90,
+        "rampStep": 5,
+        "rampPasses": 4
+      },
+      "stamps": {
+        "fileName": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "originalFileName": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "title": "1794421800000-0-b07c0ffee0000001",
+        "artist": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "album": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "duration": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "hasArtwork": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "dateAdded": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "customOrder": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "folderId": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "speedEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "speed": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "loopEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "activeLoop": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "loops.5e1f0a2b": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "loops.0f0f0f0f": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "noUpload": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampStart": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampTarget": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampStep": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampPasses": "1794301200000-0-3f2a9c1e5b7d4a60"
+      }
+    },
+    "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": {
+      "values": {
+        "fileName": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2.flac",
+        "originalFileName": "tonleiter.flac",
+        "title": "Tonleiter",
+        "artist": null,
+        "album": null,
+        "duration": 1.0,
+        "hasArtwork": false,
+        "dateAdded": "2026-11-10T09:05:00.000Z",
+        "customOrder": 0,
+        "folderId": null,
+        "speedEnabled": false,
+        "speed": 1.0,
+        "loopEnabled": false,
+        "activeLoop": null,
+        "noUpload": true,
+        "rampEnabled": false,
+        "rampStart": 60,
+        "rampTarget": 100,
+        "rampStep": 5,
+        "rampPasses": 10
+      },
+      "stamps": {
+        "fileName": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "originalFileName": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "title": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "artist": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "album": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "duration": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "hasArtwork": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "dateAdded": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "customOrder": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "folderId": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "speedEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "speed": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "loopEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "activeLoop": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "noUpload": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampStart": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampTarget": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampStep": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampPasses": "1794301200000-0-3f2a9c1e5b7d4a60"
+      }
+    },
+    "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3": {
+      "values": {
+        "fileName": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3.mp3",
+        "originalFileName": "weg.mp3",
+        "title": "Gelöscht",
+        "artist": null,
+        "album": null,
+        "duration": 30.0,
+        "hasArtwork": false,
+        "dateAdded": "2026-11-10T09:10:00.000Z",
+        "customOrder": 2,
+        "folderId": null,
+        "speedEnabled": false,
+        "speed": 1.0,
+        "loopEnabled": false,
+        "activeLoop": null,
+        "noUpload": false,
+        "rampEnabled": false,
+        "rampStart": 60,
+        "rampTarget": 100,
+        "rampStep": 5,
+        "rampPasses": 10
+      },
+      "stamps": {
+        "fileName": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "originalFileName": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "title": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "artist": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "album": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "duration": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "hasArtwork": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "dateAdded": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "customOrder": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "folderId": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "speedEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "speed": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "loopEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "activeLoop": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "noUpload": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampEnabled": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampStart": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampTarget": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampStep": "1794301200000-0-3f2a9c1e5b7d4a60",
+        "rampPasses": "1794301200000-0-3f2a9c1e5b7d4a60"
+      },
+      "deleted": "1794467700000-1-b07c0ffee0000001"
+    }
+  }
+}

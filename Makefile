@@ -3,7 +3,7 @@
 # (clang-format, clang-tidy). core/third_party/ is never formatted, linted or read.
 .PHONY: help test test-core test-wasm test-app test-hook test-tools format format-check lint lint-dart \
         lint-core coverage coverage-run coverage-core coverage-app coverage-diff mutants fuzz report \
-        sanitize sanitize-thread test-core-debug network-free
+        sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property
 
 SHELL := /bin/bash
 # A failing build must not be hidden by `| tail` (GNU Make 3.81 on macOS has no .SHELLFLAGS).
@@ -30,6 +30,8 @@ help:
 	@echo "make test-core-debug core tests in a Debug build (same cases and tolerances as Release)"
 	@echo "make sanitize       core tests with AddressSanitizer and UndefinedBehaviorSanitizer"
 	@echo "make sanitize-thread core tests with ThreadSanitizer"
+	@echo "make fuzz           libFuzzer with ASan/UBSan, FUZZ_SECONDS per target (default 60)"
+	@echo "make property       Dart random tests, PROPERTY_CASES cases, PROPERTY_SEED (printed on failure)"
 	@echo "make format         dart format and clang-format"
 	@echo "make format-check   fails if a file is not formatted"
 	@echo "make lint           flutter analyze (strict), C++ warnings as errors, clang-tidy"
@@ -127,8 +129,8 @@ coverage-diff: coverage-run
 # ---- Sanitizers (#57), docs/TESTS.md ----
 # Separate Debug builds, core/build stays untouched. WP_SANITIZE instruments every target (also
 # third_party) and sets the sanitizer options for ctest; any finding fails its test. A
-# self-test with a deliberate bug per sanitizer proves that. Fuzz targets (#10) build in the same
-# way with -DWP_SANITIZE=address,undefined.
+# self-test with a deliberate bug per sanitizer proves that. Fuzz targets (#10, make fuzz) build in
+# the same way with -DWP_SANITIZE=address,undefined.
 sanitize:
 	cmake -S core -B core/build-asan -DCMAKE_BUILD_TYPE=Debug -DWP_SANITIZE=address,undefined >/dev/null
 	$(PIPEFAIL) cmake --build core/build-asan -j 8 2>&1 | tail -20
@@ -141,12 +143,58 @@ sanitize-thread:
 	$(PIPEFAIL) cmake --build core/build-tsan -j 8 2>&1 | tail -20
 	ctest --test-dir core/build-tsan --output-on-failure -j 4
 
+# ---- Fuzzing (#10), docs/TESTS.md ----
+# libFuzzer needs clang with libFuzzer (Homebrew llvm; Apple Clang has none, on Linux the system
+# clang). Build core/build-fuzz with ASan and UBSan (#57) and coverage instrumentation for all code;
+# each target starts from the checked-in regressions and start corpus (core/tests/fuzz/) and keeps
+# new corpus files in core/build-fuzz/corpus/<target> (not checked in). A finding (crash, sanitizer
+# report, broken invariant, timeout, out of memory) stops the run and fails; the input is saved as
+# core/build-fuzz/artifacts/<target>/crash-* (or leak-, timeout-, oom-). Check it into
+# core/tests/fuzz/regressions/<target>/ once the bug is fixed.
+FUZZ_SECONDS ?= 60
+FUZZ_TARGETS ?= decoder capi
+FUZZ_DIR      = core/build-fuzz
+FUZZ_CC      ?= $(if $(filter Darwin,$(shell uname -s)),$(LLVM_BIN)/clang,clang)
+FUZZ_CXX     ?= $(if $(filter Darwin,$(shell uname -s)),$(LLVM_BIN)/clang++,clang++)
+# Options of the sanitizers like in ctest (core/CMakeLists.txt); a finding aborts.
+FUZZ_ENV = UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1:suppressions='$(CURDIR)/core/tests/sanitizer/ubsan.supp'" \
+           ASAN_OPTIONS="halt_on_error=1:allocator_may_return_null=1$(if $(filter Darwin,$(shell uname -s)),,:detect_leaks=1)" \
+           LSAN_OPTIONS="suppressions='$(CURDIR)/core/tests/sanitizer/lsan.supp'"
+
+fuzz-build:
+	cmake -S core -B $(FUZZ_DIR) -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWP_SANITIZE=address,undefined \
+	  -DWP_FUZZ=ON -DCMAKE_C_COMPILER="$(FUZZ_CC)" -DCMAKE_CXX_COMPILER="$(FUZZ_CXX)" >/dev/null
+	$(PIPEFAIL) cmake --build $(FUZZ_DIR) -j 8 --target $(addprefix fuzz_,$(FUZZ_TARGETS)) 2>&1 | tail -20
+
+fuzz: fuzz-build
+	@for t in $(FUZZ_TARGETS); do \
+	  mkdir -p $(FUZZ_DIR)/corpus/$$t $(FUZZ_DIR)/artifacts/$$t; \
+	  echo "fuzz_$$t: $(FUZZ_SECONDS) s"; \
+	  $(FUZZ_ENV) $(FUZZ_DIR)/fuzz_$$t $(FUZZ_DIR)/corpus/$$t core/tests/fuzz/regressions/$$t \
+	    core/tests/fuzz/corpus/$$t -max_total_time=$(FUZZ_SECONDS) -timeout=10 -rss_limit_mb=2048 \
+	    -max_len=65536 -print_final_stats=1 -artifact_prefix=$(FUZZ_DIR)/artifacts/$$t/ \
+	    > $(FUZZ_DIR)/fuzz_$$t.log 2>&1; rc=$$?; \
+	  grep -E '^(stat::number_of_executed_units|stat::new_units_added|INFO: seed corpus)' \
+	    $(FUZZ_DIR)/fuzz_$$t.log; \
+	  if [ $$rc -ne 0 ]; then tail -40 $(FUZZ_DIR)/fuzz_$$t.log; \
+	    echo "fuzz_$$t: finding, input in $(FUZZ_DIR)/artifacts/$$t/"; exit 1; fi; \
+	done
+
+# ---- Random tests (#10), docs/TESTS.md ----
+# The Dart random tests (app/test/property/) also run in make test with 100 cases and the fixed seed.
+# Here with more cases or another seed; a failure names the case seed to check in as a regression
+# (app/test/property/regressions.json).
+PROPERTY_CASES ?= 100
+PROPERTY_SEED  ?= 20261119
+property:
+	cd app && WP_PROPERTY_CASES=$(PROPERTY_CASES) WP_PROPERTY_SEED=$(PROPERTY_SEED) \
+	  flutter test --reporter failures-only test/property/
+
 # ---- Not set up yet ----
 define not_yet
 	@echo "make $@: noch nicht eingerichtet (#$(1))"; exit 1
 endef
 
 mutants:       ; $(call not_yet,11)
-fuzz:          ; $(call not_yet,10)
 report:        ; $(call not_yet,12)
 network-free:  ; $(call not_yet,58)

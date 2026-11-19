@@ -1,6 +1,7 @@
 #include "player_core.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <new>
 #include <vector>
 
@@ -48,6 +49,16 @@ bool pausesPlayback(DeviceEvent e) {
 
 namespace {
 
+// #10 (found by fuzz_decoder): float WAV files can hold NaN, infinities or huge values. Such
+// samples would reach the device and poison the time stretch for the rest of the title, so a
+// non-finite sample becomes silence and the rest is limited to +-kMaxSample (about +18 dB, far
+// above any sensible level, so real audio is never changed).
+constexpr float kMaxSample = 8.0f;
+void sanitizeSamples(float *s, size_t n) {
+  for (size_t i = 0; i < n; ++i)
+    s[i] = std::isfinite(s[i]) ? std::clamp(s[i], -kMaxSample, kMaxSample) : 0.0f;
+}
+
 int mapOpenError(ma_result r) {
   switch (r) {
   case MA_DOES_NOT_EXIST:
@@ -93,8 +104,12 @@ int readAll(ma_decoder &dec, const std::atomic<bool> *cancel, std::atomic<double
   try {
     constexpr ma_uint64 kBlock = 8192;
     out.data.clear();
+    // #10 (found by fuzz_decoder): the length comes from the file header; a damaged header claimed
+    // 3 billion frames and made a few bytes reserve 24 GB. Reserve at most 5 minutes up front,
+    // longer titles grow while decoding.
+    const ma_uint64 cap = static_cast<ma_uint64>(dec.outputSampleRate) * 300;
     if (total > 0)
-      out.data.reserve(static_cast<size_t>((total + kBlock) * Player::kChannels));
+      out.data.reserve(static_cast<size_t>((std::min(total, cap) + kBlock) * Player::kChannels));
     std::vector<float> buf(kBlock * Player::kChannels);
     long long frames = 0;
     for (;;) {
@@ -104,6 +119,7 @@ int readAll(ma_decoder &dec, const std::atomic<bool> *cancel, std::atomic<double
       }
       ma_uint64 read = 0;
       const ma_result r = ma_decoder_read_pcm_frames(&dec, buf.data(), kBlock, &read);
+      sanitizeSamples(buf.data(), static_cast<size_t>(read * Player::kChannels));
       out.data.insert(out.data.end(), buf.begin(),
                       buf.begin() + static_cast<long>(read * Player::kChannels));
       frames += static_cast<long long>(read);
@@ -214,6 +230,7 @@ int convertPcm(const float *interleaved, int channels, long long frames, int src
         break;
       }
       done += in;
+      sanitizeSamples(buf.data(), static_cast<size_t>(got * Player::kChannels));
       out.data.insert(out.data.end(), buf.begin(),
                       buf.begin() + static_cast<long>(got * Player::kChannels));
       if (got == 0)

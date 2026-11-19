@@ -338,6 +338,58 @@ void volumeScalesDirectOutput() {
   CHECK(e.playing());
 }
 
+// #10/AK4, found by fuzz_capi: arguments through the C API may be NaN, infinite or huge. Expected
+// from the rules of engine.cpp: NaN seek and NaN rate change nothing, a seek beyond the end lands
+// on the end (2000 frames at 1000 Hz = 2 s), a loop end beyond the file ends at the file end, the
+// volume is limited to 0–1 (5 plays like 1, NaN is silence). Every sample stays finite.
+void nonFiniteArgumentsAreSafe() {
+  const int sr = 1000;
+  wp::Engine e;
+  e.setSource(ramp(2000), 2, sr);
+  e.setRate(1.5);
+  e.setRate(std::nan(""));
+  CHECK(e.rate() == 1.5);
+  e.setRate(1.0);
+  e.seek(0.5);
+  renderFrames(e, 1);
+  e.pause();
+  e.seek(std::nan(""));
+  renderFrames(e, 1);
+  CHECK_NEAR(e.position(), 0.5, 1e-9);
+  e.seek(INFINITY);
+  renderFrames(e, 1);
+  CHECK_NEAR(e.position(), 2.0, 1e-9);
+  e.seek(1e300);
+  renderFrames(e, 1);
+  CHECK_NEAR(e.position(), 2.0, 1e-9);
+  e.seek(-INFINITY);
+  renderFrames(e, 1);
+  CHECK(e.position() == 0.0);
+  // Loop 0.5 s .. end of file: the playhead wraps from frame 2000 to 500.
+  e.setLoop(0.5, 1e300);
+  e.seek(1.9);
+  e.setVolume(5.0f);
+  e.play();
+  auto out = renderFrames(e, 200, 64);
+  CHECK(out[0] == 1900.0f);      // volume 5 limited to 1
+  CHECK(out[2 * 100] == 500.0f); // 1900 + 100 = 2000 wraps to the loop start 500
+  e.setLoop(std::nan(""), 1.0);  // invalid: loop off
+  e.setVolume(std::nanf(""));
+  auto silent = renderFrames(e, 100);
+  bool zero = true;
+  for (float v : silent)
+    zero = zero && v == 0.0f;
+  CHECK(zero);
+  e.setVolume(INFINITY);
+  e.setRate(INFINITY); // limited to 2.0
+  CHECK(e.rate() == 2.0);
+  auto fast = renderFrames(e, 300);
+  bool finite = true;
+  for (float v : fast)
+    finite = finite && std::isfinite(v);
+  CHECK(finite);
+}
+
 void rateChangeKeepsPositionAndSignal() {
   const int sr = 44100;
   wp::Engine e;
@@ -622,6 +674,7 @@ int main(int argc, char **argv) {
       {"positionFollowsRate", positionFollowsRate},
       {"stretchIsDeterministic", stretchIsDeterministic},
       {"volumeScalesDirectOutput", volumeScalesDirectOutput},
+      {"nonFiniteArgumentsAreSafe", nonFiniteArgumentsAreSafe},
       {"rateChangeKeepsPositionAndSignal", rateChangeKeepsPositionAndSignal},
       {"seekDuringStretchedPlayback", seekDuringStretchedPlayback},
       {"queueKeepsOrderAndRejectsWhenFull", queueKeepsOrderAndRejectsWhenFull},

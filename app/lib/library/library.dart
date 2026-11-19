@@ -61,6 +61,17 @@ class TrackNotOnDevice extends LibraryMessage {
   final String title;
 }
 
+/// `state.json` in the cloud is damaged and was not merged; the library on this device is unchanged (#10/AK7).
+class CloudStateUnreadable extends LibraryMessage {
+  const CloudStateUnreadable();
+}
+
+/// `state.json` in the cloud was written by a newer app ([version]); nothing is synced (#10/AK7).
+class CloudStateTooNew extends LibraryMessage {
+  const CloudStateTooNew(this.version);
+  final int version;
+}
+
 /// These files (names) could not be imported.
 class ImportFailed extends LibraryMessage {
   const ImportFailed(this.files);
@@ -211,7 +222,7 @@ class Library extends ChangeNotifier {
       return _afterLoad();
     }
     try {
-      if (json == null) throw const FormatException();
+      if (json == null || !isFiniteJson(json)) throw const FormatException();
       if (version == SharedState.formatVersion) {
         _state = SharedState.fromJson((json as Map).cast());
         _clock.observe(_state.latest);
@@ -266,7 +277,16 @@ class Library extends ChangeNotifier {
   Future<void> _migrate(Uint8List raw) async {
     final legacy = await migrateLegacyLibrary(store, raw);
     _folders = legacy.folders;
-    _tracks = legacy.tracks;
+    // #10 (found with the golden files): `[Track]` of the Swift app has no folders, but its entries may
+    // still name one. Such a track showed in no folder until the next start; now it shows without one,
+    // like a track whose folder was deleted on another device.
+    final folderIds = {for (final f in _folders) f.id};
+    _tracks = [
+      for (final t in legacy.tracks)
+        t.folderId == null || folderIds.contains(t.folderId)
+            ? t
+            : t.copyWith(folderId: () => null),
+    ];
     _droppedMissing = legacy.missing;
     await _readLegacyPrefs();
     _state = SharedState.empty;
@@ -333,9 +353,26 @@ class Library extends ChangeNotifier {
       folders: records(_state.folders, {
         for (final f in _folders) f.id: f.toShared(),
       }),
-      settings: _state.settings.update(_settingsValues(), stamp),
+      settings: _state.settings.update(_chosenSettings(), stamp),
     );
   }
+
+  /// #10 (found by the random sync tests): shared settings without a stamp that are still at their default
+  /// (sort order «date added», appearance «system») were never chosen on this device and are not stamped.
+  /// Before, the first save of a new device stamped its defaults as the newest change, and its first sync
+  /// reset the sort order and appearance chosen on all other devices.
+  Map<String, Object?> _chosenSettings() {
+    final stamped = _state.settings.stamps;
+    return {
+      for (final e in _settingsValues().entries)
+        if (stamped.containsKey(e.key) || !_isDefault(e.key, e.value))
+          e.key: e.value,
+    };
+  }
+
+  static bool _isDefault(String key, Object? value) =>
+      (key == 'sortOrder' && value == TrackSortOrder.dateAdded.name) ||
+      (key == 'appearance' && value == Appearance.system.name);
 
   Future<void> _afterLoad() async {
     if (_tracks.isNotEmpty) await _askPersistence();
@@ -414,6 +451,12 @@ class Library extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Shows [m] to the user, e.g. a problem of the sync (#10/AK7).
+  void report(LibraryMessage m) {
+    lastError = m;
+    notifyListeners();
+  }
+
   /// The audio file of [t] is on this device.
   bool hasFile(String id) => !_absent.contains(id);
 
@@ -475,12 +518,14 @@ class Library extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _write() {
+  /// Async so that an encoding error, too, reaches the caller as a failed future ([save] reports it as
+  /// [LibrarySaveFailed]) instead of being thrown into the UI (#10). The commit still happens at once.
+  Future<void> _write() async {
     _commit();
     final bytes = Uint8List.fromList(
       utf8.encode(const JsonEncoder.withIndent('  ').convert(_state.toJson())),
     );
-    return store.write(indexName, bytes);
+    await store.write(indexName, bytes);
   }
 
   /// Fasst häufige Änderungen zusammen (z. B. beim Ziehen des Tempo-Reglers).
@@ -753,8 +798,10 @@ class Library extends ChangeNotifier {
         for (var i = 0; i < ordered.length; i++)
           if (ordered[i].folderId == folderId) i,
       ];
-      final insertAt = at < slots.length
-          ? slots[at]
+      // #10 (random tests): a negative row counts as the first one instead of throwing a RangeError.
+      final row = max(0, at);
+      final insertAt = row < slots.length
+          ? slots[row]
           : (slots.isEmpty ? ordered.length : slots.last + 1);
       ordered.insertAll(insertAt, moving);
       _renumber(ordered);

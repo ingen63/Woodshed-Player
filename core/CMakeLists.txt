@@ -69,6 +69,14 @@ if(WP_SANITIZE)
   add_compile_definitions(WP_SANITIZED=1)
 endif()
 
+# #10/AK4: libFuzzer targets (make fuzz, tests/fuzz/fuzz.cmake). Needs clang with libFuzzer
+# (Homebrew llvm on macOS, Apple Clang has none). Instruments all code of the build for coverage;
+# the fuzz programs themselves add -fsanitize=fuzzer. Used together with WP_SANITIZE.
+option(WP_FUZZ "Build the libFuzzer targets (clang with libFuzzer)" OFF)
+if(WP_FUZZ)
+  add_compile_options(-fsanitize=fuzzer-no-link)
+endif()
+
 if(EMSCRIPTEN)
   include(web/web.cmake)  # eigener Zweig: Tests unter Node.js, Kern fürs AudioWorklet
   return()
@@ -170,6 +178,9 @@ add_test(NAME realtime_tests COMMAND realtime_tests)
 
 # #9: audio reference cases against the offline C API, natively and under WASM (tests/reference.cmake)
 include(tests/reference.cmake)
+
+# #10: fuzz targets, replay of regression inputs and start corpus in every build
+include(tests/fuzz/fuzz.cmake)
 
 # #57: in a sanitizer build every test runs with these options; a finding ends the test with a
 # non-zero exit code. Suppression files in tests/sanitizer/ (each entry with a reason).

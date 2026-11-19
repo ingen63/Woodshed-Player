@@ -3,6 +3,9 @@
 #   that changes core/ (or this workflow, the Makefile), and on manual start.
 # - sanitize-thread: ThreadSanitizer (make sanitize-thread) every night, only if main has a new
 #   commit since the last successful nightly run, and on manual start.
+# - fuzz: libFuzzer with ASan/UBSan (make fuzz, #10) on the decoder and the C API, nightly after a new
+#   commit and on manual start. A finding fails the job; the input is kept as an artifact.
+# - property: the Dart random tests (#10) with many cases and a new seed every night, same gate.
 # Every sanitizer finding fails its test and with it the job (core/CMakeLists.txt, WP_SANITIZE).
 # Strategy, runs and suppressions: docs/TESTS.md. #13 adds further jobs to this file; the checks for
 # changed paths live in the job «changes», so new jobs can use their own paths.
@@ -109,3 +112,54 @@ jobs:
         run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: make sanitize-thread (#57/AK2)
         run: make sanitize-thread
+
+  fuzz:
+    name: Fuzzing (core, #10)
+    needs: nightly-gate
+    # nightly after the gate, and on manual start (then the gate is skipped)
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'schedule' && needs.nightly-gate.outputs.run == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Address space layout for the sanitizers
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Corpus of earlier nights (not checked in)
+        uses: actions/cache@v4
+        with:
+          path: core/build-fuzz/corpus
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: fuzz-corpus-
+      - name: make fuzz (#10/AK4, AK9), 20 min per target
+        run: make fuzz FUZZ_SECONDS=1200
+      - name: Inputs of the finding
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-findings
+          path: |
+            core/build-fuzz/artifacts/
+            core/build-fuzz/fuzz_*.log
+          if-no-files-found: ignore
+
+  property:
+    name: Random tests (app, #10)
+    needs: nightly-gate
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'schedule' && needs.nightly-gate.outputs.run == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Random tests with many cases and a new seed (#10/AK1, AK6)
+        # The seed is printed by every test; repeat a failure locally with the same WP_PROPERTY_SEED.
+        run: make property PROPERTY_CASES=3000 PROPERTY_SEED=${{ github.run_id }}

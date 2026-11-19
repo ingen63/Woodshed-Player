@@ -45,12 +45,18 @@ class Hlc implements Comparable<Hlc> {
     if (a <= 0 || b <= a + 1 || b == s.length - 1) {
       throw FormatException('Invalid stamp', s);
     }
-    return Hlc(
-      int.parse(s.substring(0, a)),
-      int.parse(s.substring(a + 1, b)),
-      s.substring(b + 1),
-    );
+    final millis = int.parse(s.substring(0, a));
+    final counter = int.parse(s.substring(a + 1, b));
+    // #10/AK7: only times a DateTime can hold and counters exact in JavaScript (web app).
+    if (millis > maxMillis || counter > maxCounter) {
+      throw FormatException('Stamp out of range', s);
+    }
+    return Hlc(millis, counter, s.substring(b + 1));
   }
+
+  /// Largest time of a stamp (that of DateTime), largest counter.
+  static const maxMillis = 8640000000000000;
+  static const maxCounter = 0x7fffffff;
 
   static Hlc? maxOf(Iterable<Hlc?> stamps) {
     Hlc? m;
@@ -107,6 +113,16 @@ bool sameJson(Object? a, Object? b) {
   }
   return a == b;
 }
+
+/// #10 (found by the random tests): JSON allows numbers beyond the range of a double (`1e400`), which
+/// Dart reads as infinity; such a value could be read but never written again. A file containing one is
+/// damaged.
+bool isFiniteJson(Object? v) => switch (v) {
+  double d => d.isFinite,
+  Map<Object?, Object?> m => m.values.every(isFiniteJson),
+  List<Object?> l => l.every(isFiniteJson),
+  _ => true,
+};
 
 /// JSON with sorted keys, used only to break ties deterministically.
 String _canonical(Object? v) => switch (v) {

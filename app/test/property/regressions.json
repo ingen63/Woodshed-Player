@@ -1,0 +1,45 @@
+{
+  "_comment": "#10/AK2: case seeds of random tests that once failed. They run first, on every run. Key: name of the property; value: list of {seed, found, note}.",
+  "sorting and moving into folders neither lose nor duplicate a track": [
+    {
+      "seed": 1819084227,
+      "found": "2026-11-19",
+      "note": "moveTracks with a negative row threw a RangeError"
+    }
+  ],
+  "saving and loading gives the same state": [
+    {
+      "seed": 1819234688,
+      "found": "2026-11-19",
+      "note": "moveTracks with a negative row threw a RangeError"
+    }
+  ],
+  "loop bounds are valid after every change": [
+    {
+      "seed": 1819060470,
+      "found": "2026-11-19",
+      "note": "stored loop closer than 1 s after clamping to the duration stayed on without reaching the core"
+    }
+  ],
+  "migration twice changes nothing and reports nothing": [
+    {
+      "seed": 1819282202,
+      "found": "2026-11-19",
+      "note": "a number beyond the double range (1e400) was read as infinity; save then threw instead of reporting"
+    }
+  ],
+  "random edits, deletions and syncs on 2 to 4 devices converge": [
+    {
+      "seed": 1819107984,
+      "found": "2026-11-19",
+      "note": "the first save of a new device stamped the default sort order and appearance as the newest change; the devices did not converge"
+    }
+  ],
+  "damaged state.json never crashes and never loses local data": [
+    {
+      "seed": 1819282202,
+      "found": "2026-11-19",
+      "note": "a speed of 1e400 in state.json was merged as infinity; every later save of the library failed"
+    }
+  ]
+}

@@ -575,6 +575,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileOnOneDevice => 'File only on one device';
 
   @override
+  String get cloudStateUnreadable =>
+      'The library in the cloud is damaged and was not applied. Your data on this device are unchanged; syncing waits until the cloud holds a readable library again.';
+
+  @override
+  String get cloudStateTooNew =>
+      'The library in the cloud was saved by a newer version of Woodshed Player. Please update the app. Until then, nothing is synced.';
+
+  @override
   String trackNotOnDevice(String title) {
     return 'The audio file of «$title» is only on another device and not in the cloud.';
   }

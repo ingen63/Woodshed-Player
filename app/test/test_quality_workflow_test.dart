@@ -1,4 +1,4 @@
-// #57: sanitizer runs of the C++ core in .github/workflows/test-quality.yml and the make targets
+// #57, #10: sanitizer, fuzzing and random test runs in .github/workflows/test-quality.yml and the make targets
 // they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -72,6 +72,52 @@ void main() {
       expect(tsan, contains("needs.nightly-gate.outputs.run == 'true'"));
       expect(tsan, contains("github.event_name == 'workflow_dispatch'"));
       expect(tsan, contains('run: make sanitize-thread\n'));
+    });
+  });
+
+  group('#10/AK4, AK9 fuzzing', () {
+    test('make fuzz builds core/build-fuzz with libFuzzer, ASan and UBSan', () {
+      expect(makefile, contains('\nfuzz: fuzz-build\n'));
+      expect(makefile, isNot(contains('fuzz:          ; \$(call not_yet')));
+      expect(makefile, contains('-DWP_SANITIZE=address,undefined'));
+      expect(makefile, contains('-DWP_FUZZ=ON'));
+      // regressions and the checked-in start corpus first, new corpus files in the build folder
+      expect(
+        makefile,
+        contains(r'$(FUZZ_DIR)/corpus/$$t core/tests/fuzz/regressions/$$t'),
+      );
+      expect(makefile, contains('core/tests/fuzz/corpus/\$\$t'));
+      expect(makefile, contains('-artifact_prefix='));
+    });
+
+    test('runs nightly only after a new commit, and by hand; findings fail and are kept', () {
+      final fuzz = job(workflow, 'fuzz');
+      expect(fuzz, contains('runs-on: ubuntu-latest'));
+      expect(fuzz, contains("needs.nightly-gate.outputs.run == 'true'"));
+      expect(fuzz, contains("github.event_name == 'workflow_dispatch'"));
+      expect(fuzz, contains('run: make fuzz FUZZ_SECONDS='));
+      expect(fuzz, contains('if: failure()'));
+      expect(fuzz, contains('actions/upload-artifact@v4'));
+      expect(fuzz, contains('core/build-fuzz/artifacts/'));
+    });
+  });
+
+  group('#10/AK1, AK6 random tests', () {
+    test('make property passes the number of cases and the seed', () {
+      expect(makefile, contains('\nproperty:\n'));
+      expect(
+        makefile,
+        contains(
+          r'WP_PROPERTY_CASES=$(PROPERTY_CASES) WP_PROPERTY_SEED=$(PROPERTY_SEED)',
+        ),
+      );
+    });
+
+    test('nightly with many cases and a new seed', () {
+      final property = job(workflow, 'property');
+      expect(property, contains("needs.nightly-gate.outputs.run == 'true'"));
+      expect(property, contains('make property PROPERTY_CASES=3000'));
+      expect(property, contains(r'PROPERTY_SEED=${{ github.run_id }}'));
     });
   });
 }

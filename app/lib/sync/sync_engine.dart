@@ -14,7 +14,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import '../library/library.dart';
-import '../library/stamps.dart' show sameJson;
+import '../library/stamps.dart' show isFiniteJson, sameJson;
 import 'cloud_provider.dart';
 import 'sync_service.dart';
 
@@ -288,16 +288,9 @@ class CloudSync extends SyncService {
       SharedState? theirs;
       var generation = 0;
       if (remote != null) {
-        final Map<String, Object?> j;
-        try {
-          j = (jsonDecode(utf8.decode(remote.bytes)) as Map).cast();
-        } on FormatException {
-          throw const CloudError('state.json unreadable');
-        }
-        final v = j['formatVersion'];
-        if (v is int && v > SharedState.formatVersion) throw SyncTooNew(v);
-        theirs = SharedState.fromJson(j);
-        generation = (j['generation'] as num?)?.toInt() ?? 0;
+        final (state, gen) = _readState(remote);
+        theirs = state;
+        generation = gen;
         await library.mergeRemote(theirs);
       }
       final mine = library.state;
@@ -323,6 +316,48 @@ class CloudSync extends SyncService {
     }
     throw CloudError('state.json: $maxConflicts conflicts in a row');
   }
+
+  /// Reads `state.json` and checks it before anything is merged (#10/AK7): a damaged file (not JSON, other
+  /// types, missing stamps, numbers beyond a double, stamps out of range, records the app cannot show)
+  /// leaves the library untouched. The user gets one message per damaged version, the sync stops with an
+  /// error and is retried. A newer format version stops the sync ([SyncTooNew]).
+  (SharedState, int) _readState(CloudFile remote) {
+    try {
+      final j = jsonDecode(utf8.decode(remote.bytes));
+      if (j is! Map) throw const FormatException('not an object');
+      final v = j['formatVersion'];
+      if (v is int && v > SharedState.formatVersion) {
+        if (_reported != remote.version) library.report(CloudStateTooNew(v));
+        _reported = remote.version;
+        throw SyncTooNew(v);
+      }
+      if (v != SharedState.formatVersion || !isFiniteJson(j)) {
+        throw const FormatException('format version or numbers');
+      }
+      final state = SharedState.fromJson(j.cast());
+      // every record must be one the app can show (as when loading library.json)
+      for (final e in state.tracks.entries) {
+        Track.fromShared(e.key, e.value.values);
+      }
+      for (final e in state.folders.entries) {
+        TrackFolder.fromShared(e.key, e.value.values);
+      }
+      TrackSortOrder.parse(state.settings.values['sortOrder'] as String?);
+      final g = j['generation'];
+      return (state, g is int && g >= 0 && g <= Hlc.maxCounter ? g : 0);
+    } on SyncTooNew {
+      rethrow;
+    } catch (e) {
+      if (_reported != remote.version) {
+        library.report(const CloudStateUnreadable());
+      }
+      _reported = remote.version;
+      throw CloudError('state.json unreadable: $e');
+    }
+  }
+
+  /// Version of `state.json` already reported as damaged or too new: one message per version.
+  String? _reported;
 
   /// `state.json`: the shared state plus a generation counter for the backup slots.
   static Uint8List encodeState(SharedState s, int generation) =>

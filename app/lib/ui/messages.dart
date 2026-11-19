@@ -109,6 +109,8 @@ String libraryMessageText(AppLocalizations l, LibraryMessage m) => switch (m) {
   LibraryTooNew() => l.libraryTooNew,
   ImportFailed(:final files) => l.importFailed(files.join('\n')),
   TrackNotOnDevice(:final title) => l.trackNotOnDevice(title),
+  CloudStateUnreadable() => l.cloudStateUnreadable,
+  CloudStateTooNew() => l.cloudStateTooNew,
 };
 
 String sortOrderLabel(AppLocalizations l, TrackSortOrder o) => switch (o) {

@@ -280,7 +280,12 @@ void main() {
             final hash = (await store.sha256(
               'Tracks/${l.tracks[i].fileName}',
             ))!;
-            final old = Track.fromLegacyJson(before[i]);
+            var old = Track.fromLegacyJson(before[i]);
+            if (golden == goldenLegacy) {
+              // #10: `[Track]` has no folders, a folder ID of an entry points nowhere; the track shows
+              // without folder (as from the second start on before #10).
+              old = old.copyWith(folderId: () => null);
+            }
             expect(l.tracks[i].id, hash);
             expect(
               {...l.tracks[i].toShared()}..remove('fileName'),

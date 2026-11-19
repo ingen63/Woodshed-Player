@@ -25,9 +25,9 @@ VivaPlan.
 |---|---|---|---|
 | 1 Einheiten | `app/test/*_test.dart`, `core/tests/*_tests.cpp` | Zeitformat, Bibliothek, Stempel und Zusammenführen, Metadaten, Player-Service, Metronom-Logik, Engine, Befehls-Queue, Wellenform | vorhanden |
 | 2 Audio-Referenzfälle | `core/tests/reference_tests.cpp` über die C-API, dazu `engine_tests.cpp`, `metronome_tests.cpp`, `player_tests.cpp`; im Web dieselben Fälle unter Node.js (`core/build-wasm`), Vergleich der Samples nativ ↔ Web | Offline-Rendering ohne Audiogerät: Loop-Naht, Seek und Pause, Tempo und Tonhöhe, Klickpositionen, jede Funktion von `wp_core.h` | vorhanden (#9) |
-| 3 Invarianten und Zufallstests | – | Eigenschaften über viele zufällige Fälle mit festem, ausgegebenem Startwert | Lücke, #10 |
-| 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler); alle Kerntests unter ASan/UBSan und TSan (`make sanitize`, `make sanitize-thread`) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | teilweise (Sanitizer vorhanden, #57), Fuzzing #10 |
-| 5 Golden-Dateien | `app/test/golden/` (`library.json` der Swift-App, alt und neu), `core/tests/golden/metronome_positions.txt` | jede Version liest alle alten Stände; Klickpositionen des Metronoms (#9) | teilweise, #10 |
+| 3 Invarianten und Zufallstests | `app/test/property/` (`property.dart`, Regressionsfälle in `regressions.json`) | Eigenschaften über viele zufällige Fälle mit festem, ausgegebenem Startwert: Bibliothek, Loop-Grenzen, Zeitformat, Abgleich auf 2–4 Geräten | vorhanden (#10) |
+| 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler, abgeschnittene Dateien), `library_files_property_test.dart`, `sync_property_test.dart`, `core/tests/fuzz/` (`make fuzz`); alle Kerntests unter ASan/UBSan und TSan (`make sanitize`, `make sanitize-thread`) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | vorhanden (#57, #10) |
+| 5 Golden-Dateien | `app/test/golden/` (`library.json` jeder Version: Swift alt und neu, Format 2 von #36 und #37), `golden_files_test.dart`, `core/tests/golden/metronome_positions.txt` | jede Version liest alle alten Stände; Klickpositionen des Metronoms (#9) | vorhanden (#9, #10) |
 | 6 Oberfläche | Widget-Tests in `app/test/`, Rauchtest `app/integration_test/app_smoke_test.dart`, Prüfseiten im Browser `app/tool/web_*_check.dart` | Layout je Grösse, Bedienung, Texte, Tastenkürzel | teilweise, #13 |
 | Werkzeuge | `app/tool/after_commit_hook_test.dart`, `coverage_test.dart`, `pre_push_hook_test.dart` | Hook nach dem Commit, Abdeckung je Teil, `coverage-diff`, `pre-push` | vorhanden (#7, #8) |
 
@@ -48,9 +48,9 @@ zugeordnet.
 | Titel-ID SHA-256, dieselbe Datei nur einmal, Speicher-Schicht Dateisystem und OPFS | vorhanden: `file_store_test.dart` (#35/AK1–AK5) | – |
 | Sortierung (alphabetisch natürlich, hinzugefügt, eigene), Ordner, Verschieben | vorhanden: `library_test.dart` (#16/AK5, `naturalCompare`) | – |
 | Titel und Artist bearbeiten, leerer Titel nicht möglich | vorhanden: `track_edit_test.dart` (#24) | – |
-| Sortieren und Verschieben verlieren und verdoppeln keinen Titel; Speichern und Laden ergibt denselben Stand (Zufallstests) | Lücke | #10 |
-| Verfälschte `library.json` (Typwechsel, fehlende Felder, abgeschnitten) ohne Absturz | Lücke | #10 |
-| Golden-Dateien jeder Version (auch Format 2), Migration idempotent | Lücke (nur Swift-Stände eingecheckt) | #10 |
+| Sortieren und Verschieben verlieren und verdoppeln keinen Titel; Speichern und Laden ergibt denselben Stand (Zufallstests) | vorhanden: `property/library_property_test.dart` (#10/AK1) | – |
+| Verfälschte `library.json` (Typwechsel, fehlende Felder, falsche Verweise, Extremwerte, abgeschnitten) ohne Absturz, mit Meldung | vorhanden: `property/library_files_property_test.dart` (#10/AK3) | – |
+| Golden-Dateien jeder Version (auch Format 2), Migration idempotent | vorhanden: `golden_files_test.dart` (#10/AK5), `property/library_files_property_test.dart` (#10/AK8) | – |
 | 10'000 Titel in 500 Ordnern: Laden, Sortieren, Speichern je ≤ 1 s | Lücke | #59 |
 
 ### Wiedergabe
@@ -64,7 +64,7 @@ zugeordnet.
 | Render-Pfad ohne Speicheranforderung und ohne Sperre, Befehle aus vielen Threads | vorhanden: `engine_tests.cpp` (`renderDoesNotAllocate`, `commandsFromManyThreadsWhileRendering`, Queue-Fälle), `realtime_tests.cpp` (#57/AK4, `Player::render` mit Tempo, Loop, Metronom), `player_tests.cpp` (`controlFromSecondThreadWhileRendering`, #57/AK2) | – |
 | Wellenform (Minimum/Maximum je Abschnitt, Grenzen) | vorhanden: `waveform_tests.cpp`, `wp_waveform_ffi_test.dart`, `web_binding_test.dart` (#34/AK3) | – |
 | Seek auf t beginnt bei Sample round(t × Abtastrate); Pause und Fortsetzen ohne verlorenes Sample | vorhanden: `reference_tests.cpp` (#9/AK3, Rampe, t knapp unter und über einem halben Sample, im Stand und beim Spielen) | – |
-| Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | Lücke | #10 |
+| Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | vorhanden: `player_tests.cpp` (`truncatedAndWrongAudioFiles`, #10/AK3), `core/tests/fuzz/` mit Wiederholung von Korpus und Regressionsfällen in jedem Build (`fuzz_*_replay`), `make fuzz` (#10/AK4) | – |
 | AddressSanitizer, UBSan, ThreadSanitizer | vorhanden: `make sanitize`, `make sanitize-thread`, Selbsttest `tests/sanitizer/selftest.cpp`, Workflow `test-quality.yml` (#57) | – |
 | Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | Lücke | #59 |
 
@@ -88,14 +88,14 @@ zugeordnet.
 | Steigerung nach Durchgängen (Stufen, Ziel, Zurücksetzen, Speichern) | vorhanden: `loop_ramp_test.dart` (#29), `player_service_test.dart` (#29), `library_test.dart` (#29/AK7) | – |
 | Marker ziehen, Zeitfelder, S/E, Ganzer Titel | vorhanden: `home_page_test.dart` (#17/AK4), `player_view_test.dart` (#19/AK7, #19/AK9), `studio_design_test.dart` (#30/AK6) | – |
 | Naht mit Rampe über 100 Durchläufe, Durchgänge zählen genau | vorhanden: `reference_tests.cpp` (#9/AK2, Blöcke 1–4096 Frames) | – |
-| Grenzen nach jeder zufälligen Änderung gültig | Lücke | #10 |
+| Grenzen nach jeder zufälligen Änderung gültig, auch nach dem Laden gespeicherter Grenzen | vorhanden: `property/player_property_test.dart` (#10/AK1) | – |
 
 ### Zeitformat
 
 | Regel / Fall | Abgleich | Issue |
 |---|---|---|
 | `mm:ss` formatieren und parsen, ungültige Eingaben | vorhanden: `widget_test.dart` (`formatTime`, `parseTime`) | – |
-| `parse(format(x)) == x` für zufällige Zeiten | Lücke | #10 |
+| `parse(format(x)) == x` für zufällige Zeiten | vorhanden: `property/player_property_test.dart` (#10/AK1) | – |
 
 ### Metronom
 
@@ -137,8 +137,8 @@ zugeordnet.
 | Ohne Konto keine Verbindung | vorhanden: `sync_test.dart` (#37/AK2), `sync_app_test.dart` (#37/AK2) | – |
 | Warteschlange offline, Wiederholung, Sicherungen unter `backup/`, Auslöser | vorhanden: `sync_test.dart` (#37/AK3, #37/AK6, Auslöser), `sync_app_test.dart` | – |
 | «Nicht hochladen» und «Synchronisieren» im Kontextmenü | vorhanden: `sync_test.dart` (#37/AK5), `sync_app_test.dart` (#37/AK5) | – |
-| Zufallsfolgen auf 2–4 Geräten: gleicher Stand, zweiter Abgleich ändert nichts, kein Verlust | Lücke | #10 |
-| Verfälschte Sync-Dateien aus der Cloud ohne Absturz und ohne Datenverlust | Lücke | #10 |
+| Zufallsfolgen auf 2–4 Geräten: gleicher Stand, zweiter Abgleich ändert nichts, kein Verlust | vorhanden: `property/sync_property_test.dart` (#10/AK6) | – |
+| Verfälschte Sync-Dateien aus der Cloud ohne Absturz und ohne Datenverlust, mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7) | – |
 | Zusammenführen von 10'000 Titeln ≤ 2 s | Lücke | #59 |
 | Nur die Anbietermodule öffnen Verbindungen | Lücke | #58 |
 | Anbieter Google Drive, OneDrive, direkte Verbindung | Lücke (noch nicht umgesetzt) | #54, #55, #56 |
@@ -160,6 +160,7 @@ zugeordnet.
 | macOS- und iOS-Build bei jeder Änderung an Kern oder Plugin | vorhanden: Hook nach dem Commit (`.claude/hooks/after-commit.sh`), geprüft in `app/tool/after_commit_hook_test.dart` | – |
 | Swift-Altprojekt: Tests und iOS-Build | vorhanden: `WoodshedPlayerTests/` über den Hook (`xcodebuild`) | – |
 | Workflow `test-quality.yml`: Sanitizer-Läufe des Kerns auf Linux | vorhanden: `test-quality.yml` (Jobs `sanitize`, `sanitize-thread`), `test_quality_workflow_test.dart` (#57) | – |
+| Workflow `test-quality.yml`: Fuzzing und Zufallstests nächtlich | vorhanden: Jobs `fuzz` und `property`, `test_quality_workflow_test.dart` (#10); beobachtbar erst nach dem Push | – |
 | Workflow `test-quality.yml`: übrige Tests auf Linux, macOS/iOS nächtlich, Rauchtest der gebauten App | Lücke | #13 |
 | Windows und Linux: Build, Tests, Windows-Pfade | Lücke | #60 |
 
@@ -183,6 +184,8 @@ make test-wasm      # Kern unter Node.js (Emscripten), Referenzfälle gegen die 
 make test-core-debug  # Kerntests im Debug-Build (core/build-debug), gleiche Toleranzen wie Release
 make sanitize       # Kerntests mit AddressSanitizer und UBSan (core/build-asan)
 make sanitize-thread  # Kerntests mit ThreadSanitizer (core/build-tsan)
+make fuzz           # libFuzzer mit ASan/UBSan auf Decoder und C-API, FUZZ_SECONDS je Ziel (Vorgabe 60)
+make property       # Zufallstests der App mit PROPERTY_CASES Fällen und Startwert PROPERTY_SEED
 make coverage       # alle Tests mit Abdeckung, Prüfung je Teil gegen tools/coverage-min
 make coverage-diff  # Abdeckung der seit BASE geänderten Zeilen (Vorgabe origin/main), ein Hinweis
 make format         # dart format (app/) und clang-format (core/, ohne third_party)
@@ -192,10 +195,11 @@ cd app && flutter test integration_test -d macos   # Rauchtest mit echtem Kern
 ```
 
 Noch nicht eingerichtet; die Ziele melden «noch nicht eingerichtet» mit Issue und brechen ab: `make mutants` (#11),
-`make fuzz` (#10), `make report` (#12), `make network-free` (#58).
+`make report` (#12), `make network-free` (#58).
 
 Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten für `test-wasm`, Homebrew `llvm` für
-`clang-format` und `clang-tidy` (`brew install llvm`; das Makefile findet sie unter `$(brew --prefix llvm)/bin`).
+`clang-format`, `clang-tidy` und libFuzzer (`brew install llvm`; das Makefile findet sie unter
+`$(brew --prefix llvm)/bin`; Apple-Clang hat kein libFuzzer).
 `llvm-cov` und `llvm-profdata` für `make coverage` müssen zum Compiler passen; auf macOS nimmt das Makefile die aus
 Xcode (`xcrun`), sonst die aus dem `PATH` bzw. Homebrew.
 
@@ -326,8 +330,10 @@ dass der Zähler Anforderungen und Sperren sieht. Die geteilten Atomics müssen 
 Grenze: Auf macOS lassen sich `malloc` und Sperren aus dem Testprogramm nicht abfangen; dort zählen nur `operator new`
 und `delete`, den Rest prüft der Linux-Lauf.
 
-**Fuzzing (AK5).** Fuzz-Ziele aus #10 bauen im selben Build mit `-DWP_SANITIZE=address,undefined` und ergänzen nur
-für ihr eigenes Ziel `-fsanitize=fuzzer`; sie erben damit ASan, UBSan und die Optionen für `ctest`.
+**Fuzzing (AK5).** Die Fuzz-Ziele aus #10 bauen mit `make fuzz` in `core/build-fuzz` mit
+`-DWP_SANITIZE=address,undefined -DWP_FUZZ=ON`: aller Code des Builds mit `-fsanitize=fuzzer-no-link` (Abdeckung für
+libFuzzer), die Fuzz-Programme zusätzlich mit `-fsanitize=fuzzer`; jeder Fund von ASan oder UBSan beendet den Lauf
+(Abschnitt «Zufallstests, Robustheit, Fuzzing und Golden-Dateien»).
 
 **Unterdrückungen (AK6).** In `core/tests/sanitizer/` liegen `ubsan.supp`, `tsan.supp` und `lsan.supp`. Jeder Eintrag
 braucht darüber einen Kommentar mit Meldung, Grund und Issue und steht in der folgenden Liste. Funde in
@@ -392,6 +398,83 @@ Rundungsunterschied bis 2e-2 (siehe «Gefundene Fehler»).
 braucht Systemton (#51). Der optionale Vergleich mit AVAudioUnitTimePitch bleibt der Hörvergleich von Hand
 (`tools/hoervergleich.sh`).
 
+## Zufallstests, Robustheit, Fuzzing und Golden-Dateien (#10)
+
+**Zufallstests (AK1, AK2, AK6).** `app/test/property/property.dart` führt eine Eigenschaft über viele Fälle aus,
+ohne zusätzliches Paket (`dart:math` `Random`). Die Fallzahl kommt aus `WP_PROPERTY_CASES` (Vorgabe 100, bei jedem
+`flutter test`), der Startwert aus `WP_PROPERTY_SEED` (Vorgabe 20261119); jeder Test gibt beides aus, Fall *i*
+läuft mit `caseSeed(Startwert, i)`. Scheitert ein Fall, nennt die Meldung dessen Startwert. Er wird mit Datum und
+Grund in `app/test/property/regressions.json` unter dem Namen der Eigenschaft eingetragen und läuft danach bei jedem
+Lauf **zuerst**, vor den Zufallsfällen. Nächtlich läuft `make property PROPERTY_CASES=3000` mit neuem Startwert
+(Job `property`). Langsame Eigenschaften (Abgleich) nehmen einen Bruchteil der Fallzahl.
+
+| Eigenschaft | Datei | Invariante |
+|---|---|---|
+| Sortieren und Verschieben | `library_property_test.dart` | nach jedem von 5–35 zufälligen Schritten (Import, Ordner anlegen, umbenennen, löschen, verschieben, ziehen, Sortierung, Titel, Einstellungen, Löschen) jeder Titel genau einmal, in einem bestehenden Ordner oder ohne |
+| Speichern und Laden | `library_property_test.dart` | geladener Stand = gespeicherter Stand; erneutes Speichern schreibt dieselbe Datei |
+| Loop-Grenzen | `player_property_test.dart` | nach Laden (gespeicherte Grenzen, auch ausserhalb der Datei) und jeder Änderung: 0 ≤ Anfang, Ende ≤ Dauer; ab 1 s Dauer Ende ≥ Anfang + 1 s; der Kern hat genau den aktiven Loop |
+| Zeitformat | `player_property_test.dart` | `parseTime(formatTime(x)) == x` (ganze Sekunden bis 100 h), dasselbe mit Zehnteln und im Zeitfeld; beliebiges x ergibt ⌊x⌋ |
+| Abgleich | `sync_property_test.dart` | 2–4 Geräte, 10–40 Schritte (Import aus gemeinsamem Vorrat, Löschen, Titel, Ordner, Verschieben, Loops, Abgleich, teils offline): Zusammenführen in jeder Reihenfolge gleich; nach zwei Runden Abgleich alle Geräte gleich; ein weiterer Abgleich schreibt nichts; jeder nie gelöschte Titel ist auf allen Geräten, mit Audiodatei dort und in der Cloud; der gespeicherte Stand lädt wieder gleich |
+
+**Robustheit (AK3, AK7, AK8).** `app/test/property/corrupt.dart` verfälscht eine Datei zufällig: Typwechsel,
+fehlendes Feld, falscher Verweis (Ordner, Loop, ID, Dateiname), Extremwerte (`1e400`, 30-stellige Zahlen, 2⁵³ + 1,
+riesige Texte), fremde Versionsnummer, fehlende oder unsinnige Stempel, abgeschnittene Datei.
+
+- `library_files_property_test.dart`: Jede Golden-Datei, verfälscht, wird geladen. Erlaubt sind drei Ausgänge: Die
+  Bibliothek öffnet ohne Meldung und ist stimmig (jeder Titel einmal, in einem bestehenden Ordner, Speichern und
+  erneutes Laden ohne Meldung und ohne Änderung); oder «beschädigt» mit Sicherung der Datei unter
+  `library.json.defekt-<Zeit>`; oder «neuere Version» (nur lesen, Datei bleibt). Jede Meldung hat einen Text in jeder
+  Sprache. Stand 19.11.2026 bei 3 × 1500 Fällen: rund 49 % geöffnet, 48 % beschädigt, 3 % neuere Version.
+- AK8: Für jede Golden-Datei und jede verfälschte, die noch öffnet, ändert ein zweites Laden und Speichern nach der
+  Migration nichts (gleicher Inhalt von `library.json`) und meldet nichts; `migrateLegacyLibrary` zweimal auf
+  dieselbe Datei gibt dasselbe Ergebnis.
+- `sync_property_test.dart`: Gerät A legt `state.json` in die Cloud, Gerät B hat eigene, nie abgeglichene Titel. Die
+  verfälschte `state.json` darf nie abstürzen; B behält jeden eigenen Titel unverändert, und was B gespeichert hat,
+  lädt ohne Meldung gleich wieder. Unbrauchbare Dateien prüft die Sync-Engine vor dem Zusammenführen
+  (`CloudSync._readState`): Version genau 2, keine Zahl ausserhalb des Bereichs eines double, Stempel lesbar und im
+  Bereich, jeder Datensatz darstellbar. Sonst bleibt die Bibliothek unberührt, die Datei in der Cloud ebenso, der
+  Abgleich scheitert und wird wiederholt, und die Meldung «Bibliothek in der Cloud beschädigt» bzw. «neuere
+  Version» erscheint einmal je Version der Datei. Stand 19.11.2026 bei 2 × 1000 Fällen: rund 69 % abgewiesen, 28 %
+  noch gültig und übernommen, 3 % neuere Version.
+- Kern (AK3): `player_tests.cpp` (`truncatedAndWrongAudioFiles`) schneidet WAV, FLAC und MP3 an 10 Stellen ab
+  (leer, Teil des Kopfs, nur Kopf, Teile der Daten) und lädt falsche Inhalte hinter bekannten Endungen: Ergebnis ist
+  immer der lesbare Teil oder `WP_ERR_UNSUPPORTED_FORMAT` (in der App «Format nicht unterstützt», `loadUnsupported`),
+  danach spielt der bisherige Titel weiter.
+
+**Fuzzing (AK4, AK9).** Zwei Ziele in `core/tests/fuzz/`:
+
+| Ziel | Eingabe | Invarianten |
+|---|---|---|
+| `fuzz_decoder` | rohe Bytes als Datei: `wp::decodeMemory` (Kern im Browser, Worker) mit einer vom ersten Byte gewählten Rate, `wp::fileDuration` über eine temporäre Datei | Ergebnis OK oder ein dokumentierter Fehlercode; bei OK mindestens ein Frame, genau Frames × 2 endliche Samples, Wellenform endlich; die Dauer positiv oder ein Fehlercode |
+| `fuzz_capi` | ein kleines Programm aus Befehlen über die C-API von `wp_core.h` (`wp_core_offline`, derselbe `wp::Player` wie in der App, ohne Audiogerät): Laden aus Bytes, PCM und Datei, Play, Pause, Seek, Tempo, Loop, Lautstärke, Rendern, Metronom, Wellenform; Argumente auch NaN, unendlich, negativ, riesig | nach jedem Befehl Position und Dauer endlich, 0 ≤ Position ≤ Dauer, Loop-Zähler fällt nie, Metronom 20–300 BPM, jedes gerenderte Sample endlich, Fehlercodes dokumentiert |
+
+Der Startkorpus (`core/tests/fuzz/corpus/<ziel>/`, 19 Dateien, 78 kB) ist erzeugt: `core/tools/make_fuzz_corpus.py`
+schreibt kleine WAV-Dateien (8/16/24 Bit, Float, Mono/Stereo), beschädigte WAV-Köpfe, die ersten 1500 Bytes des
+eigenen Testaudios und Befehlsprogramme; keine fremden Audiodateien. Gefundene Eingaben liegen in
+`core/tests/fuzz/regressions/<ziel>/`. Beide Ordner laufen in **jedem** Build als `ctest`-Fall `fuzz_<ziel>_replay`
+(Regressionsfälle zuerst), ohne libFuzzer, also auch in Release, Debug, ASan/UBSan und TSan.
+
+`make fuzz` baut `core/build-fuzz` (RelWithDebInfo, ASan und UBSan, `allocator_may_return_null=1`, unter Linux
+LeakSanitizer) mit Homebrew-Clang und lässt jedes Ziel `FUZZ_SECONDS` lang laufen (Vorgabe 60, nächtlich 1200), mit
+Zeitgrenze 10 s je Eingabe und 2 GB Speicher. Neue Korpusdateien bleiben in `core/build-fuzz/corpus/` (nicht
+eingecheckt; im Workflow über den Cache von Nacht zu Nacht). Ein Fund (Absturz, Sanitizer, verletzte Invariante,
+Zeitüberschreitung, Speicher) beendet den Lauf mit Fehler und legt die Eingabe unter
+`core/build-fuzz/artifacts/<ziel>/` ab; der Job `fuzz` lädt sie als Artefakt hoch. Nach der Behebung kommt die
+Eingabe nach `core/tests/fuzz/regressions/<ziel>/`. Stand 19.11.2026, je 60 s auf dem Mac: `fuzz_decoder` rund
+35 000–90 000 Eingaben, `fuzz_capi` rund 700–1100 (langsam, weil jede Eingabe bis zu 64 Blöcke rendert), ohne Fund.
+
+**Golden-Dateien (AK5).** `app/test/golden/` hält `library.json` jeder Version mit erfundenen Titeln
+(`README.md` dort): Swift `[Track]`, Swift `{folders, tracks}`, Format 2 von #36 (ein Feld `loop`, erzeugt mit dem
+Code von Commit 8f9fb22) und Format 2 seit #37 (`make_golden_v2.dart`). `golden_files_test.dart` lädt jede mit der
+aktuellen Version (Werte von Hand aus den Dateien), verlangt, dass jede Datei im Ordner in der Liste steht, und dass
+die aktuelle Version `library_v2.json` inhaltlich unverändert wieder schreibt; ändert sich das Format, braucht es eine
+neue Golden-Datei.
+
+**Grenzen.** Der nächtliche Fuzz- und Zufallslauf lässt sich erst nach dem Push beobachten; lokal belegt sind
+`make fuzz` (60 s je Ziel) und `make property` mit bis zu 2000 Fällen. Die Fuzz-Ziele laufen nicht unter
+WebAssembly. Eine beschädigte `state.json` bleibt in der Cloud liegen, bis ein Gerät sie ersetzt; eine Wiederherstellung
+aus `backup/` gibt es noch nicht.
+
 ## Hook nach dem Commit
 
 `.claude/hooks/after-commit.sh` läuft nach jedem `git commit` aus Claude Code. Er prüft das Format der Nachricht
@@ -431,3 +514,42 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
 6. 19.11.2026, #9: `sanitizer_selftest_thread` (#57) schlug in `make sanitize-thread` einmal fehl, als parallel
    `make coverage` lief; einzeln dreimal grün. Der absichtliche Wettlauf wird unter starker Last offenbar nicht immer
    erkannt. Noch nicht behoben und noch keinem Issue zugeordnet.
+7. 19.11.2026, #10/AK4, `fuzz_decoder`: Float-WAV-Dateien mit NaN, unendlichen oder riesigen Samples wurden
+   unverändert übernommen; sie wären ans Gerät gegangen und hätten den Time-Stretch für den Rest des Titels
+   vergiftet. Behoben in `player_core.cpp` (`sanitizeSamples`: nicht endlich wird Stille, sonst auf ±8 begrenzt,
+   beim Dekodieren und beim Wandeln von PCM). Regressionsfall `regressions/decoder/nan_float_wav`.
+8. 19.11.2026, #10/AK4, `fuzz_decoder`: Ein beschädigter MP3-Kopf (Xing-Rahmenzahl) liess wenige Bytes 24 GB
+   reservieren (`readAll` reservierte die Länge aus dem Kopf). Auf iPhone/iPad hätte das «kein Speicher» statt
+   «Format nicht unterstützt» gemeldet. Behoben: im Voraus höchstens 5 min, längere Titel wachsen beim Dekodieren.
+   Regressionsfall `regressions/decoder/huge_length_header`.
+9. 19.11.2026, #10/AK4, `fuzz_capi`: NaN oder unendlich als Lautstärke oder Tempo über die C-API machten jedes
+   folgende Sample NaN; Seek und Loop-Ende mit riesigen Zeiten verliessen über `llround` den Bereich von `long long`
+   (auf x86 ein negativer Lesezeiger). Behoben in `engine.cpp` (NaN-Seek und -Tempo ignoriert, Zeiten bis 10⁶ s,
+   Lautstärke 0–1, NaN = still) und `metronome.cpp` (NaN-Lautstärke = still). Regressionsfall
+   `regressions/capi/nonfinite_arguments`, Tests `nonFiniteArgumentsAreSafe` (`engine_tests.cpp`) und
+   `volumeChangeWithoutCrackle` (`metronome_tests.cpp`). In der App nicht erreichbar (die UI begrenzt die Werte).
+10. 19.11.2026, #10/AK1, Zufallstest: `Library.moveTracks` mit negativer Zeile warf einen `RangeError`. Die App ruft
+    es nie so auf; jetzt zählt eine negative Zeile als erste. Regressionsfälle in `regressions.json`.
+11. 19.11.2026, #10/AK1, Zufallstest: Gespeicherte Loop-Grenzen, die nach dem Begrenzen auf die Dauer weniger als
+    1 s auseinander lagen (z. B. Loop 10–11 s eines anderen Geräts, hier 10,5 s Dauer), blieben «an», ohne den Kern
+    zu erreichen. Behoben in `PlayerService._normalized` (wie beim Setzen des Endes: Ende auf Anfang + 1 s oder
+    Anfang auf Ende − 1 s). Regressionsfall und Tests «loop bounds of stored settings» (`player_property_test.dart`).
+12. 19.11.2026, #10/AK5, Golden-Datei: Ein Titel aus dem ältesten Swift-Format `[Track]` mit `folderID` (Ordner gab es
+    in der Datei nicht) war nach der Migration bis zum nächsten Start in keinem Ordner sichtbar. Behoben in
+    `Library._migrate`; `file_store_test.dart` (#36/AK3) erwartet für diese Datei jetzt «ohne Ordner».
+13. 19.11.2026, #10/AK8, Zufallstest: Eine Zahl ausserhalb des Bereichs eines double (`1e400`) in `library.json` las
+    Dart als unendlich; jedes Speichern warf danach eine Ausnahme direkt in die Oberfläche statt «konnte nicht
+    gespeichert werden» zu melden. Behoben: Eine solche Datei gilt als beschädigt (`isFiniteJson`), `_write` meldet
+    Fehler über die Future. Regressionsfall und Test «a number beyond the range of a double».
+14. 19.11.2026, #10/AK6, Zufallstest Abgleich: Das erste Speichern eines neuen Geräts stempelte seine
+    Standardwerte (Sortierung «hinzugefügt», Darstellung «System») als jüngste Änderung; sein erster Abgleich setzte
+    die auf allen anderen Geräten gewählte Sortierung und Darstellung zurück, und die Geräte waren nach zwei Runden
+    nicht gleich. Behoben: nie gewählte Standardwerte werden nicht gestempelt (`Library._chosenSettings`).
+    Regressionsfall und Test «a new device does not reset the settings chosen on the others».
+15. 19.11.2026, #10/AK7, Zufallstest Abgleich: Eine `state.json` mit `1e400` wurde zusammengeführt; danach scheiterte
+    jedes Speichern der Bibliothek, Änderungen gingen nicht mehr auf die Platte. Ebenso wurden Typwechsel
+    übernommen. Behoben: `CloudSync._readState` prüft vor dem Zusammenführen, Stempel ausserhalb des Bereichs gelten
+    als ungültig (`Hlc.parse`), Meldungen `cloudStateUnreadable` und `cloudStateTooNew`. Regressionsfall und Test
+    «one message per damaged version».
+16. 19.11.2026, #10: Im vollen Lauf von `flutter test` schlug `home_page_test.dart` («#17/AK1 Liste Sortierung
+    umstellen») erneut einmal fehl, einzeln grün; wie Fall 3, noch nicht behoben.
