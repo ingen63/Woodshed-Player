@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iterator>
+#include <memory>
 #include <random>
 #include <string>
 #include <thread>
@@ -382,6 +384,72 @@ void deviceChangePausesAndKeepsPosition() {  // #14/AK4
     }
 }
 
+std::string readBytes(const fs::path& p) {
+    std::ifstream f(p, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(f), {});
+}
+
+// Dekodieren aus dem Speicher (Web) liefert dasselbe wie aus der Datei (#33/AK3).
+void decodeMemoryMatchesFile() {
+    for (const fs::path& file : {writeIndexWav("mem.wav", kSr / 2), kAudio / "sine440.flac", kAudio / "sine440.mp3"}) {
+        wp::Player fromFile(kSr);
+        CHECK(fromFile.load(file.string()) == wp::kOk);
+        const std::string bytes = readBytes(file);
+        auto src = std::make_unique<wp::Source>();
+        CHECK(wp::decodeMemory(bytes.data(), bytes.size(), kSr, *src) == wp::kOk);
+        CHECK(src->frames == fromFile.engine().frames());
+        wp::Player fromMemory(kSr);
+        CHECK(fromMemory.setSource(std::move(src)) == wp::kOk);
+        CHECK(fromMemory.engine().duration() == fromFile.engine().duration());
+        fromFile.engine().play();
+        fromMemory.engine().play();
+        const long long n = fromFile.engine().frames();
+        CHECK(renderFrames(fromFile, n) == renderFrames(fromMemory, n));
+    }
+    wp::Source out;
+    CHECK(wp::decodeMemory("kein Audio", 10, kSr, out) == wp::kErrUnsupportedFormat);
+    CHECK(wp::decodeMemory("", 0, kSr, out) == wp::kErrUnsupportedFormat);
+    CHECK(wp::decodeMemory(nullptr, 10, kSr, out) == wp::kErrInvalidArgument);
+}
+
+// Fremd dekodiertes PCM (AAC/M4A aus dem Browser) wird auf Stereo und die Rate des Kerns gewandelt (#33/AK4).
+void convertPcmToPlayerFormat() {
+    constexpr int kSrc = 44100;
+    std::vector<float> mono(kSrc);
+    for (int i = 0; i < kSrc; ++i) mono[i] = 0.5f * static_cast<float>(std::sin(2 * 3.14159265358979323846 * 440 * i / kSrc));
+    auto src = std::make_unique<wp::Source>();
+    CHECK(wp::convertPcm(mono.data(), 1, kSrc, kSrc, kSr, *src) == wp::kOk);
+    CHECK(std::llabs(src->frames - kSr) <= 2);
+    wp::Player p(kSr);
+    CHECK(p.setSource(std::move(src)) == wp::kOk);
+    CHECK_NEAR(p.engine().duration(), 1.0, 1e-3);
+    float mins[10], maxs[10];
+    CHECK(p.waveform(0.0, 0.5, 10, mins, maxs) == wp::kOk);
+    CHECK_NEAR(maxs[5], 0.5, 0.01);
+    p.engine().play();
+    auto out = renderFrames(p, kSr / 2);
+    CHECK_NEAR(zeroCrossingFreq(out, kSr / 10, kSr / 4), 440.0, 8.0);
+    CHECK_NEAR(rms(out, kSr / 10, kSr / 4), 0.5 / std::sqrt(2.0), 0.02);
+    bool stereo = true;
+    for (long long i = kSr / 10; i < kSr / 4; ++i) stereo = stereo && out[i * 2] == out[i * 2 + 1];
+    CHECK(stereo);
+
+    // Gleiche Rate, Stereo: unverändert
+    std::vector<float> st = {0.1f, -0.1f, 0.2f, -0.2f, 0.3f, -0.3f};
+    wp::Source same;
+    CHECK(wp::convertPcm(st.data(), 2, 3, kSr, kSr, same) == wp::kOk);
+    CHECK(same.frames == 3 && same.data == st);
+
+    wp::Source bad;
+    CHECK(wp::convertPcm(nullptr, 2, 3, kSr, kSr, bad) == wp::kErrInvalidArgument);
+    CHECK(wp::convertPcm(st.data(), 0, 3, kSr, kSr, bad) == wp::kErrInvalidArgument);
+    CHECK(wp::convertPcm(st.data(), 2, 0, kSr, kSr, bad) == wp::kErrInvalidArgument);
+    CHECK(wp::convertPcm(st.data(), 2, 3, 0, kSr, bad) == wp::kErrInvalidArgument);
+    wp::Player q(kSr);
+    CHECK(q.setSource(nullptr) == wp::kErrInvalidArgument);
+    CHECK(q.setSource(std::make_unique<wp::Source>()) == wp::kErrInvalidArgument);
+}
+
 }  // namespace
 
 int main() {
@@ -399,6 +467,8 @@ int main() {
         {"waveformOfLoadedFile", waveformOfLoadedFile},
         {"devicePolicy", devicePolicy},
         {"deviceChangePausesAndKeepsPosition", deviceChangePausesAndKeepsPosition},
+        {"decodeMemoryMatchesFile", decodeMemoryMatchesFile},
+        {"convertPcmToPlayerFormat", convertPcmToPlayerFormat},
     };
     for (auto& [name, fn] : tests) {
         const int before = failures;

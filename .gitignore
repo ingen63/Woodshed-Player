@@ -11,3 +11,6 @@ Bildschirmfoto*.png
 
 # lokaler Arbeitsordner: nicht ins Git
 /local/
+
+# Emscripten- und weitere Kern-Builds (#33)
+core/build-*/

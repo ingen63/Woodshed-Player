@@ -68,6 +68,7 @@ Die Screenshots zeigen erfundene Titel und eine erzeugte Wellenform (`cd app && 
   Steuerbefehle erreichen den Audio-Thread über eine Lock-free-Queue, Titel werden im Hintergrund dekodiert,
   Ladefehler kommen mit Code und Text (`wp_error_message`). Tests mit `ctest`, Testaudio aus `core/tools/make_test_audio.sh`.
 - `app/` (Flutter-App): `lib/library/` (`library.json` byte-gleich zur Swift-App, eigener Metadaten-Leser für ID3/FLAC/WAV), `lib/player/` (Player-Service über FFI), `lib/app/` (Zusammenspiel, Dateiauswahl), `lib/ui/`. Rauchtest mit echtem Kern: `cd app && flutter test integration_test -d macos`.
+- `core/web/`: Kern fürs Web (#33): `emcmake cmake -S core -B core/build-wasm` baut `wp_core_web.wasm` fürs AudioWorklet (C-API wie `wp_core.h`, ergänzt um `wp_core_web.h`) und lässt dieselben `ctest`-Fälle unter Node.js laufen. MP3, WAV und FLAC dekodiert der Kern, AAC/M4A der Browser (`decodeAudioData`). JS-Hülle `wp_core_web.mjs`, Worklet `wp_worklet.js`, Browser-Test `browser_test.html`.
 - `web/w0/`: Machbarkeitstest für die Web-App (#32): Engine und Metronom als WebAssembly im AudioWorklet (`core/web/build_w0.sh`, Prüfung mit `node core/web/w0_test.mjs`). Ergebnis in `docs/PLAN-WEB-UND-SYNC.md`.
 
 ## Datenschutz

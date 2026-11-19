@@ -1,0 +1,96 @@
+<!doctype html>
+<!-- Browser-Test des WASM-Kerns (#33): spielt MP3, FLAC und AAC/M4A über das AudioWorklet «wp-core» in einem
+     OfflineAudioContext ab und misst Tonhöhe und Pegel. AAC/M4A dekodiert der Browser (decodeAudioData).
+     Aufruf (aus dem Repo-Ordner): python3 -m http.server 8733, dann http://localhost:8733/core/web/browser_test.html
+     Erwartet core/build-wasm/wp_core_web.wasm (emcmake-Build, siehe core/CMakeLists.txt). -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kern-Test Web</title>
+<style>
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 16px; background: #fff; color: #111; }
+  td, th { padding: 4px 10px; text-align: left; border-bottom: 1px solid #ddd; }
+  .ok { color: #176b2c; } .fehl { color: #b00020; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Kern-Test Web</h1>
+<p id="status">läuft …</p>
+<table><thead><tr><th>Datei</th><th>Weg</th><th>Laden</th><th>Frequenz</th><th>Pegel</th><th>Ergebnis</th></tr></thead>
+<tbody id="rows"></tbody></table>
+<script type="module">
+import { WP_OK, WP_ERR_UNSUPPORTED_FORMAT } from './wp_core_web.mjs';
+
+const SR = 48000;
+const module = await WebAssembly.compile(await (await fetch('../build-wasm/wp_core_web.wasm')).arrayBuffer());
+
+// Spielt `bytes` eine Sekunde lang im Worklet ab. Fragt nur den Kern; kann er das Format nicht, dekodiert
+// der Browser und das PCM geht als Startbefehl ins Worklet.
+async function play(bytes) {
+  const ctx = new OfflineAudioContext(2, SR, SR);
+  await ctx.audioWorklet.addModule('./wp_worklet.js');
+  let init = [{ cmd: 'loadEncoded', args: [bytes] }, { cmd: 'play' }];
+  let way = 'Kern';
+  // Probe: kann der Kern das Format? (eigener Kontext, damit der eigentliche Lauf sauber startet)
+  const probe = await runInit(ctx, init, false);
+  if (probe[0] === WP_ERR_UNSUPPORTED_FORMAT) {
+    const buf = await ctx.decodeAudioData(bytes.slice().buffer);
+    const channels = [...Array(buf.numberOfChannels).keys()].map((c) => buf.getChannelData(c));
+    init = [{ cmd: 'loadPcm', args: [channels, buf.sampleRate] }, { cmd: 'play' }];
+    way = 'Browser (decodeAudioData) → Kern';
+  }
+  const ctx2 = new OfflineAudioContext(2, SR, SR);
+  await ctx2.audioWorklet.addModule('./wp_worklet.js');
+  const [rendered, results] = await runInit(ctx2, init, true);
+  return { way, results, L: rendered.getChannelData(0), R: rendered.getChannelData(1) };
+}
+
+async function runInit(ctx, init, render) {
+  const node = new AudioWorkletNode(ctx, 'wp-core', { outputChannelCount: [2], processorOptions: { module, init } });
+  node.connect(ctx.destination);
+  const ask = (cmd) => new Promise((ok) => {
+    node.port.onmessage = (e) => ok(e.data.result);
+    node.port.postMessage({ id: 1, cmd });
+  });
+  if (!render) {
+    // Ohne Rendern: Ergebnisse der Startbefehle abfragen (der Prozessor existiert erst nach dem Start).
+    const done = ctx.startRendering();
+    const res = await ask('initResults');
+    await done;
+    return res;
+  }
+  const done = ctx.startRendering();
+  const res = await ask('initResults');
+  return [await done, res];
+}
+
+const freq = (v, from, n) => { let c = 0; for (let i = from + 1; i < from + n; i++) if (v[i - 1] < 0 && v[i] >= 0) c++; return c * SR / n; };
+const rms = (v, from, n) => { let s = 0; for (let i = from; i < from + n; i++) s += v[i] * v[i]; return Math.sqrt(s / n); };
+
+const results = [];
+for (const file of ['sine440.mp3', 'sine440.flac', 'sine440.m4a']) {
+  const row = { file };
+  try {
+    const bytes = new Uint8Array(await (await fetch(`../tests/audio/${file}`)).arrayBuffer());
+    const { way, results: r, L, R } = await play(bytes);
+    const f = freq(L, SR / 10, SR / 2), level = rms(L, SR / 10, SR / 2);
+    Object.assign(row, { way, load: r[0], f: f.toFixed(1), level: level.toFixed(3) });
+    row.ok = r[0] === WP_OK && Math.abs(f - 440) <= 8 && Math.abs(level - 0.5 / Math.SQRT2) <= 0.05
+      && L.every((x, i) => x === R[i]);
+  } catch (e) {
+    row.error = String(e);
+    row.ok = false;
+  }
+  results.push(row);
+  document.getElementById('rows').insertAdjacentHTML('beforeend',
+    `<tr><td>${row.file}</td><td>${row.way ?? '–'}</td><td>${row.load === WP_OK ? 'geladen' : row.error ?? row.load}</td>` +
+    `<td>${row.f ?? '–'} Hz</td><td>${row.level ?? '–'}</td><td class="${row.ok ? 'ok' : 'fehl'}">${row.ok ? 'ok' : 'Fehler'}</td></tr>`);
+}
+const allOk = results.every((r) => r.ok);
+document.getElementById('status').textContent = allOk ? 'Alle Dateien dekodiert und abgespielt.' : 'Fehler, siehe Tabelle.';
+document.getElementById('status').className = allOk ? 'ok' : 'fehl';
+window.wpResults = results;
+</script>
+</body>
+</html>

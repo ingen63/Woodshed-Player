@@ -124,6 +124,15 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - AAC/M4A: im Browser mit `decodeAudioData` vorab in PCM wandeln, dann an den Kern geben (Plattform-Decoder, wie im Umbauplan vorgesehen).
 - Gleiche `ctest`-Fälle laufen auch gegen das WASM-Ziel (Node.js), damit Tempo, Loop-Grenzen und Seek identisch bleiben.
 
+#### Umsetzung W1 (#33)
+
+- **Bau:** `emcmake cmake -S core -B core/build-wasm -DCMAKE_BUILD_TYPE=Release && cmake --build core/build-wasm && ctest --test-dir core/build-wasm` (Emscripten über Homebrew oder emsdk). Der Zweig steht in `core/web/web.cmake`.
+- **Zwei Varianten:** Die `ctest`-Programme (`engine_tests`, `metronome_tests`, `waveform_tests`, `player_tests`) laufen mit Threads unter Node.js, unverändert und mit denselben Prüfungen wie nativ. `wp_core_web.wasm` (ca. 360 KB) läuft ohne Threads und ohne JS-Hülle im AudioWorklet, wie in W0.
+- **C-API:** Steuerung, Wellenform und Metronom wie `wp_core.h`; dazu `core/web/wp_core_web.h` (`wp_web_create`, `wp_web_load_encoded`, `wp_web_load_pcm`, `wp_web_render`). Laden geht über Bytes statt Pfade.
+- **Dekodieren:** MP3, WAV, FLAC im Kern (miniaudio aus dem Speicher). AAC/M4A meldet der Kern als nicht unterstützt; der Hauptthread dekodiert mit `decodeAudioData` und gibt das PCM weiter (`loadFile` in `wp_core_web.mjs`).
+- **Noch offen für W2:** Dekodieren blockiert das Worklet für die Dauer des Ladens (ein laufendes Metronom setzt kurz aus). Besser in einem Worker mit einer zweiten Instanz des Kerns dekodieren und nur das PCM ins Worklet geben.
+- **Prüfung:** `node core/web/wp_core_web_test.mjs` (Teil von `ctest`) und `core/web/browser_test.html` (MP3, FLAC, M4A im Worklet eines `OfflineAudioContext`, misst Tonhöhe und Pegel).
+
 ### W2 – Dart-Anbindung Web (3–4 Tage)
 - `audio_core.dart`: Schnittstelle mit `AudioCoreFfi` und `AudioCoreWeb` (`dart:js_interop`, Paket `web`).
 - Wellenform, Pegel, Position als Nachrichten vom Worklet; Steuerung in Gegenrichtung.

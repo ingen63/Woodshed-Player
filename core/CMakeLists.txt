@@ -9,6 +9,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Plattformen: macOS und iOS werden gebaut und getestet; Windows, Linux und Android sind konfiguriert
 # (Bau dort in #13). iOS: cmake -S core -B core/build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS
 # Android: cmake -S core -B core/build-android -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26
+# Web (#33): emcmake cmake -S core -B core/build-wasm -DCMAKE_BUILD_TYPE=Release && cmake --build core/build-wasm
+#   && ctest --test-dir core/build-wasm   (Tests laufen unter Node.js, Ergebnis: wp_core_web.wasm fürs AudioWorklet)
 if(APPLE)
   enable_language(OBJC OBJCXX)
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -24,6 +26,11 @@ endif()
 find_package(Threads REQUIRED)
 
 set(WP_THIRD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+
+if(EMSCRIPTEN)
+  include(web/web.cmake)  # eigener Zweig: Tests unter Node.js, Kern fürs AudioWorklet
+  return()
+endif()
 
 # Wiedergabe-Logik ohne Audiogerät (für Tests und Offline-Rendering)
 add_library(wp_engine STATIC src/engine.cpp src/metronome.cpp src/waveform.cpp)

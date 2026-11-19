@@ -1,6 +1,7 @@
 #!/bin/sh
 # Erzeugt das Testaudio für core/tests/audio (#14): 1 s Sinus 440 Hz, Amplitude 0,5, mono, 44,1 kHz,
-# als FLAC und MP3. WAV-Dateien schreiben die Tests selbst. Braucht python3, flac und lame.
+# als FLAC, MP3 und AAC/M4A (#33, Browser-Dekodierung). WAV-Dateien schreiben die Tests selbst.
+# Braucht python3, flac, lame und afconvert (macOS).
 set -eu
 dir="$(cd "$(dirname "$0")/../tests/audio" && pwd)"
 tmp="$(mktemp -d)"
@@ -14,4 +15,5 @@ with wave.open(sys.argv[1], "wb") as w:
 EOF
 flac --silent --force --best -o "$dir/sine440.flac" "$tmp/sine440.wav"
 lame --silent -b 128 "$tmp/sine440.wav" "$dir/sine440.mp3"
+afconvert -f m4af -d aac -b 128000 "$tmp/sine440.wav" "$dir/sine440.m4a"
 ls -l "$dir"

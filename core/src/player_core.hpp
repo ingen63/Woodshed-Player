@@ -34,6 +34,14 @@ const char* errorMessage(int code);
 // < 0 = Fehlercode. MP3 ohne Längenangabe wird dafür einmal durchgelesen.
 double fileDuration(const std::string& path);
 
+// Dekodiert MP3, WAV oder FLAC aus dem Speicher nach `out` (Stereo, f32, `sampleRate`), z. B. im Browser,
+// wo es keine Dateipfade gibt (#33). kOk, kErrInvalidArgument, kErrUnsupportedFormat oder kErrOutOfMemory.
+int decodeMemory(const void* data, size_t size, int sampleRate, Source& out);
+
+// Wandelt bereits dekodiertes PCM (interleaved, `channels` Kanäle, `srcRate`) nach `out` (Stereo, `dstRate`),
+// z. B. AAC/M4A, das der Browser dekodiert hat (#33). Mono wird auf beide Kanäle gelegt.
+int convertPcm(const float* interleaved, int channels, long long frames, int srcRate, int dstRate, Source& out);
+
 // Ladezustand, gleich wie WP_LOAD_* in wp_core.h; Werte < 0 sind Fehlercodes des letzten Ladevorgangs.
 enum LoadState { kLoadIdle = 0, kLoadRunning = 1, kLoadReady = 2 };
 
@@ -73,6 +81,11 @@ public:
     int waitForLoad();
     // loadAsync() und waitForLoad().
     int load(const std::string& path);
+
+    // Setzt einen bereits dekodierten Titel (Stereo, Samplerate des Players) ein und berechnet die Wellenform,
+    // ohne Datei und ohne Lade-Thread (Web, #33). Nicht im Audio-Thread aufrufen. Wie beim Laden steht der
+    // Titel danach am Anfang, pausiert, ohne Loop. kOk, kErrInvalidArgument, kErrBusy oder kErrOutOfMemory.
+    int setSource(std::unique_ptr<Source> source);
 
     int loadState() const { return loadState_.load(); }
     double loadProgress() const { return loadProgress_.load(); }  // 0–1 des laufenden bzw. letzten Ladens
