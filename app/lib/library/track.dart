@@ -47,6 +47,9 @@ class Track {
     required this.customOrder,
     this.settings = const PlaybackSettings(),
     this.folderId,
+    this.loopId,
+    this.loops = const {},
+    this.noUpload = false,
   });
 
   /// SHA-256 of the audio file (64 lowercase hex digits, #36): identifies the track on every device; the same
@@ -73,6 +76,17 @@ class Track {
   /// Ordner; null = «Ohne Ordner».
   final String? folderId;
 
+  /// ID of the loop shown in the player (its range is [settings].loopStart/loopEnd); null = no loop (#37).
+  final String? loopId;
+
+  /// All loops of the track by ID, null for a deleted one (#37/AK4). Each loop is a shared field of its
+  /// own, so loops from several devices are merged element by element. The active one is taken from
+  /// [settings] when saving.
+  final Map<String, LoopRange?> loops;
+
+  /// «Don't upload» (#37/AK5): the audio file stays on this device, the metadata are synced anyway.
+  final bool noUpload;
+
   Track copyWith({
     String? title,
     String? Function()? artist,
@@ -83,6 +97,9 @@ class Track {
     String? Function()? folderId,
     String? id,
     String? fileName,
+    String? Function()? loopId,
+    Map<String, LoopRange?>? loops,
+    bool? noUpload,
   }) => Track(
     id: id ?? this.id,
     fileName: fileName ?? this.fileName,
@@ -96,10 +113,47 @@ class Track {
     customOrder: customOrder ?? this.customOrder,
     settings: settings ?? this.settings,
     folderId: folderId != null ? folderId() : this.folderId,
+    loopId: loopId != null ? loopId() : this.loopId,
+    loops: loops ?? this.loops,
+    noUpload: noUpload ?? this.noUpload,
   );
 
-  /// Entry of the former `library.json` (format 1, Swift app); `id` is still the UUID there.
-  factory Track.fromLegacyJson(Map<String, Object?> j) => Track(
+  /// New playback settings from the player. Setting a loop where there was none creates a loop with a
+  /// new ID from [newLoopId]; clearing it deletes the active loop (#37/AK4).
+  Track withSettings(PlaybackSettings s, String Function() newLoopId) {
+    final hasLoop = s.loopEnd > 0;
+    if (hasLoop && loopId == null) {
+      final id = newLoopId();
+      return copyWith(
+        settings: s,
+        loopId: () => id,
+        loops: {...loops, id: LoopRange(s.loopStart, s.loopEnd)},
+      );
+    }
+    if (!hasLoop && loopId != null) {
+      return copyWith(
+        settings: s,
+        loopId: () => null,
+        loops: {...loops, loopId!: null},
+      );
+    }
+    return copyWith(settings: s);
+  }
+
+  /// Entry of the former `library.json` (format 1, Swift app); `id` is still the UUID there. Its loop gets
+  /// the fixed ID «0».
+  factory Track.fromLegacyJson(Map<String, Object?> j) {
+    final t = Track._fromLegacyJson(j);
+    final s = t.settings;
+    return s.loopEnd > 0
+        ? t.copyWith(
+            loopId: () => '0',
+            loops: {'0': LoopRange(s.loopStart, s.loopEnd)},
+          )
+        : t;
+  }
+
+  factory Track._fromLegacyJson(Map<String, Object?> j) => Track(
     id: (j['id'] as String).toUpperCase(),
     fileName: j['fileName'] as String,
     originalFileName:
@@ -119,8 +173,11 @@ class Track {
     folderId: (j['folderID'] as String?)?.toUpperCase(),
   );
 
-  /// Shared fields (#36/AK5), each stamped on its own. Loop start, end and switch form one field so that
-  /// merging never mixes the boundaries of two devices.
+  /// Prefix of the loop fields: `loops.<id>` = `{start, end}` or null (deleted).
+  static const loopPrefix = 'loops.';
+
+  /// Shared fields (#36/AK5), each stamped on its own. Every loop is one field `loops.<id>` with start and
+  /// end, so merging never mixes the boundaries of two devices but keeps loops from both (#37/AK4).
   Map<String, Object?> toShared() => {
     'fileName': fileName,
     'originalFileName': originalFileName,
@@ -134,11 +191,15 @@ class Track {
     'folderId': folderId,
     'speedEnabled': settings.speedEnabled,
     'speed': settings.speed,
-    'loop': {
-      'enabled': settings.loopEnabled,
-      'start': settings.loopStart,
-      'end': settings.loopEnd,
-    },
+    'loopEnabled': settings.loopEnabled,
+    'activeLoop': loopId,
+    for (final e in loops.entries) '$loopPrefix${e.key}': e.value?.toJson(),
+    if (loopId case final id?)
+      '$loopPrefix$id': LoopRange(
+        settings.loopStart,
+        settings.loopEnd,
+      ).toJson(),
+    'noUpload': noUpload,
     'rampEnabled': settings.rampEnabled,
     'rampStart': settings.rampStart,
     'rampTarget': settings.rampTarget,
@@ -149,7 +210,25 @@ class Track {
   factory Track.fromShared(String id, Map<String, Object?> v) {
     double d(Object? x, double fallback) => x is num ? x.toDouble() : fallback;
     int? i(Object? x) => x is num ? x.round() : null;
-    final loop = v['loop'] is Map ? v['loop'] as Map : const {};
+    final loops = <String, LoopRange?>{
+      for (final e in v.entries)
+        if (e.key.startsWith(loopPrefix))
+          e.key.substring(loopPrefix.length): LoopRange.fromJson(e.value),
+    };
+    String? loopId = v['activeLoop'] as String?;
+    var loopEnabled = v['loopEnabled'] as bool? ?? false;
+    if (!v.containsKey('activeLoop') && v['loop'] is Map) {
+      // Format 2 before #37: one loop {enabled, start, end}; it gets the fixed ID «0» on every device.
+      final old = v['loop'] as Map;
+      loopEnabled = old['enabled'] as bool? ?? false;
+      final r = LoopRange.fromJson(old);
+      if (r != null) {
+        loopId = '0';
+        loops['0'] = r;
+      }
+    }
+    final active = loopId == null ? null : loops[loopId];
+    if (active == null) loopId = null; // deleted on another device
     final fileName = v['fileName'] as String;
     return Track(
       id: id,
@@ -165,13 +244,16 @@ class Track {
           DateTime.utc(2001),
       customOrder: i(v['customOrder']) ?? 0,
       folderId: v['folderId'] as String?,
+      loopId: loopId,
+      loops: Map.unmodifiable(loops),
+      noUpload: v['noUpload'] as bool? ?? false,
       settings:
           PlaybackSettings(
             speedEnabled: v['speedEnabled'] as bool? ?? false,
             speed: d(v['speed'], 1),
-            loopEnabled: loop['enabled'] as bool? ?? false,
-            loopStart: d(loop['start'], 0),
-            loopEnd: d(loop['end'], 0),
+            loopEnabled: loopEnabled,
+            loopStart: active?.start ?? 0,
+            loopEnd: active?.end ?? 0,
           ).copyWith(
             rampEnabled: v['rampEnabled'] as bool?,
             rampStart: i(v['rampStart']),
@@ -183,11 +265,42 @@ class Track {
   }
 }
 
+/// Start and end of a loop in seconds (#37/AK4).
+class LoopRange {
+  const LoopRange(this.start, this.end);
+  final double start;
+  final double end;
+
+  Map<String, Object?> toJson() => {'start': start, 'end': end};
+
+  /// null for a deleted loop or invalid contents.
+  static LoopRange? fromJson(Object? j) {
+    if (j is! Map) return null;
+    final s = j['start'];
+    final e = j['end'];
+    return s is num && e is num ? LoopRange(s.toDouble(), e.toDouble()) : null;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is LoopRange && other.start == start && other.end == end;
+
+  @override
+  int get hashCode => Object.hash(start, end);
+}
+
 /// Ordner der Bibliothek (`TrackFolder` in Swift).
 class TrackFolder {
-  const TrackFolder({required this.id, required this.name});
+  const TrackFolder({required this.id, required this.name, this.sync = true});
   final String id;
   final String name;
+
+  /// «Sync» (#37/AK5): the audio files of its tracks go to the cloud; off keeps them on this device, the
+  /// metadata are synced anyway.
+  final bool sync;
+
+  TrackFolder copyWith({String? name, bool? sync}) =>
+      TrackFolder(id: id, name: name ?? this.name, sync: sync ?? this.sync);
 
   /// Entry of the former `library.json` (format 1).
   factory TrackFolder.fromLegacyJson(Map<String, Object?> j) => TrackFolder(
@@ -196,10 +309,14 @@ class TrackFolder {
   );
 
   /// Shared fields (#36/AK5).
-  Map<String, Object?> toShared() => {'name': name};
+  Map<String, Object?> toShared() => {'name': name, 'sync': sync};
 
   factory TrackFolder.fromShared(String id, Map<String, Object?> v) =>
-      TrackFolder(id: id, name: v['name'] as String? ?? '');
+      TrackFolder(
+        id: id,
+        name: v['name'] as String? ?? '',
+        sync: v['sync'] as bool? ?? true,
+      );
 }
 
 /// Sort order of the library; the UI names it in the user's language (#43).

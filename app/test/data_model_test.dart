@@ -126,7 +126,9 @@ void main() {
             'artist',
             'folderId',
             'speed',
-            'loop',
+            'loopEnabled',
+            'activeLoop',
+            'noUpload',
             'rampStart',
           ]),
         );
@@ -159,7 +161,12 @@ void main() {
             for (final k in after.stamps.keys)
               if (after.stamps[k] != before.stamps[k]) k,
           ];
-          expect(changed..sort(), ['loop', 'title']);
+          // #37: the new loop is a field `loops.<id>` of its own, the active one is referenced
+          expect(changed.where((k) => k.startsWith('loops.')), hasLength(1));
+          expect(
+            changed.where((k) => !k.startsWith('loops.')).toList()..sort(),
+            ['activeLoop', 'loopEnabled', 'title'],
+          );
           expect(after.stamps['title']! > before.stamps['title']!, isTrue);
         },
       );

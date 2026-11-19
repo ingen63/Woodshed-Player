@@ -985,6 +985,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The following files could not be imported:\n{files}'**
   String importFailed(String files);
+
+  /// Track context menu switch (#37): the audio file stays on this device, its data are synced anyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t upload'**
+  String get dontUpload;
+
+  /// Folder context menu switch (#37): upload the audio files of this folder to the cloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get syncFolder;
+
+  /// Track row (#37): the audio file is on another device and not in the cloud.
+  ///
+  /// In en, this message translates to:
+  /// **'File only on one device'**
+  String get fileOnOneDevice;
+
+  /// No description provided for @trackNotOnDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'The audio file of «{title}» is only on another device and not in the cloud.'**
+  String trackNotOnDevice(String title);
 }
 
 class _AppLocalizationsDelegate

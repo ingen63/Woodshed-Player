@@ -28,12 +28,15 @@ Future<AppController> createAppController({Object? baseDir}) async {
     onRunningChanged: files.keepAwake,
   );
   await metronome.restore();
-  return AppController(
+  // #37: without an account no sync (NoSync); providers and accounts follow in #38/#40.
+  final controller = AppController(
     library: library,
     player: PlayerService(core),
     metronome: metronome,
     files: files,
   );
+  await controller.start();
+  return controller;
 }
 
 /// Aufnahme gibt es im Browser nicht.

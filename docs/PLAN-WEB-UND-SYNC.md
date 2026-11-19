@@ -178,7 +178,7 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - **Migration** (`migration.dart`, gleiche Logik für Dateisystem und OPFS): Sicherung `library.v1.json`, dann die Zuordnung alte UUID → Hash in `library.v1-ids.json` (aus `contentHash` von #35, sonst berechnet), dann Umbenennen, zuletzt `library.json` im Format 2. Bricht sie ab, setzt der nächste Start dort fort. `preferences.json` und `metronome.json` werden übernommen und bleiben liegen. **Die Swift-Kompatibilität entfällt:** Das Swift-Altprojekt kann die Bibliothek danach nicht mehr öffnen.
 - **Version:** Eine Datei mit höherer `formatVersion` wird nicht geschrieben (auch nicht über Import oder Löschen), die Oberfläche meldet «App aktualisieren» (`libraryTooNew`).
 - **Trennung:** Geteilt (in `library.json`): Titeldaten, Ordner, Loops, Tempo, Steigerung, Metronom-Voreinstellungen, Darstellung, Sortierung. Gerätelokal: `device.json` mit der Gerät-ID; Cloud-Konto, Tokens, Cache-Obergrenze, Fensterlage und Ausgabegerät kommen dort hinzu, Dateipfade leitet der Store ab.
-- **Offen für #37:** Fehlt die Audiodatei beim Laden, fällt der Titel wie bisher weg (ohne Grabstein). Mit Sync muss ein Titel ohne lokale Datei sichtbar bleiben.
+- **Gelöst in #37:** Ein Titel ohne lokale Datei, der auf einem anderen Gerät importiert wurde, bleibt sichtbar.
 
 ### W5 – Sync-Engine (4–5 Tage)
 - `CloudProvider`-Schnittstelle, `InMemoryProvider` für Tests, `NoSync` ohne Konto.
@@ -188,6 +188,16 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - **Pro Titel «nicht hochladen»:** gemeinsames Feld mit Stempel; der Titel bleibt in der Bibliothek der anderen Geräte sichtbar, mit «Datei nur auf einem Gerät».
 - **Pro Ordner «synchronisieren»:** Feld am Ordner (geteilt); Titel in nicht gewählten Ordnern werden nicht hochgeladen, ihre Metadaten wandern trotzdem mit.
 - **Sicherung:** Vor jedem Schreiben von `state.json` wird der bisherige Stand nach `backup/state-<n>.json` (rotierend, 5 Stück) kopiert. Wiederherstellen über Einstellungen → Cloud.
+
+#### Umsetzung W5 (#37)
+
+- **Schnittstelle** (`app/lib/sync/cloud_provider.dart`): `CloudProvider` mit `list(prefix)`, `get`, `put` (mit `ifVersion` bzw. `ifAbsent`, sonst `VersionConflict`), `delete`, `quota`. Fehlerarten: `CloudOffline` (ganzer Abgleich wartet), `CloudError` (eine Aufgabe wird wiederholt). `InMemoryProvider` für Tests kann offline gehen, Uploads abbrechen und zwischen Lesen und Schreiben ein anderes Gerät schreiben lassen.
+- **Ohne Konto** erzeugt die App `NoSync` (`sync_service.dart`, ohne Import der Engine oder eines Anbieters); ein Test prüft den Importgraphen und dass kein `HttpClient` entsteht. Mit Konto (#38/#40) kommt `CloudSync` (`sync_engine.dart`), dann per bedingtem bzw. verzögertem Import.
+- **Ablauf eines Abgleichs:** `state.json` lesen, mit `Library.mergeRemote` zusammenführen (rein, je Feld), nur bei Unterschied schreiben: zuerst den bisherigen Inhalt nach `backup/state-<n>.json` (Platz = Generation mod 5 + 1, die Generation steht in `state.json`), dann bedingt auf die gelesene Version; bei Konflikt neu lesen, zusammenführen, höchstens 5-mal. Danach `audio/` auflisten und planen: fehlende Dateien hochladen, Dateien gelöschter oder ausgeschlossener Titel löschen (nur Hashes, die `state.json` kennt), am Desktop fehlende herunterladen, sonst beim Abspielen (`fetchAudio`). Heruntergeladenes wird gegen den Hash geprüft.
+- **Warteschlange:** Aufgaben `state`, `up:`, `down:`, `rm:` je Hash mit Versuchszähler und Backoff (2 s verdoppelnd, höchstens 5 min); nach 5 Fehlversuchen ruht eine Aufgabe bis «Jetzt abgleichen» (#40) oder zum nächsten Start. Ohne Verbindung wartet der ganze Abgleich, höchstens 8 automatische Wiederholungen, danach nur noch Auslöser. Die Warteschlange wird bei jedem Abgleich aus Bibliothek und Cloud neu abgeleitet, darum braucht sie keine eigene Datei: Offline-Änderungen stehen in `library.json` und gehen beim nächsten Abgleich mit.
+- **Loops:** Jeder Loop ist ein eigenes Feld `loops.<id>` (`{start, end}`, `null` = gelöscht), dazu `activeLoop` und `loopEnabled`. Zwei Geräte, die je einen Loop setzen, behalten beide; der zuletzt gesetzte wird angezeigt. Der eine Loop aus Format 2 vor #37 bekommt die feste ID `0`.
+- **Schalter:** `noUpload` am Titel und `sync` am Ordner (Standard an) sind geteilte Felder mit Stempel, bedienbar im Kontextmenü. Ein Titel, dessen Datei hier fehlt und der auf einem anderen Gerät importiert wurde, bleibt sichtbar; liegt die Datei auch nicht in der Cloud, steht «Datei nur auf einem Gerät». Fehlt die Datei eines hier importierten Titels, fällt er wie bisher weg.
+- **Auslöser:** Start (`AppController.start`), Rückkehr in den Vordergrund (`AppLifecycleListener`), Änderung (`Library.onLocalChange`, 5 s verzögert und zusammengefasst). Der Knopf «Jetzt abgleichen» (`syncNow`) und die Wiederherstellung aus `backup/` kommen mit #40.
 
 ### W6 – Anbieter und Anmeldung (6–9 Tage)
 - Je Anbieter ein Modul über die REST-API mit dem Paket `http`, ohne grosse SDKs:

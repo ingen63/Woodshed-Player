@@ -33,6 +33,9 @@ class _HomePageState extends State<HomePage> {
   /// Hält den Aufnahme-Knopf (und eine laufende Aufnahme) über Layout-Wechsel hinweg.
   final _recordingKey = GlobalKey();
 
+  /// #37: back in the foreground → sync.
+  late final AppLifecycleListener _lifecycle;
+
   AppController get c => widget.controller;
 
   @override
@@ -41,10 +44,12 @@ class _HomePageState extends State<HomePage> {
     KeyboardPresence.instance.attach();
     c.addListener(_showMessage);
     c.metronome.addListener(_updateTicker);
+    _lifecycle = AppLifecycleListener(onResume: () => c.resumed());
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     c.removeListener(_showMessage);
     c.metronome.removeListener(_updateTicker);
     _metronomeTicker?.cancel();

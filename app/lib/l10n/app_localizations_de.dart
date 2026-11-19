@@ -570,4 +570,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String importFailed(String files) {
     return 'Folgende Dateien konnten nicht importiert werden:\n$files';
   }
+
+  @override
+  String get dontUpload => 'Nicht hochladen';
+
+  @override
+  String get syncFolder => 'Synchronisieren';
+
+  @override
+  String get fileOnOneDevice => 'Datei nur auf einem Gerät';
+
+  @override
+  String trackNotOnDevice(String title) {
+    return 'Die Audiodatei von «$title» liegt nur auf einem anderen Gerät und nicht in der Cloud.';
+  }
 }

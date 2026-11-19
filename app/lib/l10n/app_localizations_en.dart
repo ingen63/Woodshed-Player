@@ -564,4 +564,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String importFailed(String files) {
     return 'The following files could not be imported:\n$files';
   }
+
+  @override
+  String get dontUpload => 'Don\'t upload';
+
+  @override
+  String get syncFolder => 'Sync';
+
+  @override
+  String get fileOnOneDevice => 'File only on one device';
+
+  @override
+  String trackNotOnDevice(String title) {
+    return 'The audio file of «$title» is only on another device and not in the cloud.';
+  }
 }

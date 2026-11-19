@@ -14,6 +14,7 @@ import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/metronome/metronome_controller.dart';
 import 'package:woodshed_player/player/audio_core.dart';
 import 'package:woodshed_player/player/player_service.dart';
+import 'package:woodshed_player/sync/sync_service.dart';
 import 'package:wp_core/wp_core.dart';
 
 /// Kern-Attrappe: Laden bleibt «läuft», bis der Test es mit [finishLoad] oder [failLoad] beendet.
@@ -200,7 +201,11 @@ class FakeFiles implements FilePlatform {
 /// Kern, Timer, Bibliothek in [dir] und Controller zusammen. Laden wird mit [finishLoads] abgeschlossen.
 class TestApp {
   /// [duration]: Dauer jeder importierten Datei in Sekunden (null: unknown on import, as in the browser).
-  TestApp(Directory dir, {double? duration = 30}) {
+  TestApp(
+    Directory dir, {
+    double? duration = 30,
+    SyncService Function(Library library)? sync,
+  }) {
     library = Library(
       IoFileStore(dir),
       probe: (_) => duration,
@@ -221,6 +226,7 @@ class TestApp {
       player: player,
       metronome: MetronomeController(metronome),
       files: files,
+      sync: sync?.call(library),
     );
   }
 

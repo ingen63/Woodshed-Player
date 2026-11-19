@@ -55,6 +55,12 @@ class LibrarySaveFailed extends LibraryMessage {
   final String detail;
 }
 
+/// The audio file of this track (title) is on another device only and not in the cloud (#37/AK5).
+class TrackNotOnDevice extends LibraryMessage {
+  const TrackNotOnDevice(this.title);
+  final String title;
+}
+
 /// These files (names) could not be imported.
 class ImportFailed extends LibraryMessage {
   const ImportFailed(this.files);
@@ -119,6 +125,13 @@ class Library extends ChangeNotifier {
   bool _readOnly = false;
   int _newerVersion = 0;
 
+  /// Tracks whose audio file is not on this device (synced from another one, #37).
+  final _absent = <String>{};
+
+  /// Called after the library saved a change made on this device (not after [mergeRemote]); the sync
+  /// engine schedules a sync (#37).
+  void Function()? onLocalChange;
+
   /// Problem for the UI (#43: as data, the UI words it); the UI clears it after showing it.
   LibraryMessage? lastError;
   Timer? _pendingSave;
@@ -177,6 +190,7 @@ class Library extends ChangeNotifier {
     _clock = HlcClock(_device.deviceId, now: _now);
     _droppedMissing = 0;
     _readOnly = false;
+    _absent.clear();
     final raw = await store.read(indexName);
     if (raw == null) {
       await _readLegacyPrefs();
@@ -220,11 +234,19 @@ class Library extends ChangeNotifier {
       return _afterLoad();
     }
     final present = <Track>[];
+    _absent.clear();
     for (final t in _tracks) {
-      if (await store.exists(trackName(t.fileName))) present.add(t);
+      if (await store.exists(trackName(t.fileName))) {
+        present.add(t);
+      } else if (_state.tracks[t.id]?.stamps['fileName']?.device !=
+          _device.deviceId) {
+        // Imported on another device (#37): stays visible without a file here.
+        present.add(t);
+        _absent.add(t.id);
+      }
     }
     if (present.length < _tracks.length) {
-      // Missing files drop out as before; their records go too (no tombstone).
+      // A file imported here and now missing drops out as before; its record goes too (no tombstone).
       final gone = {for (final t in _tracks) t.id}
         ..removeAll(present.map((t) => t.id));
       _droppedMissing += gone.length;
@@ -344,10 +366,113 @@ class Library extends ChangeNotifier {
     _pendingSave?.cancel();
     _pendingSave = null;
     if (_readOnly) return Future.value();
-    return _write().catchError((Object e) {
+    final before = _state.latest;
+    final done = _write().catchError((Object e) {
       lastError = LibrarySaveFailed('$e');
       notifyListeners();
     });
+    if (_state.latest != before) onLocalChange?.call();
+    return done;
+  }
+
+  // ---- Sync (#37) ----
+
+  /// Merges the shared state of another device or the cloud into the library and saves the result. Local
+  /// changes not yet saved are stamped first, so nothing is lost. Tracks deleted elsewhere lose their
+  /// local files; tracks new here are marked as without a file until it arrives ([addAudio]).
+  Future<void> mergeRemote(SharedState remote) async {
+    if (_readOnly) return;
+    _pendingSave?.cancel();
+    _pendingSave = null;
+    _commit();
+    _clock.observe(remote.latest);
+    final before = {for (final t in _tracks) t.id: t};
+    _state = _state.merge(remote).purge(_now());
+    _materialize();
+    final alive = {for (final t in _tracks) t.id};
+    for (final t in before.values) {
+      if (!alive.contains(t.id)) {
+        await store.delete(trackName(t.fileName)).catchError((_) {});
+        await store.delete(_artworkName(t.id)).catchError((_) {});
+      }
+    }
+    _absent.removeWhere((id) => !alive.contains(id));
+    for (final t in _tracks) {
+      if (!before.containsKey(t.id) || _absent.contains(t.id)) {
+        if (await store.exists(trackName(t.fileName))) {
+          _absent.remove(t.id);
+        } else {
+          _absent.add(t.id);
+        }
+      }
+    }
+    try {
+      await _write();
+    } catch (e) {
+      lastError = LibrarySaveFailed('$e');
+    }
+    notifyListeners();
+  }
+
+  /// The audio file of [t] is on this device.
+  bool hasFile(String id) => !_absent.contains(id);
+
+  /// Name of the audio file in the cloud: `audio/<hash>.<ext>` (plan, cloud layout).
+  static String cloudAudioName(Track t) {
+    final dot = t.fileName.lastIndexOf('.');
+    return 'audio/${t.id}${dot > 0 ? t.fileName.substring(dot) : ''}';
+  }
+
+  /// The audio file of [t] may go to the cloud: not «don't upload» and its folder is synced (#37/AK5).
+  bool uploadable(Track t) {
+    if (t.noUpload) return false;
+    final f = t.folderId;
+    if (f == null) return true;
+    return _folders.where((x) => x.id == f).firstOrNull?.sync ?? true;
+  }
+
+  /// Contents of the audio file of [t]; null if it is not on this device.
+  Future<Uint8List?> readAudio(Track t) => store.read(trackName(t.fileName));
+
+  /// Stores the audio file of track [id] that came from the cloud. Returns false if [bytes] do not match
+  /// the track's hash (damaged download).
+  Future<bool> addAudio(String id, Uint8List bytes) async {
+    final t = track(id);
+    if (t == null) return false;
+    final hash = bytes.length > _hashInline
+        ? await compute(_sha256Hex, bytes)
+        : _sha256Hex(bytes);
+    if (hash != id) return false;
+    await store.write(trackName(t.fileName), bytes);
+    if (t.hasArtwork) {
+      final art = readMetadata(bytes).artwork;
+      if (art != null && art.isNotEmpty) {
+        await store.write(_artworkName(id), art).catchError((_) {});
+      }
+    }
+    _absent.remove(id);
+    notifyListeners();
+    await refreshStorage();
+    return true;
+  }
+
+  /// Switches «don't upload» for these tracks (#37/AK5).
+  void setNoUpload(Set<String> ids, bool on) {
+    _tracks = [
+      for (final t in _tracks)
+        ids.contains(t.id) ? t.copyWith(noUpload: on) : t,
+    ];
+    save();
+    notifyListeners();
+  }
+
+  /// Switches «sync» for the folder (#37/AK5).
+  void setFolderSync(String id, bool on) {
+    final i = _folders.indexWhere((f) => f.id == id);
+    if (i < 0 || _folders[i].sync == on) return;
+    _folders[i] = _folders[i].copyWith(sync: on);
+    save();
+    notifyListeners();
   }
 
   Future<void> _write() {
@@ -533,6 +658,7 @@ class Library extends ChangeNotifier {
       store.delete(_artworkName(t.id)).catchError((_) {});
     }
     _tracks.removeWhere((t) => ids.contains(t.id));
+    _absent.removeAll(ids);
     save();
     notifyListeners();
     refreshStorage();
@@ -592,7 +718,7 @@ class Library extends ChangeNotifier {
     final i = _folders.indexWhere((f) => f.id == id);
     final t = name.trim();
     if (i < 0 || t.isEmpty) return;
-    _folders[i] = TrackFolder(id: id, name: t);
+    _folders[i] = _folders[i].copyWith(name: t);
     save();
     notifyListeners();
   }
@@ -681,10 +807,19 @@ class Library extends ChangeNotifier {
 
   // ---- Einstellungen pro Titel ----
 
+  /// Random loop ID (8 hex digits), unique per track in practice (#37/AK4).
+  String _newLoopId() {
+    final r = _random ?? Random.secure();
+    return List.generate(
+      4,
+      (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
+
   void updateSettings(String id, PlaybackSettings settings) {
     final i = _tracks.indexWhere((t) => t.id == id);
     if (i < 0 || _tracks[i].settings == settings) return;
-    _tracks[i] = _tracks[i].copyWith(settings: settings);
+    _tracks[i] = _tracks[i].withSettings(settings, _newLoopId);
     _scheduleSave();
     notifyListeners();
   }

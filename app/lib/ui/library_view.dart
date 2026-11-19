@@ -49,7 +49,7 @@ class _LibraryViewState extends State<LibraryView> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([lib, c.player]),
+      listenable: Listenable.merge([lib, c.player, c.sync]),
       builder: (context, _) {
         final folders = lib.sortedFolders;
         final loose = lib.sortedTracksIn(null);
@@ -123,6 +123,12 @@ class _LibraryViewState extends State<LibraryView> {
             },
             child: Text(l.renameEllipsis),
           ),
+          CheckboxMenuButton(
+            key: Key('syncFolder:${f.name}'),
+            value: f.sync,
+            onChanged: (v) => lib.setFolderSync(f.id, v ?? true),
+            child: Text(l.syncFolder),
+          ),
           MenuItemButton(
             leadingIcon: const Icon(WsIcons.trash, size: 16),
             onPressed: () async {
@@ -154,6 +160,7 @@ class _LibraryViewState extends State<LibraryView> {
       track: t,
       artwork: lib.artworkPath(t),
       selected: c.player.trackId == t.id,
+      onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
       indent: indent,
       touch: widget.touch,
       onTap: () => _select(t),
@@ -195,6 +202,12 @@ class _LibraryViewState extends State<LibraryView> {
             ),
           ],
           child: Text(l.moveToFolder),
+        ),
+        CheckboxMenuButton(
+          key: const Key('dontUpload'),
+          value: t.noUpload,
+          onChanged: (v) => lib.setNoUpload({t.id}, v ?? false),
+          child: Text(l.dontUpload),
         ),
         MenuItemButton(
           leadingIcon: const Icon(WsIcons.trash, size: 16),
@@ -614,6 +627,7 @@ class _TrackRow extends StatelessWidget {
     required this.track,
     required this.artwork,
     required this.selected,
+    this.onlyElsewhere = false,
     required this.indent,
     required this.touch,
     required this.onTap,
@@ -624,6 +638,9 @@ class _TrackRow extends StatelessWidget {
   final Track track;
   final String? artwork;
   final bool selected, indent, touch;
+
+  /// The audio file is on another device only (#37/AK5).
+  final bool onlyElsewhere;
   final VoidCallback onTap;
   final void Function(String trackId) onDrop;
   final List<Widget> Function(BuildContext context) menu;
@@ -690,6 +707,16 @@ class _TrackRow extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (onlyElsewhere)
+                      Text(
+                        context.l10n.fileOnOneDevice,
+                        key: Key('onlyElsewhere:${track.title}'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: ws.amber,
+                        ),
+                      ),
                     if (track.artist != null)
                       Text(
                         track.artist!,

@@ -103,6 +103,7 @@ String libraryMessageText(AppLocalizations l, LibraryMessage m) => switch (m) {
   LibrarySaveFailed(:final detail) => l.librarySaveFailed(detail),
   LibraryTooNew() => l.libraryTooNew,
   ImportFailed(:final files) => l.importFailed(files.join('\n')),
+  TrackNotOnDevice(:final title) => l.trackNotOnDevice(title),
 };
 
 String sortOrderLabel(AppLocalizations l, TrackSortOrder o) => switch (o) {

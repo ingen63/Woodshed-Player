@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/library/library.dart';
+import 'package:woodshed_player/sync/sync_service.dart';
 import 'package:woodshed_player/time_format.dart';
 import 'package:woodshed_player/ui/home_page.dart';
 import 'package:woodshed_player/ui/player_view.dart';
@@ -23,13 +24,17 @@ Future<TestApp> pumpApp(
   Size size = wide,
   List<String> titles = const ['Ärger', 'Bossa', 'Zebra'],
   Map<String, Uint8List> files = const {},
+  SyncService? sync,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final dir = Directory.systemTemp.createTempSync('wp_ui_test');
   addTearDown(() => dir.deleteSync(recursive: true));
-  final app = TestApp(Directory('${dir.path}/lib'));
+  final app = TestApp(
+    Directory('${dir.path}/lib'),
+    sync: sync == null ? null : (_) => sync,
+  );
   await tester.runAsync(() async {
     await app.library.load();
     final src = Directory('${dir.path}/quelle')..createSync();
