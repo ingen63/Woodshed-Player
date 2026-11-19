@@ -2,7 +2,9 @@
 # under w0/, the web app (#41) under app/.
 # Every push to main publishes the whole site; the app in it is built from the latest tag reachable from the
 # pushed commit (git describe), so new app versions only go online with a new tag, while text fixes to the start
-# page and legal texts go online at once. A tag push runs the same workflow. Without any tag the app is left out.
+# page and legal texts go online at once. Without any tag the app is left out.
+# A tag push starts this workflow on main (job «redeploy»): the github-pages environment only lets main deploy,
+# and the main run then builds the app from the new tag.
 # Before the app build the tests of that tag run: WASM core under Node.js and flutter test.
 # The person details are filled in from repository secrets CONTROLLER_NAME, CONTROLLER_ADDRESS and CONTACT_EMAIL;
 # the build fails if one is missing or a placeholder is left (site/build_site.py).
@@ -19,19 +21,32 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 env:
   FLUTTER_VERSION: 3.50.0
 
 jobs:
-  deploy:
+  redeploy:
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Publish the new tag via a run on main (#41/AK1)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
+
+  deploy:
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

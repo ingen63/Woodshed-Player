@@ -17,6 +17,14 @@ void main() {
       expect(workflow, isNot(contains('paths:')));
     });
 
+    test('a tag push publishes through a run on main', () {
+      // The github-pages environment only lets main deploy.
+      expect(workflow, contains("if: github.ref_type == 'tag'"));
+      expect(workflow, contains('gh workflow run pages.yml'));
+      expect(workflow, contains('--ref main'));
+      expect(workflow, contains("if: github.ref_type != 'tag'"));
+    });
+
     test('builds the app from the latest tag and leaves it out without one', () {
       expect(workflow, contains('git describe --tags --abbrev=0'));
       expect(workflow, contains('ref: \${{ steps.tag.outputs.tag }}'));
