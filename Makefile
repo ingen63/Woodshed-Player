@@ -37,6 +37,7 @@ help:
 	@echo "make lint           flutter analyze (strict), C++ warnings as errors, clang-tidy"
 	@echo "make coverage       all tests with line coverage, checked per part against tools/coverage-min"
 	@echo "make coverage-diff  coverage of the lines changed since BASE (default origin/main), a hint"
+	@echo "make network-free   no network code outside the provider modules, blocked packages, core, CSP"
 
 # ---- Tests ----
 test: test-core test-app test-tools
@@ -68,7 +69,8 @@ test-app:
 
 # Tests of the tools in staged git repositories with fake tools: the hook after a commit (#7/AK7),
 # coverage check and diff, pre-push hook (#8/AK6)
-TOOL_TESTS = tool/after_commit_hook_test.dart tool/coverage_test.dart tool/pre_push_hook_test.dart
+TOOL_TESTS = tool/after_commit_hook_test.dart tool/coverage_test.dart tool/pre_push_hook_test.dart \
+             tool/network_free_test.dart
 test-tools:
 	cd app && flutter test --reporter failures-only $(TOOL_TESTS)
 test-hook: test-tools
@@ -190,6 +192,14 @@ property:
 	cd app && WP_PROPERTY_CASES=$(PROPERTY_CASES) WP_PROPERTY_SEED=$(PROPERTY_SEED) \
 	  flutter test --reporter failures-only test/property/
 
+# ---- Network freedom (#58), docs/TESTS.md ----
+# The check (app/tool/network_free.dart, needs the app's packages) with its own tests, and the #37 test
+# that the app without an account creates no HttpClient. Network code belongs in app/lib/sync/providers/.
+network-free:
+	cd app && flutter pub get >/dev/null
+	dart app/tool/network_free.dart
+	cd app && flutter test --reporter failures-only tool/network_free_test.dart test/sync_app_test.dart
+
 # ---- Not set up yet ----
 define not_yet
 	@echo "make $@: noch nicht eingerichtet (#$(1))"; exit 1
@@ -197,4 +207,3 @@ endef
 
 mutants:       ; $(call not_yet,11)
 report:        ; $(call not_yet,12)
-network-free:  ; $(call not_yet,58)

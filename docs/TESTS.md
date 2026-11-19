@@ -126,7 +126,7 @@ zugeordnet.
 | Im echten Browser: Position, Pegel, Tempo, Loop, Metronom, Laden ohne Aussetzer, OPFS | vorhanden, von Hand: `app/tool/web_core_check.sh`, `app/tool/web_store_check.sh` (#34, #35, #42); Lücke: automatischer Lauf im Browser | #13 |
 | Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6), jede Funktion der C-API in einem Referenzfall | vorhanden: `reference_tests` (nativ `--dump`, WASM `--compare`), `reference_api_coverage` (#9/AK7), `core_build_flags_test.dart` (ohne FMA) | – |
 | `flutter build web` und `flutter test --platform chrome` bei jedem Push | Lücke | #13 |
-| Content-Security-Policy mit erlaubten Hosts | Lücke | #58 |
+| Content-Security-Policy mit erlaubten Hosts | vorhanden: `app/web/index.html`, `app/tool/network_free_test.dart` (#58/AK4), im Browser von Hand geprüft | – |
 | Web-Audio auf iPhone und Android | vorhanden unter Node.js: `core/web/w0_test.mjs`; Lücke: auf echten Geräten nur von Hand | #32 |
 
 ### Abgleich/Sync
@@ -140,7 +140,7 @@ zugeordnet.
 | Zufallsfolgen auf 2–4 Geräten: gleicher Stand, zweiter Abgleich ändert nichts, kein Verlust | vorhanden: `property/sync_property_test.dart` (#10/AK6) | – |
 | Verfälschte Sync-Dateien aus der Cloud ohne Absturz und ohne Datenverlust, mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7) | – |
 | Zusammenführen von 10'000 Titeln ≤ 2 s | Lücke | #59 |
-| Nur die Anbietermodule öffnen Verbindungen | Lücke | #58 |
+| Nur die Anbietermodule (`app/lib/sync/providers/`) öffnen Verbindungen, keine Analyse- oder Werbepakete, kein Netzwerk im Kern | vorhanden: `make network-free`, `app/tool/network_free_test.dart` (#58) | – |
 | Anbieter Google Drive, OneDrive, direkte Verbindung | Lücke (noch nicht umgesetzt) | #54, #55, #56 |
 
 ### Oberfläche und Sprache
@@ -175,6 +175,7 @@ zugeordnet.
 | C-API (`player.cpp`) über die geteilte Bibliothek: Nullzeiger, Laden, Seek, Tempo, Loop, Wellenform, Metronom, Aufnahme im Ruhezustand | vorhanden: `core/tests/capi_tests.cpp` (#8) | – |
 | Mutationstests | Lücke | #11 |
 | Übersichtsseite Testqualität | Lücke | #12 |
+| Netzwerkfreiheit bei jedem Push: Prüfung mit eigenen Tests | vorhanden: `make network-free`, Job `network-free` in `test-quality.yml`, `test_quality_workflow_test.dart` (#58/AK6) | – |
 
 ## Ausführen
 
@@ -188,6 +189,7 @@ make fuzz           # libFuzzer mit ASan/UBSan auf Decoder und C-API, FUZZ_SECON
 make property       # Zufallstests der App mit PROPERTY_CASES Fällen und Startwert PROPERTY_SEED
 make coverage       # alle Tests mit Abdeckung, Prüfung je Teil gegen tools/coverage-min
 make coverage-diff  # Abdeckung der seit BASE geänderten Zeilen (Vorgabe origin/main), ein Hinweis
+make network-free   # kein Netzwerkcode ausserhalb der Anbietermodule, Sperrliste, Kern, CSP (#58)
 make format         # dart format (app/) und clang-format (core/, ohne third_party)
 make format-check   # schlägt fehl, wenn eine Datei nicht formatiert ist
 make lint           # flutter analyze (streng), C++ mit -Werror, clang-tidy
@@ -195,7 +197,7 @@ cd app && flutter test integration_test -d macos   # Rauchtest mit echtem Kern
 ```
 
 Noch nicht eingerichtet; die Ziele melden «noch nicht eingerichtet» mit Issue und brechen ab: `make mutants` (#11),
-`make report` (#12), `make network-free` (#58).
+`make report` (#12).
 
 Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten für `test-wasm`, Homebrew `llvm` für
 `clang-format`, `clang-tidy` und libFuzzer (`brew install llvm`; das Makefile findet sie unter
@@ -474,6 +476,63 @@ neue Golden-Datei.
 `make fuzz` (60 s je Ziel) und `make property` mit bis zu 2000 Fällen. Die Fuzz-Ziele laufen nicht unter
 WebAssembly. Eine beschädigte `state.json` bleibt in der Cloud liegen, bis ein Gerät sie ersetzt; eine Wiederherstellung
 aus `backup/` gibt es noch nicht.
+
+## Netzwerkfreiheit (#58)
+
+Das Versprechen «kein Netzwerk ausser beschlossenen Funktionen» (`CLAUDE.md`, README Datenschutz) prüft
+`make network-free`, auch nachdem die Cloud-Anbieter (#38) Netzwerkcode mitbringen. Das Ziel führt die Prüfung
+`app/tool/network_free.dart` aus, dann ihre Tests `app/tool/network_free_test.dart` und `app/test/sync_app_test.dart`
+(#37/AK2: ohne Konto entsteht kein `HttpClient`). Der Workflow `test-quality.yml` startet es im Job `network-free` bei
+jedem Push auf `main`, ohne Pfadfilter.
+
+**Erlaubter Ordner: `app/lib/sync/providers/`.** Nur dort darf Code Netzwerkpakete importieren (`package:http`,
+`dio`, `web_socket_channel` u. a.) oder Verbindungen öffnen (`HttpClient`, `HttpServer`, `WebSocket`, Sockets,
+`fetch`, `XMLHttpRequest`, `EventSource`, `sendBeacon`, `RTCPeerConnection`). Die Anbietermodule für Google Drive
+(#54), OneDrive (#55) und die direkte Verbindung (#56) legt #38 dort ab, auch den Loopback-Empfänger der Anmeldung
+am Desktop. Geprüft werden Dart, JavaScript und HTML in `app/lib/`, `app/packages/`, `app/web/` und die Dateien, die
+`build_web_core.sh` aus `core/web/` in die App kopiert; Kommentare zählen nicht, Build-Ordner und die erzeugte Kopie
+`app/web/wp_core/` werden übersprungen. Jeder Treffer nennt Datei und Zeile.
+
+Das Laden eigener Dateien der Seite per `fetch` (gleicher Ursprung) ist erlaubt, wenn die Zeile oder eine der zwei
+darüber `network-free: own origin, <Grund>` trägt. Heute sind das zwei Stellen: der WASM-Kern in
+`audio_core_web.dart` und `sw.js`, der nur Anfragen an die eigene Seite weiterreicht. Für andere Netzwerkaufrufe
+gilt die Markierung nicht.
+
+**Sperrliste.** `app/pubspec.lock` darf keines der Pakete aus `blockedPackages` enthalten (Analyse, Absturzberichte,
+Werbung, Fernkonfiguration, z. B. `firebase_analytics`, `sentry_flutter`, `amplitude_flutter`, `mixpanel_flutter`,
+`google_mobile_ads`). Verglichen werden exakte Paketnamen; ein Paket mit ähnlichem Namen fällt nicht auf, ein neues
+Paket dieser Art kommt mit seinem Namen auf die Liste.
+
+**Kern.** `core/src/` und `core/include/` enthalten keine Netzwerkaufrufe und -header (`socket`, `connect`,
+`getaddrinfo`, `curl_*`, `sys/socket.h`, `NSURLSession`, Network.framework u. a.). `core/third_party/` wird nie gelesen.
+
+**Content Security Policy der Web-App** (`app/web/index.html`, `<meta http-equiv>`, GitHub Pages erlaubt keine
+eigenen Header). `connect-src` enthält genau `'self'` und die API- und Anmelde-Hosts der Anbieter: Google
+(`https://www.googleapis.com`, `https://oauth2.googleapis.com`, `https://accounts.google.com`), Dropbox
+(`https://api.dropboxapi.com`, `https://content.dropboxapi.com`; vorgegeben im Auftrag zu #58, obwohl Dropbox laut
+`docs/KONZEPT-SYNC.md` entfällt) und Microsoft (`https://graph.microsoft.com`,
+`https://login.microsoftonline.com`). Ein neuer Host braucht einen Kommentar im Issue und gehört in
+`allowedConnectSrc` und den Test. Die übrigen Direktiven:
+
+| Direktive | Wert | Grund |
+|---|---|---|
+| `default-src` | `'self'` | alles Übrige nur von der eigenen Seite |
+| `script-src` | `'self' 'wasm-unsafe-eval' 'sha256-…'` | eigene Skripte (Flutter, AudioWorklet, Worker); WebAssembly von CanvasKit und Audio-Kern; das Inline-Skript in `index.html` über seinen Hash. Ändert es sich, nennt die Prüfung den neuen Hash |
+| `style-src` | `'self' 'unsafe-inline'` | Flutter schreibt `<style>`-Elemente in die Seite |
+| `img-src`, `media-src` | `'self' data: blob:` bzw. `'self' blob:` | Bilder und Audio aus dem Speicher der Seite |
+| `font-src` | `'self' data:` | Schriften liegen bei der App |
+| `worker-src`, `manifest-src` | `'self'` | Service Worker, Decoder-Worker, Manifest |
+| `object-src`, `form-action` | `'none'` | keine Plugins, keine Formulare |
+| `base-uri` | `'self'` | `<base href>` nur auf die eigene Seite |
+
+Von Hand geprüft am 20.11.2026: `flutter build web`, lokal ausgeliefert, Chrome: App startet isoliert
+(`crossOriginIsolated`, Service Worker), Metronom läuft (WASM, AudioWorklet, Decoder-Worker), keine CSP-Meldung in
+der Konsole; ein `fetch` an einen fremden Host wird mit `connect-src` blockiert.
+
+**Grenzen.** Die Suche ist textbasiert: Netzwerkzugriff über Umwege (z. B. ein Plugin mit nativem Netzwerkcode, ein
+dynamisch zusammengesetzter Name) findet sie nicht; dafür prüfen die Sperrliste und `sync_app_test.dart` zur Laufzeit.
+Die direkte Verbindung (#56) braucht im Browser ihre Relay-Hosts in `connect-src`; sie kommen mit #56 dazu. Der Job im
+Workflow lässt sich erst nach dem Push beobachten.
 
 ## Hook nach dem Commit
 

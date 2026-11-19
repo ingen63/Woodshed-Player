@@ -1,4 +1,4 @@
-// #57, #10: sanitizer, fuzzing and random test runs in .github/workflows/test-quality.yml and the make targets
+// #57, #10, #58: sanitizer, fuzzing, random test and network check runs in .github/workflows/test-quality.yml and the make targets
 // they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -118,6 +118,28 @@ void main() {
       expect(property, contains("needs.nightly-gate.outputs.run == 'true'"));
       expect(property, contains('make property PROPERTY_CASES=3000'));
       expect(property, contains(r'PROPERTY_SEED=${{ github.run_id }}'));
+    });
+  });
+
+  group('#58/AK6 network check', () {
+    test('make network-free runs the check, its tests and the #37 test', () {
+      expect(makefile, contains('\nnetwork-free:\n'));
+      expect(makefile, isNot(contains('call not_yet,58')));
+      final target = makefile.substring(makefile.indexOf('\nnetwork-free:\n'));
+      final body = target.substring(0, target.indexOf('\n\n'));
+      expect(body, contains('dart app/tool/network_free.dart'));
+      expect(body, contains('tool/network_free_test.dart'));
+      // #58/AK5: without an account no HttpClient (#37/AK2) stays part of the check
+      expect(body, contains('test/sync_app_test.dart'));
+    });
+
+    test('runs on every push to main without a path filter, and by hand', () {
+      final job58 = job(workflow, 'network-free');
+      expect(job58, contains("github.event_name == 'push'"));
+      expect(job58, contains("github.event_name == 'workflow_dispatch'"));
+      expect(job58, isNot(contains('needs:')));
+      expect(job58, contains('runs-on: ubuntu-latest'));
+      expect(job58, contains('run: make network-free\n'));
     });
   });
 }

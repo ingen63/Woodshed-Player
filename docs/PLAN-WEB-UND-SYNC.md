@@ -209,6 +209,7 @@ Abgelöst durch `docs/KONZEPT-SYNC.md` (Mischform): Google Drive #54, OneDrive #
 - **App-Registrierung** bei Google und Microsoft (öffentliche Client-IDs, kein Geheimnis im Code). Das legst Du an, die IDs kommen in die Konfiguration.
 - Token-Ablage: Desktop im Schlüsselbund bzw. Credential Store, Web in IndexedDB. Ziel sind Refresh-Tokens, wo der Anbieter sie für Web-Apps ausgibt (OneDrive). Bei Google gibt es ohne eigenen Server nur kurzlebige Zugriffstokens, deshalb stille Neuanmeldung, im Zweifel ein Tippen.
 - Kontingent anzeigen, Warnung bei fast vollem Speicher.
+- **Ablage und Netzwerkprüfung (#58):** Alle Anbietermodule und jeder andere Netzwerkcode liegen in `app/lib/sync/providers/`, nur dort erlaubt `make network-free` Netzwerkpakete und Verbindungen. Die Web-App erlaubt Verbindungen per Content Security Policy (`app/web/index.html`) nur zur eigenen Seite und zu den API- und Anmelde-Hosts von Google, Dropbox und Microsoft; weitere Hosts (z. B. Download-Adressen von OneDrive, Relays der direkten Verbindung) kommen mit dem jeweiligen Issue in die Liste und den Test. Einzelheiten in `docs/TESTS.md`.
 
 ### W7 – PWA und Handy-Bedienung (4–6 Tage)
 - Manifest, Icons, Service Worker (Offline-Start der App-Hülle), Hinweis «Zum Home-Bildschirm» für iOS.

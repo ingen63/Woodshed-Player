@@ -43,6 +43,7 @@ class WebAudioCore implements AudioCore {
     required WebFileBytes bytesOf,
     String base = assetDir,
   }) async {
+    // network-free: own origin, the core's WASM file next to the app (#58)
     final response = await web.window
         .fetch('${base}wp_core_web.wasm'.toJS)
         .toDart;

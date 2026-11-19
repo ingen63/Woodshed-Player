@@ -103,7 +103,7 @@ void main() {
       ]) {
         expect(files.where((f) => f.endsWith(module)), isEmpty, reason: module);
       }
-      // no HTTP client anywhere in the app yet (providers come with #38)
+      // no HTTP client anywhere in the app yet (providers come with #38 in app/lib/sync/providers/, #58)
       for (final f in files) {
         final text = File(f).readAsStringSync();
         expect(

@@ -21,6 +21,7 @@ function isolate(response) {
 
 /** Network first. #39 adds the cache fallback for the offline start here. */
 async function respond(request) {
+  // network-free: own origin, the fetch listener passes only same-origin requests (#58)
   return isolate(await fetch(request));
 }
 

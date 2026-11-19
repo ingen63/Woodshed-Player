@@ -6,6 +6,8 @@
 # - fuzz: libFuzzer with ASan/UBSan (make fuzz, #10) on the decoder and the C API, nightly after a new
 #   commit and on manual start. A finding fails the job; the input is kept as an artifact.
 # - property: the Dart random tests (#10) with many cases and a new seed every night, same gate.
+# - network-free: the network check (make network-free, #58) on every push to main, whatever it changes,
+#   and on manual start.
 # Every sanitizer finding fails its test and with it the job (core/CMakeLists.txt, WP_SANITIZE).
 # Strategy, runs and suppressions: docs/TESTS.md. #13 adds further jobs to this file; the checks for
 # changed paths live in the job «changes», so new jobs can use their own paths.
@@ -71,6 +73,20 @@ jobs:
         run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: make sanitize (#57/AK1)
         run: make sanitize
+
+  network-free:
+    name: Network freedom (#58)
+    # every push, no path filter: any file can bring network code; and on manual start
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: make network-free (#58/AK6)
+        run: make network-free
 
   nightly-gate:
     if: github.event_name == 'schedule'
