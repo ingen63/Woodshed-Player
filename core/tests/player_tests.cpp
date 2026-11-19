@@ -1,6 +1,7 @@
 // Tests des Player-Kerns (#14) ohne Audiogerät: Laden von WAV/FLAC/MP3, Fehlerfälle, Laden im
 // Hintergrund, Gerätewechsel, Dateiende, Seek und Loop-Grenzen mit geladenen Dateien. WAV-Dateien
 // werden hier erzeugt; FLAC/MP3 stammen aus core/tools/make_test_audio.sh (Sinus 440 Hz, 1 s).
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cmath>
@@ -576,6 +577,81 @@ void errorMessagesAreEnglishAscii() { // #46/AK1
   }
 }
 
+// #57/AK2: a render thread plays like the audio device while this thread controls play, pause,
+// seek, tempo, loop, metronome and loads a new title. Under ThreadSanitizer (make sanitize-thread)
+// every data race fails the run; in every build the output stays finite and the final state
+// follows the last commands.
+void controlFromSecondThreadWhileRendering() {
+  const fs::path wav = writeIndexWav("race4s.wav", 4LL * kSr);
+  wp::Player p(kSr);
+  CHECK(p.load(wav.string()) == wp::kOk);
+  std::atomic<bool> stop{false};
+  std::atomic<bool> finite{true};
+  std::atomic<long long> blocks{0};
+  std::thread audio([&] {
+    std::vector<float> out(256 * 2);
+    while (!stop.load()) {
+      p.render(out.data(), 256);
+      for (float x : out)
+        if (!std::isfinite(x))
+          finite.store(false);
+      blocks.fetch_add(1);
+    }
+  });
+  auto waitBlocks = [&](long long n) {
+    const long long target = blocks.load() + n;
+    while (blocks.load() < target)
+      std::this_thread::yield();
+  };
+  wp::Engine &e = p.engine();
+  wp::Metronome &m = p.metronome();
+  for (int i = 0; i < 200; ++i) {
+    e.play();
+    e.seek((i % 35) / 10.0);
+    e.setRate(0.5 + (i % 16) / 10.0);
+    if (i % 3 == 0)
+      e.setLoop(1.0, 3.0);
+    if (i % 7 == 0)
+      e.setLoop(0, 0);
+    if (i % 5 == 0)
+      e.pause();
+    if (i % 4 == 0) {
+      m.start();
+      m.setBpm(60 + i);
+      m.setSubdivision(1 + i % 4);
+    }
+    if (i % 9 == 0)
+      m.stop();
+    (void)e.position();
+    (void)e.loopPasses();
+    if (i % 50 == 25) {
+      CHECK(p.loadAsync(wav.string()) == wp::kOk); // loader thread runs alongside
+      e.collectGarbage();
+    }
+    if (i % 20 == 0)
+      waitBlocks(1);
+  }
+  CHECK(p.waitForLoad() == wp::kOk);
+  e.collectGarbage();
+  // Loop 1–3 s, tempo 1.5, playing: after 2 s of output the position is inside the loop.
+  e.setLoop(1.0, 3.0);
+  e.seek(1.5);
+  e.setRate(1.5);
+  e.play();
+  m.stop();
+  waitBlocks(2LL * kSr / 256);
+  stop = true;
+  audio.join();
+  CHECK(finite.load());
+  CHECK(e.playing());
+  CHECK(e.rate() == 1.5);
+  CHECK(e.position() >= 1.0 - 1e-6 && e.position() <= 3.0 + 1e-6);
+  e.pause();
+  float frame[2];
+  p.render(frame, 1);
+  CHECK(!e.playing());
+}
+
 } // namespace
 
 int main() {
@@ -599,6 +675,7 @@ int main() {
       {"emptyAudioIsUnsupported", emptyAudioIsUnsupported},
       {"convertPcmToPlayerFormat", convertPcmToPlayerFormat},
       {"setSourceWithoutPeaks", setSourceWithoutPeaks},
+      {"controlFromSecondThreadWhileRendering", controlFromSecondThreadWhileRendering},
   };
   for (auto &[name, fn] : tests) {
     const int before = failures;

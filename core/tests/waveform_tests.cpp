@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "test_timing.hpp"
 #include "waveform.hpp"
 
 namespace {
@@ -111,8 +112,8 @@ void overviewIsFast() { // #28/AK5: 5 Minuten, 1000 Werte, auf dem Mac unter 200
   const double query = std::chrono::duration<double, std::milli>(t2 - t1).count();
   std::printf("  5 min: computed while loading %.1f ms, overview of 1000 values %.2f ms\n", build,
               query);
-  CHECK(build < 200.0);
-  CHECK(query < 20.0);
+  CHECK(!kTimingChecks || build < 200.0);
+  CHECK(!kTimingChecks || query < 20.0);
 }
 
 } // namespace

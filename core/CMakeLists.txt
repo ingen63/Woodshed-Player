@@ -46,6 +46,20 @@ if(WP_COVERAGE)
   add_link_options(-fprofile-instr-generate)
 endif()
 
+# #57: sanitizers (make sanitize, make sanitize-thread). WP_SANITIZE is a -fsanitize list, e.g.
+# "address,undefined" or "thread". It instruments every target of this build, third-party code
+# included, so findings there show up too (they are reported, not fixed there). Any finding aborts
+# the program (-fno-sanitize-recover), so the test fails. Fuzz targets (#10) inherit these flags
+# and only add "fuzzer" for their own target. Suppressions: tests/sanitizer/*.supp, each with a
+# reason (docs/TESTS.md).
+set(WP_SANITIZE "" CACHE STRING "Sanitizers to build with, e.g. address,undefined or thread")
+if(WP_SANITIZE)
+  add_compile_options(-fsanitize=${WP_SANITIZE} -fno-sanitize-recover=all -fno-omit-frame-pointer
+    -g)
+  add_link_options(-fsanitize=${WP_SANITIZE})
+  add_compile_definitions(WP_SANITIZED=1)
+endif()
+
 if(EMSCRIPTEN)
   include(web/web.cmake)  # eigener Zweig: Tests unter Node.js, Kern fürs AudioWorklet
   return()
@@ -138,3 +152,51 @@ target_link_libraries(capi_tests PRIVATE wp_core)
 target_compile_definitions(capi_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
 wp_strict_warnings(capi_tests)
 add_test(NAME capi_tests COMMAND capi_tests)
+
+# #57/AK4: no allocation and no blocking lock in the render path (Player::render)
+add_executable(realtime_tests tests/realtime_tests.cpp)
+target_link_libraries(realtime_tests PRIVATE wp_playercore ${CMAKE_DL_LIBS})
+wp_strict_warnings(realtime_tests)
+add_test(NAME realtime_tests COMMAND realtime_tests)
+
+# #57: in a sanitizer build every test runs with these options; a finding ends the test with a
+# non-zero exit code. Suppression files in tests/sanitizer/ (each entry with a reason).
+if(WP_SANITIZE)
+  set(WP_SAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests/sanitizer)
+  set(WP_SAN_ENV
+    "UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:suppressions='${WP_SAN_DIR}/ubsan.supp'"
+    "TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1:suppressions='${WP_SAN_DIR}/tsan.supp'")
+  if(APPLE)
+    # LeakSanitizer is not supported with ASan on macOS
+    list(APPEND WP_SAN_ENV "ASAN_OPTIONS=halt_on_error=1:detect_stack_use_after_return=1")
+  else()
+    list(APPEND WP_SAN_ENV
+      "ASAN_OPTIONS=halt_on_error=1:detect_leaks=1:detect_stack_use_after_return=1"
+      "LSAN_OPTIONS=suppressions='${WP_SAN_DIR}/lsan.supp'")
+  endif()
+  get_property(wp_tests DIRECTORY PROPERTY TESTS)
+  set_tests_properties(${wp_tests} PROPERTIES ENVIRONMENT "${WP_SAN_ENV}")
+
+  # Self-test: a deliberate bug per sanitizer must be reported and fail (expect_finding.cmake)
+  add_executable(sanitizer_selftest tests/sanitizer/selftest.cpp)
+  target_link_libraries(sanitizer_selftest PRIVATE Threads::Threads)
+  set(wp_san_modes)
+  if(WP_SANITIZE MATCHES "address")
+    list(APPEND wp_san_modes "address|AddressSanitizer: heap-buffer-overflow")
+  endif()
+  if(WP_SANITIZE MATCHES "undefined")
+    list(APPEND wp_san_modes "undefined|runtime error: signed integer overflow")
+  endif()
+  if(WP_SANITIZE MATCHES "thread")
+    list(APPEND wp_san_modes "thread|ThreadSanitizer: data race")
+  endif()
+  foreach(entry IN LISTS wp_san_modes)
+    string(REPLACE "|" ";" parts "${entry}")
+    list(GET parts 0 mode)
+    list(GET parts 1 pattern)
+    add_test(NAME sanitizer_selftest_${mode}
+      COMMAND ${CMAKE_COMMAND} -DBIN=$<TARGET_FILE:sanitizer_selftest> -DMODE=${mode}
+        "-DPATTERN=${pattern}" -P ${WP_SAN_DIR}/expect_finding.cmake)
+    set_tests_properties(sanitizer_selftest_${mode} PROPERTIES ENVIRONMENT "${WP_SAN_ENV}")
+  endforeach()
+endif()

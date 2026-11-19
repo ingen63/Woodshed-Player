@@ -3,7 +3,7 @@
 # (clang-format, clang-tidy). core/third_party/ is never formatted, linted or read.
 .PHONY: help test test-core test-wasm test-app test-hook test-tools format format-check lint lint-dart \
         lint-core coverage coverage-run coverage-core coverage-app coverage-diff mutants fuzz report \
-        sanitize network-free
+        sanitize sanitize-thread test-core-debug network-free
 
 SHELL := /bin/bash
 # A failing build must not be hidden by `| tail` (GNU Make 3.81 on macOS has no .SHELLFLAGS).
@@ -27,6 +27,9 @@ CPP_FILES  = $(LS_FILES) -- core | grep -v '^core/third_party/' | grep -E '\.(c|
 help:
 	@echo "make test           core (ctest), app (flutter test) and the hook tests"
 	@echo "make test-wasm      core tests under Node.js (Emscripten)"
+	@echo "make test-core-debug core tests in a Debug build (same cases and tolerances as Release)"
+	@echo "make sanitize       core tests with AddressSanitizer and UndefinedBehaviorSanitizer"
+	@echo "make sanitize-thread core tests with ThreadSanitizer"
 	@echo "make format         dart format and clang-format"
 	@echo "make format-check   fails if a file is not formatted"
 	@echo "make lint           flutter analyze (strict), C++ warnings as errors, clang-tidy"
@@ -40,6 +43,13 @@ test-core:
 	cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release >/dev/null
 	$(PIPEFAIL) cmake --build core/build -j 8 2>&1 | tail -20
 	ctest --test-dir core/build --output-on-failure
+
+# #57/AK3: the same tests in Debug (asserts on, no optimisation), same tolerances as Release.
+# Only time limits are skipped there (core/tests/test_timing.hpp).
+test-core-debug:
+	cmake -S core -B core/build-debug -DCMAKE_BUILD_TYPE=Debug >/dev/null
+	$(PIPEFAIL) cmake --build core/build-debug -j 8 2>&1 | tail -20
+	ctest --test-dir core/build-debug --output-on-failure -j 4
 
 test-wasm:
 	emcmake cmake -S core -B core/build-wasm -DCMAKE_BUILD_TYPE=Release >/dev/null
@@ -109,6 +119,23 @@ coverage-app:
 coverage-diff: coverage-run
 	dart app/tool/coverage_diff.dart --base $(BASE)
 
+# ---- Sanitizers (#57), docs/TESTS.md ----
+# Separate Debug builds, core/build stays untouched. WP_SANITIZE instruments every target (also
+# third_party) and sets the sanitizer options for ctest; any finding fails its test. A
+# self-test with a deliberate bug per sanitizer proves that. Fuzz targets (#10) build in the same
+# way with -DWP_SANITIZE=address,undefined.
+sanitize:
+	cmake -S core -B core/build-asan -DCMAKE_BUILD_TYPE=Debug -DWP_SANITIZE=address,undefined >/dev/null
+	$(PIPEFAIL) cmake --build core/build-asan -j 8 2>&1 | tail -20
+	ctest --test-dir core/build-asan --output-on-failure -j 4
+
+# #57/AK2: ThreadSanitizer; player_tests and engine_tests control playback, seek, tempo and loop
+# from other threads while rendering.
+sanitize-thread:
+	cmake -S core -B core/build-tsan -DCMAKE_BUILD_TYPE=Debug -DWP_SANITIZE=thread >/dev/null
+	$(PIPEFAIL) cmake --build core/build-tsan -j 8 2>&1 | tail -20
+	ctest --test-dir core/build-tsan --output-on-failure -j 4
+
 # ---- Not set up yet ----
 define not_yet
 	@echo "make $@: noch nicht eingerichtet (#$(1))"; exit 1
@@ -117,5 +144,4 @@ endef
 mutants:       ; $(call not_yet,11)
 fuzz:          ; $(call not_yet,10)
 report:        ; $(call not_yet,12)
-sanitize:      ; $(call not_yet,57)
 network-free:  ; $(call not_yet,58)

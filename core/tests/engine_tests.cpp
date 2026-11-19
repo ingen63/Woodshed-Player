@@ -13,6 +13,7 @@
 #include "command_queue.hpp"
 #include "engine.hpp"
 #include "metronome.hpp"
+#include "test_timing.hpp"
 
 // Zählt Speicherreservierungen und -freigaben im markierten Thread (#14/AK1).
 namespace {
@@ -500,7 +501,7 @@ void renderDoesNotAllocate() { // #14/AK1: Audio-Thread reserviert keinen Speich
   CHECK(e.playing());
 }
 
-void commandsFromManyThreadsWhileRendering() { // #14/AK1
+void commandsFromManyThreadsWhileRendering() { // #14/AK1, #57/AK2
   const int sr = 8000;
   wp::Engine e;
   e.setSource(sine(440, 10.0, sr), 2, sr);
@@ -513,7 +514,7 @@ void commandsFromManyThreadsWhileRendering() { // #14/AK1
     controllers.emplace_back([&e, &stop, t] {
       int i = 0;
       while (!stop.load()) {
-        switch ((i++ + t) % 4) {
+        switch ((i++ + t) % 6) {
         case 0:
           e.seek((i % 90) / 10.0);
           break;
@@ -522,6 +523,12 @@ void commandsFromManyThreadsWhileRendering() { // #14/AK1
           break;
         case 2:
           e.setVolume((i % 10) / 10.0f);
+          break;
+        case 3: // #57/AK2: loop and pause from other threads, too
+          e.setLoop(1.0 + (i % 3), 6.0 + (i % 3));
+          break;
+        case 4:
+          e.pause();
           break;
         default:
           e.play();
@@ -565,7 +572,7 @@ void seeksAreCoalescedPerBlock() { // #14/AK1: viele Seeks in einem Block kosten
   const double ms =
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
   CHECK_NEAR(e.position(), 4.0, 1e-3);
-  CHECK(ms < 50.0);
+  CHECK(!kTimingChecks || ms < 50.0);
   if (ms >= 50.0)
     std::printf("  block with 1001 seeks: %.1f ms\n", ms);
 

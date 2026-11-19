@@ -1,0 +1,111 @@
+# Test quality (#57, extended by #13): sanitizer runs of the C++ audio core on Linux.
+# - sanitize: AddressSanitizer and UndefinedBehaviorSanitizer (make sanitize) on every push to main
+#   that changes core/ (or this workflow, the Makefile), and on manual start.
+# - sanitize-thread: ThreadSanitizer (make sanitize-thread) every night, only if main has a new
+#   commit since the last successful nightly run, and on manual start.
+# Every sanitizer finding fails its test and with it the job (core/CMakeLists.txt, WP_SANITIZE).
+# Strategy, runs and suppressions: docs/TESTS.md. #13 adds further jobs to this file; the checks for
+# changed paths live in the job «changes», so new jobs can use their own paths.
+name: Test quality
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 2 * * *'  # nightly, 02:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-quality-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.diff.outputs.core }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Paths changed by the push
+        id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "core=true" >> "$GITHUB_OUTPUT"   # new branch or unknown base: run everything
+            exit 0
+          fi
+          if git diff --name-only "$BEFORE" "$GITHUB_SHA" \
+             | grep -qE '^(core/|Makefile$|\.github/workflows/test-quality\.yml$)'; then
+            echo "core=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "core=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  sanitize:
+    name: ASan and UBSan (core)
+    needs: changes
+    # runs after «changes» on push, and on manual start (then «changes» is skipped)
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'push' && needs.changes.outputs.core == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Address space layout for the sanitizers
+        # newer Ubuntu kernels use more ASLR bits than the sanitizer runtimes of older clang accept
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: make sanitize (#57/AK1)
+        run: make sanitize
+
+  nightly-gate:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - name: New commit since the last successful nightly run?
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow test-quality.yml \
+            --event schedule --status success --limit 1 --json headSha --jq '.[0].headSha // ""')
+          if [ "$last" = "$GITHUB_SHA" ]; then
+            echo "No new commit since $last, ThreadSanitizer run skipped."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  sanitize-thread:
+    name: TSan (core)
+    needs: nightly-gate
+    # nightly after the gate, and on manual start (then the gate is skipped)
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'schedule' && needs.nightly-gate.outputs.run == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Address space layout for the sanitizers
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: make sanitize-thread (#57/AK2)
+        run: make sanitize-thread

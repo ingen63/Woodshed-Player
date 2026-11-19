@@ -26,7 +26,7 @@ VivaPlan.
 | 1 Einheiten | `app/test/*_test.dart`, `core/tests/*_tests.cpp` | Zeitformat, Bibliothek, Stempel und Zusammenführen, Metadaten, Player-Service, Metronom-Logik, Engine, Befehls-Queue, Wellenform | vorhanden |
 | 2 Audio-Referenzfälle | `core/tests/engine_tests.cpp`, `metronome_tests.cpp`, `player_tests.cpp`; im Web dieselben Fälle unter Node.js (`core/build-wasm`) | Offline-Rendering ohne Audiogerät: Loop-Naht, Seek, Tempo und Tonhöhe, Klickpositionen | teilweise, Ausbau #9 |
 | 3 Invarianten und Zufallstests | – | Eigenschaften über viele zufällige Fälle mit festem, ausgegebenem Startwert | Lücke, #10 |
-| 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | teilweise, #10 und #57 |
+| 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler); alle Kerntests unter ASan/UBSan und TSan (`make sanitize`, `make sanitize-thread`) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | teilweise (Sanitizer vorhanden, #57), Fuzzing #10 |
 | 5 Golden-Dateien | `app/test/golden/` (`library.json` der Swift-App, alt und neu) | jede Version liest alle alten Stände; Klickpositionen des Metronoms | teilweise, #9 und #10 |
 | 6 Oberfläche | Widget-Tests in `app/test/`, Rauchtest `app/integration_test/app_smoke_test.dart`, Prüfseiten im Browser `app/tool/web_*_check.dart` | Layout je Grösse, Bedienung, Texte, Tastenkürzel | teilweise, #13 |
 | Werkzeuge | `app/tool/after_commit_hook_test.dart`, `coverage_test.dart`, `pre_push_hook_test.dart` | Hook nach dem Commit, Abdeckung je Teil, `coverage-diff`, `pre-push` | vorhanden (#7, #8) |
@@ -61,11 +61,11 @@ zugeordnet.
 | Laden im Hintergrund, neueres Laden ersetzt laufendes, Fehler mit Code und englischem Text | vorhanden: `player_tests.cpp` (`loadRunsInBackground`, `newerLoadReplacesRunningLoad`, `loadErrorsHaveCodeAndText`, `errorMessagesAreEnglishAscii`), `player_service_test.dart` (#15/AK3), `core_error_texts_test.dart` (#46) | – |
 | Play, Pause, Seek, ±15 s, Lautstärke, Dateiende | vorhanden: `engine_tests.cpp` (`seekSetsPositionAndFirstSample`, `endOfFileStopsAndRestarts`, `volumeScalesDirectOutput`), `player_service_test.dart` (#15/AK1) | – |
 | Gerätewechsel pausiert, Position bleibt | vorhanden: `player_tests.cpp` (`devicePolicy`, `deviceChangePausesAndKeepsPosition`) | – |
-| Render-Pfad ohne Speicheranforderung, Befehle aus vielen Threads | vorhanden: `engine_tests.cpp` (`renderDoesNotAllocate`, `commandsFromManyThreadsWhileRendering`, Queue-Fälle) | – |
+| Render-Pfad ohne Speicheranforderung und ohne Sperre, Befehle aus vielen Threads | vorhanden: `engine_tests.cpp` (`renderDoesNotAllocate`, `commandsFromManyThreadsWhileRendering`, Queue-Fälle), `realtime_tests.cpp` (#57/AK4, `Player::render` mit Tempo, Loop, Metronom), `player_tests.cpp` (`controlFromSecondThreadWhileRendering`, #57/AK2) | – |
 | Wellenform (Minimum/Maximum je Abschnitt, Grenzen) | vorhanden: `waveform_tests.cpp`, `wp_waveform_ffi_test.dart`, `web_binding_test.dart` (#34/AK3) | – |
 | Seek auf t beginnt bei Sample round(t × Abtastrate); Pause und Fortsetzen ohne verlorenes Sample | Lücke (Seek nur Position und erstes Sample) | #9 |
 | Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | Lücke | #10 |
-| AddressSanitizer, UBSan, ThreadSanitizer | Lücke | #57 |
+| AddressSanitizer, UBSan, ThreadSanitizer | vorhanden: `make sanitize`, `make sanitize-thread`, Selbsttest `tests/sanitizer/selftest.cpp`, Workflow `test-quality.yml` (#57) | – |
 | Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | Lücke | #59 |
 
 ### Tempo
@@ -158,7 +158,8 @@ zugeordnet.
 |---|---|---|
 | macOS- und iOS-Build bei jeder Änderung an Kern oder Plugin | vorhanden: Hook nach dem Commit (`.claude/hooks/after-commit.sh`), geprüft in `app/tool/after_commit_hook_test.dart` | – |
 | Swift-Altprojekt: Tests und iOS-Build | vorhanden: `WoodshedPlayerTests/` über den Hook (`xcodebuild`) | – |
-| Workflow `test-quality.yml` auf Linux, macOS/iOS nächtlich, Rauchtest der gebauten App | Lücke | #13 |
+| Workflow `test-quality.yml`: Sanitizer-Läufe des Kerns auf Linux | vorhanden: `test-quality.yml` (Jobs `sanitize`, `sanitize-thread`), `test_quality_workflow_test.dart` (#57) | – |
+| Workflow `test-quality.yml`: übrige Tests auf Linux, macOS/iOS nächtlich, Rauchtest der gebauten App | Lücke | #13 |
 | Windows und Linux: Build, Tests, Windows-Pfade | Lücke | #60 |
 
 ### Hygiene und Werkzeuge
@@ -178,6 +179,9 @@ zugeordnet.
 ```sh
 make test           # Kern (ctest), App (flutter test) und die Tests der Werkzeuge
 make test-wasm      # Kern unter Node.js (Emscripten)
+make test-core-debug  # Kerntests im Debug-Build (core/build-debug), gleiche Toleranzen wie Release
+make sanitize       # Kerntests mit AddressSanitizer und UBSan (core/build-asan)
+make sanitize-thread  # Kerntests mit ThreadSanitizer (core/build-tsan)
 make coverage       # alle Tests mit Abdeckung, Prüfung je Teil gegen tools/coverage-min
 make coverage-diff  # Abdeckung der seit BASE geänderten Zeilen (Vorgabe origin/main), ein Hinweis
 make format         # dart format (app/) und clang-format (core/, ohne third_party)
@@ -187,7 +191,7 @@ cd app && flutter test integration_test -d macos   # Rauchtest mit echtem Kern
 ```
 
 Noch nicht eingerichtet; die Ziele melden «noch nicht eingerichtet» mit Issue und brechen ab: `make mutants` (#11),
-`make fuzz` (#10), `make report` (#12), `make sanitize` (#57), `make network-free` (#58).
+`make fuzz` (#10), `make report` (#12), `make network-free` (#58).
 
 Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten für `test-wasm`, Homebrew `llvm` für
 `clang-format` und `clang-tidy` (`brew install llvm`; das Makefile findet sie unter `$(brew --prefix llvm)/bin`).
@@ -281,6 +285,60 @@ genannt):
   verwendet werden; sie zählen mit.
 - **Zähler über 64 Bit:** Beim Zusammenführen der Profile mehrerer Testprogramme meldet `llvm-cov` für einzelne
   Inline-Funktionen aus Headern («mismatched data») übergelaufene Zähler; sie gelten als ausgeführt.
+
+## Sanitizer und Echtzeitsicherheit (#57)
+
+**Läufe.** Der Schalter `WP_SANITIZE` in `core/CMakeLists.txt` (Liste für `-fsanitize`) instrumentiert alle Ziele
+eines Builds, auch die Bibliotheken aus `core/third_party/`, und setzt für jeden `ctest`-Fall die Optionen der
+Sanitizer (`halt_on_error=1`, `-fno-sanitize-recover=all`). Jeder Fund beendet das Testprogramm mit einem Fehlercode
+und lässt den Lauf scheitern. Die Builds liegen in eigenen Ordnern, `core/build` bleibt unberührt:
+
+| Ziel | Build | Sanitizer | Workflow `test-quality.yml` (Linux) |
+|---|---|---|---|
+| `make sanitize` | `core/build-asan`, Debug | AddressSanitizer, UndefinedBehaviorSanitizer; unter Linux mit LeakSanitizer | Job `sanitize`: bei jedem Push auf `main` mit Änderung in `core/` (oder an `Makefile`, Workflow), von Hand startbar |
+| `make sanitize-thread` | `core/build-tsan`, Debug | ThreadSanitizer | Job `sanitize-thread`: nächtlich, nur wenn `main` seit dem letzten erfolgreichen Nachtlauf einen neuen Commit hat; von Hand startbar |
+| `make test-core-debug` | `core/build-debug`, Debug | – | – (#13) |
+| `make test-core` | `core/build`, Release | – | – (#13) |
+
+Lokal laufen sie auf macOS mit Apple-Clang, im Workflow unter Linux mit Clang. Der Selbsttest
+`core/tests/sanitizer/selftest.cpp` enthält je Sanitizer einen absichtlichen Fehler (Pufferüberlauf,
+Ganzzahlüberlauf, Wettlauf); `expect_finding.cmake` verlangt Meldung und Fehlercode. Er beweist, dass ein Fund die
+Tests wirklich scheitern lässt.
+
+**Wettläufe (AK2).** Unter ThreadSanitizer steuern `engine_tests.cpp` (`commandsFromManyThreadsWhileRendering`: drei
+Threads mit Seek, Tempo, Lautstärke, Loop, Pause, Play) und `player_tests.cpp` (`controlFromSecondThreadWhileRendering`:
+ein Render-Thread wie das Audiogerät, gesteuert werden Play, Pause, Seek, Tempo, Loop, Metronom und Laden im
+Hintergrund) die Wiedergabe, während gerendert wird.
+
+**Debug und Release (AK3).** Alle Kerntests laufen in Debug (`make test-core-debug`, auch die Sanitizer-Builds) und in
+Release (`make test-core`) mit denselben Fällen und denselben Toleranzen; es gibt keine Toleranz je Build. Nur die
+Zeitgrenzen (Wellenform in 200 ms, 1001 Seeks in 50 ms) prüfen ausschliesslich optimierte Builds ohne Sanitizer
+(`core/tests/test_timing.hpp`). Die Referenzfälle und Golden-Dateien aus #9 kommen als `ctest`-Fälle dazu und laufen
+damit ohne weitere Einrichtung in allen vier Builds.
+
+**Echtzeitsicherheit (AK4).** `core/tests/realtime_tests.cpp` rendert über `Player::render` (das ruft der Callback des
+Audiogeräts) mit Tempo 0,75, 1,5, 0,5 und 1,25, Loop, Metronom mit Taktart, Unterteilung und Steigerung, Seek,
+Lautstärke und Titelwechsel und zählt im Render-Thread jede Speicheranforderung und -freigabe (alle ersetzbaren
+`operator new`/`delete`) und, unter Linux mit glibc ohne Sanitizer, zusätzlich `malloc`, `calloc`, `realloc`, `free`,
+`posix_memalign`, `aligned_alloc` und `pthread_mutex_lock`. Erwartet wird 0. Ein Gegentest im selben Programm zeigt,
+dass der Zähler Anforderungen und Sperren sieht. Die geteilten Atomics müssen sperrfrei sein (`static_assert`).
+Grenze: Auf macOS lassen sich `malloc` und Sperren aus dem Testprogramm nicht abfangen; dort zählen nur `operator new`
+und `delete`, den Rest prüft der Linux-Lauf.
+
+**Fuzzing (AK5).** Fuzz-Ziele aus #10 bauen im selben Build mit `-DWP_SANITIZE=address,undefined` und ergänzen nur
+für ihr eigenes Ziel `-fsanitize=fuzzer`; sie erben damit ASan, UBSan und die Optionen für `ctest`.
+
+**Unterdrückungen (AK6).** In `core/tests/sanitizer/` liegen `ubsan.supp`, `tsan.supp` und `lsan.supp`. Jeder Eintrag
+braucht darüber einen Kommentar mit Meldung, Grund und Issue und steht in der folgenden Liste. Funde in
+`core/third_party/` werden gemeldet und unterdrückt, nicht dort behoben.
+
+| Sanitizer | Eintrag | Grund | Issue |
+|---|---|---|---|
+| – | keine | Stand 19.11.2026: ASan, UBSan und TSan melden in allen Kerntests nichts (macOS) | – |
+
+**Grenzen.** LeakSanitizer gibt es mit ASan auf macOS nicht; Lecks prüft nur der Linux-Lauf. `capi_tests` öffnet ein
+echtes Audiogerät; ohne Gerät (Linux-Runner) überspringt er die Ladefälle, der Callback des Geräts läuft dann nicht
+unter den Sanitizern.
 
 ## Hook nach dem Commit
 

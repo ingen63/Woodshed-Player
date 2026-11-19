@@ -1,0 +1,4 @@
+# LeakSanitizer suppressions (#57, Linux; macOS has no leak detection with ASan). Format:
+# leak:<function or library pattern>. Every entry needs a comment above it: what is reported, why
+# it is not a bug in our code or cannot be fixed here, and the issue that tracks it. docs/TESTS.md
+# lists every entry. Currently none.
