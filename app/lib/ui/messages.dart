@@ -1,5 +1,8 @@
 // UI texts that depend on data (#43): errors, storage line, sort order, ramp status. The texts themselves
 // live in lib/l10n/app_*.arb; numbers are formatted for the user's locale.
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:wp_core/wp_types.dart';
@@ -14,6 +17,30 @@ export '../l10n/app_localizations.dart';
 extension L10nContext on BuildContext {
   AppLocalizations get l10n => AppLocalizations.of(this);
 }
+
+/// Where the app runs, for hints that say how files come in (#42/AK4).
+enum HintPlatform { browser, macOS, mobile }
+
+HintPlatform get currentHintPlatform => kIsWeb
+    ? HintPlatform.browser
+    : Platform.isMacOS
+    ? HintPlatform.macOS
+    : HintPlatform.mobile;
+
+/// Hint in the player without a track: drag into the window on macOS, «Files» on iPhone/iPad, the
+/// browser's file picker on the web.
+String openFileHint(AppLocalizations l, HintPlatform p) => switch (p) {
+  HintPlatform.browser => l.openFileHintBrowser,
+  HintPlatform.macOS => l.openFileHintDrop,
+  HintPlatform.mobile => l.openFileHintFiles,
+};
+
+/// Hint in the empty library, as [openFileHint].
+String emptyLibraryHint(AppLocalizations l, HintPlatform p) => switch (p) {
+  HintPlatform.browser => l.emptyLibraryHintBrowser,
+  HintPlatform.macOS => l.emptyLibraryHintDrop,
+  HintPlatform.mobile => l.emptyLibraryHint,
+};
 
 /// Bytes with one decimal from KB on, in the locale's notation: «512 B», «1,2 GB» (de), «1.2 GB» (en).
 String formatBytes(int bytes, String locale) {

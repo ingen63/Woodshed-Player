@@ -577,6 +577,16 @@ class Library extends ChangeNotifier {
     return true;
   }
 
+  /// Stores the duration the audio core found on loading, for tracks imported without one (in the
+  /// browser only the core knows it, #42/AK5). Known durations stay as they are.
+  void fillDuration(String id, double seconds) {
+    final i = _tracks.indexWhere((t) => t.id == id);
+    if (i < 0 || seconds <= 0 || _tracks[i].duration > 0) return;
+    _tracks[i] = _tracks[i].copyWith(duration: seconds);
+    save(); // at once: the page may be reloaded right after loading
+    notifyListeners();
+  }
+
   // ---- Einstellungen pro Titel ----
 
   void updateSettings(String id, PlaybackSettings settings) {

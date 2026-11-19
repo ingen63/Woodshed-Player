@@ -2,7 +2,10 @@
 // als Nachricht ans Worklet, Zustand (Position, Pegel, Loop-Durchgänge, Metronom) kommt etwa alle 10 ms als
 // Nachricht zurück. Die Getter der Schnittstelle sind synchron und lesen deshalb den zuletzt gemeldeten
 // Zustand. Die Wellenform holt die Anbindung einmal nach dem Laden (siehe WaveformSummary).
-// MP3, WAV und FLAC dekodiert der Kern im Worklet, AAC/M4A der Browser im Hauptthread (decodeAudioData).
+// Loading (#42): a Worker with a second instance of the core (wp_loader.js) decodes MP3, WAV and FLAC and
+// computes the waveform; AAC/M4A the browser decodes (decodeAudioData) and the Worker converts it. Only the
+// finished PCM goes to the worklet, which takes it over between render blocks, so playback and metronome
+// go on while a file loads.
 // Die Dateien liefert app/tool/build_web_core.sh nach web/wp_core/.
 import 'dart:async';
 import 'dart:js_interop';
@@ -23,8 +26,9 @@ external JSPromise<JSObject> _wasmCompile(JSArrayBuffer bytes);
 typedef WebFileBytes = Future<Uint8List?> Function(String path);
 
 class WebAudioCore implements AudioCore {
-  WebAudioCore._(this._ctx, this._node, this._bytesOf) {
+  WebAudioCore._(this._ctx, this._node, this._loader, this._bytesOf) {
     _node.port.onmessage = ((web.MessageEvent e) => _onMessage(e.data)).toJS;
+    _loader.onmessage = ((web.MessageEvent e) => _onLoaderMessage(e.data)).toJS;
   }
 
   /// Ordner mit wp_core_web.wasm, wp_core_web.mjs und wp_worklet.js, relativ zur Seite.
@@ -65,11 +69,18 @@ class WebAudioCore implements AudioCore {
       ),
     );
     node.connect(ctx.destination);
-    return WebAudioCore._(ctx, node, bytesOf);
+    final loader = web.Worker(
+      '${base}wp_loader.js'.toJS,
+      web.WorkerOptions(type: 'module'),
+    );
+    final core = WebAudioCore._(ctx, node, loader, bytesOf);
+    await core._ask('init', [module]);
+    return core;
   }
 
   final web.AudioContext _ctx;
   final web.AudioWorkletNode _node;
+  final web.Worker _loader;
   final WebFileBytes _bytesOf;
 
   // ---- Nachrichten ----
@@ -110,6 +121,40 @@ class WebAudioCore implements AudioCore {
   void _send(String cmd, [List<JSAny?> args = const []]) =>
       _call(cmd, args).ignore();
 
+  // ---- Messages to the loader worker (#42) ----
+
+  int _lastLoaderId = 0;
+  final _loaderReplies = <int, Completer<JSAny?>>{};
+
+  Future<JSAny?> _ask(
+    String cmd, [
+    List<JSAny?> args = const [],
+    List<JSObject> transfer = const [],
+  ]) {
+    final id = ++_lastLoaderId;
+    final reply = Completer<JSAny?>();
+    _loaderReplies[id] = reply;
+    final msg = JSObject()
+      ..['id'] = id.toJS
+      ..['cmd'] = cmd.toJS
+      ..['args'] = args.toJS;
+    _loader.postMessage(msg, transfer.toJS);
+    return reply.future;
+  }
+
+  void _onLoaderMessage(JSAny? data) {
+    if (data == null || !data.isA<JSObject>()) return;
+    final m = data as JSObject;
+    final reply = _loaderReplies.remove((m['id'] as JSNumber?)?.toDartInt);
+    if (reply == null) return;
+    final error = m['error'];
+    if (error != null) {
+      reply.completeError(StateError((error as JSString).toDart));
+    } else {
+      reply.complete(m['result']);
+    }
+  }
+
   void _onMessage(JSAny? data) {
     if (data == null || !data.isA<JSObject>()) return;
     final m = data as JSObject;
@@ -133,6 +178,8 @@ class WebAudioCore implements AudioCore {
     final peak = (s['peak'] as JSNumber?)?.toDartDouble;
     if (peak != null) _peak = peak;
     final time = (s['time'] as JSNumber?)?.toDartDouble ?? 0;
+    final wall = (s['wall'] as JSNumber?)?.toDartDouble ?? 0;
+    final busy = (s['busy'] as JSNumber?)?.toDartDouble ?? 0;
     final ack = (s['ack'] as JSNumber?)?.toDartInt ?? 0;
     // Älter als der letzte Befehl (z. B. Position vor einem Seek): nur den Pegel übernehmen.
     if (force || ack >= _lastId) {
@@ -147,6 +194,8 @@ class WebAudioCore implements AudioCore {
       _states.add(
         WebCoreState(
           time: time,
+          wall: wall / 1000,
+          busy: busy / 1000,
           peak: _peak,
           position: _position,
           playing: _playing,
@@ -182,8 +231,12 @@ class WebAudioCore implements AudioCore {
     return WpCode.ok;
   }
 
+  /// Sections of the waveform per second and at most, as WaveformSummary.binsFor.
+  static final _bins = JSObject()
+    ..['perSecond'] = WaveformSummary.binsPerSecond.toJS
+    ..['max'] = WaveformSummary.maxBins.toJS;
+
   Future<void> _load(String path, int generation) async {
-    int code;
     try {
       final bytes = await _bytesOf(path);
       if (generation != _loadGeneration) return;
@@ -191,34 +244,39 @@ class WebAudioCore implements AudioCore {
         _loadState = WpCode.fileNotFound;
         return;
       }
-      // Own copy whose buffer is transferred to the worklet; the bytes stay for the browser decoder.
+      final rate = _ctx.sampleRate.toJS;
+      // Own copy whose buffer is transferred to the worker; the bytes stay for the browser decoder.
       final copy = Uint8List.fromList(bytes).buffer.toJS;
-      code =
-          ((await _call('loadEncoded', [copy], [copy])) as JSNumber).toDartInt;
-      if (code == WpCode.unsupportedFormat) {
-        code = await _decodeInBrowser(bytes);
+      var track =
+          (await _ask('decode', [copy, rate, _bins], [copy])) as JSObject;
+      if (_code(track) == WpCode.unsupportedFormat) {
+        track = await _decodeInBrowser(bytes) ?? track;
       }
+      if (generation != _loadGeneration) return;
+      if (_code(track) != WpCode.ok) {
+        _loadState = _code(
+          track,
+        ); // the previous title stays loaded and keeps playing
+        return;
+      }
+      _loadProgress = 0.5;
+      final pcm = track['pcm'] as JSFloat32Array;
+      final code = ((await _call(
+        'beginPcm',
+        [pcm],
+        [pcm['buffer'] as JSObject],
+      )) as JSNumber).toDartInt;
       if (generation != _loadGeneration) return;
       if (code != WpCode.ok) {
         _loadState = code;
         return;
       }
-      _loadProgress = 0.5;
       _applyState((await _call('state')) as JSObject, force: true);
-      final count = WaveformSummary.binsFor(_duration);
-      final wave = (await _call('waveform', [
-        0.toJS,
-        _duration.toJS,
-        count.toJS,
-      ])) as JSObject?;
-      if (generation != _loadGeneration) return;
-      _summary = wave == null
-          ? null
-          : WaveformSummary(
-              _duration,
-              (wave['mins'] as JSFloat32Array).toDart,
-              (wave['maxs'] as JSFloat32Array).toDart,
-            );
+      _summary = WaveformSummary(
+        _duration,
+        (track['mins'] as JSFloat32Array).toDart,
+        (track['maxs'] as JSFloat32Array).toDart,
+      );
       _loadProgress = 1;
       _loadState = WpCode.loadReady;
     } catch (_) {
@@ -226,22 +284,38 @@ class WebAudioCore implements AudioCore {
     }
   }
 
-  /// AAC/M4A u. a.: der Browser dekodiert, das PCM geht ans Worklet (wie loadFile in wp_core_web.mjs).
-  Future<int> _decodeInBrowser(Uint8List bytes) async {
+  static int _code(JSObject track) => (track['code'] as JSNumber).toDartInt;
+
+  /// AAC/M4A u. a.: the browser decodes, the worker converts to stereo at the context's rate. null if the
+  /// browser cannot decode it either.
+  Future<JSObject?> _decodeInBrowser(Uint8List bytes) async {
     final web.AudioBuffer buffer;
     try {
       buffer = await _ctx
           .decodeAudioData(Uint8List.fromList(bytes).buffer.toJS)
           .toDart;
     } catch (_) {
-      return WpCode.unsupportedFormat;
+      return null;
     }
     final channels = <JSAny?>[
       for (var c = 0; c < buffer.numberOfChannels; c++)
         buffer.getChannelData(c),
     ];
-    final r = await _call('loadPcm', [channels.toJS, buffer.sampleRate.toJS]);
-    return (r as JSNumber).toDartInt;
+    return (await _ask('convert', [
+      channels.toJS,
+      buffer.sampleRate.toJS,
+      _ctx.sampleRate.toJS,
+      _bins,
+    ])) as JSObject;
+  }
+
+  /// The way before #42: the worklet decodes the file itself and blocks meanwhile. Only for the control
+  /// measurement in tool/web_core_check.dart; WP_OK or error code.
+  Future<int> loadInWorklet(Uint8List bytes) async {
+    wake();
+    _loadGeneration++;
+    final copy = Uint8List.fromList(bytes).buffer.toJS;
+    return ((await _call('loadEncoded', [copy], [copy])) as JSNumber).toDartInt;
   }
 
   @override
@@ -373,6 +447,8 @@ class _WebMetronome implements MetronomeBackend {
 class WebCoreState {
   const WebCoreState({
     required this.time,
+    required this.wall,
+    required this.busy,
     required this.peak,
     required this.position,
     required this.playing,
@@ -382,6 +458,13 @@ class WebCoreState {
 
   /// Audiozeit am Ende des gemeldeten Blocks (Sekunden) und Spitzenpegel seit der letzten Meldung.
   final double time, peak;
+
+  /// Wall clock when the worklet sent it (seconds, Date.now()); shows gaps the audio time hides, e.g. a
+  /// blocked worklet (#42/AK1).
+  final double wall;
+
+  /// Longest single command or render block in the worklet since the previous state (seconds).
+  final double busy;
   final double position;
   final bool playing, metroRunning;
   final int loopPasses;

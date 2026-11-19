@@ -61,13 +61,20 @@ class AppController extends ChangeNotifier {
     return t == null ? null : library.artworkPath(t);
   }
 
-  /// Titel in den Player laden (ohne abzuspielen, wie in der Swift-App).
-  Future<bool> select(Track t) => player.load(
-    library.filePath(t),
-    title: t.title,
-    trackId: t.id,
-    settings: t.settings,
-  );
+  /// Titel in den Player laden (ohne abzuspielen, wie in der Swift-App). A track without a known
+  /// duration (imported in the browser) gets the one the core found (#42/AK5).
+  Future<bool> select(Track t) async {
+    final ok = await player.load(
+      library.filePath(t),
+      title: t.title,
+      trackId: t.id,
+      settings: t.settings,
+    );
+    if (ok && player.trackId == t.id) {
+      library.fillDuration(t.id, player.duration);
+    }
+    return ok;
+  }
 
   Future<void> pickAndImport({String? folderId}) async {
     final paths = await files.pickAudioFiles();

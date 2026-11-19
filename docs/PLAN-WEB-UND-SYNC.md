@@ -130,7 +130,7 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - **Zwei Varianten:** Die `ctest`-Programme (`engine_tests`, `metronome_tests`, `waveform_tests`, `player_tests`) laufen mit Threads unter Node.js, unverändert und mit denselben Prüfungen wie nativ. `wp_core_web.wasm` (ca. 360 KB) läuft ohne Threads und ohne JS-Hülle im AudioWorklet, wie in W0.
 - **C-API:** Steuerung, Wellenform und Metronom wie `wp_core.h`; dazu `core/web/wp_core_web.h` (`wp_web_create`, `wp_web_load_encoded`, `wp_web_load_pcm`, `wp_web_render`). Laden geht über Bytes statt Pfade.
 - **Dekodieren:** MP3, WAV, FLAC im Kern (miniaudio aus dem Speicher). AAC/M4A meldet der Kern als nicht unterstützt; der Hauptthread dekodiert mit `decodeAudioData` und gibt das PCM weiter (`loadFile` in `wp_core_web.mjs`).
-- **Noch offen für W2:** Dekodieren blockiert das Worklet für die Dauer des Ladens (ein laufendes Metronom setzt kurz aus). Besser in einem Worker mit einer zweiten Instanz des Kerns dekodieren und nur das PCM ins Worklet geben.
+- **Erledigt mit #42:** Dekodieren blockierte das Worklet für die Dauer des Ladens. Jetzt dekodiert ein Worker mit einer zweiten Instanz des Kerns, siehe Umsetzung W2.
 - **Prüfung:** `node core/web/wp_core_web_test.mjs` (Teil von `ctest`) und `core/web/browser_test.html` (MP3, FLAC, M4A im Worklet eines `OfflineAudioContext`, misst Tonhöhe und Pegel).
 
 ### W2 – Dart-Anbindung Web (3–4 Tage)
@@ -145,7 +145,10 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - **Dateien:** Bis W3 vorläufige Dateiauswahl (`<input type=file>`), Bibliothek nur für die Sitzung (`Library.session`, mit #35 ersetzt).
 - **Bau:** `app/tool/build_web_core.sh` legt Kern, Hülle und Worklet nach `app/web/wp_core/`, dann `flutter build web`. CanvasKit kommt von der eigenen Seite (`web/flutter_bootstrap.js`).
 - **Prüfung:** `app/tool/web_core_check.sh` baut eine Prüfseite mit den Diensten der Web-App, die eine erzeugte Sinusdatei und `sine440.m4a` lädt und Position, Pegel, Wellenform, Tempo (0,5× und 1,5×), Loop-Sprung, Seek und Metronom misst.
-- **Noch offen:** Dekodieren blockiert weiterhin das Worklet (siehe W1).
+- **Laden ohne Aussetzer (#42):** Der Worker `wp_loader.js` dekodiert mit einer eigenen Instanz von `wp_core_web.wasm` (`wp_web_track_decode`, für AAC/M4A `wp_web_track_convert` nach `decodeAudioData` im Hauptthread) und berechnet die Wellenform. Ins Worklet geht nur das fertige PCM (Stereo, Rate des AudioContext); es übernimmt es in Stücken von 32 768 Frames nach jedem Block (`wp_web_pcm_begin/append/commit`), der bisherige Titel spielt bis zur Übernahme weiter. Gemessen in Chrome mit einer WAV von 3 Minuten: Laden ca. 0,8 s, Worklet höchstens 1 ms am Stück beschäftigt, Klickabstände 0,488–0,500 s; vorher (Kern dekodiert im Worklet) 29 ms am Stück.
+- **Dauer in der Bibliothek (#42):** Im Browser kennt die Bibliothek die Dauer beim Import nicht; nach dem ersten Laden übernimmt sie die Dauer aus dem Kern und speichert sie sofort.
+- **Hinweise:** Ohne Titel nennen Player und leere Bibliothek im Browser die Dateiauswahl des Browsers (`openFileHintBrowser`, `emptyLibraryHintBrowser`).
+- **Prüfung #42:** `app/tool/web_core_check.sh` misst zusätzlich Metronom und Wiedergabe gegen die Wanduhr während des Ladens, MP3/WAV/FLAC/M4A, eine kaputte Datei und die Dauer, auch nach dem Neuladen der Seite (die Seite lädt sich dazu einmal selbst neu). Eine Kontrollmessung lädt auf dem alten Weg und zeigt, dass die Messung ein blockiertes Worklet erkennt.
 
 ### W3 – Speicher-Schicht und Bibliothek ohne Pfade (3–4 Tage)
 - `FileStore`-Schnittstelle (`file_platform.dart` wird dazu ausgebaut): Desktop = Dateisystem, Web = OPFS. Import im Web über Dateiauswahl.
@@ -157,7 +160,7 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - **Speicher-Schicht:** `FileStore` (`file_platform.dart`) mit Namen relativ zur Bibliothek (`library.json`, `Tracks/<id>.<ext>`). `IoFileStore` (`file_store_io.dart`) im App-Ordner wie bisher, `OpfsFileStore` (`file_store_web.dart`) im Ordner `WoodshedPlayer` des OPFS; Schreiben über `createWritable()` ist atomar, Schreib- und Löschvorgänge laufen nacheinander. `Library` kennt nur noch den Store, kein `dart:io` mehr.
 - **Titel-ID:** Jeder Titel trägt `contentHash` (SHA-256, Paket `crypto`). Die UUID bleibt interne `id` und Dateiname, damit `library.json` für die Swift-App lesbar bleibt (sie überliest das Zusatzfeld). Alte Bibliotheken bekommen den Hash nach dem Öffnen im Hintergrund (Dateisystem: eigenes Isolate, Datei in Stücken gelesen). Ein Import mit bekanntem Hash legt keine zweite Datei an (`ImportResult.duplicates`). Die volle Umstellung der ID folgt mit W4 (#36).
 - **Pfade:** Auf Desktop und Handy liefert der Store den gerätelokalen Pfad (Audio-Kern, Cover); im Browser gibt es keinen, der Kern liest die Bytes aus dem OPFS.
-- **Dateiauswahl im Web:** übergibt die Bytes einmal an die Bibliothek, die sie im OPFS ablegt; der Titel bleibt nach Neuladen. Die Dauer kennt erst der Kern beim Laden.
+- **Dateiauswahl im Web:** übergibt die Bytes einmal an die Bibliothek, die sie im OPFS ablegt; der Titel bleibt nach Neuladen. Die Dauer kennt erst der Kern beim Laden; die Bibliothek übernimmt sie dann (#42).
 - **Speicher:** Sobald die Bibliothek Titel hat, fragt sie einmal `navigator.storage.persist()` an (nur im Browser). Im Fuss der Bibliothek steht der Verbrauch, im Browser mit freiem Platz aus `estimate()` und ob der Speicher dauerhaft ist.
 - **Prüfung:** `app/tool/web_store_check.sh` baut eine Prüfseite (Import einer erzeugten Sinusdatei, OPFS, Hash, Doppel, Abspielen, Neuladen, Speicherzeile).
 

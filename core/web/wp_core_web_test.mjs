@@ -4,7 +4,9 @@
 // Aufruf: node core/web/wp_core_web_test.mjs <wp_core_web.wasm> <core/tests/audio>
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createCore, loadFile, WP_OK, WP_ERR_UNSUPPORTED_FORMAT, WP_ERR_INVALID_ARGUMENT } from './wp_core_web.mjs';
+import {
+  createCore, createDecoder, loadFile, WP_OK, WP_ERR_UNSUPPORTED_FORMAT, WP_ERR_INVALID_ARGUMENT,
+} from './wp_core_web.mjs';
 
 const [wasmPath, audioDir] = process.argv.slice(2);
 const wasm = new WebAssembly.Module(readFileSync(wasmPath));
@@ -157,6 +159,66 @@ const tests = {
     let clicks = 0;
     for (let i = 1; i < SR; i++) if (L[i - 1] === 0 && L[i] !== 0) clicks++;
     check(clicks === 2, `${clicks} Klicks in 1 s bei 120 BPM statt 2`);
+  },
+  async decoderInWorkerTakenOverInPieces() { // #42/AK1, #42/AK2: decode elsewhere, old title plays on
+    const decoder = await createDecoder(wasm);
+    const d = decoder.decode(indexWav(3 * SR), SR);
+    check(d.code === WP_OK && d.pcm.length === 3 * SR * 2, `decoded ${d.code}, ${d.pcm?.length} samples`);
+    near(d.duration, 3.0, 1e-9, 'decoder duration');
+    check(d.mins.length === 600 && d.maxs.length === 600, `waveform ${d.mins.length} sections for 3 s`);
+    const core = await createCore(wasm, SR);
+    core.loadEncoded(indexWav(2 * SR));
+    core.seek(0.5);
+    core.play();
+    check(core.beginPcm(d.pcm) === WP_OK, 'begin');
+    let expected = SR / 2, continuous = true, result = null, pumps = 0;
+    while (result === null) {
+      const { L, R } = render(core, 128, 128);
+      for (let i = 0; i < 128; i++) continuous = continuous && frameIndex(L[i], R[i]) === expected++;
+      result = core.pumpPcm(SR / 4);
+      pumps++;
+    }
+    check(continuous, 'old title plays on without a jump while the new one is taken over');
+    check(result === WP_OK && pumps === 12, `commit ${result} after ${pumps} pieces`);
+    near(core.duration, 3.0, 1e-9, 'new title in place');
+    check(!core.playing && core.position === 0, 'new title at the start, paused');
+    check(core.waveform(0, 1, 10) === null, 'worklet keeps no stale waveform');
+    core.seek(2.5);
+    core.play();
+    const { L, R } = render(core, 2, 2);
+    check(frameIndex(L[0], R[0]) === 2.5 * SR && frameIndex(L[1], R[1]) === 2.5 * SR + 1, 'new title sample-exact');
+  },
+  async decoderFormatsAndErrors() { // #42/AK3
+    const decoder = await createDecoder(wasm);
+    for (const f of ['sine440.mp3', 'sine440.flac']) {
+      const d = decoder.decode(readFileSync(join(audioDir, f)), SR);
+      check(d.code === WP_OK, `${f} decoded`);
+      near(d.maxs[100], 0.5, 0.04, `${f} waveform`);
+      const core = await createCore(wasm, SR);
+      core.beginPcm(d.pcm);
+      let r = null;
+      while (r === null) r = core.pumpPcm();
+      check(r === WP_OK, `${f} taken over`);
+      await sineChecks(core, `${f} via decoder`);
+    }
+    const m4a = decoder.decode(readFileSync(join(audioDir, 'sine440.m4a')), SR);
+    check(m4a.code === WP_ERR_UNSUPPORTED_FORMAT && !m4a.pcm, 'M4A goes to decodeAudioData');
+    const mono = new Float32Array(44100).map((_, i) => 0.5 * Math.sin((2 * Math.PI * 440 * i) / 44100));
+    const c = decoder.convert([mono], 44100, SR);
+    check(c.code === WP_OK && Math.abs(c.pcm.length / 2 - SR) <= 2, 'PCM from the browser converted');
+    near(c.duration, 1.0, 1e-3, 'converted duration');
+    check(decoder.convert([], 44100, SR).code === WP_ERR_INVALID_ARGUMENT, 'empty PCM rejected');
+    check(decoder.decode(new TextEncoder().encode('no audio'), SR).code === WP_ERR_UNSUPPORTED_FORMAT, 'no audio');
+
+    const core = await createCore(wasm, SR);
+    core.loadEncoded(indexWav(2 * SR));
+    check(core.beginPcm(new Float32Array(0)) === WP_ERR_INVALID_ARGUMENT, 'empty title rejected');
+    check(core.pumpPcm() === WP_ERR_INVALID_ARGUMENT, 'nothing to take over');
+    core.beginPcm(c.pcm);
+    core.pumpPcm(100);
+    check(core.beginPcm(new Float32Array(0)) === WP_ERR_INVALID_ARGUMENT, 'newer load replaces the unfinished one');
+    check(core.pumpPcm() === WP_ERR_INVALID_ARGUMENT, 'unfinished one discarded');
+    near(core.duration, 2.0, 1e-9, 'previous title stays playable');
   },
 };
 

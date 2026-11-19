@@ -450,6 +450,26 @@ void convertPcmToPlayerFormat() {
     CHECK(q.setSource(std::make_unique<wp::Source>()) == wp::kErrInvalidArgument);
 }
 
+// #42/AK1: in the browser the worklet takes over a title without computing the waveform (the worker has it).
+void setSourceWithoutPeaks() {
+    wp::Player p(kSr);
+    auto first = std::make_unique<wp::Source>();
+    first->data.assign(static_cast<size_t>(kSr) * 2, 0.5f);
+    first->frames = kSr;
+    CHECK(p.setSource(std::move(first)) == wp::kOk);
+    float mins[10], maxs[10];
+    CHECK(p.waveform(0.0, 1.0, 10, mins, maxs) == wp::kOk);
+    auto second = std::make_unique<wp::Source>();
+    second->data.assign(static_cast<size_t>(kSr) * 4, 0.25f);
+    second->frames = 2 * kSr;
+    CHECK(p.setSource(std::move(second), false) == wp::kOk);
+    CHECK_NEAR(p.engine().duration(), 2.0, 1e-9);
+    CHECK(p.waveform(0.0, 1.0, 10, mins, maxs) == wp::kErrInvalidArgument);  // no stale waveform
+    p.engine().play();
+    auto out = renderFrames(p, 64);
+    CHECK(out[10] == 0.25f);
+}
+
 }  // namespace
 
 int main() {
@@ -469,6 +489,7 @@ int main() {
         {"deviceChangePausesAndKeepsPosition", deviceChangePausesAndKeepsPosition},
         {"decodeMemoryMatchesFile", decodeMemoryMatchesFile},
         {"convertPcmToPlayerFormat", convertPcmToPlayerFormat},
+        {"setSourceWithoutPeaks", setSourceWithoutPeaks},
     };
     for (auto& [name, fn] : tests) {
         const int before = failures;

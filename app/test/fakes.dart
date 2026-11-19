@@ -199,8 +199,8 @@ class FakeFiles implements FilePlatform {
 
 /// Kern, Timer, Bibliothek in [dir] und Controller zusammen. Laden wird mit [finishLoads] abgeschlossen.
 class TestApp {
-  /// [duration]: Dauer jeder importierten Datei in Sekunden.
-  TestApp(Directory dir, {double duration = 30}) {
+  /// [duration]: Dauer jeder importierten Datei in Sekunden (null: unknown on import, as in the browser).
+  TestApp(Directory dir, {double? duration = 30}) {
     library = Library(
       IoFileStore(dir),
       probe: (_) => duration,

@@ -134,6 +134,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Füge MP3-, WAV- oder FLAC-Dateien mit + hinzu.';
 
   @override
+  String get emptyLibraryHintBrowser =>
+      'Füge MP3-, WAV- oder FLAC-Dateien mit + aus der Dateiauswahl des Browsers hinzu.';
+
+  @override
   String get addMp3 => 'MP3 hinzufügen';
 
   @override
@@ -231,6 +235,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get openFileHintFiles =>
       'Öffne eine MP3-, WAV- oder FLAC-Datei aus «Dateien».';
+
+  @override
+  String get openFileHintBrowser =>
+      'Öffne eine MP3-, WAV- oder FLAC-Datei über die Dateiauswahl des Browsers.';
 
   @override
   String get openFile => 'Datei öffnen';

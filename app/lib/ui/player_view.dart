@@ -1,10 +1,8 @@
 // Übe-Bildschirm im Design «Studio» (#30, docs/design/A-*.dc.html): Kopf mit Titel und Zeit,
 // Zeitleiste (Wellenform), Loop-Leiste, Module Tempo · Steigerung · Metronom und Wiedergabe.
 // Desktop: drei Module nebeneinander; Tablet: zwei Spalten; Phone: einspaltig, S/Play/E unten.
-import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../library/playback_settings.dart';
@@ -310,9 +308,7 @@ class _EmptyCard extends StatelessWidget {
             ),
           ),
           Text(
-            !kIsWeb && Platform.isMacOS
-                ? l.openFileHintDrop
-                : l.openFileHintFiles,
+            openFileHint(l, currentHintPlatform),
             textAlign: TextAlign.center,
             style: TextStyle(color: ws.muted),
           ),

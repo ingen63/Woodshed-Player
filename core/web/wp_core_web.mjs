@@ -7,6 +7,8 @@ export const WP_ERR_INVALID_ARGUMENT = -1;
 export const WP_ERR_UNSUPPORTED_FORMAT = -3;
 export const WP_ERR_OUT_OF_MEMORY = -5;
 export const MAX_BLOCK = 4096;
+// Frames the worklet copies per render block while taking over a title (#42): about 0.2 ms of work.
+export const PCM_CHUNK = 32768;
 
 const ENOSYS = 52;
 const imports = {
@@ -84,6 +86,35 @@ export class WpCore {
     return this.#withCopy(inter, (ptr) => this.x.wp_web_load_pcm(this.p, ptr, n, frames, sampleRate));
   }
 
+  // Takes over a title decoded elsewhere (#42): interleaved stereo at this core's rate. Returns WP_OK or an
+  // error code; then pumpPcm() moves it into the core piece by piece while the old title keeps playing.
+  beginPcm(stereo) {
+    this.pending = null;
+    const frames = Math.floor(stereo.length / 2);
+    const r = this.x.wp_web_pcm_begin(this.p, frames);
+    if (r === WP_OK) this.pending = { stereo, frames, done: 0 };
+    return r;
+  }
+
+  // Copies up to maxFrames of the pending title; null while there is more, else the result of the commit.
+  pumpPcm(maxFrames = PCM_CHUNK) {
+    const job = this.pending;
+    if (!job) return WP_ERR_INVALID_ARGUMENT;
+    const n = Math.min(maxFrames, job.frames - job.done);
+    if (n > 0) {
+      const part = job.stereo.subarray(job.done * 2, (job.done + n) * 2);
+      const r = this.#withCopy(part, (ptr) => this.x.wp_web_pcm_append(this.p, ptr, n));
+      if (r !== WP_OK) {
+        this.pending = null;
+        return r;
+      }
+      job.done += n;
+      if (job.done < job.frames) return null;
+    }
+    this.pending = null;
+    return this.x.wp_web_pcm_commit(this.p);
+  }
+
   // Rendert left.length Frames (höchstens MAX_BLOCK) nach left und right, z. B. die Ausgänge des Worklets.
   render(left, right) {
     const frames = left.length;
@@ -132,6 +163,81 @@ export class WpCore {
   }
   metroSetTimedRamp(enabled, start, target, seconds) {
     this.x.wp_metro_set_ramp_timed(this.p, enabled ? 1 : 0, start, target, seconds);
+  }
+}
+
+// Decoding without a player (#42), e.g. in a Worker next to the AudioWorklet. Each result holds the PCM
+// (interleaved stereo at `sampleRate`, own buffer, transferable), the duration and the waveform
+// (`bins` sections over the whole title, see WaveformSummary in the app), or only `code` on failure.
+export async function createDecoder(wasm) {
+  const module = wasm instanceof WebAssembly.Module ? wasm : await WebAssembly.compile(wasm);
+  const instance = await WebAssembly.instantiate(module, imports);
+  instance.exports._initialize();
+  return new WpDecoder(instance.exports);
+}
+
+export class WpDecoder {
+  constructor(x) { this.x = x; }
+
+  #copyIn(typed, fn) {
+    const ptr = this.x.wp_web_alloc(typed.byteLength);
+    if (!ptr) return { code: WP_ERR_OUT_OF_MEMORY };
+    try {
+      new Uint8Array(this.x.memory.buffer, ptr, typed.byteLength)
+        .set(new Uint8Array(typed.buffer, typed.byteOffset, typed.byteLength));
+      return fn(ptr);
+    } finally {
+      this.x.wp_web_free(ptr);
+    }
+  }
+
+  #result(make, bins) {
+    const err = this.x.wp_web_alloc(4);
+    try {
+      const t = make(err);
+      if (!t) return { code: new Int32Array(this.x.memory.buffer, err, 1)[0] || WP_ERR_UNSUPPORTED_FORMAT };
+      try {
+        const frames = this.x.wp_web_track_frames(t);
+        const duration = this.x.wp_web_track_duration(t);
+        const pcm = new Float32Array(this.x.memory.buffer, this.x.wp_web_track_data(t), frames * 2).slice();
+        const count = Math.max(1, Math.min(bins.max, Math.ceil(duration * bins.perSecond)));
+        const w = this.x.wp_web_alloc(count * 8);
+        try {
+          if (this.x.wp_web_track_waveform(t, 0, duration, count, w, w + count * 4) !== WP_OK) {
+            return { code: WP_ERR_INVALID_ARGUMENT };
+          }
+          const all = new Float32Array(this.x.memory.buffer, w, count * 2);
+          return { code: WP_OK, pcm, duration, mins: all.slice(0, count), maxs: all.slice(count) };
+        } finally {
+          this.x.wp_web_free(w);
+        }
+      } finally {
+        this.x.wp_web_track_free(t);
+      }
+    } finally {
+      this.x.wp_web_free(err);
+    }
+  }
+
+  // MP3, WAV or FLAC. code WP_ERR_UNSUPPORTED_FORMAT: try decodeAudioData (AAC/M4A).
+  decode(bytes, sampleRate, bins = { perSecond: 200, max: 400000 }) {
+    const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    return this.#copyIn(u8, (ptr) =>
+      this.#result((err) => this.x.wp_web_track_decode(ptr, u8.byteLength, sampleRate, err), bins));
+  }
+
+  // PCM as decodeAudioData returns it (one Float32Array per channel, any rate).
+  convert(channels, srcRate, sampleRate, bins = { perSecond: 200, max: 400000 }) {
+    const n = channels.length;
+    const frames = n ? channels[0].length : 0;
+    if (!n || !frames || channels.some((c) => c.length !== frames)) return { code: WP_ERR_INVALID_ARGUMENT };
+    const inter = new Float32Array(frames * n);
+    for (let c = 0; c < n; c++) {
+      const src = channels[c];
+      for (let i = 0; i < frames; i++) inter[i * n + c] = src[i];
+    }
+    return this.#copyIn(inter, (ptr) =>
+      this.#result((err) => this.x.wp_web_track_convert(ptr, n, frames, srcRate, sampleRate, err), bins));
   }
 }
 

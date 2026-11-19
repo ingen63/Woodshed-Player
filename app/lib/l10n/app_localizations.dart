@@ -326,6 +326,12 @@ abstract class AppLocalizations {
   /// **'Add MP3, WAV or FLAC files with +.'**
   String get emptyLibraryHint;
 
+  /// No description provided for @emptyLibraryHintBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Add MP3, WAV or FLAC files with + from the browser\'s file picker.'**
+  String get emptyLibraryHintBrowser;
+
   /// No description provided for @addMp3.
   ///
   /// In en, this message translates to:
@@ -481,6 +487,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open an MP3, WAV or FLAC file from “Files”.'**
   String get openFileHintFiles;
+
+  /// No description provided for @openFileHintBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open an MP3, WAV or FLAC file with the browser\'s file picker.'**
+  String get openFileHintBrowser;
 
   /// No description provided for @openFile.
   ///

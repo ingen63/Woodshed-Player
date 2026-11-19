@@ -59,6 +59,7 @@
   "noTracks": "No tracks",
   "emptyLibraryHintDrop": "Add MP3, WAV or FLAC files with + or drag them here.",
   "emptyLibraryHint": "Add MP3, WAV or FLAC files with +.",
+  "emptyLibraryHintBrowser": "Add MP3, WAV or FLAC files with + from the browser's file picker.",
   "addMp3": "Add MP3",
   "folderActions": "Folder actions",
   "trackActions": "Actions",
@@ -120,6 +121,7 @@
   "noTrackSelected": "No track selected",
   "openFileHintDrop": "Open an MP3, WAV or FLAC file or drag it into the window.",
   "openFileHintFiles": "Open an MP3, WAV or FLAC file from “Files”.",
+  "openFileHintBrowser": "Open an MP3, WAV or FLAC file with the browser's file picker.",
   "openFile": "Open file",
   "loopLength": "{seconds} s",
   "@loopLength": {

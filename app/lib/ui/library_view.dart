@@ -468,9 +468,7 @@ class _EmptyLibrary extends StatelessWidget {
             Text(l.noTracks, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
-              !kIsWeb && Platform.isMacOS
-                  ? l.emptyLibraryHintDrop
-                  : l.emptyLibraryHint,
+              emptyLibraryHint(l, currentHintPlatform),
               textAlign: TextAlign.center,
               style: TextStyle(color: grey),
             ),

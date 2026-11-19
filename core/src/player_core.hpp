@@ -85,7 +85,9 @@ public:
     // Setzt einen bereits dekodierten Titel (Stereo, Samplerate des Players) ein und berechnet die Wellenform,
     // ohne Datei und ohne Lade-Thread (Web, #33). Nicht im Audio-Thread aufrufen. Wie beim Laden steht der
     // Titel danach am Anfang, pausiert, ohne Loop. kOk, kErrInvalidArgument, kErrBusy oder kErrOutOfMemory.
-    int setSource(std::unique_ptr<Source> source);
+    // withPeaks = false skips the waveform (#42: in the browser a worker computes it, the AudioWorklet must
+    // not spend the time); waveform() then reports kErrInvalidArgument until the next title with peaks.
+    int setSource(std::unique_ptr<Source> source, bool withPeaks = true);
 
     int loadState() const { return loadState_.load(); }
     double loadProgress() const { return loadProgress_.load(); }  // 0–1 des laufenden bzw. letzten Ladens

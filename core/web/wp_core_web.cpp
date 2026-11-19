@@ -12,7 +12,31 @@
 struct wp_player {
     std::unique_ptr<wp::Player> core;
     std::vector<float> out;
+    std::unique_ptr<wp::Source> pending;  // title being taken over piece by piece (#42)
+    long long pendingFrames = 0;
 };
+
+struct wp_web_track {
+    wp::Source source;
+    wp::Peaks peaks;
+    int sampleRate = 0;
+};
+
+namespace {
+
+wp_web_track* finishTrack(std::unique_ptr<wp_web_track> t, int r, int* err) {
+    if (r == WP_OK) {
+        try {
+            t->peaks = wp::Peaks(t->source.data.data(), t->source.frames, wp::Player::kChannels, t->sampleRate);
+        } catch (const std::bad_alloc&) {
+            r = WP_ERR_OUT_OF_MEMORY;
+        }
+    }
+    if (err) *err = r;
+    return r == WP_OK ? t.release() : nullptr;
+}
+
+}  // namespace
 
 extern "C" {
 
@@ -61,6 +85,78 @@ int wp_web_load_pcm(wp_player* p, const float* interleaved, int channels, int fr
     } catch (const std::bad_alloc&) {
         return WP_ERR_OUT_OF_MEMORY;
     }
+}
+
+wp_web_track* wp_web_track_decode(const void* data, size_t size, int sampleRate, int* err) {
+    try {
+        auto t = std::make_unique<wp_web_track>();
+        t->sampleRate = sampleRate;
+        const int r = wp::decodeMemory(data, size, sampleRate, t->source);
+        return finishTrack(std::move(t), r, err);
+    } catch (const std::bad_alloc&) {
+        if (err) *err = WP_ERR_OUT_OF_MEMORY;
+        return nullptr;
+    }
+}
+
+wp_web_track* wp_web_track_convert(const float* interleaved, int channels, int frames, int srcRate, int dstRate,
+                                   int* err) {
+    try {
+        auto t = std::make_unique<wp_web_track>();
+        t->sampleRate = dstRate;
+        const int r = wp::convertPcm(interleaved, channels, frames, srcRate, dstRate, t->source);
+        return finishTrack(std::move(t), r, err);
+    } catch (const std::bad_alloc&) {
+        if (err) *err = WP_ERR_OUT_OF_MEMORY;
+        return nullptr;
+    }
+}
+
+const float* wp_web_track_data(wp_web_track* t) { return t ? t->source.data.data() : nullptr; }
+int wp_web_track_frames(wp_web_track* t) { return t ? static_cast<int>(t->source.frames) : 0; }
+double wp_web_track_duration(wp_web_track* t) {
+    return t && t->sampleRate > 0 ? static_cast<double>(t->source.frames) / t->sampleRate : 0.0;
+}
+int wp_web_track_waveform(wp_web_track* t, double start, double end, int count, float* mins, float* maxs) {
+    return t && t->peaks.query(start, end, count, mins, maxs) ? WP_OK : WP_ERR_INVALID_ARGUMENT;
+}
+void wp_web_track_free(wp_web_track* t) { delete t; }
+
+int wp_web_pcm_begin(wp_player* p, int frames) {
+    if (!p) return WP_ERR_INVALID_ARGUMENT;
+    p->pending.reset();
+    p->pendingFrames = 0;
+    if (frames < 1) return WP_ERR_INVALID_ARGUMENT;
+    try {
+        p->core->engine().collectGarbage();  // frees replaced titles before the new one needs the memory
+        auto s = std::make_unique<wp::Source>();
+        s->data.reserve(static_cast<size_t>(frames) * wp::Player::kChannels);  // no zero fill
+        p->pending = std::move(s);
+        p->pendingFrames = frames;
+        return WP_OK;
+    } catch (const std::bad_alloc&) {
+        return WP_ERR_OUT_OF_MEMORY;
+    }
+}
+
+int wp_web_pcm_append(wp_player* p, const float* stereo, int frames) {
+    if (!p || !p->pending || !stereo || frames < 1) return WP_ERR_INVALID_ARGUMENT;
+    auto& data = p->pending->data;
+    const size_t n = static_cast<size_t>(frames) * wp::Player::kChannels;
+    if (data.size() + n > static_cast<size_t>(p->pendingFrames) * wp::Player::kChannels)
+        return WP_ERR_INVALID_ARGUMENT;
+    data.insert(data.end(), stereo, stereo + n);  // within the reserved capacity, no reallocation
+    return WP_OK;
+}
+
+int wp_web_pcm_commit(wp_player* p) {
+    if (!p || !p->pending) return WP_ERR_INVALID_ARGUMENT;
+    auto source = std::move(p->pending);
+    const long long expected = p->pendingFrames;
+    p->pendingFrames = 0;
+    source->frames = static_cast<long long>(source->data.size() / wp::Player::kChannels);
+    if (source->frames != expected) return WP_ERR_INVALID_ARGUMENT;
+    return p->core->setSource(std::move(source), false);
 }
 
 float* wp_web_render(wp_player* p, int frames) {

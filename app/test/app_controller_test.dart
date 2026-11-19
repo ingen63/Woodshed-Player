@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/app/file_platform.dart';
+import 'package:woodshed_player/app/file_store_io.dart';
 import 'package:woodshed_player/metronome/metronome_controller.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:wp_core/wp_core.dart';
@@ -59,6 +60,37 @@ void main() {
       expect(a.controller.currentTrack?.id, t.id);
     },
   );
+
+  /// Imports [file] through the controller (which loads the first track) and finishes the load with
+  /// [loaded] seconds as the core reports them.
+  Future<String> importAndLoad(TestApp a, String file, double loaded) async {
+    final f = a.controller.importFiles([src(file).path]);
+    await until(() => a.core.loadState == WpCode.loadRunning);
+    a.finishLoads(loaded);
+    return (await f).imported.single.id;
+  }
+
+  test('#42/AK5: a track without a duration gets the one found on loading, kept after reload', () async {
+    final a = TestApp(Directory('${tmp.path}/lib'), duration: null);
+    await a.library.load();
+    final id = await importAndLoad(a, 'a.wav', 6);
+    expect(a.library.track(id)!.duration, 6);
+    await a.library.save();
+    final reloaded = Library(
+      IoFileStore(Directory('${tmp.path}/lib')),
+      probe: (_) => null,
+      readSource: readLocalFile,
+    );
+    await reloaded.load();
+    expect(reloaded.track(id)!.duration, 6);
+  });
+
+  test('#42/AK5: a known duration stays as it is', () async {
+    final a = await app();
+    final id = await importAndLoad(a, 'a.mp3', 31);
+    expect(a.player.trackId, id);
+    expect(a.library.track(id)!.duration, 30);
+  });
 
   test('Änderungen im Player landen in der Bibliothek', () async {
     final a = await app();

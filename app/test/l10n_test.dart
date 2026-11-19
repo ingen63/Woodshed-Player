@@ -204,4 +204,42 @@ void main() {
       });
     }
   });
+
+  group('#42/AK4 hints without a track name the way files come in', () {
+    for (final locale in const [Locale('en'), Locale('de')]) {
+      final l = lookupAppLocalizations(locale);
+      test('$locale', () {
+        // macOS and iOS keep their texts.
+        expect(openFileHint(l, HintPlatform.macOS), l.openFileHintDrop);
+        expect(openFileHint(l, HintPlatform.mobile), l.openFileHintFiles);
+        expect(emptyLibraryHint(l, HintPlatform.macOS), l.emptyLibraryHintDrop);
+        expect(emptyLibraryHint(l, HintPlatform.mobile), l.emptyLibraryHint);
+        // The browser: its file picker, neither «Files» nor dragging.
+        final hints = [
+          openFileHint(l, HintPlatform.browser),
+          emptyLibraryHint(l, HintPlatform.browser),
+        ];
+        for (final h in hints) {
+          expect(
+            h,
+            contains(
+              locale.languageCode == 'de'
+                  ? 'Dateiauswahl des Browsers'
+                  : "browser's file picker",
+            ),
+          );
+          expect(
+            h,
+            isNot(
+              contains(locale.languageCode == 'de' ? '«Dateien»' : '“Files”'),
+            ),
+          );
+          expect(
+            h,
+            isNot(contains(locale.languageCode == 'de' ? 'zieh' : 'drag')),
+          );
+        }
+      });
+    }
+  });
 }

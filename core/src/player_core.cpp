@@ -257,13 +257,15 @@ void Player::runLoad(std::string path) {
     loadState_.store(result == kOk ? kLoadReady : result);
 }
 
-int Player::setSource(std::unique_ptr<Source> source) {
+int Player::setSource(std::unique_ptr<Source> source, bool withPeaks) {
     if (!source || source->frames < 1 ||
         source->data.size() != static_cast<size_t>(source->frames) * static_cast<size_t>(kChannels))
         return kErrInvalidArgument;
     try {
         // Übersicht einmal hier ausserhalb des Audio-Threads berechnen (#28)
-        auto peaks = std::make_shared<const Peaks>(source->data.data(), source->frames, kChannels, sampleRate_);
+        std::shared_ptr<const Peaks> peaks;
+        if (withPeaks)
+            peaks = std::make_shared<const Peaks>(source->data.data(), source->frames, kChannels, sampleRate_);
         if (!engine_.submitSource(std::move(source))) return kErrBusy;
         std::lock_guard<std::mutex> lock(peaksMutex_);
         peaks_ = std::move(peaks);
