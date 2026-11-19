@@ -1,5 +1,5 @@
 // #34: Teile der Web-Anbindung, die ohne Browser laufen: Wellenform aus der Zusammenfassung (die Getter im
-// Browser sind synchron, das Worklet liefert nur Nachrichten). Die Bibliothek im Browser prüft file_store_test.dart (#35).
+// Browser sind synchron, das Worklet liefert nur Nachrichten). The browser library is tested in file_store_test.dart (#35).
 // Wiedergabe, Tempo, Loop, Seek, Metronom und Pegel im echten Browser prüft tool/web_core_check.dart (AK3).
 import 'dart:io';
 import 'dart:typed_data';

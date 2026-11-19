@@ -1,22 +1,22 @@
 // Dateiauswahl, Ordner und Drag & Drop vom nativen Teil (Kanal «woodshed/files»), austauschbar für Tests.
-// Dazu die Speicher-Schicht (#35): [FileStore] legt Bibliothek und Audiodateien ab, auf Desktop und Handy
-// im Dateisystem (file_store_io.dart), im Browser im Origin Private File System (file_store_web.dart).
+// Plus the storage layer (#35): [FileStore] holds the library and audio files, in the file system on desktop
+// and mobile (file_store_io.dart), in the browser's Origin Private File System (file_store_web.dart).
 import 'package:flutter/services.dart';
 
-/// Speicherplatz der Bibliothek für die Anzeige im Fuss der Bibliothek.
+/// Storage used by the library, shown in the library footer.
 class StorageInfo {
   const StorageInfo({required this.used, this.quota, this.persisted});
 
-  /// Belegte Bytes (Desktop: Ordner der Bibliothek; Web: alles, was die Seite speichert).
+  /// Bytes used (desktop: the library folder; web: everything the page stores).
   final int used;
 
-  /// Obergrenze in Bytes, die der Browser der Seite zugesteht; null auf Desktop und Handy.
+  /// Quota in bytes the browser grants the page; null on desktop and mobile.
   final int? quota;
 
-  /// Dauerhafter Speicher gewährt (Browser löscht nicht von sich aus); null auf Desktop und Handy.
+  /// Persistent storage granted (the browser won't evict it on its own); null on desktop and mobile.
   final bool? persisted;
 
-  /// Kleine Zeile, z. B. «1,2 GB belegt» oder «1,2 GB belegt · 58 GB frei · dauerhaft gespeichert».
+  /// Short UI line, e.g. «1,2 GB belegt» or «1,2 GB belegt · 58 GB frei · dauerhaft gespeichert».
   String get label {
     final parts = ['${formatBytes(used)} belegt'];
     if (quota case final q?) parts.add('${formatBytes(max0(q - used))} frei');
@@ -29,7 +29,7 @@ class StorageInfo {
   static int max0(int v) => v < 0 ? 0 : v;
 }
 
-/// Bytes deutsch mit Komma und einer Nachkommastelle ab KB: «512 B», «1,2 GB».
+/// Bytes in German notation, one decimal from KB on: «512 B», «1,2 GB».
 String formatBytes(int bytes) {
   const units = ['KB', 'MB', 'GB', 'TB'];
   if (bytes < 1000) return '$bytes B';
@@ -42,35 +42,35 @@ String formatBytes(int bytes) {
   return '${v.toStringAsFixed(1).replaceAll('.', ',')} ${units[i]}';
 }
 
-/// Ablage der Bibliothek. Namen sind relativ und mit «/» getrennt («library.json», «Tracks/‹id›.mp3»).
-/// Schreiben ersetzt eine Datei als Ganzes; Schreib- und Löschvorgänge laufen in Aufrufreihenfolge.
+/// Library storage. Names are relative and separated by «/» («library.json», «Tracks/‹id›.mp3»).
+/// A write replaces the whole file; writes and deletes run in call order.
 abstract class FileStore {
-  /// Inhalt oder null, wenn die Datei fehlt.
+  /// Contents, or null if the file is missing.
   Future<Uint8List?> read(String name);
 
-  /// Legt die Datei an oder ersetzt sie (fehlende Ordner werden angelegt).
+  /// Creates or replaces the file (missing folders are created).
   Future<void> write(String name, Uint8List bytes);
 
   Future<bool> exists(String name);
 
-  /// Löscht die Datei, falls es sie gibt.
+  /// Deletes the file if it exists.
   Future<void> delete(String name);
 
   Future<void> rename(String from, String to);
 
-  /// SHA-256 des Inhalts (64 Hex-Zeichen) oder null, wenn die Datei fehlt.
+  /// SHA-256 of the contents (64 hex digits), or null if the file is missing.
   Future<String?> sha256(String name);
 
-  /// Ort der Datei für den Audio-Kern: auf Desktop und Handy der gerätelokale Pfad, im Browser der Name.
+  /// Location for the audio core: the device-local path on desktop and mobile, the name in the browser.
   String locate(String name);
 
-  /// Gerätelokaler Pfad (Desktop und Handy); null im Browser, wo es keine Pfade gibt.
+  /// Device-local path (desktop and mobile); null in the browser, which has no paths.
   String? localPath(String name);
 
-  /// Belegter (und im Browser verfügbarer) Speicher.
+  /// Used (and, in the browser, available) storage.
   Future<StorageInfo> storageInfo();
 
-  /// Dauerhaften Speicher anfragen (nur im Browser, `navigator.storage.persist()`); sonst null.
+  /// Requests persistent storage (browser only, `navigator.storage.persist()`); null elsewhere.
   Future<bool?> requestPersistence() async => null;
 }
 

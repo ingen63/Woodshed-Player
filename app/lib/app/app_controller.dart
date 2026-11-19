@@ -71,7 +71,7 @@ class AppController extends ChangeNotifier {
     if (paths.isNotEmpty) await importFiles(paths, folderId: folderId);
   }
 
-  /// Importiert und lädt den ersten neuen (oder schon vorhandenen) Titel, falls noch keiner geladen ist.
+  /// Imports and loads the first new (or already present) track if none is loaded yet.
   Future<ImportResult> importFiles(
     List<String> paths, {
     String? folderId,

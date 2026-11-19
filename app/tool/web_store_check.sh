@@ -1,7 +1,7 @@
 #!/bin/sh
-# #35: baut die Prüfseite der Speicher-Schicht (tool/web_store_check.dart) nach app/build/web_store_check.
-# Danach: Server «web-store-check» aus .claude/launch.json (oder python3 -m http.server -d app/build/web_store_check),
-# Seite öffnen, «Prüfung starten» drücken, nach dem Neuladen noch einmal.
+# #35: builds the storage layer check page (tool/web_store_check.dart) into app/build/web_store_check.
+# Then: server «web-store-check» from .claude/launch.json (or python3 -m http.server -d app/build/web_store_check),
+# open the page, press «Start check», and again after the reload.
 set -e
 cd "$(dirname "$0")/.."
 tool/build_web_core.sh

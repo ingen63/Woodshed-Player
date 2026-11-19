@@ -1,11 +1,11 @@
-// #35: Prüfung der Speicher-Schicht im echten Browser. Nimmt die Dienste der Web-App (createAppController
-// aus platform_web.dart) mit der Bibliothek im Origin Private File System. Teil 1 leert die Bibliothek,
-// übergibt eine erzeugte Sinusdatei wie die Dateiauswahl (WebFilePlatform.register) und prüft Ablage im
-// OPFS, SHA-256, Doppel, Abspielen und Speicheranzeige. Dann lädt die Seite neu (?teil=2) und Teil 2 prüft,
-// dass der Titel noch da ist und spielt. Keine fremden Audiodateien.
-// Bau und Aufruf: app/tool/web_store_check.sh, dann im Browser «Prüfung starten» (zweimal, vor und nach dem
-// Neuladen; der AudioContext braucht eine Bedienung). Ergebnis als JSON in #ergebnis, Titel der Seite
-// «Prüfung: n von m bestanden» (nach Teil 2 über beide Teile).
+// #35: checks the storage layer in a real browser. Uses the web app's services (createAppController from
+// platform_web.dart) with the library in the Origin Private File System. Part 1 clears the library, hands
+// over a generated sine file the way the file picker does (WebFilePlatform.register) and checks storage in
+// the OPFS, SHA-256, duplicates, playback and the storage line. Then the page reloads (?part=2) and part 2
+// checks that the track is still there and plays. No third-party audio files.
+// Build and run: app/tool/web_store_check.sh, then press «Start check» in the browser (twice, before and
+// after the reload; the AudioContext needs a user gesture). Result as JSON in #result, page title
+// «Check: n of m passed» (after part 2, covering both parts).
 import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
@@ -20,7 +20,7 @@ import 'package:woodshed_player/app/file_store_web.dart';
 import 'package:woodshed_player/app/platform_web.dart';
 import 'package:woodshed_player/player/audio_core_web.dart';
 
-/// 16-Bit-Mono-WAV, [seconds] 440 Hz mit Pegel 0,5.
+/// 16-bit mono WAV, [seconds] of 440 Hz at level 0.5.
 Uint8List sineWav({double seconds = 2, int rate = 44100}) {
   final n = (seconds * rate).round();
   final b = ByteData(44 + n * 2);
@@ -56,13 +56,16 @@ class Check {
   final String detail;
 
   Map<String, Object> toJson() => {
-    'kriterium': name,
+    'criterion': name,
     'ok': ok,
-    'messung': detail,
+    'measurement': detail,
   };
 
-  static Check fromJson(Map j) =>
-      Check(j['kriterium'] as String, j['ok'] as bool, j['messung'] as String);
+  static Check fromJson(Map j) => Check(
+    j['criterion'] as String,
+    j['ok'] as bool,
+    j['measurement'] as String,
+  );
 }
 
 Future<void> wait(int ms) => Future.delayed(Duration(milliseconds: ms));
@@ -71,10 +74,10 @@ late final AppController app;
 late final WebFilePlatform files;
 late final WebAudioCore core;
 
-/// Ergebnis von Teil 1 und ID des Titels, über das Neuladen hinweg.
+/// Result of part 1 and the track ID, kept across the reload.
 const _key = 'wp-store-check';
 
-/// Lädt [id], spielt kurz und misst den Pegel.
+/// Loads [id], plays briefly and measures the level.
 Future<(bool, double, double)> playBriefly(String id) async {
   final t = app.library.track(id);
   if (t == null) return (false, 0.0, 0.0);
@@ -99,9 +102,9 @@ Future<List<Check>> part1() async {
   final r = await app.importFiles([files.register('Sinus 440.wav', wav)]);
   final t = r.imported.isEmpty ? null : r.imported.single;
   add(
-    'AK3 Dateiauswahl fügt Titel hinzu',
+    'AK3 file picker adds the track',
     t != null && lib.tracks.length == 1 && t.title == 'Sinus 440',
-    'Titel: ${lib.tracks.map((t) => t.title).toList()}',
+    'tracks: ${lib.tracks.map((t) => t.title).toList()}',
   );
   if (t == null) return checks;
 
@@ -109,45 +112,45 @@ Future<List<Check>> part1() async {
   final stored = await store.read('Tracks/${t.fileName}');
   final index = await store.read('library.json');
   add(
-    'AK1 Datei und library.json im OPFS',
+    'AK1 file and library.json in the OPFS',
     stored != null &&
         stored.length == wav.length &&
         index != null &&
         utf8.decode(index).contains(t.id),
-    'Tracks/${t.fileName}: ${stored?.length} Bytes (erwartet ${wav.length}), '
+    'Tracks/${t.fileName}: ${stored?.length} Bytes (expected ${wav.length}), '
         'library.json: ${index?.length} Bytes',
   );
   add(
-    'AK2 SHA-256 als contentHash',
+    'AK2 SHA-256 as contentHash',
     t.contentHash == hash && utf8.decode(index!).contains(hash),
-    'contentHash ${t.contentHash}, erwartet $hash',
+    'contentHash ${t.contentHash}, expected $hash',
   );
 
   final again = await app.importFiles([files.register('Kopie.wav', wav)]);
   final stillOne = await store.exists('Tracks/${t.fileName}');
   add(
-    'AK2 gleiche Datei nur einmal',
+    'AK2 same file stored once',
     again.imported.isEmpty &&
         again.duplicates.single.id == t.id &&
         lib.tracks.length == 1 &&
         stillOne,
-    'neu: ${again.imported.length}, schon da: ${again.duplicates.length}, '
-        'Titel in der Bibliothek: ${lib.tracks.length}',
+    'new: ${again.imported.length}, already there: ${again.duplicates.length}, '
+        'tracks in the library: ${lib.tracks.length}',
   );
 
   final (loaded, duration, peak) = await playBriefly(t.id);
   add(
-    'AK3 Titel spielt aus dem OPFS',
+    'AK3 track plays from the OPFS',
     loaded && (duration - 2).abs() < 0.02 && peak > 0.3,
-    'geladen: $loaded, Dauer ${duration.toStringAsFixed(3)} s, Spitze ${peak.toStringAsFixed(3)}',
+    'loaded: $loaded, duration ${duration.toStringAsFixed(3)} s, peak ${peak.toStringAsFixed(3)}',
   );
 
   await lib.refreshStorage();
   final s = lib.storage;
   add(
-    'AK5 persist() angefragt, Speicher angezeigt',
+    'AK5 persist() requested, storage shown',
     s != null && s.quota != null && s.persisted != null && s.used > 0,
-    'Zeile: «${s?.label}»',
+    'line: «${s?.label}»',
   );
 
   web.window.localStorage.setItem(
@@ -169,38 +172,37 @@ Future<List<Check>> part2() async {
   final id = saved['id'] as String?;
   final t = id == null ? null : app.library.track(id);
   add(
-    'AK3 nach dem Neuladen noch in der Bibliothek',
+    'AK3 still in the library after reload',
     t != null && t.contentHash == saved['hash'],
-    'Titel: ${app.library.tracks.map((t) => '${t.title} ${t.contentHash?.substring(0, 8)}').toList()}',
+    'tracks: ${app.library.tracks.map((t) => '${t.title} ${t.contentHash?.substring(0, 8)}').toList()}',
   );
   final (loaded, duration, peak) = id == null
       ? (false, 0.0, 0.0)
       : await playBriefly(id);
   add(
-    'AK3 spielt nach dem Neuladen',
+    'AK3 plays after reload',
     loaded && (duration - 2).abs() < 0.02 && peak > 0.3,
-    'geladen: $loaded, Dauer ${duration.toStringAsFixed(3)} s, Spitze ${peak.toStringAsFixed(3)}',
+    'loaded: $loaded, duration ${duration.toStringAsFixed(3)} s, peak ${peak.toStringAsFixed(3)}',
   );
   final s = app.library.storage;
   add(
-    'AK5 Speicherzeile',
+    'AK5 storage line',
     s != null && s.label.contains('belegt') && s.label.contains('frei'),
-    'Zeile: «${s?.label}»',
+    'line: «${s?.label}»',
   );
   return checks;
 }
 
 Future<void> main() async {
-  final second = web.window.location.search.contains('teil=2');
+  final second = web.window.location.search.contains('part=2');
   final body = web.document.body!;
-  final status = web.HTMLParagraphElement()
-    ..textContent = 'Kern wird geladen …';
+  final status = web.HTMLParagraphElement()..textContent = 'Loading core …';
   final button = web.HTMLButtonElement()
     ..id = 'start'
-    ..textContent = 'Prüfung starten'
+    ..textContent = 'Start check'
     ..disabled = true;
-  final out = web.HTMLPreElement.pre()..id = 'ergebnis';
-  // Über der (leeren) Flutter-Ansicht, sonst fängt sie die Klicks ab.
+  final out = web.HTMLPreElement.pre()..id = 'result';
+  // Above the (empty) Flutter view, which would otherwise catch the clicks.
   final page = web.HTMLDivElement()
     ..style.position = 'relative'
     ..style.zIndex = '10'
@@ -209,42 +211,41 @@ Future<void> main() async {
   page
     ..append(
       web.HTMLHeadingElement.h1()
-        ..textContent = 'Speicher-Schicht #35, Teil ${second ? 2 : 1}',
+        ..textContent = 'Storage layer #35, part ${second ? 2 : 1}',
     )
     ..append(status)
     ..append(button)
     ..append(out);
   body.append(page);
-  web.document.title = 'Prüfung bereit (Teil ${second ? 2 : 1})';
+  web.document.title = 'Check ready (part ${second ? 2 : 1})';
   if (!second) await OpfsFileStore.clear(libraryDir);
   app = await createAppController();
   files = app.files as WebFilePlatform;
   core = app.player.core as WebAudioCore;
-  status.textContent = 'Bereit.';
+  status.textContent = 'Ready.';
   button.disabled = false;
   button.onclick = ((web.Event _) {
-    core.wake(); // in der Bedienung, sonst bleibt der AudioContext stumm
+    core.wake(); // inside the gesture, otherwise the AudioContext stays silent
     button.disabled = true;
-    status.textContent = 'läuft …';
+    status.textContent = 'running …';
     (second ? part2() : part1()).then(
       (checks) {
         final passed = checks.where((c) => c.ok).length;
         out.textContent = const JsonEncoder.withIndent('  ').convert(checks);
         if (second) {
-          status.textContent = '$passed von ${checks.length} bestanden';
-          web.document.title =
-              'Prüfung: $passed von ${checks.length} bestanden';
+          status.textContent = '$passed of ${checks.length} passed';
+          web.document.title = 'Check: $passed of ${checks.length} passed';
         } else {
           status.textContent =
-              'Teil 1: $passed von ${checks.length}, lade neu …';
+              'Part 1: $passed of ${checks.length}, reloading …';
           Timer(const Duration(milliseconds: 500), () {
-            web.window.location.search = '?teil=2';
+            web.window.location.search = '?part=2';
           });
         }
       },
       onError: (Object e, StackTrace st) {
-        out.textContent = 'Fehler: $e\n$st';
-        web.document.title = 'Prüfung: Fehler';
+        out.textContent = 'Error: $e\n$st';
+        web.document.title = 'Check: error';
       },
     );
   }).toJS;

@@ -1,5 +1,5 @@
-// FileStore im Dateisystem (#35): Desktop und Handy. Die Bibliothek liegt wie bei der Swift-App im
-// App-Ordner (`library.json`, `Tracks/`). Die Pfade bleiben gerätelokale Zusatzinfo.
+// FileStore in the file system (#35): desktop and mobile. As in the Swift app, the library lives in the
+// app folder (`library.json`, `Tracks/`). Paths stay device-local extra information.
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
@@ -11,13 +11,13 @@ import 'file_platform.dart';
 class IoFileStore extends FileStore {
   IoFileStore(this.base);
 
-  /// Ordner der Bibliothek.
+  /// Library folder.
   final Directory base;
 
   File _file(String name) => File('${base.path}/$name');
 
-  // Die Methoden arbeiten synchron im async-Rumpf: Schreiben und Löschen sind erledigt, wenn der Aufruf
-  // zurückkehrt, damit bleibt die Reihenfolge erhalten.
+  // The methods work synchronously inside the async body: writes and deletes are done when the call
+  // returns, which keeps them in order.
 
   @override
   Future<Uint8List?> read(String name) async {
@@ -48,7 +48,7 @@ class IoFileStore extends FileStore {
     _file(from).renameSync(_file(to).path);
   }
 
-  /// Rechnet in einem eigenen Isolate und liest die Datei in Stücken (grosse Dateien blockieren nichts).
+  /// Hashes in a separate isolate and reads the file in chunks (large files block nothing).
   @override
   Future<String?> sha256(String name) {
     final path = _file(name).path;
@@ -77,7 +77,7 @@ class IoFileStore extends FileStore {
   }
 }
 
-/// Liest eine gewählte oder hereingezogene Datei (Quelle des Imports); null, wenn sie fehlt.
+/// Reads a picked or dropped file (import source); null if it is missing.
 Future<Uint8List?> readLocalFile(String path) async {
   final f = File(path);
   return f.existsSync() ? f.readAsBytes() : null;

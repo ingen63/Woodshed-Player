@@ -49,7 +49,7 @@ class Track {
     this.contentHash,
   });
 
-  /// Interne ID (UUID) und Name der Datei in `Tracks/`, wie in der Swift-App.
+  /// Internal ID (UUID) and file name in `Tracks/`, as in the Swift app.
   final String id;
 
   /// Dateiname im Ordner `Tracks/` der Bibliothek.
@@ -69,9 +69,8 @@ class Track {
   /// Ordner; null = «Ohne Ordner».
   final String? folderId;
 
-  /// SHA-256 des Inhalts (64 Hex-Zeichen, #35): identifiziert den Titel geräteübergreifend, dieselbe
-  /// Datei wird nur einmal gespeichert. Zusatzfeld, das die Swift-App überliest; fehlt bei alten
-  /// Bibliotheken und wird beim Öffnen nachgerechnet.
+  /// SHA-256 of the contents (64 hex digits, #35): identifies the track across devices; the same file is
+  /// stored only once. Extra field the Swift app ignores; missing in old libraries and computed on open.
   final String? contentHash;
 
   Track copyWith({

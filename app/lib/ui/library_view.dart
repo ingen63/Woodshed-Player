@@ -441,7 +441,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// Speicherverbrauch im Fuss der Bibliothek (#35/AK5), z. B. «1,2 GB belegt».
+/// Storage usage in the library footer (#35/AK5), e.g. «1,2 GB belegt».
 class _StorageLine extends StatelessWidget {
   const _StorageLine(this.text);
   final String text;

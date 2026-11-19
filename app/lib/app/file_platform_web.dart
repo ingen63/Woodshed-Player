@@ -1,6 +1,6 @@
-// Dateiauswahl im Browser (#34, #35): `<input type=file>` liest die Dateien in den Speicher. Jede Datei
-// bekommt einen Schlüssel «web:<n>/<Dateiname>»; die Bibliothek holt sie damit einmal ab ([take]) und
-// legt sie dauerhaft im OPFS ab (file_store_web.dart).
+// File picker in the browser (#34, #35): `<input type=file>` reads the files into memory. Each file gets a
+// key «web:<n>/<file name>»; the library fetches it once with that key ([take]) and stores it
+// persistently in the OPFS (file_store_web.dart).
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
@@ -13,10 +13,10 @@ class WebFilePlatform implements FilePlatform {
   final _files = <String, Uint8List>{};
   int _count = 0;
 
-  /// Gewählte Bytes zum Schlüssel abholen (für den Import); danach sind sie hier vergessen.
+  /// Takes the picked bytes for [key] (for the import); afterwards they are dropped here.
   Future<Uint8List?> take(String key) async => _files.remove(key);
 
-  /// Legt Bytes zum Abholen ab und gibt ihren Schlüssel zurück (Dateiauswahl, Prüfseiten).
+  /// Holds bytes for pickup and returns their key (file picker, check pages).
   String register(String name, Uint8List bytes) {
     final path = 'web:${++_count}/$name';
     _files[path] = bytes;

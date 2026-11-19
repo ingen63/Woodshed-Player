@@ -1,5 +1,5 @@
-// Dienste der App im Browser: WASM-Kern im AudioWorklet (#34), Bibliothek im Origin Private File System
-// (#35), Import über die Dateiauswahl. Keine Aufnahme. Gegenstück auf Desktop und Handy: platform_native.dart.
+// App services in the browser: WASM core in the AudioWorklet (#34), library in the Origin Private File
+// System (#35), import through the file picker. No recording. Desktop and mobile: platform_native.dart.
 import 'package:material_ui/material_ui.dart';
 
 import '../library/library.dart';
@@ -10,15 +10,15 @@ import 'app_controller.dart';
 import 'file_platform_web.dart';
 import 'file_store_web.dart';
 
-/// Ordner der Bibliothek im OPFS der Seite.
+/// Library folder in the page's OPFS.
 const libraryDir = 'WoodshedPlayer';
 
-/// [baseDir] gibt es nur auf Desktop und Handy; im Browser liegt die Bibliothek im OPFS.
+/// [baseDir] exists only on desktop and mobile; in the browser the library lives in the OPFS.
 Future<AppController> createAppController({Object? baseDir}) async {
   final files = WebFilePlatform();
   final store = await OpfsFileStore.open(libraryDir);
   final core = await WebAudioCore.create(bytesOf: store.read);
-  // Dauer kennt im Browser erst der Kern beim Laden.
+  // In the browser only the core knows the duration, once it loads the file.
   final library = Library(store, probe: (_) => null, readSource: files.take);
   await library.load();
   final metronome = MetronomeController(

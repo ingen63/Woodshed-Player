@@ -233,8 +233,8 @@ class TestApp {
   }
 }
 
-/// FileStore im Speicher, verhält sich wie OPFS im Browser (#35): keine Pfade, der Audio-Kern bekommt den
-/// Namen. [hashGate] hält das Nachrechnen der Hashes an, bis es freigegeben wird.
+/// In-memory FileStore that behaves like OPFS in the browser (#35): no paths, the audio core gets the name.
+/// [hashGate] holds back hashing until it is completed.
 class MemoryFileStore extends FileStore {
   final files = <String, Uint8List>{};
   int persistRequests = 0;

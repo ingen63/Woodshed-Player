@@ -1,5 +1,5 @@
 // #34/AK3: Prüfung der Web-Anbindung im echten Browser. Nimmt die Dienste der Web-App (createAppController
-// aus platform_web.dart: WASM-Kern im AudioWorklet, Bibliothek im OPFS (#35, vorher geleert), PlayerService, Metronom), lädt eine
+// aus platform_web.dart: WASM-Kern im AudioWorklet, Bibliothek (#35: OPFS library, cleared first), PlayerService, Metronom), lädt eine
 // erzeugte Sinusdatei (WAV, 0–3 s 440 Hz mit Pegel 0,5, danach Stille) und die erzeugte sine440.m4a aus
 // core/tests/audio (AAC, Dekodieren im Browser) und misst Position, Pegel, Wellenform, Tempo, Loop-Sprung,
 // Seek und Metronom. Hören ist nicht nötig.
@@ -289,7 +289,9 @@ Future<void> main() async {
     ..append(out);
   body.append(page);
   web.document.title = 'Prüfung bereit';
-  await OpfsFileStore.clear(libraryDir); // jede Prüfung mit leerer Bibliothek
+  await OpfsFileStore.clear(
+    libraryDir,
+  ); // every check starts with an empty library
   app = await createAppController();
   files = app.files as WebFilePlatform;
   core = app.player.core as WebAudioCore;

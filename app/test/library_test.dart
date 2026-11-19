@@ -54,20 +54,20 @@ Future<Library> loaded(Directory base) async {
   return l;
 }
 
-/// Ordner und Dateien der Bibliothek im Dateisystem (nur für Tests).
+/// Library folders and files in the file system (tests only).
 extension IoLibrary on Library {
   Directory get base => (store as IoFileStore).base;
   Directory get tracksDir => Directory('${base.path}/Tracks');
   File get indexFile => File('${base.path}/library.json');
 }
 
-/// library.json ohne die Zeilen `contentHash` (#35), zum Vergleich mit den Golden-Dateien der Swift-App.
+/// library.json without the `contentHash` lines (#35), to compare with the Swift app's golden files.
 String withoutHashes(String json) => json.replaceAll(
   RegExp(r'^ *"contentHash" : "[0-9a-f]{64}",\n', multiLine: true),
   '',
 );
 
-/// Quelldatei; ohne [content] mit eigenem Inhalt je Name (gleicher Inhalt wäre ein Doppel, #35).
+/// Source file; without [content] it gets contents unique to its name (equal contents are a duplicate, #35).
 File source(String name, [String? content]) =>
     File('${dir('quelle').path}/$name')
       ..writeAsStringSync(content ?? 'audio $name');
@@ -166,7 +166,7 @@ void main() {
       expect(l.tracks.map((t) => t.id), containsAll([id1, id2]));
       expect(l.folders.length, 2);
       expect(l.sortOrder, TrackSortOrder.alphabetical);
-      // Beim Öffnen kommt nur der contentHash dazu (#35).
+      // Opening only adds contentHash (#35).
       expect(
         withoutHashes(File('${base.path}/library.json').readAsStringSync()),
         before,
@@ -181,7 +181,7 @@ void main() {
       expect(l.droppedMissing, 1);
     });
 
-    test('ohne library.json: leere Bibliothek, Tracks/ entsteht beim ersten Import (#35)', () async {
+    test('no library.json: empty library, Tracks/ appears with the first import (#35)', () async {
       final base = dir('neu');
       final l = await loaded(base);
       expect(l.tracks, isEmpty);

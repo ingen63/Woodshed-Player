@@ -1,7 +1,7 @@
 // Bibliothek (#16), wie Library.swift der Swift-App: Dateien werden in die Bibliothek kopiert,
 // Metadaten und Einstellungen liegen in `library.json` im gleichen Format `{folders, tracks}`.
-// Seit #35 über eine Speicher-Schicht ([FileStore]): Dateisystem auf Desktop und Handy, OPFS im Browser.
-// Jeder Titel trägt den SHA-256 seines Inhalts (`contentHash`); dieselbe Datei wird nur einmal gespeichert.
+// Since #35 through a storage layer ([FileStore]): file system on desktop and mobile, OPFS in the browser.
+// Every track carries the SHA-256 of its contents (`contentHash`); the same file is stored only once.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -19,10 +19,10 @@ export '../app/file_platform.dart' show FileStore, StorageInfo;
 export 'track.dart';
 
 /// Dauer einer Datei in Sekunden, < 0 = Fehler. In der App `wpFileDuration` aus dem Audio-Kern.
-/// null = erst beim Laden bekannt (Browser, wo der Kern im Worklet dekodiert).
+/// null = known only when loading (browser, where the core decodes in the worklet).
 typedef DurationProbe = double? Function(String path);
 
-/// Inhalt einer gewählten oder hereingezogenen Datei (Quelle des Imports); null, wenn sie fehlt.
+/// Contents of a picked or dropped file (import source); null if it is missing.
 typedef SourceReader = Future<Uint8List?> Function(String source);
 
 class ImportResult {
@@ -32,18 +32,18 @@ class ImportResult {
   /// Ursprüngliche Dateinamen, die nicht übernommen werden konnten.
   final List<String> failed;
 
-  /// Titel, die mit gleichem Inhalt schon in der Bibliothek waren (keine zweite Datei).
+  /// Tracks whose contents were already in the library (no second file).
   final List<Track> duplicates;
 }
 
 String _sha256Hex(Uint8List bytes) => crypto.sha256.convert(bytes).toString();
 
-/// Bis zu dieser Grösse (Bytes) wird der Hash direkt gerechnet, das dauert nur Millisekunden.
+/// Up to this size (bytes) the hash is computed inline; that takes only milliseconds.
 const _hashInline = 1 << 20;
 
 class Library extends ChangeNotifier {
-  /// [store] enthält `library.json`, `preferences.json` und den Ordner `Tracks/`. [readSource] liest die
-  /// Dateien, die importiert werden (Pfad auf Desktop, Schlüssel der Dateiauswahl im Browser).
+  /// [store] holds `library.json`, `preferences.json` and the `Tracks/` folder. [readSource] reads the
+  /// files being imported (path on desktop, file picker key in the browser).
   Library(
     this.store, {
     required this.probe,
@@ -84,11 +84,11 @@ class Library extends ChangeNotifier {
   /// Beim letzten Laden entfernte Einträge, deren Datei fehlte.
   int get droppedMissing => _droppedMissing;
 
-  /// Fertig, wenn die fehlenden `contentHash` alter Bibliotheken nachgerechnet sind (läuft nach [load]
-  /// im Hintergrund).
+  /// Completes once missing `contentHash` values of old libraries are computed (runs in the background
+  /// after [load]).
   Future<void> get hashing => _hashing ?? Future.value();
 
-  /// Belegter Speicher (im Browser auch verfügbarer und ob dauerhaft); null, bis er gemessen ist.
+  /// Used storage (in the browser also available space and persistence); null until measured.
   StorageInfo? get storage => _storage;
 
   TrackSortOrder get sortOrder => _sortOrder;
@@ -137,7 +137,7 @@ class Library extends ChangeNotifier {
     await refreshStorage();
   }
 
-  /// Dauerhaften Speicher einmal anfragen, sobald es etwas zu behalten gibt (nur im Browser wirksam).
+  /// Requests persistent storage once there is something to keep (only has an effect in the browser).
   Future<void> _askPersistence() async {
     if (_persistAsked) return;
     _persistAsked = true;
@@ -146,7 +146,7 @@ class Library extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Misst den belegten Speicher neu (nach Laden, Import und Löschen).
+  /// Measures used storage again (after load, import and delete).
   Future<void> refreshStorage() async {
     try {
       _storage = await store.storageInfo();
@@ -154,8 +154,8 @@ class Library extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Rechnet fehlende `contentHash` nach, Titel für Titel, ohne die Oberfläche zu blockieren
-  /// (Dateisystem: eigenes Isolate). Gespeichert wird einmal am Ende.
+  /// Computes missing `contentHash` values track by track without blocking the UI (file system:
+  /// separate isolate). Saves once at the end.
   Future<void> _backfillHashes() async {
     final missing = [
       for (final t in _tracks)
@@ -164,7 +164,7 @@ class Library extends ChangeNotifier {
     var changed = false;
     for (final id in missing) {
       final t = track(id);
-      if (t == null) continue; // inzwischen gelöscht
+      if (t == null) continue; // deleted meanwhile
       String? hash;
       try {
         hash = await store.sha256(trackName(t.fileName));
@@ -205,8 +205,8 @@ class Library extends ChangeNotifier {
     }
   }
 
-  /// Schreibt `library.json` (atomar). Im Dateisystem ist die Datei geschrieben, wenn der Aufruf
-  /// zurückkehrt; im Browser in Aufrufreihenfolge kurz danach.
+  /// Writes `library.json` atomically. In the file system the file is written when the call returns; in
+  /// the browser shortly after, in call order.
   Future<void> save() {
     _pendingSave?.cancel();
     _pendingSave = null;
@@ -286,17 +286,17 @@ class Library extends ChangeNotifier {
 
   Track? track(String id) => _tracks.where((t) => t.id == id).firstOrNull;
 
-  /// Titel mit diesem Inhalt (SHA-256), falls schon in der Bibliothek.
+  /// Track with these contents (SHA-256), if already in the library.
   Track? trackWithHash(String hash) =>
       _tracks.where((t) => t.contentHash == hash).firstOrNull;
 
-  /// Ort der Datei für den Audio-Kern: gerätelokaler Pfad auf Desktop und Handy, Name im Browser.
+  /// File location for the audio core: device-local path on desktop and mobile, name in the browser.
   String filePath(Track t) => store.locate(trackName(t.fileName));
 
-  /// Gerätelokaler Pfad der Datei (Desktop und Handy); null im Browser.
+  /// Device-local path of the file (desktop and mobile); null in the browser.
   String? localPath(Track t) => store.localPath(trackName(t.fileName));
 
-  /// Cover als gerätelokaler Pfad; im Browser (noch) keins.
+  /// Artwork as a device-local path; none in the browser (yet).
   String? artworkPath(Track t) =>
       t.hasArtwork ? store.localPath(_artworkName(t.id)) : null;
 
@@ -304,15 +304,15 @@ class Library extends ChangeNotifier {
 
   // ---- Import und Löschen ----
 
-  /// Übernimmt die Dateien in die Bibliothek und liest Titel, Künstler, Album, Cover und Dauer. Dateien,
-  /// deren Inhalt schon da ist, landen in [ImportResult.duplicates] und werden nicht noch einmal gespeichert.
+  /// Adds the files to the library and reads title, artist, album, artwork and duration. Files whose
+  /// contents are already present end up in [ImportResult.duplicates] and are not stored again.
   Future<ImportResult> importFiles(
     List<String> paths, {
     String? folderId,
   }) async {
     _importing = true;
     notifyListeners();
-    if (_hashing case final h?) await h; // alte Titel brauchen ihren Hash, sonst wird ein Doppel nicht erkannt
+    if (_hashing case final h?) await h; // old tracks need their hash, otherwise a duplicate goes unnoticed
     final imported = <Track>[];
     final failed = <String>[];
     final duplicates = <Track>[];
@@ -340,7 +340,7 @@ class Library extends ChangeNotifier {
     return ImportResult(imported, failed, duplicates);
   }
 
-  /// (Titel, schon vorhanden) oder null bei Fehler.
+  /// (track, already present) or null on failure.
   Future<(Track, bool)?> _importFile(String source, String? folderId) async {
     final id = newUuid(_random);
     final name = _baseName(source);
@@ -352,7 +352,7 @@ class Library extends ChangeNotifier {
     try {
       final bytes = await readSource(source);
       if (bytes == null) return null;
-      // Grosse Dateien in einem eigenen Isolate (im Browser läuft compute im selben Thread).
+      // Large files in a separate isolate (in the browser compute runs on the same thread).
       final hash = bytes.length > _hashInline
           ? await compute(_sha256Hex, bytes)
           : _sha256Hex(bytes);

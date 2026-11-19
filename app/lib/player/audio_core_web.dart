@@ -19,7 +19,7 @@ import 'waveform_summary.dart';
 @JS('WebAssembly.compile')
 external JSPromise<JSObject> _wasmCompile(JSArrayBuffer bytes);
 
-/// Bytes einer Datei der Bibliothek (Name im OPFS, #35); null, wenn sie fehlt.
+/// Bytes of a library file (name in the OPFS, #35); null if it is missing.
 typedef WebFileBytes = Future<Uint8List?> Function(String path);
 
 class WebAudioCore implements AudioCore {
@@ -191,7 +191,7 @@ class WebAudioCore implements AudioCore {
         _loadState = WpCode.fileNotFound;
         return;
       }
-      // Eigene Kopie, deren Speicher ans Worklet übergeht; die Bytes bleiben für den Browser-Dekoder.
+      // Own copy whose buffer is transferred to the worklet; the bytes stay for the browser decoder.
       final copy = Uint8List.fromList(bytes).buffer.toJS;
       code =
           ((await _call('loadEncoded', [copy], [copy])) as JSNumber).toDartInt;

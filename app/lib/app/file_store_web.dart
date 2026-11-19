@@ -1,6 +1,6 @@
-// FileStore im Browser (#35): Origin Private File System (OPFS, `navigator.storage.getDirectory()`).
-// Die Bibliothek bleibt über Neuladen und Neustart des Browsers erhalten. `createWritable()` schreibt in
-// eine Zwischendatei und ersetzt erst beim Schliessen, deshalb ist jedes Schreiben atomar.
+// FileStore in the browser (#35): Origin Private File System (OPFS, `navigator.storage.getDirectory()`).
+// The library survives reloads and browser restarts. `createWritable()` writes to a swap file and only
+// replaces on close, so every write is atomic.
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
@@ -13,25 +13,25 @@ import 'file_platform.dart';
 class OpfsFileStore extends FileStore {
   OpfsFileStore._(this._root);
 
-  /// Ordner [dir] im OPFS der Seite (wird angelegt), z. B. «WoodshedPlayer».
+  /// Folder [dir] in the page's OPFS (created if needed), e.g. «WoodshedPlayer».
   static Future<OpfsFileStore> open(String dir) async {
     final origin = await web.window.navigator.storage.getDirectory().toDart;
     return OpfsFileStore._(await _subdir(origin, dir, create: true));
   }
 
-  /// Löscht den Ordner [dir] samt Inhalt (für Prüfseiten, die mit leerer Bibliothek beginnen).
+  /// Deletes folder [dir] with its contents (for check pages that start with an empty library).
   static Future<void> clear(String dir) async {
     final origin = await web.window.navigator.storage.getDirectory().toDart;
     try {
       await origin
           .removeEntry(dir, web.FileSystemRemoveOptions(recursive: true))
           .toDart;
-    } catch (_) {} // gibt es noch nicht
+    } catch (_) {} // does not exist yet
   }
 
   final web.FileSystemDirectoryHandle _root;
 
-  /// Schreiben, Umbenennen und Löschen nacheinander, in Aufrufreihenfolge.
+  /// Writes, renames and deletes one after another, in call order.
   Future<void> _queue = Future.value();
 
   Future<T> _serial<T>(Future<T> Function() op) {
@@ -51,7 +51,7 @@ class OpfsFileStore extends FileStore {
       )
       .toDart;
 
-  /// Ordner und Dateiname zu «a/b/c.mp3»; null, wenn ein Ordner fehlt und [create] falsch ist.
+  /// Folder and file name for «a/b/c.mp3»; null if a folder is missing and [create] is false.
   Future<(web.FileSystemDirectoryHandle, String)?> _parent(
     String name, {
     bool create = false,
@@ -102,10 +102,10 @@ class OpfsFileStore extends FileStore {
     if (parent == null) return;
     try {
       await parent.$1.removeEntry(parent.$2).toDart;
-    } catch (_) {} // fehlt schon
+    } catch (_) {} // already gone
   }
 
-  // Lesen wartet auf ausstehendes Schreiben, damit es den neuesten Stand sieht.
+  // Reads wait for pending writes so they see the latest state.
   @override
   Future<Uint8List?> read(String name) => _serial(() => _read(name));
 
@@ -120,11 +120,11 @@ class OpfsFileStore extends FileStore {
   @override
   Future<void> delete(String name) => _serial(() => _delete(name));
 
-  /// OPFS kennt kein allgemeines Umbenennen: kopieren und das Original löschen.
+  /// OPFS has no general rename: copy, then delete the original.
   @override
   Future<void> rename(String from, String to) => _serial(() async {
     final bytes = await _read(from);
-    if (bytes == null) throw StateError('$from fehlt');
+    if (bytes == null) throw StateError('$from is missing');
     await _write(to, bytes);
     await _delete(from);
   });

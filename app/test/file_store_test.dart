@@ -1,6 +1,6 @@
-// #35: Speicher-Schicht (FileStore) und Titel über den SHA-256 ihres Inhalts. Dateisystem nur in temporären
-// Ordnern, nie in der echten Bibliothek; der Browser wird mit MemoryFileStore nachgebildet (keine Pfade,
-// wie OPFS). Das echte OPFS im Browser prüft tool/web_store_check.dart.
+// #35: storage layer (FileStore) and tracks identified by the SHA-256 of their contents. File system only in
+// temporary folders, never the real library; the browser is modelled with MemoryFileStore (no paths, like
+// OPFS). tool/web_store_check.dart checks the real OPFS in a browser.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -19,7 +19,7 @@ import 'fakes.dart';
 const goldenNew = 'test/golden/library_swift.json';
 const goldenLegacy = 'test/golden/library_swift_legacy.json';
 
-/// SHA-256 von «abc» (FIPS 180-2, Anhang B.1).
+/// SHA-256 of «abc» (FIPS 180-2, appendix B.1).
 const abcHash =
     'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 
@@ -39,14 +39,14 @@ Library ioLibrary(Directory base) => Library(
   random: Random(7),
 );
 
-/// Bibliothek wie im Browser: Dateiauswahl liefert Schlüssel, deren Bytes einmal abgeholt werden.
+/// Library as in the browser: the file picker hands out keys whose bytes are fetched once.
 class WebLike {
   WebLike([MemoryFileStore? store]) : store = store ?? MemoryFileStore();
   final MemoryFileStore store;
   final picked = <String, Uint8List>{};
   late final library = Library(
     store,
-    probe: (_) => null, // Dauer kennt erst der Kern beim Laden
+    probe: (_) => null, // only the core knows the duration, when loading
     readSource: (key) async => picked.remove(key),
     saveDelay: Duration.zero,
     random: Random(5),
@@ -59,7 +59,7 @@ class WebLike {
   }
 }
 
-/// Bibliotheksordner mit library.json aus [golden] und den Audiodateien der Golden-Titel.
+/// Library folder with library.json from [golden] and audio files for the golden tracks.
 Directory swiftFolder(String golden) {
   final d = Directory('${tmp.path}/swift')..createSync();
   File(golden).copySync('${d.path}/library.json');
@@ -85,8 +85,8 @@ void main() {
   setUp(() => tmp = Directory.systemTemp.createTempSync('wp_store_test'));
   tearDown(() => tmp.deleteSync(recursive: true));
 
-  group('#35/AK1 FileStore für Dateisystem und OPFS', () {
-    test('Dateisystem: schreiben, lesen, umbenennen, löschen, Hash', () async {
+  group('#35/AK1 FileStore for file system and OPFS', () {
+    test('file system: write, read, rename, delete, hash', () async {
       final s = IoFileStore(Directory('${tmp.path}/lib'));
       expect(await s.read('Tracks/a.mp3'), isNull);
       await s.write('Tracks/a.mp3', bytes('abc'));
@@ -99,17 +99,17 @@ void main() {
       expect(await s.exists('Tracks/a.mp3'), isFalse);
       expect((await s.storageInfo()).used, 3);
       await s.delete('Tracks/b.mp3');
-      await s.delete('Tracks/b.mp3'); // fehlt schon: kein Fehler
+      await s.delete('Tracks/b.mp3'); // already gone: no error
       expect(await s.exists('Tracks/b.mp3'), isFalse);
       expect(await s.sha256('Tracks/b.mp3'), isNull);
       expect(
         Directory('${tmp.path}/lib/Tracks').listSync(),
         isEmpty,
-        reason: 'keine Zwischendateien',
+        reason: 'no temporary files left',
       );
     });
 
-    test('OPFS-Implementierung im Browser, gewählt von platform_web', () {
+    test('OPFS implementation for the browser, chosen by platform_web', () {
       final web = File('lib/app/file_store_web.dart').readAsStringSync();
       expect(web, contains('class OpfsFileStore extends FileStore'));
       expect(web, contains('navigator.storage.getDirectory()'));
@@ -122,7 +122,7 @@ void main() {
       expect(library, isNot(contains("import 'dart:io'")));
     });
 
-    test('Bibliothek arbeitet mit jedem FileStore', () async {
+    test('library works with any FileStore', () async {
       final w = WebLike();
       await w.library.load();
       final t = (await w.library.importFiles([w.pick('a.mp3', 'eins')]))
@@ -133,8 +133,8 @@ void main() {
     });
   });
 
-  group('#35/AK2 Titel über SHA-256, dieselbe Datei nur einmal', () {
-    test('Import speichert den Hash des Inhalts', () async {
+  group('#35/AK2 tracks identified by SHA-256, the same file stored once', () {
+    test('import stores the content hash', () async {
       final l = ioLibrary(Directory('${tmp.path}/lib'));
       await l.load();
       final t = (await l.importFiles([source('a.mp3', 'abc').path]))
@@ -146,11 +146,11 @@ void main() {
         File('${tmp.path}/lib/library.json').readAsStringSync(),
       );
       expect(json.single['contentHash'], abcHash);
-      expect(json.single['id'], t.id, reason: 'UUID bleibt interne ID');
+      expect(json.single['id'], t.id, reason: 'UUID stays the internal ID');
       expect(json.single['fileName'], '${t.id}.mp3');
     });
 
-    test('gleicher Inhalt unter anderem Namen: keine zweite Datei', () async {
+    test('same contents under another name: no second file', () async {
       final base = Directory('${tmp.path}/lib');
       final l = ioLibrary(base);
       await l.load();
@@ -160,7 +160,7 @@ void main() {
       final r = await l.importFiles([
         source('kopie.mp3', 'abc').path,
         source('anders.mp3', 'xyz').path,
-        source('nochmal.mp3', 'xyz').path, // Doppel im selben Import
+        source('nochmal.mp3', 'xyz').path, // duplicate within the same import
       ]);
       expect(r.imported.map((t) => t.originalFileName), ['anders.mp3']);
       expect(r.duplicates.map((t) => t.id), [first.id, r.imported.single.id]);
@@ -169,14 +169,14 @@ void main() {
       expect(Directory('${base.path}/Tracks').listSync(), hasLength(2));
     });
 
-    test('alte Bibliothek: Hash wird im Hintergrund nachgerechnet', () async {
+    test('old library: hash is computed in the background', () async {
       final store = MemoryFileStore()..hashGate = Completer<void>();
       store.files['library.json'] = File(goldenNew).readAsBytesSync();
       for (final t in tracksIn(File(goldenNew).readAsStringSync())) {
         store.files['Tracks/${t['fileName']}'] = bytes('inhalt ${t['id']}');
       }
       final w = WebLike(store);
-      await w.library.load(); // kehrt zurück, obwohl das Rechnen noch hängt
+      await w.library.load(); // returns although hashing is still blocked
       expect(w.library.tracks, hasLength(2));
       expect(w.library.tracks.every((t) => t.contentHash == null), isTrue);
       var done = false;
@@ -200,7 +200,7 @@ void main() {
     });
 
     test(
-      'Import wartet auf das Nachrechnen und erkennt alte Titel als Doppel',
+      'import waits for hashing and detects old tracks as duplicates',
       () async {
         final store = MemoryFileStore()..hashGate = Completer<void>();
         store.files['library.json'] = File(goldenNew).readAsBytesSync();
@@ -222,20 +222,20 @@ void main() {
     );
   });
 
-  group('#35/AK3 Im Web fügt die Dateiauswahl Titel dauerhaft hinzu', () {
-    test('Import landet im Speicher und ist nach dem Neuladen da', () async {
+  group('#35/AK3 the web file picker adds tracks permanently', () {
+    test('import lands in storage and survives a reload', () async {
       final w = WebLike();
       await w.library.load();
       final key = w.pick('Etüde in G.mp3', 'ton');
       final t = (await w.library.importFiles([key])).imported.single;
       expect(t.title, 'Etüde in G');
-      expect(t.duration, 0, reason: 'Dauer erst beim Laden bekannt');
-      expect(w.picked, isEmpty, reason: 'Bytes der Auswahl abgeholt');
+      expect(t.duration, 0, reason: 'duration known only when loading');
+      expect(w.picked, isEmpty, reason: 'picked bytes were taken');
       expect(w.library.filePath(t), 'Tracks/${t.fileName}');
-      expect(w.library.localPath(t), isNull, reason: 'im Browser kein Pfad');
+      expect(w.library.localPath(t), isNull, reason: 'no path in the browser');
       expect(w.store.files['Tracks/${t.fileName}'], bytes('ton'));
 
-      // «Neu laden»: frische Bibliothek auf demselben Speicher.
+      // «Reload»: fresh library on the same storage.
       final again = WebLike(w.store);
       await again.library.load();
       await again.library.hashing;
@@ -243,7 +243,7 @@ void main() {
       expect(again.library.tracks.single.contentHash, t.contentHash);
     });
 
-    test('Ordner, Einstellungen und Löschen bleiben gespeichert', () async {
+    test('folders, settings and deletion are persisted', () async {
       final w = WebLike();
       await w.library.load();
       final t = (await w.library.importFiles([w.pick('a.mp3', 'a')]))
@@ -261,7 +261,7 @@ void main() {
       expect(w.store.files.keys, isNot(contains('Tracks/${t.fileName}')));
     });
 
-    test('fehlende Auswahl wird gemeldet', () async {
+    test('missing picked file is reported', () async {
       final w = WebLike();
       await w.library.load();
       final r = await w.library.importFiles(['web:9/weg.mp3']);
@@ -271,9 +271,9 @@ void main() {
   });
 
   group(
-    '#35/AK4 Desktop: Pfad gerätelokal, alte Bibliotheken öffnen unverändert',
+    '#35/AK4 desktop: path is device-local, old libraries open unchanged',
     () {
-      test('Pfad nur als gerätelokale Zusatzinfo', () async {
+      test('path only as device-local extra information', () async {
         final base = Directory('${tmp.path}/lib');
         final l = ioLibrary(base);
         await l.load();
@@ -288,7 +288,7 @@ void main() {
       });
 
       for (final golden in [goldenNew, goldenLegacy]) {
-        test('library.json im alten Format ($golden)', () async {
+        test('library.json in the old format ($golden)', () async {
           final base = swiftFolder(golden);
           final before = tracksIn(File(golden).readAsStringSync());
           final l = ioLibrary(base);
@@ -304,7 +304,7 @@ void main() {
           for (var i = 0; i < before.length; i++) {
             final a = {...after[i]}..remove('contentHash');
             final expected = Track.fromJson(before[i]).toJson();
-            expect(a, expected, reason: 'alle bisherigen Felder unverändert');
+            expect(a, expected, reason: 'all previous fields unchanged');
             expect(
               after[i]['contentHash'],
               await IoFileStore(base).sha256('Tracks/${after[i]['fileName']}'),
@@ -319,21 +319,18 @@ void main() {
         });
       }
 
-      test(
-        'ohne Bibliothek: nichts wird angelegt ausser beim Speichern',
-        () async {
-          final base = Directory('${tmp.path}/leer');
-          final l = ioLibrary(base);
-          await l.load();
-          expect(l.tracks, isEmpty);
-          expect(File('${base.path}/library.json').existsSync(), isFalse);
-        },
-      );
+      test('no library: nothing is created until saving', () async {
+        final base = Directory('${tmp.path}/leer');
+        final l = ioLibrary(base);
+        await l.load();
+        expect(l.tracks, isEmpty);
+        expect(File('${base.path}/library.json').existsSync(), isFalse);
+      });
     },
   );
 
-  group('#35/AK5 dauerhafter Speicher und Speicherverbrauch', () {
-    test('Zeile für Desktop und Browser', () {
+  group('#35/AK5 persistent storage and storage usage', () {
+    test('line for desktop and browser', () {
       expect(const StorageInfo(used: 1234567890).label, '1,2 GB belegt');
       expect(const StorageInfo(used: 512).label, '512 B belegt');
       expect(const StorageInfo(used: 12300).label, '12,3 KB belegt');
@@ -351,10 +348,10 @@ void main() {
       );
     });
 
-    test('Browser: persist() einmal anfragen, sobald es Titel gibt', () async {
+    test('browser: request persist() once there are tracks', () async {
       final w = WebLike();
       await w.library.load();
-      expect(w.store.persistRequests, 0, reason: 'leere Bibliothek');
+      expect(w.store.persistRequests, 0, reason: 'empty library');
       await w.library.importFiles([w.pick('a.mp3', 'a')]);
       await w.library.importFiles([w.pick('b.mp3', 'b')]);
       expect(w.store.persistRequests, 1);
@@ -363,10 +360,10 @@ void main() {
 
       final again = WebLike(w.store);
       await again.library.load();
-      expect(w.store.persistRequests, 2, reason: 'beim Öffnen mit Titeln');
+      expect(w.store.persistRequests, 2, reason: 'on open with tracks');
     });
 
-    test('Desktop: kein persist(), belegter Platz der Bibliothek', () async {
+    test('desktop: no persist(), space used by the library', () async {
       final base = Directory('${tmp.path}/lib');
       final store = IoFileStore(base);
       expect(await store.requestPersistence(), isNull);
@@ -382,7 +379,7 @@ void main() {
       expect(l.storage!.used, lessThan(used));
     });
 
-    testWidgets('Zeile im Fuss der Bibliothek', (tester) async {
+    testWidgets('line in the library footer', (tester) async {
       tester.view.physicalSize = const Size(1100, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
