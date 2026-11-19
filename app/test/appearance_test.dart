@@ -1,6 +1,7 @@
 // #31: light, dark or system appearance. Libraries live in temporary folders, never the real settings.
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/file_store_io.dart';
@@ -208,5 +209,23 @@ void main() {
         expect(ws(tester).bg, WsTheme.light.bg);
       },
     );
+
+    for (final p in [TargetPlatform.macOS, TargetPlatform.iOS]) {
+      testWidgets(
+        '#31/AK1 the library title stays on one line next to the new button ($p)',
+        (tester) async {
+          debugDefaultTargetPlatformOverride = p;
+          addTearDown(() => debugDefaultTargetPlatformOverride = null);
+          await pump(tester);
+          final title = tester.getRect(find.text(de.library));
+          final button = tester.getRect(
+            find.byKey(const Key('appearanceMenu')),
+          );
+          expect(title.height, lessThan(30)); // one line of titleLarge (22)
+          expect(title.right, lessThanOrEqualTo(button.left));
+          debugDefaultTargetPlatformOverride = null;
+        },
+      );
+    }
   });
 }

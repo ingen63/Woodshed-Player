@@ -376,10 +376,16 @@ class _Header extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              l.library,
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
+            // One line; shrinks in narrow sidebars instead of breaking the word (#31: one more button).
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                l.library,
+                maxLines: 1,
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
           IconButton(
