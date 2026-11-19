@@ -75,7 +75,7 @@ zugeordnet.
 | Tempo 0,1× – 2×, Schritte 0,05, Pfeiltasten | vorhanden: `engine_tests.cpp` (`rateIsClamped`), `player_service_test.dart` («Tempo in 0,05er-Schritten») | – |
 | Tonhöhe bleibt, Länge = Eingabe / Rate (0,25 / 0,5 / 1,5 / 2,0) | vorhanden: `engine_tests.cpp` (`stretchKeepsPitchAndChangesLength`, `stretchIsDeterministic`, `rateChangeKeepsPositionAndSignal`, `positionFollowsRate`) | – |
 | Dieselbe Prüfung für 0,1 und 1,0 mit 1 % Toleranz | Lücke | #9 |
-| Klang gegen AVAudioUnitTimePitch | nur von Hand: `tools/hoervergleich.sh` | – |
+| Klang gegen AVAudioUnitTimePitch | vorhanden, von Hand (Hörvergleich, nicht automatisierbar): `tools/hoervergleich.sh` | – |
 | Rechenzeit je Puffer ≤ 50 % des Echtzeitbudgets | Lücke | #59 |
 
 ### Loop
@@ -122,11 +122,11 @@ zugeordnet.
 | `wp_core_web.wasm` fürs AudioWorklet: Dekodieren, Seek, Loop, Dateiende, Tempo, PCM für AAC/M4A | vorhanden: `core/web/wp_core_web_test.mjs` (#33) | – |
 | Dart-Anbindung per bedingtem Import, Wellenform im Browser | vorhanden: `web_binding_test.dart` (#34) | – |
 | Auslieferung auf GitHub Pages, Service Worker für COOP/COEP | vorhanden: `web_hosting_test.dart` (#41) | – |
-| Im echten Browser: Position, Pegel, Tempo, Loop, Metronom, Laden ohne Aussetzer, OPFS | nur von Hand: `app/tool/web_core_check.sh`, `app/tool/web_store_check.sh` (#34, #35, #42) | #13 |
+| Im echten Browser: Position, Pegel, Tempo, Loop, Metronom, Laden ohne Aussetzer, OPFS | vorhanden, von Hand: `app/tool/web_core_check.sh`, `app/tool/web_store_check.sh` (#34, #35, #42); Lücke: automatischer Lauf im Browser | #13 |
 | Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6), jede Funktion der C-API in einem Referenzfall | Lücke | #9 |
 | `flutter build web` und `flutter test --platform chrome` bei jedem Push | Lücke | #13 |
 | Content-Security-Policy mit erlaubten Hosts | Lücke | #58 |
-| Web-Audio auf iPhone und Android | nur von Hand (Machbarkeitstest) | #32 |
+| Web-Audio auf iPhone und Android | vorhanden unter Node.js: `core/web/w0_test.mjs`; Lücke: auf echten Geräten nur von Hand | #32 |
 
 ### Abgleich/Sync
 
