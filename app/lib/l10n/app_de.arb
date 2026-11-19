@@ -145,6 +145,7 @@
   "loadInvalid": "Ungültige Datei-Angabe.",
   "loadUnknown": "Unbekannter Fehler beim Laden (Code {code}).",
   "libraryCorrupt": "Die Bibliothek war beschädigt und wurde als «{backup}» aufgehoben.",
+  "libraryTooNew": "Diese Bibliothek wurde mit einer neueren Version von Woodshed Player gespeichert. Bitte aktualisiere die App. Bis dahin wird nichts gespeichert.",
   "librarySaveFailed": "Bibliothek konnte nicht gespeichert werden: {detail}",
   "importFailed": "Folgende Dateien konnten nicht importiert werden:\n{files}"
 }

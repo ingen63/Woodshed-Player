@@ -9,6 +9,7 @@ import '../player/player_service.dart';
 import 'app_controller.dart';
 import 'file_platform_web.dart';
 import 'file_store_web.dart';
+import 'library_settings_store.dart';
 
 /// Library folder in the page's OPFS.
 const libraryDir = 'WoodshedPlayer';
@@ -23,7 +24,7 @@ Future<AppController> createAppController({Object? baseDir}) async {
   await library.load();
   final metronome = MetronomeController(
     core.metronome,
-    store: _SessionStore(),
+    store: LibrarySettingsStore(library),
     onRunningChanged: files.keepAwake,
   );
   await metronome.restore();
@@ -37,12 +38,3 @@ Future<AppController> createAppController({Object? baseDir}) async {
 
 /// Aufnahme gibt es im Browser nicht.
 Widget? recordingButtonFor(AppController controller) => null;
-
-/// Metronom-Einstellungen nur für die Sitzung.
-class _SessionStore implements SettingsStore {
-  Object? _json;
-  @override
-  Future<Object?> load() async => _json;
-  @override
-  Future<void> save(Object json) async => _json = json;
-}

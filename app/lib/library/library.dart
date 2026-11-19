@@ -1,7 +1,9 @@
-// Bibliothek (#16), wie Library.swift der Swift-App: Dateien werden in die Bibliothek kopiert,
-// Metadaten und Einstellungen liegen in `library.json` im gleichen Format `{folders, tracks}`.
+// Library (#16): files are copied into the library, metadata and settings live in `library.json`.
 // Since #35 through a storage layer ([FileStore]): file system on desktop and mobile, OPFS in the browser.
-// Every track carries the SHA-256 of its contents (`contentHash`); the same file is stored only once.
+// Since #36 a track is identified by the SHA-256 of its contents (the same file is stored only once), and
+// `library.json` holds the shared state with stamps and tombstones in format 2 (stamps.dart). The former
+// Swift-compatible format 1 is migrated on the first start (migration.dart); device-local settings live
+// in `device.json` (device_settings.dart).
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -10,12 +12,16 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart';
 
 import '../app/file_platform.dart';
+import 'device_settings.dart';
 import 'metadata.dart';
+import 'migration.dart';
 import 'natural_compare.dart';
-import 'swift_json.dart';
+import 'stamps.dart';
 import 'track.dart';
 
 export '../app/file_platform.dart' show FileStore, StorageInfo;
+export 'device_settings.dart' show DeviceSettings;
+export 'stamps.dart' show Hlc, SharedState, StampedRecord;
 export 'track.dart';
 
 /// Dauer einer Datei in Sekunden, < 0 = Fehler. In der App `wpFileDuration` aus dem Audio-Kern.
@@ -34,6 +40,13 @@ sealed class LibraryMessage {
 class LibraryCorrupt extends LibraryMessage {
   const LibraryCorrupt(this.backupName);
   final String backupName;
+}
+
+/// `library.json` was written by a newer app ([version] > [SharedState.formatVersion]). The library stays
+/// read-only and is not overwritten; the user should update the app (#36/AK4).
+class LibraryTooNew extends LibraryMessage {
+  const LibraryTooNew(this.version);
+  final int version;
 }
 
 /// Saving `library.json` failed.
@@ -65,7 +78,7 @@ String _sha256Hex(Uint8List bytes) => crypto.sha256.convert(bytes).toString();
 const _hashInline = 1 << 20;
 
 class Library extends ChangeNotifier {
-  /// [store] holds `library.json`, `preferences.json` and the `Tracks/` folder. [readSource] reads the
+  /// [store] holds `library.json`, `device.json` and the `Tracks/` folder. [readSource] reads the
   /// files being imported (path on desktop, file picker key in the browser).
   Library(
     this.store, {
@@ -85,21 +98,30 @@ class Library extends ChangeNotifier {
   final Random? _random;
 
   static const indexName = 'library.json';
-  static const _prefsName = 'preferences.json';
-  static String trackName(String fileName) => 'Tracks/$fileName';
-  static String _artworkName(String id) => 'Tracks/$id.artwork';
+
+  /// Settings of the Flutter app before #36; read once and then kept as a backup.
+  static const legacyPrefsName = 'preferences.json';
+  static String trackName(String fileName) => LibraryFiles.trackName(fileName);
+  static String _artworkName(String id) => LibraryFiles.artworkName(id);
 
   List<Track> _tracks = [];
   List<TrackFolder> _folders = [];
   TrackSortOrder _sortOrder = TrackSortOrder.dateAdded;
   Appearance _appearance = Appearance.system;
+  Map<String, Object?>? _metronome;
   bool _importing = false;
   int _droppedMissing = 0;
+
+  /// Persisted shared state with stamps; the lists above are its live view. [save] stamps the differences.
+  SharedState _state = SharedState.empty;
+  DeviceSettings _device = const DeviceSettings(deviceId: '0000000000000000');
+  late HlcClock _clock = HlcClock(_device.deviceId, now: _now);
+  bool _readOnly = false;
+  int _newerVersion = 0;
 
   /// Problem for the UI (#43: as data, the UI words it); the UI clears it after showing it.
   LibraryMessage? lastError;
   Timer? _pendingSave;
-  Future<void>? _hashing;
   StorageInfo? _storage;
   bool _persistAsked = false;
 
@@ -110,9 +132,14 @@ class Library extends ChangeNotifier {
   /// Beim letzten Laden entfernte Einträge, deren Datei fehlte.
   int get droppedMissing => _droppedMissing;
 
-  /// Completes once missing `contentHash` values of old libraries are computed (runs in the background
-  /// after [load]).
-  Future<void> get hashing => _hashing ?? Future.value();
+  /// Shared state as last saved (with stamps and tombstones), for the sync engine (#37).
+  SharedState get state => _state;
+
+  /// Device-local settings (#36/AK5).
+  DeviceSettings get device => _device;
+
+  /// The file is from a newer app: nothing is written (#36/AK4).
+  bool get readOnly => _readOnly;
 
   /// Used storage (in the browser also available space and persistence); null until measured.
   StorageInfo? get storage => _storage;
@@ -121,49 +148,171 @@ class Library extends ChangeNotifier {
   set sortOrder(TrackSortOrder o) {
     if (o == _sortOrder) return;
     _sortOrder = o;
-    _savePrefs();
+    save();
     notifyListeners();
   }
 
-  /// Light, dark or system appearance (#31), stored in `preferences.json` next to the sort order.
+  /// Light, dark or system appearance (#31), a shared setting next to the sort order.
   Appearance get appearance => _appearance;
   set appearance(Appearance a) {
     if (a == _appearance) return;
     _appearance = a;
-    _savePrefs();
+    save();
     notifyListeners();
+  }
+
+  /// Metronome and ramp presets (shared, #36/AK5) as MetronomeSettings JSON; null until first set.
+  Map<String, Object?>? get metronomePreset =>
+      _metronome == null ? null : Map.unmodifiable(_metronome!);
+  set metronomePreset(Map<String, Object?>? m) {
+    if (m == null || sameJson(m, _metronome)) return;
+    _metronome = Map.of(m);
+    _scheduleSave();
   }
 
   // ---- Laden und Speichern ----
 
   Future<void> load() async {
-    await _readPrefs();
+    _device = await DeviceSettings.load(store, random: _random);
+    _clock = HlcClock(_device.deviceId, now: _now);
     _droppedMissing = 0;
+    _readOnly = false;
     final raw = await store.read(indexName);
     if (raw == null) {
+      await _readLegacyPrefs();
       notifyListeners();
       return _afterLoad();
     }
-    final (folders, tracks) = _readIndex(raw);
-    if (tracks == null) {
+    Object? json;
+    try {
+      json = jsonDecode(utf8.decode(raw));
+    } catch (_) {}
+    final version = json is Map ? json['formatVersion'] : 1;
+    if (json != null && version is int && version > SharedState.formatVersion) {
+      // #36/AK4: never overwrite a newer format.
+      _readOnly = true;
+      _newerVersion = version;
+      lastError = LibraryTooNew(version);
+      notifyListeners();
+      return _afterLoad();
+    }
+    try {
+      if (json == null) throw const FormatException();
+      if (version == SharedState.formatVersion) {
+        _state = SharedState.fromJson((json as Map).cast());
+        _clock.observe(_state.latest);
+        _state = _state.purge(_now());
+        _materialize();
+      } else {
+        await _migrate(raw);
+      }
+    } catch (_) {
       // Unlesbar: Datei aufheben statt beim nächsten Speichern zu überschreiben.
       final stamp = _now().toIso8601String().replaceAll(':', '-');
       try {
         await store.rename(indexName, '$indexName.defekt-$stamp');
       } catch (_) {}
       lastError = LibraryCorrupt('$indexName.defekt-$stamp');
+      _state = SharedState.empty;
+      _tracks = [];
+      _folders = [];
       notifyListeners();
       return _afterLoad();
     }
-    _folders = folders;
-    _tracks = [
-      for (final t in tracks)
-        if (await store.exists(trackName(t.fileName))) t,
-    ];
-    _droppedMissing = tracks.length - _tracks.length;
+    final present = <Track>[];
+    for (final t in _tracks) {
+      if (await store.exists(trackName(t.fileName))) present.add(t);
+    }
+    if (present.length < _tracks.length) {
+      // Missing files drop out as before; their records go too (no tombstone).
+      final gone = {for (final t in _tracks) t.id}
+        ..removeAll(present.map((t) => t.id));
+      _droppedMissing += gone.length;
+      _tracks = present;
+      _state = _state.copyWith(
+        tracks: {
+          for (final e in _state.tracks.entries)
+            if (!gone.contains(e.key)) e.key: e.value,
+        },
+      );
+    }
     notifyListeners();
-    _hashing = _backfillHashes();
     return _afterLoad();
+  }
+
+  /// Format 1 → 2 (#36/AK3): IDs and files renamed, everything stamped now, written at once.
+  Future<void> _migrate(Uint8List raw) async {
+    final legacy = await migrateLegacyLibrary(store, raw);
+    _folders = legacy.folders;
+    _tracks = legacy.tracks;
+    _droppedMissing = legacy.missing;
+    await _readLegacyPrefs();
+    _state = SharedState.empty;
+    await _write();
+  }
+
+  /// Builds the live lists from the alive records. A track in a deleted folder shows without folder.
+  void _materialize() {
+    _folders = [
+      for (final e in _state.folders.entries)
+        if (e.value.alive) TrackFolder.fromShared(e.key, e.value.values),
+    ];
+    final folderIds = {for (final f in _folders) f.id};
+    _tracks = [
+      for (final e in _state.tracks.entries)
+        if (e.value.alive)
+          switch (Track.fromShared(e.key, e.value.values)) {
+            final t
+                when t.folderId != null && !folderIds.contains(t.folderId) =>
+              t.copyWith(folderId: () => null),
+            final t => t,
+          },
+    ];
+    final s = _state.settings.values;
+    _sortOrder = TrackSortOrder.parse(s['sortOrder'] as String?);
+    _appearance = Appearance.parse(s['appearance']);
+    final m = {
+      for (final e in s.entries)
+        if (e.key.startsWith(_metronomePrefix))
+          e.key.substring(_metronomePrefix.length): e.value,
+    };
+    _metronome = m.isEmpty ? null : m;
+  }
+
+  static const _metronomePrefix = 'metronome.';
+
+  /// Shared settings (#36/AK5), each stamped on its own.
+  Map<String, Object?> _settingsValues() => {
+    'sortOrder': _sortOrder.name,
+    'appearance': _appearance.name,
+    if (_metronome case final m?)
+      for (final e in m.entries) '$_metronomePrefix${e.key}': e.value,
+  };
+
+  /// Stamps everything that changed since the last save; removed tracks and folders become tombstones.
+  void _commit() {
+    final stamp = _clock.tick();
+    Map<String, StampedRecord> records(
+      Map<String, StampedRecord> old,
+      Map<String, Map<String, Object?>> live,
+    ) => {
+      for (final e in old.entries)
+        if (!live.containsKey(e.key))
+          e.key: e.value.alive ? e.value.delete(stamp) : e.value,
+      for (final e in live.entries)
+        e.key:
+            old[e.key]?.update(e.value, stamp) ??
+            StampedRecord.create(e.value, stamp),
+    };
+    _state = SharedState(
+      tracks: records(_state.tracks, {
+        for (final t in _tracks) t.id: t.toShared(),
+      }),
+      folders: records(_state.folders, {
+        for (final f in _folders) f.id: f.toShared(),
+      }),
+      settings: _state.settings.update(_settingsValues(), stamp),
+    );
   }
 
   Future<void> _afterLoad() async {
@@ -188,74 +337,26 @@ class Library extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Computes missing `contentHash` values track by track without blocking the UI (file system:
-  /// separate isolate). Saves once at the end.
-  Future<void> _backfillHashes() async {
-    final missing = [
-      for (final t in _tracks)
-        if (t.contentHash == null) t.id,
-    ];
-    var changed = false;
-    for (final id in missing) {
-      final t = track(id);
-      if (t == null) continue; // deleted meanwhile
-      String? hash;
-      try {
-        hash = await store.sha256(trackName(t.fileName));
-      } catch (_) {}
-      final i = _tracks.indexWhere((x) => x.id == id);
-      if (hash == null || i < 0) continue;
-      _tracks[i] = _tracks[i].copyWith(contentHash: hash);
-      changed = true;
-    }
-    if (changed) {
-      save();
-      notifyListeners();
-    }
-  }
-
-  /// Liest `{folders, tracks}` oder das alte Format `[Track]`. tracks == null: unlesbar.
-  static (List<TrackFolder>, List<Track>?) _readIndex(Uint8List raw) {
-    try {
-      final json = jsonDecode(utf8.decode(raw));
-      if (json is List) {
-        return (
-          <TrackFolder>[],
-          json
-              .map((e) => Track.fromJson((e as Map).cast<String, Object?>()))
-              .toList(),
-        );
-      }
-      final map = (json as Map).cast<String, Object?>();
-      final folders = (map['folders'] as List? ?? [])
-          .map((e) => TrackFolder.fromJson((e as Map).cast<String, Object?>()))
-          .toList();
-      final tracks = (map['tracks'] as List? ?? [])
-          .map((e) => Track.fromJson((e as Map).cast<String, Object?>()))
-          .toList();
-      return (folders, tracks);
-    } catch (_) {
-      return (<TrackFolder>[], null);
-    }
-  }
-
   /// Writes `library.json` atomically. In the file system the file is written when the call returns; in
   /// the browser shortly after, in call order.
+  /// Never when the file is from a newer app (#36/AK4).
   Future<void> save() {
     _pendingSave?.cancel();
     _pendingSave = null;
-    final bytes = Uint8List.fromList(utf8.encode(swiftPrettyJson(indexJson())));
-    return store.write(indexName, bytes).catchError((Object e) {
+    if (_readOnly) return Future.value();
+    return _write().catchError((Object e) {
       lastError = LibrarySaveFailed('$e');
       notifyListeners();
     });
   }
 
-  /// Inhalt von library.json.
-  Map<String, Object?> indexJson() => {
-    'folders': _folders.map((f) => f.toJson()).toList(),
-    'tracks': _tracks.map((t) => t.toJson()).toList(),
-  };
+  Future<void> _write() {
+    _commit();
+    final bytes = Uint8List.fromList(
+      utf8.encode(const JsonEncoder.withIndent('  ').convert(_state.toJson())),
+    );
+    return store.write(indexName, bytes);
+  }
 
   /// Fasst häufige Änderungen zusammen (z. B. beim Ziehen des Tempo-Reglers).
   void _scheduleSave() {
@@ -272,9 +373,10 @@ class Library extends ChangeNotifier {
     if (_pendingSave != null) save();
   }
 
-  Future<void> _readPrefs() async {
+  /// Sort order and appearance from `preferences.json` (before #36); the file stays as it is.
+  Future<void> _readLegacyPrefs() async {
     try {
-      final raw = await store.read(_prefsName);
+      final raw = await store.read(legacyPrefsName);
       if (raw == null) return;
       final p = jsonDecode(utf8.decode(raw)) as Map;
       _sortOrder = TrackSortOrder.parse(p['sortOrder'] as String?);
@@ -282,18 +384,6 @@ class Library extends ChangeNotifier {
     } catch (_) {
       // unlesbare Einstellungen: Standardwerte
     }
-  }
-
-  void _savePrefs() {
-    final bytes = Uint8List.fromList(
-      utf8.encode(
-        jsonEncode({
-          'sortOrder': _sortOrder.name,
-          'appearance': _appearance.name,
-        }),
-      ),
-    );
-    store.write(_prefsName, bytes).catchError((_) {});
   }
 
   @override
@@ -327,8 +417,7 @@ class Library extends ChangeNotifier {
   Track? track(String id) => _tracks.where((t) => t.id == id).firstOrNull;
 
   /// Track with these contents (SHA-256), if already in the library.
-  Track? trackWithHash(String hash) =>
-      _tracks.where((t) => t.contentHash == hash).firstOrNull;
+  Track? trackWithHash(String hash) => track(hash);
 
   /// File location for the audio core: device-local path on desktop and mobile, name in the browser.
   String filePath(Track t) => store.locate(trackName(t.fileName));
@@ -350,9 +439,13 @@ class Library extends ChangeNotifier {
     List<String> paths, {
     String? folderId,
   }) async {
+    if (_readOnly) {
+      lastError = LibraryTooNew(_newerVersion);
+      notifyListeners();
+      return ImportResult(const [], [for (final p in paths) _baseName(p)]);
+    }
     _importing = true;
     notifyListeners();
-    if (_hashing case final h?) await h; // old tracks need their hash, otherwise a duplicate goes unnoticed
     final imported = <Track>[];
     final failed = <String>[];
     final duplicates = <Track>[];
@@ -381,22 +474,22 @@ class Library extends ChangeNotifier {
 
   /// (track, already present) or null on failure.
   Future<(Track, bool)?> _importFile(String source, String? folderId) async {
-    final id = newUuid(_random);
     final name = _baseName(source);
     final dot = name.lastIndexOf('.');
     final ext = dot > 0 ? name.substring(dot + 1).toLowerCase() : 'mp3';
-    final fileName = '$id.$ext';
-    final dest = trackName(fileName);
+    String? dest;
     var written = false;
     try {
       final bytes = await readSource(source);
       if (bytes == null) return null;
       // Large files in a separate isolate (in the browser compute runs on the same thread).
-      final hash = bytes.length > _hashInline
+      final id = bytes.length > _hashInline
           ? await compute(_sha256Hex, bytes)
           : _sha256Hex(bytes);
-      final existing = trackWithHash(hash);
+      final existing = this.track(id);
       if (existing != null) return (existing, true);
+      final fileName = '$id.$ext';
+      dest = trackName(fileName);
       await store.write(dest, bytes);
       written = true;
       final duration = probe(store.locate(dest));
@@ -423,11 +516,10 @@ class Library extends ChangeNotifier {
         dateAdded: _now().toUtc(),
         customOrder: _nextOrder,
         folderId: folderId,
-        contentHash: hash,
       );
       return (track, false);
     } catch (_) {
-      if (written) await store.delete(dest).catchError((_) {});
+      if (written) await store.delete(dest!).catchError((_) {});
       return null;
     }
   }
@@ -435,6 +527,7 @@ class Library extends ChangeNotifier {
   static String _baseName(String path) => path.split(RegExp(r'[/\\]')).last;
 
   void delete(Set<String> ids) {
+    if (_readOnly) return;
     for (final t in _tracks.where((t) => ids.contains(t.id))) {
       store.delete(trackName(t.fileName)).catchError((_) {});
       store.delete(_artworkName(t.id)).catchError((_) {});
@@ -464,7 +557,6 @@ class Library extends ChangeNotifier {
     }
     _renumber(ordered);
     _sortOrder = TrackSortOrder.custom;
-    _savePrefs();
     save();
     notifyListeners();
   }

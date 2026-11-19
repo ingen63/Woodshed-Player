@@ -28,7 +28,6 @@ Library open(FileStore store) => Library(
 Future<Library> loaded(FileStore store) async {
   final l = open(store);
   await l.load();
-  await l.hashing;
   return l;
 }
 
@@ -41,11 +40,11 @@ File taggedSource() {
   return f;
 }
 
+/// Shared values of the track in library.json (format 2, #36).
 Map<String, Object?> indexTrack(Directory base, String id) {
   final j = jsonDecode(File('${base.path}/library.json').readAsStringSync());
-  return ((j as Map)['tracks'] as List)
-      .cast<Map<String, Object?>>()
-      .firstWhere((t) => t['id'] == id);
+  return (((j as Map)['tracks'] as Map)[id] as Map)['values']
+      as Map<String, Object?>;
 }
 
 void main() {
@@ -117,7 +116,7 @@ void main() {
       expect(tags.title, 'Tag title');
       expect(tags.artist, 'Tag artist');
       expect(l.track(t.id)!.contentHash, t.contentHash);
-      expect(indexTrack(base, t.id)['contentHash'], t.contentHash);
+      expect(indexTrack(base, t.id)['title'], 'New title');
       expect(l.track(t.id)!.fileName, t.fileName);
     });
 
@@ -133,7 +132,8 @@ void main() {
       expect(l.editMetadata(t.id, title: 'Only title', artist: '  '), isTrue);
       expect(l.track(t.id)!.artist, isNull);
       await l.save();
-      expect(indexTrack(base, t.id).containsKey('artist'), isFalse);
+      // #36: a removed artist is a stamped null, so the removal wins over older values when merging.
+      expect(indexTrack(base, t.id)['artist'], isNull);
     });
 
     test('#24/AK6 alphabetical sorting uses the new title', () async {

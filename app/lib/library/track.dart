@@ -1,5 +1,6 @@
-// Datenmodell der Bibliothek (#16), wie Track.swift der Swift-App. JSON wie der Swift-JSONEncoder:
-// UUIDs gross geschrieben, Datum als Sekunden seit 2001-01-01, leere optionale Felder fehlen.
+// Data model of the library (#16). Since #36 a track is identified by the SHA-256 of its audio file and is
+// stored as shared fields with stamps (stamps.dart). [Track.fromLegacyJson] reads the former Swift-compatible
+// `library.json` (format 1: UUIDs in capitals, dates as seconds since 2001-01-01) for the migration only.
 import 'dart:math';
 
 import 'playback_settings.dart';
@@ -46,13 +47,16 @@ class Track {
     required this.customOrder,
     this.settings = const PlaybackSettings(),
     this.folderId,
-    this.contentHash,
   });
 
-  /// Internal ID (UUID) and file name in `Tracks/`, as in the Swift app.
+  /// SHA-256 of the audio file (64 lowercase hex digits, #36): identifies the track on every device; the same
+  /// file is stored only once.
   final String id;
 
-  /// Dateiname im Ordner `Tracks/` der Bibliothek.
+  /// SHA-256 of the contents; the same as [id].
+  String get contentHash => id;
+
+  /// File name in the library's `Tracks/` folder: `<id>.<ext>`.
   final String fileName;
 
   /// Ursprünglicher Dateiname beim Import.
@@ -69,10 +73,6 @@ class Track {
   /// Ordner; null = «Ohne Ordner».
   final String? folderId;
 
-  /// SHA-256 of the contents (64 hex digits, #35): identifies the track across devices; the same file is
-  /// stored only once. Extra field the Swift app ignores; missing in old libraries and computed on open.
-  final String? contentHash;
-
   Track copyWith({
     String? title,
     String? Function()? artist,
@@ -81,10 +81,11 @@ class Track {
     int? customOrder,
     PlaybackSettings? settings,
     String? Function()? folderId,
-    String? contentHash,
+    String? id,
+    String? fileName,
   }) => Track(
-    id: id,
-    fileName: fileName,
+    id: id ?? this.id,
+    fileName: fileName ?? this.fileName,
     originalFileName: originalFileName,
     title: title ?? this.title,
     artist: artist != null ? artist() : this.artist,
@@ -95,10 +96,10 @@ class Track {
     customOrder: customOrder ?? this.customOrder,
     settings: settings ?? this.settings,
     folderId: folderId != null ? folderId() : this.folderId,
-    contentHash: contentHash ?? this.contentHash,
   );
 
-  factory Track.fromJson(Map<String, Object?> j) => Track(
+  /// Entry of the former `library.json` (format 1, Swift app); `id` is still the UUID there.
+  factory Track.fromLegacyJson(Map<String, Object?> j) => Track(
     id: (j['id'] as String).toUpperCase(),
     fileName: j['fileName'] as String,
     originalFileName:
@@ -116,24 +117,70 @@ class Track {
           )
         : const PlaybackSettings(),
     folderId: (j['folderID'] as String?)?.toUpperCase(),
-    contentHash: (j['contentHash'] as String?)?.toLowerCase(),
   );
 
-  Map<String, Object?> toJson() => {
-    if (album != null) 'album': album,
-    if (artist != null) 'artist': artist,
-    if (contentHash != null) 'contentHash': contentHash,
-    'customOrder': customOrder,
-    'dateAdded': dateToSwift(dateAdded),
-    'duration': duration,
+  /// Shared fields (#36/AK5), each stamped on its own. Loop start, end and switch form one field so that
+  /// merging never mixes the boundaries of two devices.
+  Map<String, Object?> toShared() => {
     'fileName': fileName,
-    if (folderId != null) 'folderID': folderId,
-    'hasArtwork': hasArtwork,
-    'id': id,
     'originalFileName': originalFileName,
-    'settings': settings.toJson(),
     'title': title,
+    'artist': artist,
+    'album': album,
+    'duration': duration,
+    'hasArtwork': hasArtwork,
+    'dateAdded': dateAdded.toUtc().toIso8601String(),
+    'customOrder': customOrder,
+    'folderId': folderId,
+    'speedEnabled': settings.speedEnabled,
+    'speed': settings.speed,
+    'loop': {
+      'enabled': settings.loopEnabled,
+      'start': settings.loopStart,
+      'end': settings.loopEnd,
+    },
+    'rampEnabled': settings.rampEnabled,
+    'rampStart': settings.rampStart,
+    'rampTarget': settings.rampTarget,
+    'rampStep': settings.rampStep,
+    'rampPasses': settings.rampPasses,
   };
+
+  factory Track.fromShared(String id, Map<String, Object?> v) {
+    double d(Object? x, double fallback) => x is num ? x.toDouble() : fallback;
+    int? i(Object? x) => x is num ? x.round() : null;
+    final loop = v['loop'] is Map ? v['loop'] as Map : const {};
+    final fileName = v['fileName'] as String;
+    return Track(
+      id: id,
+      fileName: fileName,
+      originalFileName: v['originalFileName'] as String? ?? fileName,
+      title: v['title'] as String? ?? '',
+      artist: v['artist'] as String?,
+      album: v['album'] as String?,
+      duration: d(v['duration'], 0),
+      hasArtwork: v['hasArtwork'] as bool? ?? false,
+      dateAdded:
+          DateTime.tryParse(v['dateAdded'] as String? ?? '')?.toUtc() ??
+          DateTime.utc(2001),
+      customOrder: i(v['customOrder']) ?? 0,
+      folderId: v['folderId'] as String?,
+      settings:
+          PlaybackSettings(
+            speedEnabled: v['speedEnabled'] as bool? ?? false,
+            speed: d(v['speed'], 1),
+            loopEnabled: loop['enabled'] as bool? ?? false,
+            loopStart: d(loop['start'], 0),
+            loopEnd: d(loop['end'], 0),
+          ).copyWith(
+            rampEnabled: v['rampEnabled'] as bool?,
+            rampStart: i(v['rampStart']),
+            rampTarget: i(v['rampTarget']),
+            rampStep: i(v['rampStep']),
+            rampPasses: i(v['rampPasses']),
+          ),
+    );
+  }
 }
 
 /// Ordner der Bibliothek (`TrackFolder` in Swift).
@@ -142,12 +189,17 @@ class TrackFolder {
   final String id;
   final String name;
 
-  factory TrackFolder.fromJson(Map<String, Object?> j) => TrackFolder(
+  /// Entry of the former `library.json` (format 1).
+  factory TrackFolder.fromLegacyJson(Map<String, Object?> j) => TrackFolder(
     id: (j['id'] as String).toUpperCase(),
     name: j['name'] as String? ?? '',
   );
 
-  Map<String, Object?> toJson() => {'id': id, 'name': name};
+  /// Shared fields (#36/AK5).
+  Map<String, Object?> toShared() => {'name': name};
+
+  factory TrackFolder.fromShared(String id, Map<String, Object?> v) =>
+      TrackFolder(id: id, name: v['name'] as String? ?? '');
 }
 
 /// Sort order of the library; the UI names it in the user's language (#43).

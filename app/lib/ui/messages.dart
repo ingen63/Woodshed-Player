@@ -101,6 +101,7 @@ String recordingErrorMessage(AppLocalizations l, WpRecordingException e) {
 String libraryMessageText(AppLocalizations l, LibraryMessage m) => switch (m) {
   LibraryCorrupt(:final backupName) => l.libraryCorrupt(backupName),
   LibrarySaveFailed(:final detail) => l.librarySaveFailed(detail),
+  LibraryTooNew() => l.libraryTooNew,
   ImportFailed(:final files) => l.importFailed(files.join('\n')),
 };
 

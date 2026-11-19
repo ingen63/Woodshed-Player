@@ -1,18 +1,25 @@
 // #16: Bibliothek und Datenmodell. Alle Tests arbeiten in einem temporären Ordner, nie in der echten Bibliothek.
+// Since #36 the golden files are the former format 1 and are migrated on load (see migration_test.dart).
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/app/file_store_io.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/library/natural_compare.dart';
-import 'package:woodshed_player/library/swift_json.dart';
 
 const goldenNew = 'test/golden/library_swift.json';
 const goldenLegacy = 'test/golden/library_swift_legacy.json';
+
+/// Former UUIDs of the golden tracks.
 const id1 = '0F0E0D0C-0B0A-0908-0706-050403020100';
 const id2 = '99999999-8888-7777-6666-555555555555';
+
+/// Their IDs after the migration (#36): SHA-256 of the audio files written by [swiftFolder].
+final hash1 = crypto.sha256.convert(utf8.encode('mp3')).toString();
+final hash2 = crypto.sha256.convert(utf8.encode('flac')).toString();
 const etueden = '11111111-2222-3333-4444-555555555555';
 
 late Directory tmp;
@@ -50,7 +57,6 @@ Library lib(Directory base) => Library(
 Future<Library> loaded(Directory base) async {
   final l = lib(base);
   await l.load();
-  await l.hashing;
   return l;
 }
 
@@ -61,12 +67,6 @@ extension IoLibrary on Library {
   File get indexFile => File('${base.path}/library.json');
 }
 
-/// library.json without the `contentHash` lines (#35), to compare with the Swift app's golden files.
-String withoutHashes(String json) => json.replaceAll(
-  RegExp(r'^ *"contentHash" : "[0-9a-f]{64}",\n', multiLine: true),
-  '',
-);
-
 /// Source file; without [content] it gets contents unique to its name (equal contents are a duplicate, #35).
 File source(String name, [String? content]) =>
     File('${dir('quelle').path}/$name')
@@ -76,11 +76,11 @@ void main() {
   setUp(() => tmp = Directory.systemTemp.createTempSync('wp_library_test'));
   tearDown(() => tmp.deleteSync(recursive: true));
 
-  group('#16/AK1 Datenmodell wie in der Swift-App', () {
-    test('Track mit allen Feldern aus Swift-JSON', () async {
+  group('#16/AK1 Datenmodell', () {
+    test('Track mit allen Feldern aus der Swift-JSON (migriert)', () async {
       final l = await loaded(swiftFolder('lib', goldenNew));
-      final t = l.track(id1)!;
-      expect(t.fileName, '$id1.mp3');
+      final t = l.track(hash1)!;
+      expect(t.fileName, '$hash1.mp3');
       expect(t.originalFileName, 'Übung in C.mp3');
       expect(t.title, 'Übung in C');
       expect(t.artist, 'Testband');
@@ -103,7 +103,7 @@ void main() {
           loopEnd: 47,
         ),
       );
-      final t2 = l.track(id2)!;
+      final t2 = l.track(hash2)!;
       expect(t2.artist, isNull);
       expect(t2.folderId, isNull);
       expect(t2.settings, const PlaybackSettings());
@@ -130,16 +130,6 @@ void main() {
   });
 
   group('#16/AK2 library.json', () {
-    test('Golden: geschriebene Datei ist byte-gleich zur Swift-App', () async {
-      final base = swiftFolder('lib', goldenNew);
-      final l = await loaded(base);
-      l.save();
-      expect(
-        withoutHashes(File('${base.path}/library.json').readAsStringSync()),
-        File(goldenNew).readAsStringSync(),
-      );
-    });
-
     test(
       'altes Format [Track] wird gelesen und im neuen Format gespeichert',
       () async {
@@ -151,8 +141,8 @@ void main() {
         final json = jsonDecode(
           File('${base.path}/library.json').readAsStringSync(),
         ) as Map;
-        expect(json.keys, containsAll(['folders', 'tracks']));
-        expect((json['tracks'] as List).length, 2);
+        expect(json['formatVersion'], SharedState.formatVersion);
+        expect((json['tracks'] as Map).length, 2);
       },
     );
 
@@ -161,23 +151,18 @@ void main() {
       File(
         '${base.path}/preferences.json',
       ).writeAsStringSync('{"sortOrder":"alphabetical","legacyImported":true}');
-      final before = File('${base.path}/library.json').readAsStringSync();
       final l = await loaded(base);
-      expect(l.tracks.map((t) => t.id), containsAll([id1, id2]));
+      expect(l.tracks.map((t) => t.id), containsAll([hash1, hash2]));
       expect(l.folders.length, 2);
       expect(l.sortOrder, TrackSortOrder.alphabetical);
-      // Opening only adds contentHash (#35).
-      expect(
-        withoutHashes(File('${base.path}/library.json').readAsStringSync()),
-        before,
-      );
+      expect((await loaded(base)).sortOrder, TrackSortOrder.alphabetical);
     });
 
     test('fehlende Dateien: Einträge fallen weg und werden gezählt', () async {
       final base = swiftFolder('lib', goldenNew);
       File('${base.path}/Tracks/$id2.flac').deleteSync();
       final l = await loaded(base);
-      expect(l.tracks.map((t) => t.id), [id1]);
+      expect(l.tracks.map((t) => t.id), [hash1]);
       expect(l.droppedMissing, 1);
     });
 
@@ -210,23 +195,11 @@ void main() {
       },
     );
 
-    test('Swift-Formatierung von Sonderfällen', () {
-      expect(
-        swiftPrettyJson({'a': <Object>[], 'b': <String, Object>{}}),
-        '{\n  "a" : [\n\n  ],\n  "b" : {\n\n  }\n}',
-      );
-      expect(swiftPrettyJson('a/b"\n\t\u0001é'), r'"a\/b\"\n\t\u0001é"');
-      expect(
-        swiftPrettyJson([0.1, 1e-7, 123456789.0, -0.0, 3]),
-        '[\n  0.1,\n  1e-07,\n  123456789,\n  -0,\n  3\n]',
-      );
-    });
-
     test('Einstellungen pro Titel werden gespeichert', () async {
       final base = swiftFolder('lib', goldenNew);
       final l = await loaded(base);
       l.updateSettings(
-        id2,
+        hash2,
         const PlaybackSettings(
           loopEnabled: true,
           loopStart: 0.25,
@@ -236,8 +209,8 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       l.flush();
       final again = await loaded(base);
-      expect(again.track(id2)!.settings.loopStart, 0.25);
-      expect(again.track(id2)!.settings.loopEnabled, isTrue);
+      expect(again.track(hash2)!.settings.loopStart, 0.25);
+      expect(again.track(hash2)!.settings.loopEnabled, isTrue);
     });
 
     test('#29/AK7 Steigerung pro Titel wird gespeichert', () async {
@@ -250,11 +223,11 @@ void main() {
         rampStep: 2,
         rampPasses: 6,
       );
-      l.updateSettings(id2, ramp);
+      l.updateSettings(hash2, ramp);
       await Future<void>.delayed(Duration.zero);
       l.flush();
       final again = await loaded(base);
-      expect(again.track(id2)!.settings, ramp);
+      expect(again.track(hash2)!.settings, ramp);
     });
   });
 

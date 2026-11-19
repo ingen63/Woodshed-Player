@@ -1,7 +1,6 @@
 // #35: storage layer (FileStore) and tracks identified by the SHA-256 of their contents. File system only in
 // temporary folders, never the real library; the browser is modelled with MemoryFileStore (no paths, like
 // OPFS). tool/web_store_check.dart checks the real OPFS in a browser.
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -75,12 +74,20 @@ Directory swiftFolder(String golden) {
   return d;
 }
 
+/// Track entries of a format 1 file, or (format 2) the values of each track with its key as `id`.
 List<Map<String, Object?>> tracksIn(String json) {
   final j = jsonDecode(json);
-  return [
-    for (final t in (j is List ? j : (j as Map)['tracks'] as List))
-      (t as Map).cast<String, Object?>(),
-  ];
+  final tracks = j is List ? j : (j as Map)['tracks'];
+  if (tracks is Map) {
+    return [
+      for (final e in tracks.entries)
+        {
+          ...((e.value as Map)['values'] as Map).cast<String, Object?>(),
+          'id': e.key,
+        },
+    ];
+  }
+  return [for (final t in tracks as List) (t as Map).cast<String, Object?>()];
 }
 
 void main() {
@@ -143,13 +150,13 @@ void main() {
           .imported
           .single;
       expect(t.contentHash, abcHash);
+      expect(t.id, abcHash, reason: '#36: the hash is the ID');
       expect(l.trackWithHash(abcHash)?.id, t.id);
       final json = tracksIn(
         File('${tmp.path}/lib/library.json').readAsStringSync(),
       );
-      expect(json.single['contentHash'], abcHash);
-      expect(json.single['id'], t.id, reason: 'UUID stays the internal ID');
-      expect(json.single['fileName'], '${t.id}.mp3');
+      expect(json.single['id'], abcHash);
+      expect(json.single['fileName'], '$abcHash.mp3');
     });
 
     test('same contents under another name: no second file', () async {
@@ -171,57 +178,30 @@ void main() {
       expect(Directory('${base.path}/Tracks').listSync(), hasLength(2));
     });
 
-    test('old library: hash is computed in the background', () async {
-      final store = MemoryFileStore()..hashGate = Completer<void>();
+    test('#36/AK3 old library in the browser store: same migration, old tracks detected as duplicates', () async {
+      final store = MemoryFileStore();
       store.files['library.json'] = File(goldenNew).readAsBytesSync();
-      for (final t in tracksIn(File(goldenNew).readAsStringSync())) {
+      final old = tracksIn(File(goldenNew).readAsStringSync());
+      for (final t in old) {
         store.files['Tracks/${t['fileName']}'] = bytes('inhalt ${t['id']}');
       }
       final w = WebLike(store);
-      await w.library.load(); // returns although hashing is still blocked
+      await w.library.load();
       expect(w.library.tracks, hasLength(2));
-      expect(w.library.tracks.every((t) => t.contentHash == null), isTrue);
-      var done = false;
-      w.library.hashing.then((_) => done = true);
-      await Future<void>.delayed(Duration.zero);
-      expect(done, isFalse);
-      store.hashGate!.complete();
-      await w.library.hashing;
       for (final t in w.library.tracks) {
-        expect(
-          t.contentHash,
-          await store.sha256('Tracks/${t.fileName}'),
-          reason: t.title,
-        );
+        expect(t.id, await store.sha256('Tracks/${t.fileName}'));
       }
-      final saved = tracksIn(utf8.decode(store.files['library.json']!));
+      expect(store.files.keys, contains('library.v1.json'));
+      final r = await w.library.importFiles([
+        w.pick('wieder.mp3', 'inhalt ${old.first['id']}'),
+      ]);
+      expect(r.imported, isEmpty);
       expect(
-        saved.every((t) => (t['contentHash'] as String).length == 64),
-        isTrue,
+        r.duplicates.single.originalFileName,
+        old.first['originalFileName'],
       );
+      expect(w.library.tracks, hasLength(2));
     });
-
-    test(
-      'import waits for hashing and detects old tracks as duplicates',
-      () async {
-        final store = MemoryFileStore()..hashGate = Completer<void>();
-        store.files['library.json'] = File(goldenNew).readAsBytesSync();
-        final old = tracksIn(File(goldenNew).readAsStringSync()).first;
-        for (final t in tracksIn(File(goldenNew).readAsStringSync())) {
-          store.files['Tracks/${t['fileName']}'] = bytes('inhalt ${t['id']}');
-        }
-        final w = WebLike(store);
-        await w.library.load();
-        final pending = w.library.importFiles([
-          w.pick('wieder.mp3', 'inhalt ${old['id']}'),
-        ]);
-        store.hashGate!.complete();
-        final r = await pending;
-        expect(r.imported, isEmpty);
-        expect(r.duplicates.single.id, old['id']);
-        expect(w.library.tracks, hasLength(2));
-      },
-    );
   });
 
   group('#35/AK3 the web file picker adds tracks permanently', () {
@@ -240,7 +220,6 @@ void main() {
       // «Reload»: fresh library on the same storage.
       final again = WebLike(w.store);
       await again.library.load();
-      await again.library.hashing;
       expect(again.library.tracks.single.id, t.id);
       expect(again.library.tracks.single.contentHash, t.contentHash);
     });
@@ -290,26 +269,23 @@ void main() {
       });
 
       for (final golden in [goldenNew, goldenLegacy]) {
-        test('library.json in the old format ($golden)', () async {
+        test('#36/AK3 library.json in the old format ($golden)', () async {
           final base = swiftFolder(golden);
           final before = tracksIn(File(golden).readAsStringSync());
           final l = ioLibrary(base);
           await l.load();
-          await l.hashing;
           expect(l.droppedMissing, 0);
-          expect(l.tracks.map((t) => t.id), [
-            for (final t in before) (t['id'] as String).toUpperCase(),
-          ]);
-          final after = tracksIn(
-            File('${base.path}/library.json').readAsStringSync(),
-          );
+          final store = IoFileStore(base);
           for (var i = 0; i < before.length; i++) {
-            final a = {...after[i]}..remove('contentHash');
-            final expected = Track.fromJson(before[i]).toJson();
-            expect(a, expected, reason: 'all previous fields unchanged');
+            final hash = (await store.sha256(
+              'Tracks/${l.tracks[i].fileName}',
+            ))!;
+            final old = Track.fromLegacyJson(before[i]);
+            expect(l.tracks[i].id, hash);
             expect(
-              after[i]['contentHash'],
-              await IoFileStore(base).sha256('Tracks/${after[i]['fileName']}'),
+              {...l.tracks[i].toShared()}..remove('fileName'),
+              {...old.toShared()}..remove('fileName'),
+              reason: 'all previous fields unchanged',
             );
           }
           if (golden == goldenNew) {

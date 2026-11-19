@@ -558,6 +558,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get libraryTooNew =>
+      'Diese Bibliothek wurde mit einer neueren Version von Woodshed Player gespeichert. Bitte aktualisiere die App. Bis dahin wird nichts gespeichert.';
+
+  @override
   String librarySaveFailed(String detail) {
     return 'Bibliothek konnte nicht gespeichert werden: $detail';
   }

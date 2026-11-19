@@ -13,6 +13,7 @@ import '../ui/recording_button.dart';
 import 'app_controller.dart';
 import 'file_platform.dart';
 import 'file_store_io.dart';
+import 'library_settings_store.dart';
 
 /// Dienste der App. [baseDir] ersetzt den App-Ordner (Bibliothek, Metronom-Einstellungen), z. B. im
 /// Rauchtest, damit nie die echte Bibliothek berührt wird.
@@ -29,7 +30,10 @@ Future<AppController> createAppController({Directory? baseDir}) async {
   await library.load();
   final metronome = MetronomeController(
     _PlayerMetronome(player),
-    store: FileSettingsStore(File('$support/metronome.json')),
+    store: LibrarySettingsStore(
+      library,
+      legacy: FileSettingsStore(File('$support/metronome.json')),
+    ),
     onRunningChanged: files.keepAwake,
   );
   await metronome.restore();

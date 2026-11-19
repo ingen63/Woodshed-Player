@@ -73,15 +73,15 @@ audio/<hash>.<ext>      Audiodateien, benannt nach Inhalts-Hash (SHA-256)
 
 ## Daten und Zusammenführen
 
-**Geteilt (wandert in die Cloud):** Titel (ID, Titel, Artist, Ordnerzuordnung, Sortierung), Loops und Marker, Tempo je Titel, Ordnerbaum, Metronom- und Tempo-Steigerungs-Voreinstellungen, Darstellung (Hell/Dunkel/System).
+**Geteilt (wandert in die Cloud):** Titel (ID, Titel, Artist, Ordnerzuordnung, Sortierung), Loops und Marker, Tempo je Titel, Ordnerbaum, Metronom- und Tempo-Steigerungs-Voreinstellungen, Darstellung (Hell/Dunkel/System), Sortierung der Bibliotheksliste.
 
-**Gerätelokal (bleibt lokal):** Cloud-Konto und Tokens, Cache-Obergrenze, Fensterlage, Ausgabegerät, Dateipfade auf dem Desktop.
+**Gerätelokal (bleibt lokal):** Gerät-ID, Cloud-Konto und Tokens, Cache-Obergrenze, Fensterlage, Ausgabegerät, Dateipfade auf dem Desktop.
 
 Regeln:
 - Jedes Feld trägt einen **hybriden Zeitstempel** (Zeit plus Zähler plus Gerät-ID). Je Feld gewinnt der höhere Stempel. Das ist unabhängig von Uhrabweichungen eindeutig.
 - **Grabsteine:** Gelöschte Titel und Ordner bleiben mit Stempel in `state.json`. Eine jüngere Änderung am Titel «belebt» ihn wieder. Grabsteine werden nach 90 Tagen entfernt.
 - **Mengen** (Loops je Titel) werden elementweise zusammengeführt (Loop-ID als Schlüssel), nicht als Ganzes.
-- **Migration:** Das heutige `library.json` (Swift-kompatibel) wird beim ersten Start mit neuer Version in das Format mit Stempeln überführt, ohne Datenverlust, mit Sicherungskopie.
+- **Migration:** Das heutige `library.json` (Swift-kompatibel) wird beim ersten Start mit neuer Version in das Format mit Stempeln überführt, ohne Datenverlust, mit Sicherungskopie. Danach kann das Swift-Altprojekt die Bibliothek nicht mehr öffnen (#36).
 - Format hat eine **Versionsnummer**. Ein älteres Gerät schreibt eine neuere Datei nicht zurück, sondern meldet «App aktualisieren».
 
 ## Phasen
@@ -158,7 +158,7 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 #### Umsetzung W3 (#35)
 
 - **Speicher-Schicht:** `FileStore` (`file_platform.dart`) mit Namen relativ zur Bibliothek (`library.json`, `Tracks/<id>.<ext>`). `IoFileStore` (`file_store_io.dart`) im App-Ordner wie bisher, `OpfsFileStore` (`file_store_web.dart`) im Ordner `WoodshedPlayer` des OPFS; Schreiben über `createWritable()` ist atomar, Schreib- und Löschvorgänge laufen nacheinander. `Library` kennt nur noch den Store, kein `dart:io` mehr.
-- **Titel-ID:** Jeder Titel trägt `contentHash` (SHA-256, Paket `crypto`). Die UUID bleibt interne `id` und Dateiname, damit `library.json` für die Swift-App lesbar bleibt (sie überliest das Zusatzfeld). Alte Bibliotheken bekommen den Hash nach dem Öffnen im Hintergrund (Dateisystem: eigenes Isolate, Datei in Stücken gelesen). Ein Import mit bekanntem Hash legt keine zweite Datei an (`ImportResult.duplicates`). Die volle Umstellung der ID folgt mit W4 (#36).
+- **Titel-ID:** Jeder Titel trägt `contentHash` (SHA-256, Paket `crypto`). Die UUID bleibt interne `id` und Dateiname, damit `library.json` für die Swift-App lesbar bleibt (sie überliest das Zusatzfeld). Alte Bibliotheken bekommen den Hash nach dem Öffnen im Hintergrund (Dateisystem: eigenes Isolate, Datei in Stücken gelesen). Ein Import mit bekanntem Hash legt keine zweite Datei an (`ImportResult.duplicates`). Die volle Umstellung der ID folgt mit W4 (#36), siehe dort; der Hash im Hintergrund entfällt damit.
 - **Pfade:** Auf Desktop und Handy liefert der Store den gerätelokalen Pfad (Audio-Kern, Cover); im Browser gibt es keinen, der Kern liest die Bytes aus dem OPFS.
 - **Dateiauswahl im Web:** übergibt die Bytes einmal an die Bibliothek, die sie im OPFS ablegt; der Titel bleibt nach Neuladen. Die Dauer kennt erst der Kern beim Laden; die Bibliothek übernimmt sie dann (#42).
 - **Speicher:** Sobald die Bibliothek Titel hat, fragt sie einmal `navigator.storage.persist()` an (nur im Browser). Im Fuss der Bibliothek steht der Verbrauch, im Browser mit freiem Platz aus `estimate()` und ob der Speicher dauerhaft ist.
@@ -168,6 +168,17 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - Stempel, Grabsteine, Gerät-ID, Versionsnummer, Migration von `library.json`.
 - Trennung geteilt/gerätelokal bei den Einstellungen.
 - Reine Dart-Logik, deshalb gut testbar (siehe Tests).
+
+#### Umsetzung W4 (#36)
+
+- **Format 2:** `library.json` = `{formatVersion: 2, settings, folders, tracks}`, Ordner und Titel als Abbildung ID → Eintrag `{values, stamps, deleted?}`. Die Titel-ID ist der SHA-256 der Audiodatei, Dateien heissen `Tracks/<hash>.<ext>` und `Tracks/<hash>.artwork`. Ordner behalten ihre UUID.
+- **Stempel** (`app/lib/library/stamps.dart`): `Hlc` (Millisekunden, Zähler, Gerät-ID, Text `millis-zähler-gerät`), `HlcClock` steigt auch bei zurückgestellter Uhr. Jedes geteilte Feld hat einen Stempel; Loop-Anfang, -Ende und -Schalter bilden ein Feld, damit sich Grenzen zweier Geräte nicht mischen. Ein entfernter Wert (z. B. Artist) ist ein gestempeltes `null`. `Library` vergleicht beim Speichern mit dem letzten Stand und stempelt nur Geändertes.
+- **Zusammenführen:** `StampedRecord.merge` und `SharedState.merge` sind rein (ohne Ein-/Ausgabe), kommutativ, assoziativ und idempotent (Zufallstest). #37 baut darauf auf; `Library.state` liefert den Stand.
+- **Grabsteine:** Löschen setzt `deleted`, die Werte bleiben. Lebendig ist ein Eintrag, wenn ein Feldstempel jünger ist als `deleted`; ein erneuter Import belebt ihn. Nach 90 Tagen fällt der Grabstein beim Laden weg. Ein Titel in einem anderswo gelöschten Ordner erscheint ohne Ordner.
+- **Migration** (`migration.dart`, gleiche Logik für Dateisystem und OPFS): Sicherung `library.v1.json`, dann die Zuordnung alte UUID → Hash in `library.v1-ids.json` (aus `contentHash` von #35, sonst berechnet), dann Umbenennen, zuletzt `library.json` im Format 2. Bricht sie ab, setzt der nächste Start dort fort. `preferences.json` und `metronome.json` werden übernommen und bleiben liegen. **Die Swift-Kompatibilität entfällt:** Das Swift-Altprojekt kann die Bibliothek danach nicht mehr öffnen.
+- **Version:** Eine Datei mit höherer `formatVersion` wird nicht geschrieben (auch nicht über Import oder Löschen), die Oberfläche meldet «App aktualisieren» (`libraryTooNew`).
+- **Trennung:** Geteilt (in `library.json`): Titeldaten, Ordner, Loops, Tempo, Steigerung, Metronom-Voreinstellungen, Darstellung, Sortierung. Gerätelokal: `device.json` mit der Gerät-ID; Cloud-Konto, Tokens, Cache-Obergrenze, Fensterlage und Ausgabegerät kommen dort hinzu, Dateipfade leitet der Store ab.
+- **Offen für #37:** Fehlt die Audiodatei beim Laden, fällt der Titel wie bisher weg (ohne Grabstein). Mit Sync muss ein Titel ohne lokale Datei sichtbar bleiben.
 
 ### W5 – Sync-Engine (4–5 Tage)
 - `CloudProvider`-Schnittstelle, `InMemoryProvider` für Tests, `NoSync` ohne Konto.

@@ -968,6 +968,12 @@ abstract class AppLocalizations {
   /// **'The library was damaged and was kept as “{backup}”.'**
   String libraryCorrupt(String backup);
 
+  /// No description provided for @libraryTooNew.
+  ///
+  /// In en, this message translates to:
+  /// **'This library was saved by a newer version of Woodshed Player. Please update the app. Until then, nothing is saved.'**
+  String get libraryTooNew;
+
   /// No description provided for @librarySaveFailed.
   ///
   /// In en, this message translates to:

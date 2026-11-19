@@ -179,7 +179,7 @@ Future<List<Check>> part2() async {
   add(
     'AK3 still in the library after reload',
     t != null && t.contentHash == saved['hash'],
-    'tracks: ${app.library.tracks.map((t) => '${t.title} ${t.contentHash?.substring(0, 8)}').toList()}',
+    'tracks: ${app.library.tracks.map((t) => '${t.title} ${t.contentHash.substring(0, 8)}').toList()}',
   );
   final (loaded, duration, peak) = id == null
       ? (false, 0.0, 0.0)

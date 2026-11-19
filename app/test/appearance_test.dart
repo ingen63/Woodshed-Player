@@ -1,4 +1,5 @@
 // #31: light, dark or system appearance. Libraries live in temporary folders, never the real settings.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -71,7 +72,14 @@ void main() {
       await settle();
       l.appearance = Appearance.dark;
       await settle();
-      expect(prefs(tmp).readAsStringSync(), contains('"appearance":"dark"'));
+      // #36/AK5: both are shared settings in library.json.
+      final shared =
+          ((jsonDecode(File('${tmp.path}/library.json').readAsStringSync())
+                      as Map)['settings']
+                  as Map)['values']
+              as Map;
+      expect(shared['appearance'], 'dark');
+      expect(shared['sortOrder'], 'alphabetical');
       final again = await loaded(tmp);
       expect(again.sortOrder, TrackSortOrder.alphabetical);
       expect(again.appearance, Appearance.dark);

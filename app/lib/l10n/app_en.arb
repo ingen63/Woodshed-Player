@@ -369,6 +369,7 @@
       }
     }
   },
+  "libraryTooNew": "This library was saved by a newer version of Woodshed Player. Please update the app. Until then, nothing is saved.",
   "librarySaveFailed": "The library could not be saved: {detail}",
   "@librarySaveFailed": {
     "placeholders": {

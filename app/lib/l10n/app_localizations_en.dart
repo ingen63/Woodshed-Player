@@ -552,6 +552,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get libraryTooNew =>
+      'This library was saved by a newer version of Woodshed Player. Please update the app. Until then, nothing is saved.';
+
+  @override
   String librarySaveFailed(String detail) {
     return 'The library could not be saved: $detail';
   }
