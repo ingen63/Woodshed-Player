@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:woodshed_player/app/file_store_io.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/library/natural_compare.dart';
 import 'package:woodshed_player/library/swift_json.dart';
@@ -38,8 +39,9 @@ double fakeProbe(String path) =>
 
 var clock = DateTime.utc(2026, 1, 1);
 Library lib(Directory base) => Library(
-  base,
+  IoFileStore(base),
   probe: fakeProbe,
+  readSource: readLocalFile,
   now: () => clock = clock.add(const Duration(minutes: 1)),
   saveDelay: Duration.zero,
   random: Random(1),
@@ -48,11 +50,27 @@ Library lib(Directory base) => Library(
 Future<Library> loaded(Directory base) async {
   final l = lib(base);
   await l.load();
+  await l.hashing;
   return l;
 }
 
-File source(String name, [String content = 'audio']) =>
-    File('${dir('quelle').path}/$name')..writeAsStringSync(content);
+/// Ordner und Dateien der Bibliothek im Dateisystem (nur für Tests).
+extension IoLibrary on Library {
+  Directory get base => (store as IoFileStore).base;
+  Directory get tracksDir => Directory('${base.path}/Tracks');
+  File get indexFile => File('${base.path}/library.json');
+}
+
+/// library.json ohne die Zeilen `contentHash` (#35), zum Vergleich mit den Golden-Dateien der Swift-App.
+String withoutHashes(String json) => json.replaceAll(
+  RegExp(r'^ *"contentHash" : "[0-9a-f]{64}",\n', multiLine: true),
+  '',
+);
+
+/// Quelldatei; ohne [content] mit eigenem Inhalt je Name (gleicher Inhalt wäre ein Doppel, #35).
+File source(String name, [String? content]) =>
+    File('${dir('quelle').path}/$name')
+      ..writeAsStringSync(content ?? 'audio $name');
 
 void main() {
   setUp(() => tmp = Directory.systemTemp.createTempSync('wp_library_test'));
@@ -117,7 +135,7 @@ void main() {
       final l = await loaded(base);
       l.save();
       expect(
-        File('${base.path}/library.json').readAsStringSync(),
+        withoutHashes(File('${base.path}/library.json').readAsStringSync()),
         File(goldenNew).readAsStringSync(),
       );
     });
@@ -148,7 +166,11 @@ void main() {
       expect(l.tracks.map((t) => t.id), containsAll([id1, id2]));
       expect(l.folders.length, 2);
       expect(l.sortOrder, TrackSortOrder.alphabetical);
-      expect(File('${base.path}/library.json').readAsStringSync(), before);
+      // Beim Öffnen kommt nur der contentHash dazu (#35).
+      expect(
+        withoutHashes(File('${base.path}/library.json').readAsStringSync()),
+        before,
+      );
     });
 
     test('fehlende Dateien: Einträge fallen weg und werden gezählt', () async {
@@ -159,15 +181,13 @@ void main() {
       expect(l.droppedMissing, 1);
     });
 
-    test(
-      'ohne library.json: leere Bibliothek, Ordner Tracks/ wird angelegt',
-      () async {
-        final base = dir('neu');
-        final l = await loaded(base);
-        expect(l.tracks, isEmpty);
-        expect(Directory('${base.path}/Tracks').existsSync(), isTrue);
-      },
-    );
+    test('ohne library.json: leere Bibliothek, Tracks/ entsteht beim ersten Import (#35)', () async {
+      final base = dir('neu');
+      final l = await loaded(base);
+      expect(l.tracks, isEmpty);
+      await l.importFiles([source('a.mp3').path]);
+      expect(Directory('${base.path}/Tracks').listSync(), hasLength(1));
+    });
 
     test(
       'beschädigte library.json wird aufgehoben, nicht überschrieben',

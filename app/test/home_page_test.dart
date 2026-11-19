@@ -35,7 +35,7 @@ Future<TestApp> pumpApp(
     final src = Directory('${dir.path}/quelle')..createSync();
     final paths = [
       for (final t in titles)
-        (File('${src.path}/$t.mp3')..writeAsStringSync('audio')).path,
+        (File('${src.path}/$t.mp3')..writeAsStringSync('audio $t')).path,
       for (final e in files.entries)
         (File('${src.path}/${e.key}')..writeAsBytesSync(e.value)).path,
     ];

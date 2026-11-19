@@ -15,7 +15,9 @@ late Directory tmp;
 
 File src(String name) => File('${tmp.path}/quelle/$name')
   ..createSync(recursive: true)
-  ..writeAsStringSync('audio');
+  ..writeAsStringSync(
+    'audio $name',
+  ); // verschiedener Inhalt, sonst ein Doppel (#35)
 
 /// Wartet, bis [done] gilt (Datei-Operationen laufen wirklich asynchron).
 Future<void> until(bool Function() done) async {

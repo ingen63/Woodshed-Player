@@ -12,6 +12,7 @@ import '../player/player_service.dart';
 import '../ui/recording_button.dart';
 import 'app_controller.dart';
 import 'file_platform.dart';
+import 'file_store_io.dart';
 
 /// Dienste der App. [baseDir] ersetzt den App-Ordner (Bibliothek, Metronom-Einstellungen), z. B. im
 /// Rauchtest, damit nie die echte Bibliothek berührt wird.
@@ -21,8 +22,9 @@ Future<AppController> createAppController({Directory? baseDir}) async {
       baseDir?.path ?? await files.supportDir() ?? Directory.systemTemp.path;
   final player = WpPlayer();
   final library = Library(
-    Directory('$support/WoodshedPlayer'),
+    IoFileStore(Directory('$support/WoodshedPlayer')),
     probe: wpFileDuration,
+    readSource: readLocalFile,
   );
   await library.load();
   final metronome = MetronomeController(

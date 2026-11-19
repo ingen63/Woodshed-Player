@@ -1,11 +1,10 @@
 // #34: Teile der Web-Anbindung, die ohne Browser laufen: Wellenform aus der Zusammenfassung (die Getter im
-// Browser sind synchron, das Worklet liefert nur Nachrichten) und die Bibliothek nur für die Sitzung (bis #35).
+// Browser sind synchron, das Worklet liefert nur Nachrichten). Die Bibliothek im Browser prüft file_store_test.dart (#35).
 // Wiedergabe, Tempo, Loop, Seek, Metronom und Pegel im echten Browser prüft tool/web_core_check.dart (AK3).
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/player/audio_core.dart';
 import 'package:woodshed_player/player/audio_core_ffi.dart';
 import 'package:woodshed_player/player/waveform_summary.dart';
@@ -76,40 +75,6 @@ void main() {
       expect(WaveformSummary.binsFor(3), 600);
       expect(WaveformSummary.binsFor(0), 1);
       expect(WaveformSummary.binsFor(36000), WaveformSummary.maxBins);
-    });
-  });
-
-  group('#34 Bibliothek nur für die Sitzung (Browser bis #35)', () {
-    double probe(String path) => path.contains('fehlt') ? -2 : 0;
-
-    test(
-      'Import übernimmt den Pfad der Dateiauswahl, Titel aus dem Dateinamen',
-      () async {
-        final l = Library.session(probe: probe);
-        await l.load();
-        final r = await l.importFiles([
-          'web:1/Etüde in G.mp3',
-          'web:2/fehlt.wav',
-        ]);
-        expect(l.isSession, isTrue);
-        expect(r.imported.single.title, 'Etüde in G');
-        expect(l.filePath(r.imported.single), 'web:1/Etüde in G.mp3');
-        expect(l.artworkPath(r.imported.single), isNull);
-        expect(r.failed, ['fehlt.wav']);
-      },
-    );
-
-    test('Ändern, Ordner und Löschen gehen ohne Dateien', () async {
-      final l = Library.session(probe: probe);
-      final t = (await l.importFiles(['web:1/a.mp3'])).imported.single;
-      final folder = l.createFolder('Übungen');
-      l.moveTracks({t.id}, folder.id);
-      l.sortOrder = TrackSortOrder.alphabetical;
-      l.updateSettings(t.id, t.settings.copyWith(speed: 0.75));
-      expect(l.track(t.id)!.settings.speed, 0.75);
-      l.delete({t.id});
-      expect(l.tracks, isEmpty);
-      expect(l.lastError, isNull);
     });
   });
 }

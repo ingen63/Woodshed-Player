@@ -4,8 +4,10 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/app/file_platform.dart';
+import 'package:woodshed_player/app/file_store_io.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/metronome/metronome_controller.dart';
 import 'package:woodshed_player/player/audio_core.dart';
@@ -186,8 +188,9 @@ class TestApp {
   /// [duration]: Dauer jeder importierten Datei in Sekunden.
   TestApp(Directory dir, {double duration = 30}) {
     library = Library(
-      dir,
+      IoFileStore(dir),
       probe: (_) => duration,
+      readSource: readLocalFile,
       saveDelay: Duration.zero,
       random: Random(3),
     );
@@ -227,5 +230,49 @@ class TestApp {
     for (final t in timers.where((t) => t.active).toList()) {
       t.onTick(t);
     }
+  }
+}
+
+/// FileStore im Speicher, verhält sich wie OPFS im Browser (#35): keine Pfade, der Audio-Kern bekommt den
+/// Namen. [hashGate] hält das Nachrechnen der Hashes an, bis es freigegeben wird.
+class MemoryFileStore extends FileStore {
+  final files = <String, Uint8List>{};
+  int persistRequests = 0;
+  bool persisted = false;
+  Completer<void>? hashGate;
+
+  @override
+  Future<Uint8List?> read(String name) async => files[name];
+  @override
+  Future<void> write(String name, Uint8List bytes) async =>
+      files[name] = Uint8List.fromList(bytes);
+  @override
+  Future<bool> exists(String name) async => files.containsKey(name);
+  @override
+  Future<void> delete(String name) async => files.remove(name);
+  @override
+  Future<void> rename(String from, String to) async =>
+      files[to] = files.remove(from)!;
+  @override
+  Future<String?> sha256(String name) async {
+    await hashGate?.future;
+    final b = files[name];
+    return b == null ? null : crypto.sha256.convert(b).toString();
+  }
+
+  @override
+  String locate(String name) => name;
+  @override
+  String? localPath(String name) => null;
+  @override
+  Future<StorageInfo> storageInfo() async => StorageInfo(
+    used: files.values.fold(0, (s, b) => s + b.length),
+    quota: 1000000000,
+    persisted: persisted,
+  );
+  @override
+  Future<bool?> requestPersistence() async {
+    persistRequests++;
+    return persisted = true;
   }
 }

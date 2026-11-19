@@ -1,63 +1,70 @@
-// Bibliothek (#16), wie Library.swift der Swift-App: Dateien werden in den App-Ordner kopiert,
+// Bibliothek (#16), wie Library.swift der Swift-App: Dateien werden in die Bibliothek kopiert,
 // Metadaten und Einstellungen liegen in `library.json` im gleichen Format `{folders, tracks}`.
+// Seit #35 über eine Speicher-Schicht ([FileStore]): Dateisystem auf Desktop und Handy, OPFS im Browser.
+// Jeder Titel trägt den SHA-256 seines Inhalts (`contentHash`); dieselbe Datei wird nur einmal gespeichert.
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart';
 
+import '../app/file_platform.dart';
 import 'metadata.dart';
 import 'natural_compare.dart';
 import 'swift_json.dart';
 import 'track.dart';
 
+export '../app/file_platform.dart' show FileStore, StorageInfo;
 export 'track.dart';
 
 /// Dauer einer Datei in Sekunden, < 0 = Fehler. In der App `wpFileDuration` aus dem Audio-Kern.
-typedef DurationProbe = double Function(String path);
+/// null = erst beim Laden bekannt (Browser, wo der Kern im Worklet dekodiert).
+typedef DurationProbe = double? Function(String path);
+
+/// Inhalt einer gewählten oder hereingezogenen Datei (Quelle des Imports); null, wenn sie fehlt.
+typedef SourceReader = Future<Uint8List?> Function(String source);
 
 class ImportResult {
-  const ImportResult(this.imported, this.failed);
+  const ImportResult(this.imported, this.failed, [this.duplicates = const []]);
   final List<Track> imported;
 
   /// Ursprüngliche Dateinamen, die nicht übernommen werden konnten.
   final List<String> failed;
+
+  /// Titel, die mit gleichem Inhalt schon in der Bibliothek waren (keine zweite Datei).
+  final List<Track> duplicates;
 }
 
+String _sha256Hex(Uint8List bytes) => crypto.sha256.convert(bytes).toString();
+
+/// Bis zu dieser Grösse (Bytes) wird der Hash direkt gerechnet, das dauert nur Millisekunden.
+const _hashInline = 1 << 20;
+
 class Library extends ChangeNotifier {
-  /// [base] enthält `library.json`, `preferences.json` und den Ordner `Tracks/`.
+  /// [store] enthält `library.json`, `preferences.json` und den Ordner `Tracks/`. [readSource] liest die
+  /// Dateien, die importiert werden (Pfad auf Desktop, Schlüssel der Dateiauswahl im Browser).
   Library(
-    Directory base, {
+    this.store, {
     required this.probe,
+    required this.readSource,
     DateTime Function()? now,
     this.saveDelay = const Duration(milliseconds: 400),
     Random? random,
-  }) : _base = base,
-       _now = now ?? DateTime.now,
+  }) : _now = now ?? DateTime.now,
        _random = random; // ignore: prefer_initializing_formals
 
-  /// Vorläufige Bibliothek im Browser (#34, bis #35): Titel gelten nur für die Sitzung, nichts wird
-  /// gespeichert oder kopiert. Der Dateiname des Titels ist der Pfad, den die Dateiauswahl liefert.
-  Library.session({required this.probe, DateTime Function()? now})
-    : _base = null,
-      saveDelay = Duration.zero,
-      _now = now ?? DateTime.now,
-      _random = null;
-
-  final Directory? _base;
-  Directory get base => _base!;
-
-  /// Nur für die Sitzung (Browser bis #35), ohne Dateien.
-  bool get isSession => _base == null;
+  final FileStore store;
   final DurationProbe probe;
+  final SourceReader readSource;
   final Duration saveDelay;
   final DateTime Function() _now;
   final Random? _random;
 
-  Directory get tracksDir => Directory('${base.path}/Tracks');
-  File get indexFile => File('${base.path}/library.json');
-  File get _prefsFile => File('${base.path}/preferences.json');
+  static const indexName = 'library.json';
+  static const _prefsName = 'preferences.json';
+  static String trackName(String fileName) => 'Tracks/$fileName';
+  static String _artworkName(String id) => 'Tracks/$id.artwork';
 
   List<Track> _tracks = [];
   List<TrackFolder> _folders = [];
@@ -66,6 +73,9 @@ class Library extends ChangeNotifier {
   int _droppedMissing = 0;
   String? lastError;
   Timer? _pendingSave;
+  Future<void>? _hashing;
+  StorageInfo? _storage;
+  bool _persistAsked = false;
 
   List<Track> get tracks => List.unmodifiable(_tracks);
   List<TrackFolder> get folders => List.unmodifiable(_folders);
@@ -73,6 +83,13 @@ class Library extends ChangeNotifier {
 
   /// Beim letzten Laden entfernte Einträge, deren Datei fehlte.
   int get droppedMissing => _droppedMissing;
+
+  /// Fertig, wenn die fehlenden `contentHash` alter Bibliotheken nachgerechnet sind (läuft nach [load]
+  /// im Hintergrund).
+  Future<void> get hashing => _hashing ?? Future.value();
+
+  /// Belegter Speicher (im Browser auch verfügbarer und ob dauerhaft); null, bis er gemessen ist.
+  StorageInfo? get storage => _storage;
 
   TrackSortOrder get sortOrder => _sortOrder;
   set sortOrder(TrackSortOrder o) {
@@ -85,30 +102,88 @@ class Library extends ChangeNotifier {
   // ---- Laden und Speichern ----
 
   Future<void> load() async {
-    if (isSession) return notifyListeners();
-    tracksDir.createSync(recursive: true);
-    _readPrefs();
+    await _readPrefs();
     _droppedMissing = 0;
-    if (!indexFile.existsSync()) return notifyListeners();
-    final (folders, tracks) = _readIndex(indexFile);
+    final raw = await store.read(indexName);
+    if (raw == null) {
+      notifyListeners();
+      return _afterLoad();
+    }
+    final (folders, tracks) = _readIndex(raw);
     if (tracks == null) {
       // Unlesbar: Datei aufheben statt beim nächsten Speichern zu überschreiben.
       final stamp = _now().toIso8601String().replaceAll(':', '-');
-      indexFile.renameSync('${indexFile.path}.defekt-$stamp');
+      try {
+        await store.rename(indexName, '$indexName.defekt-$stamp');
+      } catch (_) {}
       lastError =
           'Die Bibliothek war beschädigt und wurde als «library.json.defekt-$stamp» aufgehoben.';
-      return notifyListeners();
+      notifyListeners();
+      return _afterLoad();
     }
     _folders = folders;
-    _tracks = tracks.where((t) => File(filePath(t)).existsSync()).toList();
+    _tracks = [
+      for (final t in tracks)
+        if (await store.exists(trackName(t.fileName))) t,
+    ];
     _droppedMissing = tracks.length - _tracks.length;
     notifyListeners();
+    _hashing = _backfillHashes();
+    return _afterLoad();
+  }
+
+  Future<void> _afterLoad() async {
+    if (_tracks.isNotEmpty) await _askPersistence();
+    await refreshStorage();
+  }
+
+  /// Dauerhaften Speicher einmal anfragen, sobald es etwas zu behalten gibt (nur im Browser wirksam).
+  Future<void> _askPersistence() async {
+    if (_persistAsked) return;
+    _persistAsked = true;
+    try {
+      await store.requestPersistence();
+    } catch (_) {}
+  }
+
+  /// Misst den belegten Speicher neu (nach Laden, Import und Löschen).
+  Future<void> refreshStorage() async {
+    try {
+      _storage = await store.storageInfo();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Rechnet fehlende `contentHash` nach, Titel für Titel, ohne die Oberfläche zu blockieren
+  /// (Dateisystem: eigenes Isolate). Gespeichert wird einmal am Ende.
+  Future<void> _backfillHashes() async {
+    final missing = [
+      for (final t in _tracks)
+        if (t.contentHash == null) t.id,
+    ];
+    var changed = false;
+    for (final id in missing) {
+      final t = track(id);
+      if (t == null) continue; // inzwischen gelöscht
+      String? hash;
+      try {
+        hash = await store.sha256(trackName(t.fileName));
+      } catch (_) {}
+      final i = _tracks.indexWhere((x) => x.id == id);
+      if (hash == null || i < 0) continue;
+      _tracks[i] = _tracks[i].copyWith(contentHash: hash);
+      changed = true;
+    }
+    if (changed) {
+      save();
+      notifyListeners();
+    }
   }
 
   /// Liest `{folders, tracks}` oder das alte Format `[Track]`. tracks == null: unlesbar.
-  static (List<TrackFolder>, List<Track>?) _readIndex(File f) {
+  static (List<TrackFolder>, List<Track>?) _readIndex(Uint8List raw) {
     try {
-      final json = jsonDecode(f.readAsStringSync());
+      final json = jsonDecode(utf8.decode(raw));
       if (json is List) {
         return (
           <TrackFolder>[],
@@ -130,20 +205,16 @@ class Library extends ChangeNotifier {
     }
   }
 
-  /// Schreibt `library.json` sofort (atomar über eine Zwischendatei).
-  void save() {
+  /// Schreibt `library.json` (atomar). Im Dateisystem ist die Datei geschrieben, wenn der Aufruf
+  /// zurückkehrt; im Browser in Aufrufreihenfolge kurz danach.
+  Future<void> save() {
     _pendingSave?.cancel();
     _pendingSave = null;
-    if (isSession) return;
-    try {
-      base.createSync(recursive: true);
-      final tmp = File('${indexFile.path}.tmp');
-      tmp.writeAsStringSync(swiftPrettyJson(indexJson()));
-      tmp.renameSync(indexFile.path);
-    } catch (e) {
+    final bytes = Uint8List.fromList(utf8.encode(swiftPrettyJson(indexJson())));
+    return store.write(indexName, bytes).catchError((Object e) {
       lastError = 'Bibliothek konnte nicht gespeichert werden: $e';
       notifyListeners();
-    }
+    });
   }
 
   /// Inhalt von library.json.
@@ -154,7 +225,10 @@ class Library extends ChangeNotifier {
 
   /// Fasst häufige Änderungen zusammen (z. B. beim Ziehen des Tempo-Reglers).
   void _scheduleSave() {
-    if (saveDelay == Duration.zero) return save();
+    if (saveDelay == Duration.zero) {
+      save();
+      return;
+    }
     _pendingSave?.cancel();
     _pendingSave = Timer(saveDelay, save);
   }
@@ -164,21 +238,22 @@ class Library extends ChangeNotifier {
     if (_pendingSave != null) save();
   }
 
-  void _readPrefs() {
+  Future<void> _readPrefs() async {
     try {
-      final p = jsonDecode(_prefsFile.readAsStringSync()) as Map;
+      final raw = await store.read(_prefsName);
+      if (raw == null) return;
+      final p = jsonDecode(utf8.decode(raw)) as Map;
       _sortOrder = TrackSortOrder.parse(p['sortOrder'] as String?);
     } catch (_) {
-      // keine oder unlesbare Einstellungen: Standardwerte
+      // unlesbare Einstellungen: Standardwerte
     }
   }
 
   void _savePrefs() {
-    if (isSession) return;
-    try {
-      base.createSync(recursive: true);
-      _prefsFile.writeAsStringSync(jsonEncode({'sortOrder': _sortOrder.name}));
-    } catch (_) {}
+    final bytes = Uint8List.fromList(
+      utf8.encode(jsonEncode({'sortOrder': _sortOrder.name})),
+    );
+    store.write(_prefsName, bytes).catchError((_) {});
   }
 
   @override
@@ -211,35 +286,46 @@ class Library extends ChangeNotifier {
 
   Track? track(String id) => _tracks.where((t) => t.id == id).firstOrNull;
 
-  String filePath(Track t) =>
-      isSession ? t.fileName : '${tracksDir.path}/${t.fileName}';
+  /// Titel mit diesem Inhalt (SHA-256), falls schon in der Bibliothek.
+  Track? trackWithHash(String hash) =>
+      _tracks.where((t) => t.contentHash == hash).firstOrNull;
 
+  /// Ort der Datei für den Audio-Kern: gerätelokaler Pfad auf Desktop und Handy, Name im Browser.
+  String filePath(Track t) => store.locate(trackName(t.fileName));
+
+  /// Gerätelokaler Pfad der Datei (Desktop und Handy); null im Browser.
+  String? localPath(Track t) => store.localPath(trackName(t.fileName));
+
+  /// Cover als gerätelokaler Pfad; im Browser (noch) keins.
   String? artworkPath(Track t) =>
-      t.hasArtwork && !isSession ? '${tracksDir.path}/${t.id}.artwork' : null;
+      t.hasArtwork ? store.localPath(_artworkName(t.id)) : null;
 
   int get _nextOrder => _tracks.fold(-1, (m, t) => max(m, t.customOrder)) + 1;
 
   // ---- Import und Löschen ----
 
-  /// Kopiert die Dateien in die Bibliothek und liest Titel, Künstler, Album, Cover und Dauer.
+  /// Übernimmt die Dateien in die Bibliothek und liest Titel, Künstler, Album, Cover und Dauer. Dateien,
+  /// deren Inhalt schon da ist, landen in [ImportResult.duplicates] und werden nicht noch einmal gespeichert.
   Future<ImportResult> importFiles(
     List<String> paths, {
     String? folderId,
   }) async {
     _importing = true;
     notifyListeners();
+    if (_hashing case final h?) await h; // alte Titel brauchen ihren Hash, sonst wird ein Doppel nicht erkannt
     final imported = <Track>[];
     final failed = <String>[];
-    if (!isSession) tracksDir.createSync(recursive: true);
+    final duplicates = <Track>[];
     for (final path in paths) {
-      final t = isSession
-          ? _sessionTrack(path, folderId)
-          : await _importFile(path, folderId);
-      if (t == null) {
-        failed.add(_baseName(path));
-      } else {
-        _tracks.add(t);
-        imported.add(t);
+      final r = await _importFile(path, folderId);
+      switch (r) {
+        case (final Track t, false):
+          _tracks.add(t);
+          imported.add(t);
+        case (final Track t, true):
+          duplicates.add(t);
+        case _:
+          failed.add(_baseName(path));
       }
     }
     _importing = false;
@@ -249,83 +335,75 @@ class Library extends ChangeNotifier {
     }
     save();
     notifyListeners();
-    return ImportResult(imported, failed);
+    if (imported.isNotEmpty) await _askPersistence();
+    await refreshStorage();
+    return ImportResult(imported, failed, duplicates);
   }
 
-  Future<Track?> _importFile(String source, String? folderId) async {
+  /// (Titel, schon vorhanden) oder null bei Fehler.
+  Future<(Track, bool)?> _importFile(String source, String? folderId) async {
     final id = newUuid(_random);
     final name = _baseName(source);
     final dot = name.lastIndexOf('.');
     final ext = dot > 0 ? name.substring(dot + 1).toLowerCase() : 'mp3';
     final fileName = '$id.$ext';
-    final dest = File('${tracksDir.path}/$fileName');
+    final dest = trackName(fileName);
+    var written = false;
     try {
-      await File(source).copy(dest.path);
-      final duration = probe(dest.path);
-      if (duration <= 0) throw const FormatException('kein lesbares Audio');
-      final meta = readMetadata(await dest.readAsBytes());
+      final bytes = await readSource(source);
+      if (bytes == null) return null;
+      // Grosse Dateien in einem eigenen Isolate (im Browser läuft compute im selben Thread).
+      final hash = bytes.length > _hashInline
+          ? await compute(_sha256Hex, bytes)
+          : _sha256Hex(bytes);
+      final existing = trackWithHash(hash);
+      if (existing != null) return (existing, true);
+      await store.write(dest, bytes);
+      written = true;
+      final duration = probe(store.locate(dest));
+      if (duration != null && duration <= 0) {
+        throw const FormatException('kein lesbares Audio');
+      }
+      final meta = readMetadata(bytes);
       var hasArtwork = false;
       if (meta.artwork != null && meta.artwork!.isNotEmpty) {
         try {
-          File('${tracksDir.path}/$id.artwork').writeAsBytesSync(meta.artwork!);
+          await store.write(_artworkName(id), meta.artwork!);
           hasArtwork = true;
         } catch (_) {}
       }
-      return Track(
+      final track = Track(
         id: id,
         fileName: fileName,
         originalFileName: name,
         title: meta.title ?? (dot > 0 ? name.substring(0, dot) : name),
         artist: meta.artist,
         album: meta.album,
-        duration: duration,
+        duration: duration ?? 0,
         hasArtwork: hasArtwork,
         dateAdded: _now().toUtc(),
         customOrder: _nextOrder,
         folderId: folderId,
+        contentHash: hash,
       );
+      return (track, false);
     } catch (_) {
-      if (dest.existsSync()) dest.deleteSync();
+      if (written) await store.delete(dest).catchError((_) {});
       return null;
     }
-  }
-
-  /// Titel nur für die Sitzung: nichts kopieren, Titel aus dem Dateinamen, Dauer vom [probe] (0 = noch
-  /// unbekannt, < 0 = Datei fehlt).
-  Track? _sessionTrack(String path, String? folderId) {
-    final duration = probe(path);
-    if (duration < 0) return null;
-    final name = _baseName(path);
-    final dot = name.lastIndexOf('.');
-    return Track(
-      id: newUuid(_random),
-      fileName: path,
-      originalFileName: name,
-      title: dot > 0 ? name.substring(0, dot) : name,
-      duration: duration,
-      hasArtwork: false,
-      dateAdded: _now().toUtc(),
-      customOrder: _nextOrder,
-      folderId: folderId,
-    );
   }
 
   static String _baseName(String path) => path.split(RegExp(r'[/\\]')).last;
 
   void delete(Set<String> ids) {
-    for (final t in _tracks.where((t) => !isSession && ids.contains(t.id))) {
-      _tryDelete(File(filePath(t)));
-      _tryDelete(File('${tracksDir.path}/${t.id}.artwork'));
+    for (final t in _tracks.where((t) => ids.contains(t.id))) {
+      store.delete(trackName(t.fileName)).catchError((_) {});
+      store.delete(_artworkName(t.id)).catchError((_) {});
     }
     _tracks.removeWhere((t) => ids.contains(t.id));
     save();
     notifyListeners();
-  }
-
-  static void _tryDelete(File f) {
-    try {
-      if (f.existsSync()) f.deleteSync();
-    } catch (_) {}
+    refreshStorage();
   }
 
   // ---- Reihenfolge ----

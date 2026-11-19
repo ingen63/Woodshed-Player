@@ -1,12 +1,11 @@
-// Vorläufige Dateiauswahl im Browser (#34, bis #35 mit OPFS): `<input type=file>` liest die Dateien in den
-// Speicher. Sie gelten nur für diese Sitzung, nichts wird gespeichert. Jede Datei bekommt einen Pfad
-// «web:<n>/<Dateiname>», über den Bibliothek und Audio-Kern sie finden.
+// Dateiauswahl im Browser (#34, #35): `<input type=file>` liest die Dateien in den Speicher. Jede Datei
+// bekommt einen Schlüssel «web:<n>/<Dateiname>»; die Bibliothek holt sie damit einmal ab ([take]) und
+// legt sie dauerhaft im OPFS ab (file_store_web.dart).
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
-import 'package:wp_core/wp_types.dart';
 
 import 'file_platform.dart';
 
@@ -14,14 +13,10 @@ class WebFilePlatform implements FilePlatform {
   final _files = <String, Uint8List>{};
   int _count = 0;
 
-  /// Bytes zu einem Pfad dieser Sitzung; null, wenn unbekannt.
-  Uint8List? bytesOf(String path) => _files[path];
+  /// Gewählte Bytes zum Schlüssel abholen (für den Import); danach sind sie hier vergessen.
+  Future<Uint8List?> take(String key) async => _files.remove(key);
 
-  /// Dauer für die Bibliothek: 0 (erst der Kern kennt sie), Fehlercode für unbekannte Pfade.
-  double probe(String path) =>
-      _files.containsKey(path) ? 0 : WpCode.fileNotFound.toDouble();
-
-  /// Legt Bytes für die Sitzung ab und gibt ihren Pfad zurück.
+  /// Legt Bytes zum Abholen ab und gibt ihren Schlüssel zurück (Dateiauswahl, Prüfseiten).
   String register(String name, Uint8List bytes) {
     final path = 'web:${++_count}/$name';
     _files[path] = bytes;

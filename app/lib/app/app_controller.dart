@@ -71,15 +71,14 @@ class AppController extends ChangeNotifier {
     if (paths.isNotEmpty) await importFiles(paths, folderId: folderId);
   }
 
-  /// Importiert und lädt den ersten neuen Titel, falls noch keiner geladen ist.
+  /// Importiert und lädt den ersten neuen (oder schon vorhandenen) Titel, falls noch keiner geladen ist.
   Future<ImportResult> importFiles(
     List<String> paths, {
     String? folderId,
   }) async {
     final r = await library.importFiles(paths, folderId: folderId);
-    if (!player.hasTrack && r.imported.isNotEmpty) {
-      await select(r.imported.first);
-    }
+    final first = [...r.imported, ...r.duplicates].firstOrNull;
+    if (!player.hasTrack && first != null) await select(first);
     return r;
   }
 

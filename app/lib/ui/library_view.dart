@@ -82,6 +82,7 @@ class _LibraryViewState extends State<LibraryView> {
                       ],
                     ),
             ),
+            if (lib.storage case final s?) _StorageLine(s.label),
           ],
         );
       },
@@ -438,6 +439,31 @@ class _SectionHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Speicherverbrauch im Fuss der Bibliothek (#35/AK5), z. B. «1,2 GB belegt».
+class _StorageLine extends StatelessWidget {
+  const _StorageLine(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('storageLine'),
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+    decoration: BoxDecoration(
+      border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+    ),
+    child: Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontSize: 11,
+      ),
+    ),
+  );
 }
 
 class _Placeholder extends StatelessWidget {

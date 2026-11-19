@@ -142,7 +142,7 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 
 - **Schnittstelle:** `AudioCore` mit `WpAudioCore` (FFI, `audio_core_ffi.dart`) und `WebAudioCore` (`audio_core_web.dart`, `dart:js_interop`, Paket `web`). `main.dart` wählt per bedingtem Import `platform_native.dart` oder `platform_web.dart`. Die reinen Typen (`WpCode`, `WpWaveform`) liegen in `wp_types.dart` ohne `dart:ffi`.
 - **Nachrichten:** Befehle gehen mit fortlaufender id ans Worklet. Das Worklet meldet alle 10 ms Position, Loop-Durchgänge, Metronom, Spitzenpegel und die id des letzten Befehls (ältere Zustände nach einem Seek werden verworfen). Die Wellenform holt die Anbindung einmal nach dem Laden (200 Abschnitte pro Sekunde) und beantwortet jede Abfrage daraus.
-- **Dateien:** Bis W3 vorläufige Dateiauswahl (`<input type=file>`), Bibliothek nur für die Sitzung (`Library.session`).
+- **Dateien:** Bis W3 vorläufige Dateiauswahl (`<input type=file>`), Bibliothek nur für die Sitzung (`Library.session`, mit #35 ersetzt).
 - **Bau:** `app/tool/build_web_core.sh` legt Kern, Hülle und Worklet nach `app/web/wp_core/`, dann `flutter build web`. CanvasKit kommt von der eigenen Seite (`web/flutter_bootstrap.js`).
 - **Prüfung:** `app/tool/web_core_check.sh` baut eine Prüfseite mit den Diensten der Web-App, die eine erzeugte Sinusdatei und `sine440.m4a` lädt und Position, Pegel, Wellenform, Tempo (0,5× und 1,5×), Loop-Sprung, Seek und Metronom misst.
 - **Noch offen:** Dekodieren blockiert weiterhin das Worklet (siehe W1).
@@ -151,6 +151,15 @@ Zur Metronom-Abweichung: Der Klick wird sample-genau im selben Puffer wie der Ti
 - `FileStore`-Schnittstelle (`file_platform.dart` wird dazu ausgebaut): Desktop = Dateisystem, Web = OPFS. Import im Web über Dateiauswahl.
 - Titel verweisen über ID (Hash) auf Dateien, nicht über Pfade. Auf dem Desktop bleibt der Pfad als gerätelokale Zusatzinfo.
 - `navigator.storage.persist()` anfordern, Speicherverbrauch und Obergrenze anzeigen.
+
+#### Umsetzung W3 (#35)
+
+- **Speicher-Schicht:** `FileStore` (`file_platform.dart`) mit Namen relativ zur Bibliothek (`library.json`, `Tracks/<id>.<ext>`). `IoFileStore` (`file_store_io.dart`) im App-Ordner wie bisher, `OpfsFileStore` (`file_store_web.dart`) im Ordner `WoodshedPlayer` des OPFS; Schreiben über `createWritable()` ist atomar, Schreib- und Löschvorgänge laufen nacheinander. `Library` kennt nur noch den Store, kein `dart:io` mehr.
+- **Titel-ID:** Jeder Titel trägt `contentHash` (SHA-256, Paket `crypto`). Die UUID bleibt interne `id` und Dateiname, damit `library.json` für die Swift-App lesbar bleibt (sie überliest das Zusatzfeld). Alte Bibliotheken bekommen den Hash nach dem Öffnen im Hintergrund (Dateisystem: eigenes Isolate, Datei in Stücken gelesen). Ein Import mit bekanntem Hash legt keine zweite Datei an (`ImportResult.duplicates`). Die volle Umstellung der ID folgt mit W4 (#36).
+- **Pfade:** Auf Desktop und Handy liefert der Store den gerätelokalen Pfad (Audio-Kern, Cover); im Browser gibt es keinen, der Kern liest die Bytes aus dem OPFS.
+- **Dateiauswahl im Web:** übergibt die Bytes einmal an die Bibliothek, die sie im OPFS ablegt; der Titel bleibt nach Neuladen. Die Dauer kennt erst der Kern beim Laden.
+- **Speicher:** Sobald die Bibliothek Titel hat, fragt sie einmal `navigator.storage.persist()` an (nur im Browser). Im Fuss der Bibliothek steht der Verbrauch, im Browser mit freiem Platz aus `estimate()` und ob der Speicher dauerhaft ist.
+- **Prüfung:** `app/tool/web_store_check.sh` baut eine Prüfseite (Import einer erzeugten Sinusdatei, OPFS, Hash, Doppel, Abspielen, Neuladen, Speicherzeile).
 
 ### W4 – Datenmodell für den Abgleich (3–4 Tage)
 - Stempel, Grabsteine, Gerät-ID, Versionsnummer, Migration von `library.json`.

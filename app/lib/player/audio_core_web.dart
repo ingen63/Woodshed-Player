@@ -19,8 +19,8 @@ import 'waveform_summary.dart';
 @JS('WebAssembly.compile')
 external JSPromise<JSObject> _wasmCompile(JSArrayBuffer bytes);
 
-/// Bytes einer Datei zum Pfad, den die Dateiauswahl im Browser vergeben hat; null, wenn unbekannt.
-typedef WebFileBytes = Uint8List? Function(String path);
+/// Bytes einer Datei der Bibliothek (Name im OPFS, #35); null, wenn sie fehlt.
+typedef WebFileBytes = Future<Uint8List?> Function(String path);
 
 class WebAudioCore implements AudioCore {
   WebAudioCore._(this._ctx, this._node, this._bytesOf) {
@@ -175,19 +175,23 @@ class WebAudioCore implements AudioCore {
 
   @override
   int loadAsync(String path) {
-    final bytes = _bytesOf(path);
-    if (bytes == null) return WpCode.fileNotFound;
     wake();
     _loadState = WpCode.loadRunning;
     _loadProgress = 0;
-    _load(bytes, ++_loadGeneration);
+    _load(path, ++_loadGeneration);
     return WpCode.ok;
   }
 
-  Future<void> _load(Uint8List bytes, int generation) async {
+  Future<void> _load(String path, int generation) async {
     int code;
     try {
-      // Eigene Kopie, deren Speicher ans Worklet übergeht; die Bytes der Dateiauswahl bleiben.
+      final bytes = await _bytesOf(path);
+      if (generation != _loadGeneration) return;
+      if (bytes == null) {
+        _loadState = WpCode.fileNotFound;
+        return;
+      }
+      // Eigene Kopie, deren Speicher ans Worklet übergeht; die Bytes bleiben für den Browser-Dekoder.
       final copy = Uint8List.fromList(bytes).buffer.toJS;
       code =
           ((await _call('loadEncoded', [copy], [copy])) as JSNumber).toDartInt;

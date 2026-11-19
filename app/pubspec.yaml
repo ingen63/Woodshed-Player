@@ -38,6 +38,7 @@ dependencies:
   wp_core:
     path: packages/wp_core
   web: ^1.1.2
+  crypto: ^3.0.6 # SHA-256 der Titel (#35), BSD-3
 
 dev_dependencies:
   flutter_test:

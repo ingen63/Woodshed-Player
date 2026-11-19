@@ -46,8 +46,10 @@ class Track {
     required this.customOrder,
     this.settings = const PlaybackSettings(),
     this.folderId,
+    this.contentHash,
   });
 
+  /// Interne ID (UUID) und Name der Datei in `Tracks/`, wie in der Swift-App.
   final String id;
 
   /// Dateiname im Ordner `Tracks/` der Bibliothek.
@@ -67,6 +69,11 @@ class Track {
   /// Ordner; null = «Ohne Ordner».
   final String? folderId;
 
+  /// SHA-256 des Inhalts (64 Hex-Zeichen, #35): identifiziert den Titel geräteübergreifend, dieselbe
+  /// Datei wird nur einmal gespeichert. Zusatzfeld, das die Swift-App überliest; fehlt bei alten
+  /// Bibliotheken und wird beim Öffnen nachgerechnet.
+  final String? contentHash;
+
   Track copyWith({
     String? title,
     double? duration,
@@ -74,6 +81,7 @@ class Track {
     int? customOrder,
     PlaybackSettings? settings,
     String? Function()? folderId,
+    String? contentHash,
   }) => Track(
     id: id,
     fileName: fileName,
@@ -87,6 +95,7 @@ class Track {
     customOrder: customOrder ?? this.customOrder,
     settings: settings ?? this.settings,
     folderId: folderId != null ? folderId() : this.folderId,
+    contentHash: contentHash ?? this.contentHash,
   );
 
   factory Track.fromJson(Map<String, Object?> j) => Track(
@@ -107,11 +116,13 @@ class Track {
           )
         : const PlaybackSettings(),
     folderId: (j['folderID'] as String?)?.toUpperCase(),
+    contentHash: (j['contentHash'] as String?)?.toLowerCase(),
   );
 
   Map<String, Object?> toJson() => {
     if (album != null) 'album': album,
     if (artist != null) 'artist': artist,
+    if (contentHash != null) 'contentHash': contentHash,
     'customOrder': customOrder,
     'dateAdded': dateToSwift(dateAdded),
     'duration': duration,
