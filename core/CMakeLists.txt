@@ -218,6 +218,15 @@ target_link_libraries(recorder_tests PRIVATE wp_reccore)
 wp_strict_warnings(recorder_tests)
 add_test(NAME recorder_tests COMMAND recorder_tests)
 
+# #61: the device shell (src/player.cpp) compiled into the test itself, on the null device
+add_executable(device_tests tests/device_tests.cpp)
+target_link_libraries(device_tests PRIVATE wp_playercore)
+target_include_directories(device_tests PRIVATE include)
+target_compile_definitions(device_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
+wp_strict_warnings(device_tests)
+wp_mutate(device_tests)
+add_test(NAME device_tests COMMAND device_tests)
+
 # #8: the C API (src/player.cpp) through the shared library, as the Dart binding calls it
 add_executable(capi_tests tests/capi_tests.cpp)
 target_link_libraries(capi_tests PRIVATE wp_core)
@@ -261,7 +270,7 @@ include(tests/fuzz/fuzz.cmake)
 # memory ends as killed or timeout (#11/AK4).
 if(WP_MULL_PLUGIN)
   set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests recorder_tests capi_tests
-    realtime_tests reference_tests fuzz_decoder_replay fuzz_capi_replay)
+    device_tests realtime_tests reference_tests fuzz_decoder_replay fuzz_capi_replay)
   foreach(t IN LISTS WP_MUTANT_TESTS)
     target_sources(${t} PRIVATE tests/mutants/memory_guard.cpp tests/mutants/mutant_switch.cpp)
   endforeach()

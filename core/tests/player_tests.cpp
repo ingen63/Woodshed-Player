@@ -1,17 +1,20 @@
 // Tests des Player-Kerns (#14) ohne Audiogerät: Laden von WAV/FLAC/MP3, Fehlerfälle, Laden im
 // Hintergrund, Gerätewechsel, Dateiende, Seek und Loop-Grenzen mit geladenen Dateien. WAV-Dateien
 // werden hier erzeugt; FLAC/MP3 stammen aus core/tools/make_test_audio.sh (Sinus 440 Hz, 1 s).
+#include <algorithm>
 #include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iterator>
 #include <memory>
+#include <new>
 #include <random>
 #include <string>
 #include <thread>
@@ -35,6 +38,62 @@ static_assert(WP_OK == wp::kOk && WP_ERR_INVALID_ARGUMENT == wp::kErrInvalidArgu
 static_assert(WP_LOAD_IDLE == wp::kLoadIdle && WP_LOAD_RUNNING == wp::kLoadRunning &&
                   WP_LOAD_READY == wp::kLoadReady,
               "load states in wp_core.h and player_core.hpp must match");
+
+// #61: every operator new of this program goes through here. A thread can make its allocations fail
+// (tFailAlloc) and the largest single allocation is recorded (gLargestAlloc), to check how much the
+// loading reserves at once.
+namespace {
+thread_local bool tFailAlloc = false;
+std::atomic<std::size_t> gLargestAlloc{0};
+
+void *testNew(std::size_t n) {
+  if (tFailAlloc)
+    throw std::bad_alloc();
+  std::size_t largest = gLargestAlloc.load(std::memory_order_relaxed);
+  while (n > largest &&
+         !gLargestAlloc.compare_exchange_weak(largest, n, std::memory_order_relaxed)) {
+  }
+  if (void *p = std::malloc(n ? n : 1))
+    return p;
+  throw std::bad_alloc();
+}
+void *testNew(std::size_t n, std::align_val_t al) {
+  if (tFailAlloc)
+    throw std::bad_alloc();
+  void *p = nullptr;
+  const std::size_t a = std::max(static_cast<std::size_t>(al), sizeof(void *));
+  if (posix_memalign(&p, a, n ? n : 1) == 0)
+    return p;
+  throw std::bad_alloc();
+}
+} // namespace
+
+void *operator new(std::size_t n) { return testNew(n); }
+void *operator new[](std::size_t n) { return testNew(n); }
+void *operator new(std::size_t n, const std::nothrow_t &) noexcept {
+  try {
+    return testNew(n);
+  } catch (...) {
+    return nullptr;
+  }
+}
+void *operator new[](std::size_t n, const std::nothrow_t &) noexcept {
+  try {
+    return testNew(n);
+  } catch (...) {
+    return nullptr;
+  }
+}
+void *operator new(std::size_t n, std::align_val_t a) { return testNew(n, a); }
+void *operator new[](std::size_t n, std::align_val_t a) { return testNew(n, a); }
+void operator delete(void *p) noexcept { std::free(p); }
+void operator delete[](void *p) noexcept { std::free(p); }
+void operator delete(void *p, std::size_t) noexcept { std::free(p); }
+void operator delete[](void *p, std::size_t) noexcept { std::free(p); }
+void operator delete(void *p, std::align_val_t) noexcept { std::free(p); }
+void operator delete[](void *p, std::align_val_t) noexcept { std::free(p); }
+void operator delete(void *p, std::size_t, std::align_val_t) noexcept { std::free(p); }
+void operator delete[](void *p, std::size_t, std::align_val_t) noexcept { std::free(p); }
 
 namespace {
 
@@ -539,6 +598,70 @@ void decodeMemoryMatchesFile() {
   CHECK(wp::decodeMemory(nullptr, 10, kSr, out) == wp::kErrInvalidArgument);
 }
 
+// #61: FLAC of silence (mono, 16 bit, fixed blocks of 4096 frames, one CONSTANT subframe each), a
+// few bytes per block, so far more audio than kMinBytesPerSecond allows for its size. STREAMINFO
+// claims `claimed` frames (default: the true length); a PADDING block of `padding` bytes makes the
+// file larger without audio.
+std::string silentFlac(long long frames, int sr, long long claimed = -1, size_t padding = 0) {
+  if (claimed < 0)
+    claimed = frames;
+  constexpr int kBlockFrames = 4096;
+  auto crc8 = [](const std::string &d) {
+    unsigned c = 0;
+    for (const unsigned char b : d) {
+      c ^= b;
+      for (int i = 0; i < 8; ++i)
+        c = (c & 0x80) ? ((c << 1) ^ 0x07) & 0xff : (c << 1) & 0xff;
+    }
+    return static_cast<char>(c);
+  };
+  auto crc16 = [](const std::string &d) {
+    unsigned c = 0;
+    for (const unsigned char b : d) {
+      c ^= static_cast<unsigned>(b) << 8;
+      for (int i = 0; i < 8; ++i)
+        c = (c & 0x8000) ? ((c << 1) ^ 0x8005) & 0xffff : (c << 1) & 0xffff;
+    }
+    return c;
+  };
+  std::string f = "fLaC";
+  f += padding > 0 ? '\x00' : '\x80'; // STREAMINFO, last metadata block without padding
+  f += std::string("\x00\x00\x22", 3);
+  f += std::string("\x10\x00\x10\x00", 4); // block size 4096 .. 4096
+  f += std::string(6, '\0');               // frame sizes unknown
+  // 20 bits sample rate, 3 bits channels - 1 (0), 5 bits bits per sample - 1 (15), 36 bits frames
+  const unsigned long long packed = (static_cast<unsigned long long>(sr) << 44) | (15ULL << 36) |
+                                    static_cast<unsigned long long>(claimed);
+  for (int b = 7; b >= 0; --b)
+    f += static_cast<char>((packed >> (8 * b)) & 0xff);
+  f += std::string(16, '\0'); // MD5 unknown
+  if (padding > 0) {
+    f += '\x81'; // last metadata block, PADDING
+    for (int b = 2; b >= 0; --b)
+      f += static_cast<char>((padding >> (8 * b)) & 0xff);
+    f += std::string(padding, '\0');
+  }
+  CHECK(sr == 8000 && frames % kBlockFrames == 0);
+  for (long long n = 0; n < frames / kBlockFrames; ++n) {
+    std::string h = "\xff\xf8"; // sync, fixed block size
+    h += '\xc4';                // 4096 frames, 8 kHz
+    h += '\x08';                // mono, 16 bit
+    if (n < 0x80) {             // frame number, UTF-8 coded
+      h += static_cast<char>(n);
+    } else {
+      h += static_cast<char>(0xc0 | (n >> 6));
+      h += static_cast<char>(0x80 | (n & 0x3f));
+    }
+    h += crc8(h);
+    h += std::string(3, '\0'); // CONSTANT subframe, value 0
+    const unsigned c = crc16(h);
+    h += static_cast<char>(c >> 8);
+    h += static_cast<char>(c & 0xff);
+    f += h;
+  }
+  return f;
+}
+
 // #75: titles longer than 5 minutes, here 6 minutes at the lowest rate (8 kHz, 23 MB decoded).
 constexpr int kLongSr = wp::kMinSampleRate;
 constexpr long long kLongFrames = 6LL * 60 * kLongSr;
@@ -602,6 +725,87 @@ void longTitleWithWrongHeaderLength() {
     CHECK(p.load(writeBytes("long6min-claimed.wav", bytes).string()) == wp::kOk);
     CHECK(p.engine().frames() == expected);
   }
+}
+
+// #75/AK1, #61: loading from a file uses the file size for the plausibility of the header length,
+// so a long title reserves its length once there too: no single allocation is larger than the
+// samples plus one decode block (growing step by step would allocate about twice 5 minutes).
+void longTitleFromFileReservesOnce() {
+  const fs::path file = writeIndexWav("long6min-file.wav", kLongFrames, kLongSr);
+  gLargestAlloc.store(0);
+  wp::Player p(kLongSr);
+  CHECK(p.load(file.string()) == wp::kOk);
+  CHECK(p.engine().frames() == kLongFrames);
+  CHECK(gLargestAlloc.load() <= static_cast<size_t>(kLongFrames + 8192) * 2 * sizeof(float));
+}
+
+// #75, #61: the header length is reserved only once the decoder has really delivered the first
+// 5 minutes. A title of 1 minute whose header claims 6 minutes (plausible for the file size, made
+// large with padding) keeps the reservation of 5 minutes.
+void shortTitleClaimingLongerReservesOnlyFiveMinutes() {
+  constexpr long long kOneMinute = 118LL * 4096;
+  constexpr long long kClaimed = 704LL * 4096;
+  const std::string bytes = silentFlac(kOneMinute, 8000, kClaimed, 200000);
+  wp::Source out;
+  CHECK(wp::decodeMemory(bytes.data(), bytes.size(), 8000, out) == wp::kOk);
+  CHECK(out.frames == kOneMinute);
+  CHECK(out.data.capacity() <= static_cast<size_t>(300LL * 8000 + 8192) * 2);
+}
+
+// #75, #61: the header length is trusted for the reservation only if the file is large enough for
+// that much audio. Six minutes of silence in FLAC take 8 KB: the true length is reserved no more
+// than an implausible one, the buffer grows while decoding.
+void lengthImplausibleForTheFileSizeIsNotReserved() {
+  constexpr long long kFrames = 704LL * 4096; // a bit over 6 minutes at 8 kHz
+  const std::string bytes = silentFlac(kFrames, 8000);
+  CHECK(bytes.size() < 10000);
+  wp::Source out;
+  CHECK(wp::decodeMemory(bytes.data(), bytes.size(), 8000, out) == wp::kOk);
+  CHECK(out.frames == kFrames);
+  CHECK(std::all_of(out.data.begin(), out.data.end(), [](float v) { return v == 0.0f; }));
+  CHECK(out.data.capacity() != static_cast<size_t>(kFrames + 8192) * 2);
+}
+
+// #14/AK3, #61: after a load the progress is 1, also when the header claimed more frames than the
+// file holds (the frames counted then stay below the claimed length).
+void progressIsCompleteAfterLoad() {
+  const fs::path file = writeBytes("claims-double.flac", silentFlac(4LL * 4096, 8000, 8LL * 4096));
+  wp::Player p(8000);
+  CHECK(p.load(file.string()) == wp::kOk);
+  CHECK(p.engine().frames() == 4LL * 4096);
+  CHECK(p.loadProgress() == 1.0);
+}
+
+// #14/AK2, #61: if the loading thread cannot be started (no memory), the load reports
+// WP_ERR_OUT_OF_MEMORY, and the load state says so too.
+void loadThreadWithoutMemory() {
+  const std::string file = writeIndexWav("no-thread.wav", 1000).string();
+  wp::Player p(kSr);
+  tFailAlloc = true;
+  const int r = p.loadAsync(file);
+  tFailAlloc = false;
+  CHECK(r == wp::kErrOutOfMemory);
+  CHECK(p.loadState() == wp::kErrOutOfMemory);
+  CHECK(p.load(file) == wp::kOk); // afterwards loading works again
+}
+
+// #76, #61: the metronome clicks at the rate of the player (unsupported rates: the lowest one).
+void metronomeRunsAtThePlayerRate() {
+  for (const int rate : {8000, 22050, 96000}) {
+    wp::Player p(rate);
+    CHECK(p.metronome().sampleRate() == rate);
+    CHECK(p.engine().sampleRate() == rate);
+  }
+  wp::Player low(wp::kMinSampleRate - 1);
+  CHECK(low.metronome().sampleRate() == wp::kMinSampleRate);
+}
+
+// #76, #61: a player with an unsupported sample rate renders silence into the whole buffer.
+void unsupportedRateRendersSilence() {
+  wp::Player p(wp::kMinSampleRate - 1);
+  std::vector<float> out(256 * 2, 0.5f);
+  p.render(out.data(), 256);
+  CHECK(std::all_of(out.begin(), out.end(), [](float v) { return v == 0.0f; }));
 }
 
 // Fremd dekodiertes PCM (AAC/M4A aus dem Browser) wird auf Stereo und die Rate des Kerns gewandelt
@@ -852,6 +1056,15 @@ int main() {
       {"decodeMemoryMatchesFile", decodeMemoryMatchesFile},
       {"longTitleReservesHeaderLength", longTitleReservesHeaderLength},
       {"longTitleWithWrongHeaderLength", longTitleWithWrongHeaderLength},
+      {"longTitleFromFileReservesOnce", longTitleFromFileReservesOnce},
+      {"shortTitleClaimingLongerReservesOnlyFiveMinutes",
+       shortTitleClaimingLongerReservesOnlyFiveMinutes},
+      {"lengthImplausibleForTheFileSizeIsNotReserved",
+       lengthImplausibleForTheFileSizeIsNotReserved},
+      {"progressIsCompleteAfterLoad", progressIsCompleteAfterLoad},
+      {"loadThreadWithoutMemory", loadThreadWithoutMemory},
+      {"unsupportedRateRendersSilence", unsupportedRateRendersSilence},
+      {"metronomeRunsAtThePlayerRate", metronomeRunsAtThePlayerRate},
       {"unreadableFileIsReported", unreadableFileIsReported},
       {"emptyAudioIsUnsupported", emptyAudioIsUnsupported},
       {"convertPcmToPlayerFormat", convertPcmToPlayerFormat},

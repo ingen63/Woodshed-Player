@@ -467,14 +467,21 @@ class Exclusion {
   var used = 0;
 }
 
-/// Kinds of reasons allowed: equivalent mutants and boundary cases (docs/TESTS.md).
-const exclusionKinds = ['gleichwertig', 'Grenzfall'];
+/// Kinds of reasons allowed (docs/TESTS.md): equivalent mutants, boundary cases, and in the core
+/// (#61/AK3) the release of memory without an observable effect and Mull's limit (a mutant Mull
+/// does not switch effectively, measured by hand).
+const exclusionKinds = [
+  'gleichwertig',
+  'Grenzfall',
+  'Speicherfreigabe',
+  'Mull-Grenze',
+];
 
 String _squash(String s) => s.trim().replaceAll(RegExp(r'\s+'), ' ');
 
 /// Reads the exclusion file. An entry is `<file> | <mutator> | <source line>`, optionally followed
 /// by `| <column>` when the line holds the operator more than once; it needs a reason
-/// above it: a comment block starting with `# gleichwertig:` or `# Grenzfall:`. Entries right
+/// above it: a comment block starting with one of [exclusionKinds] and a colon. Entries right
 /// below each other share the reason, an empty line ends it. Throws a [FormatException] for an
 /// entry without a reason or with a malformed line.
 List<Exclusion> parseExclusions(String text) {
@@ -520,7 +527,8 @@ List<Exclusion> parseExclusions(String text) {
     }
     if (reason == null) {
       throw FormatException(
-        'line ${n + 1}: exclusion without a reason (# gleichwertig: … or # Grenzfall: … above it)',
+        'line ${n + 1}: exclusion without a reason (# gleichwertig: …, # Grenzfall: …, '
+        '# Speicherfreigabe: … or # Mull-Grenze: … above it)',
         line,
       );
     }

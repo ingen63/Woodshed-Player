@@ -30,7 +30,8 @@ const coreMinimumTimeoutMs = 20000;
 const dartMinimumTimeout = Duration(seconds: 60);
 
 /// Test programs of the core and their arguments (ctest in core/CMakeLists.txt, without the
-/// benchmarks). capi_tests uses miniaudio's null device, so parallel mutants open no audio device.
+/// benchmarks). capi_tests and device_tests use miniaudio's null device, so parallel mutants open
+/// no audio device.
 List<(String, List<String>)> coreTestPrograms(String core) => [
   ('engine_tests', []),
   ('metronome_tests', []),
@@ -38,6 +39,7 @@ List<(String, List<String>)> coreTestPrograms(String core) => [
   ('player_tests', []),
   ('recorder_tests', []),
   ('capi_tests', ['--null-backend']),
+  ('device_tests', []),
   ('realtime_tests', []),
   ('reference_tests', ['--dump', '$core/build-mutants/reference_native.bin']),
   (

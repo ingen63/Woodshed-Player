@@ -191,7 +191,7 @@ app/lib/time_format.dart | dart_lt_to_le | (seconds - seconds.roundToDouble()).a
 # wäre falsch), loadAsync ohne cancelLoad() endete im zweiten Laden mit std::terminate, ohne
 # cancel_.store(true) dauerte das Abbrechen; mit aktivem Mutanten bleiben alle Tests grün. Der
 # Eintrag für cancelLoad() trifft auch den gleich lautenden Aufruf in Player::~Player (dort ebenfalls gemessen: alle Tests grün).
-core/src/player_core.cpp | cxx_remove_void_call | engine_.configure(kChannels, sampleRate_);
+core/src/player_core.cpp | cxx_remove_void_call | engine_.configure(kChannels, configured);
 core/src/player_core.cpp | cxx_remove_void_call | cancelLoad(); | 3
 core/src/player_core.cpp | cxx_remove_void_call | engine_.collectGarbage();
 core/src/player_core.cpp | cxx_remove_void_call | cancel_.store(true);
@@ -235,6 +235,50 @@ app/lib/library/metadata.dart | dart_lt_to_le | if (eq < 0) continue;
 app/lib/library/metadata.dart | dart_le_to_lt | while (p + 8 <= b.length) {
 app/lib/library/metadata.dart | dart_le_to_lt | while (q + 8 <= end) {
 
+# ---- core (#61) ----
+# gleichwertig: Das Ende einer Unterbrechung löst in Player::onDeviceEvent nichts aus (es pausiert
+# nicht und ist kein Start des Geräts); ohne den Aufruf ändert sich also nichts.
+core/src/player.cpp | cxx_remove_void_call | p->core->onDeviceEvent(wp::DeviceEvent::InterruptionEnded);
+# gleichwertig: Der in wp_create gesetzte Zustand wird nie gelesen, bevor refreshDevice ihn neu setzt:
+# Nur loadAsync liest ihn, und wp_load_async ruft vorher immer refreshDevice. Mit Gerät steht
+# ausserdem schon der Vorgabewert true da.
+core/src/player.cpp | cxx_remove_void_call | p->core->setDeviceAvailable(ready && ma_device_start(&p->device) == MA_SUCCESS);
+# gleichwertig: Direkt danach zerstört «delete p» den Player-Kern ohnehin, in derselben Reihenfolge
+# (nach ma_device_uninit und ma_context_uninit, die Mitglieder davor sind nur Daten).
+core/src/player.cpp | cxx_remove_void_call | p->core.reset();
+# Grenzfall: Ein Titel von genau 5 Minuten (Länge = Vorab-Reservierung) bzw. eine Länge genau an der
+# Grenze der Plausibilität (Dateigrösse / 500 Bytes je Sekunde): nur ob die Länge einmal reserviert
+# wird, ändert sich, nicht der Titel.
+core/src/player_core.cpp | cxx_gt_to_ge | const bool reserveTotal = total > cap && static_cast<double>(total) <= plausibleFrames;
+core/src/player_core.cpp | cxx_le_to_lt | const bool reserveTotal = total > cap && static_cast<double>(total) <= plausibleFrames;
+# Grenzfall: Nur wenn der nächste Block den reservierten Platz genau füllt; dann reserviert «>=» die
+# Länge einen Block früher, der Titel und die Grösse der Reservierung bleiben gleich.
+core/src/player_core.cpp | cxx_gt_to_ge | if (reserveTotal && !reserveTried && out.data.size() + n > out.data.capacity()) {
+# Grenzfall: Nur ohne Längenangabe (total 0, z. B. FLAC mit 0 Frames in STREAMINFO) zeigt der
+# Fortschritt während des Ladens 1 statt 0; das Ergebnis und der Fortschritt danach (1, Test
+# progressIsCompleteAfterLoad) bleiben gleich.
+core/src/player_core.cpp | cxx_gt_to_ge | if (progress && total > 0)
+# gleichwertig: Gemessen (FLAC, MP3 und WAV, ganz, abgeschnitten nach 30, 60 und 90 % und verfälscht):
+# Die Decoder von miniaudio beenden das Lesen immer mit MA_AT_END, nie mit einem anderen Fehler;
+# der Zweig «Fehler nach den ersten Frames» kommt nicht vor.
+core/src/player_core.cpp | cxx_eq_to_ne | if (r != MA_SUCCESS && r != MA_AT_END && frames == 0)
+# Speicherfreigabe: Gibt nur den Wandler frei (ein Leck, Lecks zählen im Mutationslauf nicht);
+# das Ergebnis der Umwandlung ist schon fertig.
+core/src/player_core.cpp | cxx_remove_void_call | ma_data_converter_uninit(&conv, nullptr);
+# Mull-Grenze: Von Hand gemessen, die Tests erkennen jeden dieser Aufrufe (ohne data.reserve scheitern
+# longTitleReservesHeaderLength und longTitleFromFileReservesOnce, ohne setSampleRate
+# metronomeRunsAtThePlayerRate, ohne loader_.join() 79 Prüfungen in player_tests und 3 in
+# device_tests); Mull schaltet sie nicht wirksam (Konstruktor, try-Block, lock_guard, docs/TESTS.md).
+core/src/player_core.cpp | cxx_remove_void_call | data.reserve(count);
+core/src/player_core.cpp | cxx_remove_void_call | metronome_.setSampleRate(configured);
+core/src/player_core.cpp | cxx_remove_void_call | loader_.join();
+# Speicherfreigabe: Gibt ersetzte Titel frei, nichts sonst ändert sich (Lecks zählen im
+# Mutationslauf nicht): im Destruktor der Engine und vor dem Laden im Browser-Kern.
+core/src/engine.cpp | cxx_remove_void_call | collectGarbage();
+core/web/wp_core_web.cpp | cxx_remove_void_call | p->core->engine().collectGarbage();
+core/web/wp_core_web.cpp | cxx_remove_void_call | p->core->engine().collectGarbage(); // frees replaced titles before the new one needs the memory
+# Speicherfreigabe: Gibt Speicher frei, den der Browser-Teil mit wp_web_alloc geholt hat.
+core/web/wp_core_web.cpp | cxx_remove_void_call | void wp_web_free(void *ptr) { std::free(ptr); }
 
 # ---- app/lib/library/stamps.dart (#61) ----
 # gleichwertig: b ist immer mindestens a + 1 (indexOf ab a + 1). Die Grenzfälle a == 0 («-2-d») und

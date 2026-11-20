@@ -169,6 +169,25 @@ void main() {
       expect(list.last.reason, 'Grenzfall: exactly 1 s.');
     });
 
+    test(
+      '#61/AK3 the two kinds of the core: memory release and Mull\'s limit',
+      () {
+        final list = parseExclusions(
+          '# Speicherfreigabe: frees a replaced title, nothing else changes.\n'
+          'core/src/a.cpp | cxx_remove_void_call | collectGarbage();\n'
+          '\n'
+          '# Mull-Grenze: measured, the mutant has no effect.\n'
+          'core/src/a.cpp | cxx_remove_void_call | cancelLoad();\n',
+        );
+        expect(list.first.reason, startsWith('Speicherfreigabe: frees'));
+        expect(list.last.reason, startsWith('Mull-Grenze: measured'));
+        expect(
+          () => parseExclusions('# Leck: no\ncore/src/a.cpp | m | free(p);\n'),
+          throwsFormatException,
+        );
+      },
+    );
+
     test('an entry without a reason is an error', () {
       expect(
         () => parseExclusions('core/src/a.cpp | cxx_lt_to_le | if (x < 0)\n'),
