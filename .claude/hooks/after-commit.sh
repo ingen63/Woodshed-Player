@@ -63,9 +63,9 @@ if [ -n "$non_test" ] || [ -n "$code" ]; then
   fi
 fi
 
-# The hook itself or its tests changed (#7/AK7): run the hook tests.
-if has '^(\.claude/hooks/after-commit\.sh|app/tool/after_commit_hook_test\.dart)$'; then
-  steps+=("Hook-Tests|cd app && flutter test --reporter failures-only tool/after_commit_hook_test.dart")
+# The hook, the QA tools or the git hooks changed (#7/AK7, #69/AK1): run the tool tests.
+if has '^(\.claude/hooks/after-commit\.sh$|app/tool/|tools/git-hooks/)'; then
+  steps+=("Werkzeugtests|make test-tools")
 fi
 
 logdir="${TMPDIR:-/tmp}/woodshed-hook"

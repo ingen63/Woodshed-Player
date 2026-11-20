@@ -957,13 +957,13 @@ auf 10 Kernen), alle grün; MacBook Pro M1 Pro, macOS 26.7.
 `.claude/hooks/after-commit.sh` läuft nach jedem `git commit` aus Claude Code. Er prüft das Format der Nachricht
 (`Titel (#22)`), baut und testet die betroffenen Teile selbst (Kern: CMake und `ctest`; App: `flutter analyze` und
 `flutter test`; Kern oder Plugin: `flutter build macos --debug` und `flutter build ios --simulator --debug`; Swift:
-`xcodebuild`; der Hook selbst: seine Tests) und meldet nur Fehler oder geänderte Logik ohne Tests, dann mit Auftrag an
+`xcodebuild`; der Hook selbst, `app/tool/` oder `tools/git-hooks/`: die Werkzeugtests mit `make test-tools`, #69) und meldet nur Fehler oder geänderte Logik ohne Tests, dann mit Auftrag an
 den `test-agent`. Die volle Ausgabe liegt unter `$TMPDIR/woodshed-hook/`.
 
 Die Tests des Hooks (`app/tool/after_commit_hook_test.dart`, `make test-hook`) legen je Fall ein kleines Git-Repository
-an und ersetzen `cmake`, `ctest`, `flutter` und `xcodebuild` durch Skripte, die ihre Argumente aufschreiben und auf
+an und ersetzen `cmake`, `ctest`, `flutter`, `make` und `xcodebuild` durch Skripte, die ihre Argumente aufschreiben und auf
 Wunsch fehlschlagen. Geprüft werden Dart-Änderung, C++-Änderung, Logik ohne Test, Fehlschlag, Swift-Änderung, reine
-Dokumente, Format der Nachricht, andere Befehle, `test(auto)`-Commits und die Änderung am Hook selbst.
+Dokumente, Format der Nachricht, andere Befehle, `test(auto)`-Commits sowie Änderungen am Hook selbst, unter `app/tool/` und unter `tools/git-hooks/` (#69).
 
 ## Gefundene Fehler
 

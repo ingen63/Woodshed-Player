@@ -1,6 +1,7 @@
 // #7/AK7: tests of the Claude Code hook after a commit (.claude/hooks/after-commit.sh).
 //
-// Every test creates a small git repository and puts fake `cmake`, `ctest`, `flutter` and `xcodebuild`
+// Every test creates a small git repository and puts fake `cmake`, `ctest`, `flutter`, `make` and
+// `xcodebuild`
 // first on the PATH. The fakes record their arguments and fail on request, so the tests check which
 // steps the hook runs and what it reports to Claude, without building anything.
 //
@@ -34,7 +35,7 @@ class _Repo {
   static Future<_Repo> create() async {
     final r = _Repo(await Directory.systemTemp.createTemp('wp_hook_test'));
     final bin = Directory('${r.root.path}/bin')..createSync();
-    for (final tool in ['cmake', 'ctest', 'flutter', 'xcodebuild']) {
+    for (final tool in ['cmake', 'ctest', 'flutter', 'make', 'xcodebuild']) {
       final f = File('${bin.path}/$tool')..writeAsStringSync(_fakeTool);
       await Process.run('chmod', ['755', f.path]);
     }
@@ -232,14 +233,58 @@ void main() {
       expect(res.reason, contains('test-agent'));
     });
 
-    test('hook changed: its own tests run', () async {
+    test('hook changed: the tool tests run', () async {
       r.write('.claude/hooks/after-commit.sh', '# changed\n');
       r.commit('Hook change (#7)');
       final res = await r.runHook();
-      expect(res.calls, [
-        'flutter test --reporter failures-only tool/after_commit_hook_test.dart',
-      ]);
-      expect(res.context, contains('Hook-Tests'));
+      expect(res.calls, ['make test-tools']);
+      expect(res.context, contains('Werkzeugtests'));
+    });
+
+    test(
+      '#69/AK2 change under app/tool/: Dart checks and the tool tests run',
+      () async {
+        r.write('app/tool/coverage.dart', '// changed\n');
+        r.commit('Tool change (#69)');
+        final res = await r.runHook();
+        expect(res.calls, [
+          'flutter analyze --no-pub',
+          'flutter test --reporter failures-only',
+          'make test-tools',
+        ]);
+        expect(res.blocked, isFalse);
+        expect(res.context, contains('Werkzeugtests'));
+      },
+    );
+
+    test('#69/AK2 script under app/tool/: only the tool tests run', () async {
+      r.write('app/tool/web_core_check.sh', '# changed\n');
+      r.commit('Tool script change (#69)');
+      final res = await r.runHook();
+      expect(res.calls, ['make test-tools']);
+    });
+
+    test('#69/AK2 change under tools/git-hooks/: the tool tests run', () async {
+      r.write('tools/git-hooks/pre-push', '# changed\n');
+      r.commit('Git hook change (#69)');
+      final res = await r.runHook();
+      expect(res.calls, ['make test-tools']);
+      expect(res.context, contains('Werkzeugtests'));
+    });
+
+    test('#69/AK2 failing tool tests are reported', () async {
+      r.write('tools/git-hooks/pre-push', '# changed\n');
+      r.commit('Git hook change (#69)');
+      final res = await r.runHook(fail: 'make test-tools');
+      expect(res.blocked, isTrue);
+      expect(res.reason, contains('«Werkzeugtests»'));
+    });
+
+    test('other paths named like tools do not start the tool tests', () async {
+      r.write('tools/hoervergleich.sh', '# changed\n');
+      r.commit('Other tool (#69)');
+      final res = await r.runHook();
+      expect(res.calls, isEmpty);
     });
 
     test('documents only: no steps and no output', () async {
