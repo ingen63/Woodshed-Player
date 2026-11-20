@@ -222,6 +222,27 @@ void subdivisionChangeKeepsBeat() {
   }
 }
 
+// #70/AK3: meter and subdivision change together within beat 4 of 4/4, to 3/4 triplets. Beat 4
+// lies outside 3/4: its triplets still belong to beat 4 of bar 1, the next beat (88 200) is the
+// accent of bar 2. Before the fix the triplets counted as beat 1 and bar 2 had no accent.
+void meterAndSubdivisionChangeMidBeat() {
+  Metronome m(44100);
+  m.setSubdivision(2);
+  m.start();
+  auto t = run(m, 66150 + 2000);
+  CHECK(!t.empty() && t.back().frame == 66150 && t.back().beat == 3);
+  m.setMeter(3);
+  m.setSubdivision(3);
+  t = run(m, 88200 + 22050 - 68150 + 1);
+  CHECK(t.size() == 6);
+  if (t.size() == 6) {
+    CHECK(t[0].frame == 73500 && t[0].bar == 1 && t[0].beat == 3 && t[0].kind == Metronome::Sub);
+    CHECK(t[1].frame == 80850 && t[1].bar == 1 && t[1].beat == 3 && t[1].kind == Metronome::Sub);
+    CHECK(t[2].frame == 88200 && t[2].bar == 2 && t[2].beat == 0 && t[2].kind == Metronome::Accent);
+    CHECK(t[5].frame == 110250 && t[5].bar == 2 && t[5].beat == 1 && t[5].kind == Metronome::Beat);
+  }
+}
+
 void volumeChangeWithoutCrackle() { // #3/AK12
   Metronome m(44100);
   m.start();
@@ -736,6 +757,7 @@ int main() {
       {"accentsPerMeter", accentsPerMeter},
       {"subdivisionsAndQuieterSubClicks", subdivisionsAndQuieterSubClicks},
       {"subdivisionChangeKeepsBeat", subdivisionChangeKeepsBeat},
+      {"meterAndSubdivisionChangeMidBeat", meterAndSubdivisionChangeMidBeat},
       {"meterChangeWhilePlaying", meterChangeWhilePlaying},
       {"volumeChangeWithoutCrackle", volumeChangeWithoutCrackle},
       {"rampExampleFromIssue", rampExampleFromIssue},

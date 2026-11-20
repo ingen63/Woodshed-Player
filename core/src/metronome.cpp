@@ -199,7 +199,10 @@ void Metronome::scheduleTick() {
     sub_ = 0;
     ++beat_;
   }
-  if (beat_ >= meter) {
+  // The meter wraps the count only at a beat: a subdivision click still belongs to the running
+  // beat, even if that beat lies outside a meter changed mid-beat. That beat plays to its end and
+  // the next beat is the accent of a new bar (#70).
+  if (sub_ == 0 && beat_ >= meter) {
     beat_ = 0;
   }
   if (beat_ == 0 && sub_ == 0) {

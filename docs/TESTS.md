@@ -106,6 +106,7 @@ zugeordnet.
 | Einstellungen, Tap-Tempo, Kürzel, nie gleichzeitig mit dem Titel | vorhanden: `metronome_test.dart` (#3/AK20) | – |
 | 120 BPM bei 44,1 kHz: 22 050 Samples Abstand über 5 min; Betonung, Nebenakzent (6/8), Unterteilungen an den berechneten Stellen; Positionen eines festen Ablaufs als Golden-Datei | vorhanden: `reference_tests.cpp` (#3/AK7–AK10, #9/AK5, Klicks aus der Ausgabe erkannt), `core/tests/golden/metronome_positions.txt` | – |
 | Wechsel der Unterteilung an der Schlaggrenze überspringt keinen Schlag | vorhanden: `metronome_tests.cpp` (`subdivisionChangeKeepsBeat`, #3/AK10, gefunden mit #9) | – |
+| Taktart und Unterteilung wechseln gleichzeitig mitten im Schlag (#70): Liegt der laufende Schlag ausserhalb der neuen Taktart, klingt er aus (seine restlichen Klicks in der neuen Unterteilung, als Unterteilung dieses Schlags), der nächste Schlag ist die betonte Eins eines neuen Takts. Liegt er innerhalb, zählt der Takt weiter (#3/AK10). Die Taktart setzt den Zähler nur an einer Schlaggrenze zurück | vorhanden: `reference_tests.cpp` (#70/AK2, #70/AK3, nativ und WASM), `metronome_tests.cpp` (`meterAndSubdivisionChangeMidBeat`, Takt und Schlag) | #70 |
 
 ### Aufnahme (nur Mac)
 
@@ -384,6 +385,7 @@ zusätzlich `#3/AKn`.
 | #9/AK3 Seek, Pause | Rampe | erstes Sample round(t · 44 100), im Stand und beim Spielen; Pause verliert und wiederholt nichts |
 | #9/AK4 Tempo | Sinus 440 Hz, 1 s | Länge 44 100 / r ± 1 % für r = 0,1 / 0,5 / 1,0 / 2,0, Grundfrequenz 440 Hz ± 1 % |
 | #9/AK5, #3 Metronom | ohne Titel und mit stillem Titel | 600 Klicks in 5 min genau k · 22 050; 6/8 A B B S B B; Unterteilungen bei round(k · 22 050 / s), leiser; fester Ablauf als Golden-Datei |
+| #70 Takt und Unterteilung mitten im Schlag | ohne Titel | 4/4 Achtel → 3/4 Triolen im 4. Schlag: Triolen bei 73 500 und 80 850, Betonung bei 88 200; → 6/8 Viertel im 3. Schlag: Nebenakzent bei 154 350; → 4/4 Achtel im 6. Schlag: Achtel bei 341 775, Betonung bei 352 800 und 441 000 |
 | #9/AK7 übrige C-API | WAV (Float, 22,05 kHz), im Test geschrieben | Laden, Dauer, Wellenform, Fehlercodes, Aufnahme nicht verfügbar |
 
 **Klickerkennung.** Ein Klick beginnt mit sin(0) = 0; zwischen den Klicks ist die Ausgabe exakt 0. Die Position ist
@@ -1083,3 +1085,12 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
 24. 20.11.2026, #64, actionlint (ShellCheck SC2129, Stil): `test-quality.yml`, Job `changes`, schrieb drei Zeilen
     einzeln nach `$GITHUB_OUTPUT`; jetzt in einem Block. Dabei den Pfadfilter `code` auf alle Workflows erweitert,
     damit eine Änderung an `pages.yml` den Job `checks` (mit actionlint) auslöst. Geprüft von `make lint`.
+25. 20.11.2026, #70 (aus #9): Wechselten Taktart und Unterteilung gleichzeitig mitten in einem Schlag, der in der
+    neuen Taktart nicht mehr vorkommt (z. B. im 4. Schlag von 4/4 auf 3/4), setzte `Metronome::scheduleTick` den
+    Zähler schon beim nächsten Unterteilungsklick auf Schlag 1. Die restlichen Klicks des laufenden Schlags zählten
+    als Schlag 1, die Betonung des neuen Takts fehlte, der Takt war um einen Schlag verschoben. Behoben: Die Taktart
+    setzt den Zähler nur an einer Schlaggrenze zurück; der laufende Schlag klingt aus, der nächste ist die Eins.
+    Hätte gefangen werden müssen von einem Referenzfall mit Taktwechsel mitten im Schlag; die Golden-Datei wechselt
+    die Taktart nur in der Nähe von Schlaggrenzen. Regressionstest: Referenzfall «#70/AK2 #70/AK3 #3/AK10 meter and
+    subdivision change mid-beat» (`reference_tests.cpp`, nativ und WASM) und `meterAndSubdivisionChangeMidBeat`
+    (`metronome_tests.cpp`). Die Golden-Datei bleibt unverändert.

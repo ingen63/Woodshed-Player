@@ -663,6 +663,61 @@ void metronomeGoldenSequence() {
   CHECK(same);
 }
 
+void metronomeMeterAndSubdivisionChangeMidBeat() {
+  // #70/AK2, #70/AK3, #3/AK10: meter and subdivision change together in the middle of a beat. If
+  // the running beat lies outside the new meter, it plays to its end (its remaining clicks in the
+  // new subdivision) and the next beat is the accent of a new bar. A beat inside the new meter
+  // counts on. 120 BPM, a beat is 22 050 frames; changes at frames after the start:
+  //  - 4/4 eighths (11 025): A U B U B U B (beat 4 at 66 150). At 68 150 to 3/4 triplets (7 350):
+  //    beat 4 lies outside 3/4, its triplets at 73 500 and 80 850, then the accent at 88 200, the
+  //    bar 88 200 / 110 250 / 132 300 with triplets.
+  //  - At 135 300 (beat 3 of 3/4) to 6/8 quarters: beat 3 lies inside 6/8, the next beat is beat 4
+  //    at 154 350, the secondary accent; the accent at 220 500, the secondary accent at 286 650.
+  //  - At 335 750 (beat 6 of 6/8, its click at 330 750) to 4/4 eighths: beat 6 lies outside 4/4,
+  //    its eighth at 341 775, then the accent at 352 800 and the next at 352 800 + 88 200 = 441
+  //    000.
+  // (Before the fix the remaining clicks of the beat counted as beat 1 and the accent was missing:
+  // 88 200 came as a plain beat.)
+  Offline o;
+  wp_metro_set_volume(o.p, 1.0f);
+  wp_metro_set_bpm(o.p, 120);
+  wp_metro_set_subdivision(o.p, 2);
+  ClickDetector d;
+  renderClicks(o.p, kRate, d);
+  wp_metro_start(o.p);
+  std::vector<float> keep;
+  renderClicks(o.p, 68150, d, &keep);
+  wp_metro_set_meter(o.p, 3);
+  wp_metro_set_subdivision(o.p, 3);
+  renderClicks(o.p, 135300 - 68150, d, &keep);
+  wp_metro_set_meter(o.p, 6);
+  wp_metro_set_subdivision(o.p, 1);
+  renderClicks(o.p, 335750 - 135300, d, &keep);
+  wp_metro_set_meter(o.p, 4);
+  wp_metro_set_subdivision(o.p, 2);
+  renderClicks(o.p, 443000 - 335750, d, &keep);
+  record("metronome_meter_subdivision_change", keep);
+
+  const std::pair<long long, char> want[] = {
+      {0, 'A'},      {11025, 'U'},  {22050, 'B'},  {33075, 'U'},  {44100, 'B'},  {55125, 'U'},
+      {66150, 'B'},  {73500, 'U'},  {80850, 'U'},  {88200, 'A'},  {95550, 'U'},  {102900, 'U'},
+      {110250, 'B'}, {117600, 'U'}, {124950, 'U'}, {132300, 'B'}, {154350, 'S'}, {176400, 'B'},
+      {198450, 'B'}, {220500, 'A'}, {242550, 'B'}, {264600, 'B'}, {286650, 'S'}, {308700, 'B'},
+      {330750, 'B'}, {341775, 'U'}, {352800, 'A'}, {363825, 'U'}, {374850, 'B'}, {385875, 'U'},
+      {396900, 'B'}, {407925, 'U'}, {418950, 'B'}, {429975, 'U'}, {441000, 'A'}};
+  const size_t n = sizeof want / sizeof want[0];
+  CHECK(d.clicks.size() == n);
+  for (size_t k = 0; k < std::min(n, d.clicks.size()); ++k) {
+    const auto &c = d.clicks[k];
+    if (c.frame - kRate != want[k].first || c.kind != want[k].second) {
+      std::printf("  click %zu at %lld (%c), expected %lld (%c)\n", k, c.frame - kRate, c.kind,
+                  want[k].first, want[k].second);
+      CHECK(false);
+      break;
+    }
+  }
+}
+
 void metronomeWithTitle() {
   // #3/AK20, #9/AK5: title (silence) and metronome play together; the title adds exactly 0, so the
   // clicks lie at the same positions as without a title (k · 22 050 after the start).
@@ -963,6 +1018,8 @@ int main(int argc, char **argv) {
   run("#3/AK7 #3/AK8 #9/AK5 accents and subdivisions", metronomeAccentsAndSubdivisions);
   run("#3/AK10 #3/AK11 #3/AK15 #3/AK18 #9/AK5 golden click positions of a fixed sequence",
       metronomeGoldenSequence);
+  run("#70/AK2 #70/AK3 #3/AK10 meter and subdivision change mid-beat",
+      metronomeMeterAndSubdivisionChangeMidBeat);
   run("#3/AK20 #9/AK5 metronome with title", metronomeWithTitle);
   run("#9/AK7 load from file, waveform, errors", loadFromFile);
   run("#9/AK7 recording unavailable offline", recordingUnavailableOffline);
