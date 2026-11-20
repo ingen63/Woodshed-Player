@@ -235,3 +235,18 @@ app/lib/library/metadata.dart | dart_lt_to_le | if (eq < 0) continue;
 app/lib/library/metadata.dart | dart_le_to_lt | while (p + 8 <= b.length) {
 app/lib/library/metadata.dart | dart_le_to_lt | while (q + 8 <= end) {
 
+
+# ---- app/lib/library/stamps.dart (#61) ----
+# gleichwertig: b ist immer mindestens a + 1 (indexOf ab a + 1). Die Grenzfälle a == 0 («-2-d») und
+# b == a + 1 («1--d») lassen ein leeres Zahlfeld übrig; int.parse wirft dafür dieselbe
+# FormatException wie die Prüfung.
+app/lib/library/stamps.dart | dart_le_to_lt | if (a <= 0 || b <= a + 1 || b == s.length - 1) { | 11
+app/lib/library/stamps.dart | dart_le_to_lt | if (a <= 0 || b <= a + 1 || b == s.length - 1) { | 21
+app/lib/library/stamps.dart | dart_add_to_sub | if (a <= 0 || b <= a + 1 || b == s.length - 1) {
+# gleichwertig: Bei gleichem Zähler setzt «>=» denselben Stand noch einmal (Zeit, Zähler, eigenes Gerät).
+app/lib/library/stamps.dart | dart_gt_to_ge | (h.millis == last.millis && h.counter > last.counter)) {
+# gleichwertig: Ist nur einer der Werte eine Zahl, ergibt «a == b» falsch, wie die Prüfungen danach.
+app/lib/library/stamps.dart | dart_and_to_or | if (a is num && b is num) return a == b;
+# gleichwertig: Gleiche kanonische Form heisst gleicher JSON-Wert; die Werte unterscheiden sich
+# höchstens als 47 und 47.0, die sameJson und jeder Vergleich danach gleich behandeln.
+app/lib/library/stamps.dart | dart_gt_to_ge | _canonical(o.values[k]).compareTo(_canonical(this.values[k])) > 0;
