@@ -41,9 +41,9 @@ Stand: 19.11.2026 · Status: freigegeben, Issues #32 bis #41 · Ergänzt `UMBAUP
 ├────────────────────────────────────────────────────────────┤
 │ Sync-Engine (reines Dart)                                  │  nur aktiv mit Konto,
 │  Zusammenführen · Warteschlange · Wiederholen              │  sonst NoSync
-├───────────────┬──────────────┬─────────────────────────────┤
-│ GoogleDrive   │ Dropbox      │ OneDrive   (CloudProvider)  │  REST über `http`
-├───────────────┴──────────────┴─────────────────────────────┤
+├─────────────────────────────┬──────────────────────────────┤
+│ GoogleDrive                 │ OneDrive   (CloudProvider)   │  REST über `http`
+├─────────────────────────────┴──────────────────────────────┤
 │ Speicher-Schicht (FileStore)                               │
 │  Desktop: Dateisystem · Web: OPFS (Origin Private FS)      │
 ├───────────────────────────┬────────────────────────────────┤
@@ -209,7 +209,7 @@ Abgelöst durch `docs/KONZEPT-SYNC.md` (Mischform): Google Drive #54, OneDrive #
 - **App-Registrierung** bei Google und Microsoft (öffentliche Client-IDs, kein Geheimnis im Code). Das legst Du an, die IDs kommen in die Konfiguration.
 - Token-Ablage: Desktop im Schlüsselbund bzw. Credential Store, Web in IndexedDB. Ziel sind Refresh-Tokens, wo der Anbieter sie für Web-Apps ausgibt (OneDrive). Bei Google gibt es ohne eigenen Server nur kurzlebige Zugriffstokens, deshalb stille Neuanmeldung, im Zweifel ein Tippen.
 - Kontingent anzeigen, Warnung bei fast vollem Speicher.
-- **Ablage und Netzwerkprüfung (#58):** Alle Anbietermodule und jeder andere Netzwerkcode liegen in `app/lib/sync/providers/`, nur dort erlaubt `make network-free` Netzwerkpakete und Verbindungen. Die Web-App erlaubt Verbindungen per Content Security Policy (`app/web/index.html`) nur zur eigenen Seite und zu den API- und Anmelde-Hosts von Google, Dropbox und Microsoft; weitere Hosts (z. B. Download-Adressen von OneDrive, Relays der direkten Verbindung) kommen mit dem jeweiligen Issue in die Liste und den Test. Einzelheiten in `docs/TESTS.md`.
+- **Ablage und Netzwerkprüfung (#58):** Alle Anbietermodule und jeder andere Netzwerkcode liegen in `app/lib/sync/providers/`, nur dort erlaubt `make network-free` Netzwerkpakete und Verbindungen. Die Web-App erlaubt Verbindungen per Content Security Policy (`app/web/index.html`) nur zur eigenen Seite und zu den API- und Anmelde-Hosts von Google und Microsoft; weitere Hosts (z. B. Download-Adressen von OneDrive, Relays der direkten Verbindung) kommen mit dem jeweiligen Issue in die Liste und den Test. Einzelheiten in `docs/TESTS.md`.
 
 ### W7 – PWA und Handy-Bedienung (4–6 Tage)
 - Manifest, Icons, Service Worker (Offline-Start der App-Hülle), Hinweis «Zum Home-Bildschirm» für iOS.
@@ -263,7 +263,7 @@ Abgelöst durch M5 in `docs/KONZEPT-SYNC.md`: die Oberfläche wächst in #54, #5
 | Stummschalter macht Web Audio stumm | Wirkt wie Fehler | Umweg über `<audio>`-Element, in W0 prüfen |
 | COOP/COEP auf GitHub Pages | Kein `SharedArrayBuffer`, Kern läuft nicht | Service-Worker-Verfahren, sonst Wechsel zu Cloudflare Pages/Netlify (gleiche Dateien) |
 | iOS räumt PWA-Speicher | Titel lokal weg | `persist()`, Titel aus der Cloud nachladen, Hinweis bei Löschung |
-| Google ohne Server: nur kurzlebige Tokens | Gelegentliche Neuanmeldung | Stille Erneuerung, klare Anzeige; Dropbox/OneDrive als Alternativen |
+| Google ohne Server: nur kurzlebige Tokens | Gelegentliche Neuanmeldung | Stille Erneuerung, klare Anzeige; OneDrive oder direkte Verbindung als Alternativen |
 | Grosse Audiodateien im Browser | Speicher- und Zeitlimits beim Dekodieren | Streaming-Dekodierung im Kern, Dateien in Blöcken hochladen |
 | Cloud-Kontingent knapp (z. B. 15 GB bei Google) | Upload schlägt fehl | Anzeige, Warnung, später Schalter «nicht hochladen» pro Titel |
 | Kernänderungen brechen Web oder Desktop | Doppelte Fehler | `ctest` gegen beide Ziele in CI |
@@ -285,7 +285,7 @@ Abgelöst durch M5 in `docs/KONZEPT-SYNC.md`: die Oberfläche wächst in #54, #5
 4. #35 Speicher-Schicht mit OPFS, Titel-ID statt Pfad (W3)
 5. #36 Datenmodell mit Änderungsstempeln und Migration (W4)
 6. #37 Sync-Engine mit Zusammenführen (W5)
-7. #38 Cloud-Anbieter Google Drive, Dropbox, OneDrive (W6; ggf. je Anbieter ein Issue)
+7. #38 Cloud-Anbieter Google Drive, OneDrive (W6; aufgeteilt in #54, #55, #56)
 8. #39 PWA und Handy-Bedienung (W7)
 9. #40 Cloud-Einstellungen in der Oberfläche (W8)
 10. #41 Auslieferung auf GitHub Pages, README und Regeln (W9)
@@ -296,5 +296,5 @@ Jedes Issue bekommt Abnahmekriterien als Häkchen-Liste (Skill `issue`). Die Abn
 
 Entschieden am 19.11.2026: Schalter pro Titel in W5, Desktop-Ordner nur auf Wunsch, 5 Sicherungsstände, GitHub-Pages-Adresse (siehe Entscheidungen).
 
-1. **Anbieter-Registrierungen** (Google Cloud, Dropbox, Microsoft Entra) legst Du an, bevor W6 beginnt. Die OAuth-Weiterleitung zeigt auf die GitHub-Pages-Adresse; sie muss deshalb vorher feststehen (Kontoname und Repo-Name).
+1. **Anbieter-Registrierungen** (Google Cloud, Microsoft Entra) legst Du an, bevor W6 beginnt. Die OAuth-Weiterleitung zeigt auf die GitHub-Pages-Adresse; sie muss deshalb vorher feststehen (Kontoname und Repo-Name).
 2. **Veröffentlichung:** GitHub Pages braucht ein öffentliches Repo (oder bezahlten Plan). Das Repo ist MIT-lizenziert; vor der Veröffentlichung prüfen, dass keine privaten Daten drin sind.

@@ -1,5 +1,5 @@
 // Interface to a cloud storage (#37, plan W5): the sync engine knows no provider, only these five calls.
-// Google Drive, Dropbox and OneDrive follow in #38; tests use the InMemoryProvider. All names are relative
+// Google Drive (#54) and OneDrive (#55) follow; tests use the InMemoryProvider. All names are relative
 // to the app's own folder at the provider and separated by «/» («state.json», «audio/<hash>.mp3»).
 import 'dart:typed_data';
 
