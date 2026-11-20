@@ -114,7 +114,8 @@ zugeordnet.
 |---|---|---|
 | Start, Stopp, Fehler des Kerns statt Aufnahme, Titel nach Gebietsschema, nie auf iPhone/iPad und im Browser | vorhanden: `recording_test.dart` (#4) | – |
 | Fehlermeldungen und Berechtigungsdialog mehrsprachig | vorhanden: `recording_messages_test.dart` (#44), `permission_texts_test.dart` (#49) | – |
-| Systemton-Aufnahme im Kern (`recorder_mac.mm`, Core Audio Process Tap) | Lücke: braucht echten Systemton, kein automatischer Test | #51 |
+| Ringpuffer, Schreib-Thread, WAV-Kopf (Stereo, float32, Abtastrate des Geräts), Pegel und Stille, Übernahme der Tap-Daten (interleaved, je Kanal ein Puffer, Mono, Geräteeingänge vor dem Tap) | vorhanden: `recorder_tests.cpp` (#68, `recorder_core.cpp` ohne Audiogerät) | – |
+| Systemton-Aufnahme im Kern (`recorder_mac.mm`: Core Audio Process Tap, Aggregate-Device, IOProc) | Lücke: braucht echten Systemton, kein automatischer Test | #51 |
 
 ### Web/WASM
 
@@ -282,6 +283,13 @@ Nur im Notfall umgehen: `git push --no-verify`. Die Tests von Hook und Werkzeuge
 erreicht und verfehlt, in kleinen Git-Repositorys mit einem gestellten `make`; ein Fall pusht echt in ein leeres
 Repository mit `core.hooksPath`.
 
+**Stand** 20.11.2026 nach #68 (`make coverage`): C++-Kern **87,4 %** (1266 von 1449 Zeilen), Dart-Logik **91,2 %**
+(1891 von 2074), Dart-Oberfläche 95,0 % (2100 von 2210). Im Kern: `recorder_core.cpp` 100 % (neu, aus
+`recorder_mac.mm` herausgelöst: Ringpuffer, Schreib-Thread, WAV-Datei, Pegel, Übernahme der Tap-Daten;
+`recorder_tests.cpp`), `recorder_mac.mm` 25,1 % (43 von 171, nur noch Core Audio), `engine.cpp` 99,6 %,
+`metronome.cpp` 99,6 %, `waveform.cpp` 100 %, `player_core.cpp` 90,9 %, C-API `player.cpp` 90,5 %, Offline-Kern
+`wp_core_web.cpp` 86,7 %.
+
 **Stand** 19.11.2026 (`make coverage`): C++-Kern **80,8 %** (1065 von 1318 Zeilen), Dart-Logik **90,3 %** (1754 von
 1943), Dart-Oberfläche 95,1 % (2093 von 2200, ohne Untergrenze). Im Kern: `engine.cpp` 99,2 %, `metronome.cpp`
 96,3 %, `waveform.cpp` 100 %, `player_core.cpp` 90,2 %, C-API `player.cpp` 90,1 % (vor #8 ohne Test: 0 %),
@@ -299,8 +307,9 @@ genannt):
 - **Erzeugte Übersetzungen** (`app_localizations*.dart`): von `gen-l10n` aus den ARB-Dateien erzeugt, nicht von
   Hand geschrieben. Ihre Vollständigkeit prüft `l10n_test.dart`.
 - **Aufnahme `recorder_mac.mm`** zählt zum Kern, obwohl sie grösstenteils nur mit echtem Systemton und der
-  Berechtigung des Nutzers läuft (Core Audio Process Tap, #51); getestet sind Ruhezustand und Argumentprüfung. Sie
-  drückt den Kern um rund 13 Prozentpunkte (ohne sie 93 %).
+  Berechtigung des Nutzers läuft (Core Audio Process Tap, #51); getestet sind Ruhezustand und Argumentprüfung. Seit
+  #68 enthält sie nur noch die Ansteuerung von Core Audio; der Rest steht in `recorder_core.cpp` mit eigenen Tests.
+  Sie drückt den Kern um rund 9 Prozentpunkte (ohne sie 95,7 %; vor #68 13 Prozentpunkte).
 - **Fehlerpfade ohne Auslöser** im Kern (Speichermangel, Audiogerät lässt sich nicht anlegen, Gerätemeldungen von
   miniaudio in `player.cpp`) bleiben nicht abgedeckt; sie zählen mit.
 - **Native Anbindung** (`platform_native.dart`, `audio_core_ffi.dart`, Teile von `file_platform.dart`) zählt zur
@@ -795,8 +804,8 @@ Plugin). Im Workflow: die Debian-Pakete für Ubuntu 24.04 und LLVM 18 (`clang-18
   gespeicherte Befehlszeile und trennt sie an Leerzeichen; der Projektpfad hat eines. Das Werkzeug baut deshalb über
   einen Link ohne Leerzeichen im temporären Ordner.
 - **Testauswahl (AK3):** Jedes Testprogramm des Kerns läuft einzeln unter `mull-runner` (`engine_tests`,
-  `metronome_tests`, `waveform_tests`, `player_tests`, `capi_tests --null-backend`, `realtime_tests`,
-  `reference_tests`, `fuzz_decoder_replay`, `fuzz_capi_replay`; nicht die Leistungstests aus #59) und führt jeden
+  `metronome_tests`, `waveform_tests`, `player_tests`, `recorder_tests`, `capi_tests --null-backend`,
+  `realtime_tests`, `reference_tests`, `fuzz_decoder_replay`, `fuzz_capi_replay`; nicht die Leistungstests aus #59) und führt jeden
   Mutanten aus, der in ihm steckt. Ein Mutant ist erkannt, wenn ein Programm ihn erkennt. Mulls Abdeckungsfilter
   (nur ausgeführte Zeilen mutieren) ist bewusst aus: Er übersprang Funktionen, die die Tests ausführen
   (`Engine::apply` in `engine_tests`, die ganze geteilte Bibliothek in `capi_tests`). Mulls Zwischenspeicher
@@ -875,6 +884,10 @@ des Mutanten verhält sich das Programm unverändert, obwohl ein Test sicher sch
 sind vor allem Konstruktoren, Destruktoren und Funktionen mit `lock_guard` oder `try`. Gemessene Fälle sind als
 gleichwertig ausgeschlossen (Begründung in `tools/mutants-exclude.txt`); weitere Fälle derselben Art stehen unten als
 offen. Mulls Abdeckungsfilter ist aus demselben Grund aus (siehe oben).
+
+**Aufnahme (#68):** `recorder_core.cpp` (aus `recorder_mac.mm` herausgelöst) wird mutiert und von `recorder_tests`
+geprüft: 65 Mutanten, 51 erkannt, 8 Zeitüberschreitungen, 6 begründet ausgeschlossen (drei gleichwertige, drei in
+Destruktoren nach der Grenze oben, von Hand gemessen), keiner offen.
 
 **Offen (AK2 nicht erfüllt):** 288 nicht erkannte Mutanten, je Datei mit den Zeilen (Stand des Laufs oben; die
 aktuelle Liste mit Spalte, Mutator und Quelltext steht nach jedem Lauf in `local/mutants/full/missed.txt`). Zuerst

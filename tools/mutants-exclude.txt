@@ -125,6 +125,24 @@ core/src/player_core.cpp | cxx_lt_to_le | if (!data || sampleRate < 1)
 core/src/player_core.cpp | cxx_lt_to_le | if (!interleaved || channels < 1 || frames < 1 || srcRate < 1 || dstRate < 1) | 61
 core/src/player_core.cpp | cxx_lt_to_le | if (!interleaved || channels < 1 || frames < 1 || srcRate < 1 || dstRate < 1) | 76
 
+# ---- core/src/recorder_core.cpp ----
+# gleichwertig: Ist der Block-Pegel gleich dem gespeicherten, schreibt «>=» denselben Wert noch einmal.
+core/src/recorder_core.cpp | cxx_gt_to_ge | if (blockPeak > peak_.load())
+# gleichwertig: Mit left == 0 fordert «>=» 0 Frames an; der Ringpuffer liefert dann 0 Frames (oder
+# einen Fehler), die Schleife bricht ab, ohne etwas zu schreiben.
+core/src/recorder_core.cpp | cxx_gt_to_ge | while (left > 0) {
+# gleichwertig: Ohne die Pause wartet der Schreib-Thread aktiv auf Daten; geschrieben werden dieselben
+# Frames in derselben Reihenfolge, nur mit mehr Rechenzeit.
+core/src/recorder_core.cpp | cxx_remove_void_call | std::this_thread::sleep_for(std::chrono::milliseconds(10));
+# gleichwertig: Gemessen, Mull schaltet diese Mutanten in Destruktoren nicht wirksam (Grenze des
+# Werkzeugs, docs/TESTS.md). Von Hand entfernt erkennen die Tests jeden: ohne close() in ~Capture
+# endet captureDestructorFinishesRecording mit std::terminate, ohne close() in ~WavFile scheitert
+# wavReleasesFileHandles (Grenze 64 offene Dateien), ohne uninit() in ~FrameRing steigt
+# ringReleasesMemory auf 1,38 GB (Speicherwächter 1024 MiB).
+core/src/recorder_core.cpp | cxx_remove_void_call | FrameRing::~FrameRing() { uninit(); }
+core/src/recorder_core.cpp | cxx_remove_void_call | WavFile::~WavFile() { close(); }
+core/src/recorder_core.cpp | cxx_remove_void_call | Capture::~Capture() { close(); }
+
 # ---- core/web/wp_core_web.cpp ----
 # Grenzfall: Eine Samplerate von genau 1 Hz (siehe «Gefundene Fehler» 21).
 core/web/wp_core_web.cpp | cxx_lt_to_le | if (sampleRate < 1)

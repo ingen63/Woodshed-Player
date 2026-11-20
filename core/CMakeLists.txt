@@ -150,6 +150,14 @@ target_link_libraries(wp_playercore PUBLIC wp_engine wp_miniaudio Threads::Threa
 wp_strict_warnings(wp_playercore)
 wp_mutate(wp_playercore)
 
+# #68: platform-independent part of the recording (ring buffer, writer thread, WAV file, level),
+# tested without an audio device; recorder_mac.mm only drives Core Audio.
+add_library(wp_reccore STATIC src/recorder_core.cpp)
+target_include_directories(wp_reccore PUBLIC include)
+target_link_libraries(wp_reccore PUBLIC wp_miniaudio Threads::Threads)
+wp_strict_warnings(wp_reccore)
+wp_mutate(wp_reccore)
+
 # Kern mit C-API (wp_core.h)
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(WP_RECORDER src/recorder_mac.mm)
@@ -159,6 +167,9 @@ endif()
 add_library(wp_core SHARED src/player.cpp ${WP_RECORDER})
 target_include_directories(wp_core PUBLIC include)
 target_link_libraries(wp_core PRIVATE wp_playercore)
+if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  target_link_libraries(wp_core PRIVATE wp_reccore)
+endif()
 set_target_properties(wp_core PROPERTIES CXX_VISIBILITY_PRESET hidden)
 wp_strict_warnings(wp_core)
 wp_mutate(wp_core)
@@ -201,6 +212,12 @@ target_compile_definitions(player_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRE
 wp_strict_warnings(player_tests)
 add_test(NAME player_tests COMMAND player_tests)
 
+# #68: recording without an audio device (ring buffer, WAV file, level, tap layouts)
+add_executable(recorder_tests tests/recorder_tests.cpp)
+target_link_libraries(recorder_tests PRIVATE wp_reccore)
+wp_strict_warnings(recorder_tests)
+add_test(NAME recorder_tests COMMAND recorder_tests)
+
 # #8: the C API (src/player.cpp) through the shared library, as the Dart binding calls it
 add_executable(capi_tests tests/capi_tests.cpp)
 target_link_libraries(capi_tests PRIVATE wp_core)
@@ -242,7 +259,7 @@ include(tests/fuzz/fuzz.cmake)
 # mutants_selftest checks that an endless loop with and without growing
 # memory ends as killed or timeout (#11/AK4).
 if(WP_MULL_PLUGIN)
-  set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests capi_tests
+  set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests recorder_tests capi_tests
     realtime_tests reference_tests fuzz_decoder_replay fuzz_capi_replay)
   foreach(t IN LISTS WP_MUTANT_TESTS)
     target_sources(${t} PRIVATE tests/mutants/memory_guard.cpp tests/mutants/mutant_switch.cpp)

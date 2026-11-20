@@ -36,6 +36,7 @@ List<(String, List<String>)> coreTestPrograms(String core) => [
   ('metronome_tests', []),
   ('waveform_tests', []),
   ('player_tests', []),
+  ('recorder_tests', []),
   ('capi_tests', ['--null-backend']),
   ('realtime_tests', []),
   ('reference_tests', ['--dump', '$core/build-mutants/reference_native.bin']),

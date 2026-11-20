@@ -2,7 +2,8 @@
 // Ablauf: Tap auf alle Prozesse ausser Woodshed Player -> private Aggregate-Device -> IOProc ->
 // Ringpuffer
 // -> Schreib-Thread -> WAV (float32). Ohne Berechtigung liefert macOS nur Stille
-// (wp_rec_only_silence).
+// (wp_rec_only_silence). Ring buffer, writer thread, WAV file and level are platform-independent
+// and tested without an audio device (recorder_core.cpp, #68); this file only drives Core Audio.
 #import <AudioToolbox/AudioToolbox.h>
 #import <CoreAudio/AudioHardwareTapping.h>
 #import <CoreAudio/CATapDescription.h>
@@ -10,14 +11,12 @@
 #import <Foundation/Foundation.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
-#include <cmath>
 #include <mutex>
 #include <string>
-#include <thread>
-#include <vector>
 
-#include "miniaudio_impl.hpp"
+#include "recorder_core.hpp"
 #include "wp_core.h"
 
 namespace {
@@ -27,9 +26,6 @@ struct Recorder {
   std::string error;
   OSStatus osStatus = noErr; // of the last failed start
   std::atomic<bool> recording{false};
-  std::atomic<bool> onlySilence{true};
-  std::atomic<float> peak{0.0f};
-  std::atomic<long long> frames{0};
   double sampleRate = 48000; // Takt des Aggregate-Devices (= Ausgabegerät), nicht das Tap-Format
   UInt32 tapChannels = 2;
   bool tapNonInterleaved = false;
@@ -39,12 +35,7 @@ struct Recorder {
   AudioDeviceIOProcID ioProc = nullptr;
   dispatch_queue_t queue = nullptr;
 
-  ma_pcm_rb ring{};
-  bool ringReady = false;
-  ma_encoder encoder{};
-  bool encoderReady = false;
-  std::thread writer;
-  std::atomic<bool> writerRun{false};
+  wp::rec::Capture capture; // ring buffer, writer thread, WAV file, level
 };
 
 Recorder &rec() {
@@ -52,7 +43,8 @@ Recorder &rec() {
   return r;
 }
 
-constexpr int kChannels = 2;
+// Input buffers handed to the core per callback; the tap buffers are the last ones.
+constexpr UInt32 kMaxBuffers = 64;
 
 template <typename T>
 OSStatus getProperty(AudioObjectID obj, AudioObjectPropertySelector sel, T &value,
@@ -73,67 +65,19 @@ int fail(Recorder &r, int code, const char *what, OSStatus st = noErr) {
   return code;
 }
 
-void writerLoop(Recorder *r) {
-  while (r->writerRun.load() || ma_pcm_rb_available_read(&r->ring) > 0) {
-    ma_uint32 n = 4096;
-    void *buf = nullptr;
-    if (ma_pcm_rb_acquire_read(&r->ring, &n, &buf) == MA_SUCCESS && n > 0) {
-      ma_encoder_write_pcm_frames(&r->encoder, buf, n, nullptr);
-      ma_pcm_rb_commit_read(&r->ring, n);
-    } else {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-  }
-}
-
-// Audio-Thread: Daten aus dem Tap (interleaved oder je Kanal ein Puffer) in den Ringpuffer.
+// Audio thread: the input buffer list goes to the core, which takes the tap data from its last
+// buffers.
 void onInput(Recorder *r, const AudioBufferList *in) {
   if (!in || in->mNumberBuffers == 0)
     return;
-  float tmp[1024 * kChannels];
-  // Hat das Ausgabegerät eigene Eingänge (z. B. ein Audio-Interface), liefert das Aggregate-Device
-  // deren Puffer zuerst; die Tap-Daten stehen in den letzten Puffern.
-  const bool interleaved = !r->tapNonInterleaved;
-  const UInt32 tapBuffers = interleaved ? 1 : std::min<UInt32>(r->tapChannels, in->mNumberBuffers);
-  const UInt32 first = in->mNumberBuffers - tapBuffers;
-  const AudioBuffer *buf = &in->mBuffers[first];
-  const UInt32 srcCh = interleaved ? std::max<UInt32>(1, buf[0].mNumberChannels) : tapBuffers;
-  const UInt32 total = buf[0].mDataByteSize / sizeof(float) / (interleaved ? srcCh : 1);
-
-  float peak = 0;
-  UInt32 done = 0;
-  while (done < total) {
-    const UInt32 n = std::min<UInt32>(1024, total - done);
-    for (UInt32 i = 0; i < n; ++i) {
-      for (int c = 0; c < kChannels; ++c) {
-        const UInt32 sc = std::min<UInt32>(c, srcCh - 1);
-        const float *src = interleaved
-                               ? static_cast<const float *>(buf[0].mData) + (done + i) * srcCh + sc
-                               : static_cast<const float *>(buf[sc].mData) + done + i;
-        tmp[i * kChannels + c] = *src;
-        peak = std::max(peak, std::fabs(*src));
-      }
-    }
-    // In den Ringpuffer schreiben (bei Überlauf gehen Frames verloren statt zu blockieren).
-    ma_uint32 left = n;
-    const float *p = tmp;
-    while (left > 0) {
-      ma_uint32 chunk = left;
-      void *dst = nullptr;
-      if (ma_pcm_rb_acquire_write(&r->ring, &chunk, &dst) != MA_SUCCESS || chunk == 0)
-        break;
-      std::memcpy(dst, p, chunk * kChannels * sizeof(float));
-      ma_pcm_rb_commit_write(&r->ring, chunk);
-      p += chunk * kChannels;
-      left -= chunk;
-    }
-    done += n;
+  const UInt32 count = std::min(kMaxBuffers, in->mNumberBuffers);
+  const UInt32 first = in->mNumberBuffers - count;
+  wp::rec::TapBuffer buffers[kMaxBuffers];
+  for (UInt32 i = 0; i < count; ++i) {
+    const AudioBuffer &b = in->mBuffers[first + i];
+    buffers[i] = {b.mNumberChannels, b.mDataByteSize, static_cast<const float *>(b.mData)};
   }
-  r->frames.fetch_add(total);
-  if (peak > r->peak.load())
-    r->peak.store(peak);
-  if (peak > 1e-4f)
-    r->onlySilence.store(false);
+  r->capture.push(buffers, count, {r->tapChannels, r->tapNonInterleaved});
 }
 
 void teardown(Recorder &r) API_AVAILABLE(macos(14.2)) {
@@ -149,15 +93,7 @@ void teardown(Recorder &r) API_AVAILABLE(macos(14.2)) {
     AudioHardwareDestroyProcessTap(r.tap);
   r.tap = kAudioObjectUnknown;
 
-  r.writerRun.store(false);
-  if (r.writer.joinable())
-    r.writer.join();
-  if (r.encoderReady)
-    ma_encoder_uninit(&r.encoder);
-  r.encoderReady = false;
-  if (r.ringReady)
-    ma_pcm_rb_uninit(&r.ring);
-  r.ringReady = false;
+  r.capture.close();
   r.recording.store(false);
 }
 
@@ -231,20 +167,12 @@ int startTap(Recorder &r, const char *path) API_AVAILABLE(macos(14.2)) {
     r.sampleRate = deviceRate;
   }
 
-  // 3. Ziel: Ringpuffer (2 s) und WAV-Datei.
-  if (ma_pcm_rb_init(ma_format_f32, kChannels, static_cast<ma_uint32>(r.sampleRate * 2), nullptr,
-                     nullptr, &r.ring) != MA_SUCCESS) {
+  // 3. Ziel: Ringpuffer (2 s), WAV-Datei und Schreib-Thread.
+  const int opened = r.capture.open(path, r.sampleRate);
+  if (opened == WP_REC_ERR_OUT_OF_MEMORY)
     return fail(r, WP_REC_ERR_OUT_OF_MEMORY, "No memory for the ring buffer");
-  }
-  r.ringReady = true;
-  ma_encoder_config ec = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, kChannels,
-                                                static_cast<ma_uint32>(r.sampleRate));
-  if (ma_encoder_init_file(path, &ec, &r.encoder) != MA_SUCCESS) {
+  if (opened != 0)
     return fail(r, WP_REC_ERR_FILE, "WAV file could not be created");
-  }
-  r.encoderReady = true;
-  r.writerRun.store(true);
-  r.writer = std::thread(writerLoop, &r);
 
   // 4. Starten. Beim ersten Mal fragt macOS hier nach der Berechtigung für Systemaudio.
   if (!r.queue)
@@ -285,9 +213,7 @@ int wp_rec_start(const char *wav_path) {
   if (!wav_path)
     return fail(r, WP_REC_ERR_INVALID_PATH, "No file path");
   if (@available(macOS 14.2, *)) {
-    r.frames.store(0);
-    r.peak.store(0);
-    r.onlySilence.store(true);
+    r.capture.meter().reset();
     int res = startTap(r, wav_path);
     if (res != 0) {
       teardown(r);
@@ -310,12 +236,12 @@ int wp_rec_is_recording(void) { return rec().recording.load() ? 1 : 0; }
 
 double wp_rec_seconds(void) {
   auto &r = rec();
-  return static_cast<double>(r.frames.load()) / r.sampleRate;
+  return static_cast<double>(r.capture.meter().frames()) / r.sampleRate;
 }
 
-float wp_rec_level(void) { return rec().peak.exchange(0.0f); }
+float wp_rec_level(void) { return rec().capture.meter().takeLevel(); }
 
-int wp_rec_only_silence(void) { return rec().onlySilence.load() ? 1 : 0; }
+int wp_rec_only_silence(void) { return rec().capture.meter().onlySilence() ? 1 : 0; }
 
 int wp_rec_os_status(void) { return static_cast<int>(rec().osStatus); }
 
