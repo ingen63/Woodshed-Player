@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <memory>
 #include <new>
+#include <stdexcept>
 #include <vector>
 
 #include "player_core.hpp"
@@ -147,6 +148,8 @@ int wp_web_pcm_begin(wp_player *p, int frames) {
     p->pendingFrames = frames;
     return WP_OK;
   } catch (const std::bad_alloc &) {
+    return WP_ERR_OUT_OF_MEMORY;
+  } catch (const std::length_error &) { // more samples than a vector can hold on 32-bit WASM
     return WP_ERR_OUT_OF_MEMORY;
   }
 }

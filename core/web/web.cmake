@@ -9,9 +9,14 @@ set(WP_ENGINE_SYSTEM_INCLUDES ${WP_THIRD_PARTY}/signalsmith-stretch/include ${WP
 # Im Browser nur Dekodieren: kein Audiogerät (das ist das AudioWorklet), keine Threads in miniaudio.
 set(WP_MINIAUDIO_DEFS MA_NO_DEVICE_IO MA_NO_THREADING)
 
+# Native WASM exceptions: without them Emscripten turns every throw (std::bad_alloc when memory runs
+# out) into abort(), and the catch branches of the core (WP_ERR_OUT_OF_MEMORY, fallbacks) never run.
+# Supported by all browsers the web app targets (Chrome 95, Firefox 100, Safari 15.2) and Node.js.
+set(WP_WASM_EXCEPTIONS -fwasm-exceptions)
+
 # ---- Tests unter Node.js ----
-set(WP_TEST_COMPILE -pthread -msimd128)
-set(WP_TEST_LINK -pthread -sPROXY_TO_PTHREAD -sEXIT_RUNTIME=1 -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1
+set(WP_TEST_COMPILE -pthread -msimd128 ${WP_WASM_EXCEPTIONS})
+set(WP_TEST_LINK ${WP_WASM_EXCEPTIONS} -pthread -sPROXY_TO_PTHREAD -sEXIT_RUNTIME=1 -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1
   -sINITIAL_MEMORY=128MB -sMAXIMUM_MEMORY=2GB -sSTACK_SIZE=1MB -sPTHREAD_POOL_SIZE=8 -Wno-pthreads-mem-growth)
 
 add_library(wp_engine STATIC ${WP_ENGINE_SOURCES})
@@ -62,8 +67,8 @@ if(WP_STRICT_WARNINGS)
     TARGET_DIRECTORY wp_core_web PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
 endif()
 target_compile_definitions(wp_core_web PRIVATE ${WP_MINIAUDIO_DEFS})
-target_compile_options(wp_core_web PRIVATE -msimd128 -O3)
-target_link_options(wp_core_web PRIVATE -O3 -sSTANDALONE_WASM --no-entry -sFILESYSTEM=0
+target_compile_options(wp_core_web PRIVATE -msimd128 -O3 ${WP_WASM_EXCEPTIONS})
+target_link_options(wp_core_web PRIVATE -O3 ${WP_WASM_EXCEPTIONS} -sSTANDALONE_WASM --no-entry -sFILESYSTEM=0
   -sINITIAL_MEMORY=64MB -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=2GB -sSTACK_SIZE=256KB)
 set_target_properties(wp_core_web PROPERTIES SUFFIX ".wasm")
 

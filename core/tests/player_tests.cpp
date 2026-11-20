@@ -778,14 +778,8 @@ void progressIsCompleteAfterLoad() {
 
 // #14/AK2, #61: if the loading thread cannot be started (no memory), the load reports
 // WP_ERR_OUT_OF_MEMORY, and the load state says so too.
-// #93/AK2: checked natively only. The WASM build cannot catch exceptions (Emscripten default), so
-// the std::bad_alloc thrown here aborts the test program instead of reaching the fallback. The
-// browser core (web/wp_core_web.cpp) has no loading thread anyway, so the case does not exist
-// there.
+// #93/AK2: runs in the WASM tests too; they are built with -fwasm-exceptions like the browser core.
 void loadThreadWithoutMemory() {
-#ifdef __EMSCRIPTEN__
-  std::printf("skip loadThreadWithoutMemory: no exception catching in the WASM build (#93)\n");
-#else
   const std::string file = writeIndexWav("no-thread.wav", 1000).string();
   wp::Player p(kSr);
   tFailAlloc = true;
@@ -794,7 +788,6 @@ void loadThreadWithoutMemory() {
   CHECK(r == wp::kErrOutOfMemory);
   CHECK(p.loadState() == wp::kErrOutOfMemory);
   CHECK(p.load(file) == wp::kOk); // afterwards loading works again
-#endif
 }
 
 // #76, #61: the metronome clicks at the rate of the player (unsupported rates: the lowest one).

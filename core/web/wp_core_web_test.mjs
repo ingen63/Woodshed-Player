@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   createCore, createDecoder, loadFile, WP_OK, WP_ERR_UNSUPPORTED_FORMAT, WP_ERR_INVALID_ARGUMENT,
+  WP_ERR_OUT_OF_MEMORY,
 } from './wp_core_web.mjs';
 
 const [wasmPath, audioDir] = process.argv.slice(2);
@@ -219,6 +220,18 @@ const tests = {
     check(core.beginPcm(new Float32Array(0)) === WP_ERR_INVALID_ARGUMENT, 'newer load replaces the unfinished one');
     check(core.pumpPcm() === WP_ERR_INVALID_ARGUMENT, 'unfinished one discarded');
     near(core.duration, 2.0, 1e-9, 'previous title stays playable');
+  },
+  // #93: running out of memory reports WP_ERR_OUT_OF_MEMORY instead of aborting the WASM core (it is
+  // built with -fwasm-exceptions); the previous title stays playable and loading works again.
+  async outOfMemoryIsReported() {
+    const core = await createCore(wasm, SR);
+    core.loadEncoded(indexWav(2 * SR));
+    const begin = (frames) => core.x.wp_web_pcm_begin(core.p, frames);
+    check(begin(300_000_000) === WP_ERR_OUT_OF_MEMORY, '2.4 GB title: out of memory'); // above 2 GB
+    check(begin(2 ** 31 - 1) === WP_ERR_OUT_OF_MEMORY, 'more samples than a vector holds: out of memory');
+    near(core.duration, 2.0, 1e-9, 'previous title stays playable');
+    check(core.loadPcm([new Float32Array(SR).fill(0.25)], SR) === WP_OK, 'loading works again');
+    near(core.duration, 1.0, 1e-9, 'new title loaded');
   },
 };
 
