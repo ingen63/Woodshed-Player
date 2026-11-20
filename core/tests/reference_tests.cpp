@@ -78,6 +78,7 @@ void record(const std::string &name, const std::vector<float> &samples) {
       return;
     }
     compared.insert(name);
+    // Same length native and WASM, e.g. 22 080 frames for tempo_2.0 (#94/AK3).
     CHECK(it->second.size() == samples.size());
     double maxDiff = 0;
     const size_t n = std::min(it->second.size(), samples.size());
@@ -1013,7 +1014,7 @@ int main(int argc, char **argv) {
   run("#9/AK2 loop seam over 100 passes (ramp)", loopSeamOver100Passes);
   run("#9/AK3 seek starts at round(t x rate)", seekStartsAtRoundedFrame);
   run("#9/AK3 pause and resume lose no frame", pauseAndResumeLoseNoFrame);
-  run("#9/AK4 tempo: length input / r, pitch 440 Hz", tempoLengthAndPitch);
+  run("#9/AK4 #94/AK2 #94/AK3 tempo: length input / r, pitch 440 Hz", tempoLengthAndPitch);
   run("#3/AK9 #9/AK5 120 BPM without drift over 5 min", metronomeWithoutDriftOverFiveMinutes);
   run("#3/AK7 #3/AK8 #9/AK5 accents and subdivisions", metronomeAccentsAndSubdivisions);
   run("#3/AK10 #3/AK11 #3/AK15 #3/AK18 #9/AK5 golden click positions of a fixed sequence",

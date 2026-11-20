@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <random>
 
 #include "signalsmith-stretch/signalsmith-stretch.h"
 
@@ -13,8 +14,11 @@ constexpr int kChunk = 4096; // grösster Block pro process()-Aufruf
 }
 
 struct Engine::Stretch {
-  // Fester Startwert: gleiche Eingabe ergibt gleiche Ausgabe (Tests, Golden-Dateien).
-  signalsmith::stretch::SignalsmithStretch<float> s{42};
+  // Fixed seed: the same input gives the same output (tests, golden files). The engine is named
+  // (#94): the default std::default_random_engine is implementation-defined, minstd_rand in libc++
+  // (macOS, iOS, Emscripten) but minstd_rand0 in libstdc++ (Linux), so native Linux and WASM
+  // stretched differently.
+  signalsmith::stretch::SignalsmithStretch<float, std::minstd_rand> s{42};
   std::vector<float *> in, out;
   std::vector<float> seekBuf;
 };

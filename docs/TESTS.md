@@ -1177,3 +1177,18 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     chrome`, das die Schriften nicht wie die gebaute App lädt. Regressionstest: `make test-web-start`
     (`app/tool/web_start_check.dart`) und «#72/AK2 pubspec declares Roboto as an alias …»
     (`web_start_check_test.dart`).
+27. 20.11.2026, #94 (aus #77): Im ersten Lauf des Jobs `contract` wichen die Tempo-Fälle zwischen dem nativen Kern
+    unter Linux x86_64 und dem WASM-Kern ab (`tempo_0.1` 9,83e-01, `tempo_0.5` 1,07e-02, `tempo_2.0` 2,17e-03). Die
+    Länge stimmte (bei 2,0× beide 22 080 Frames; 22 050 ist der erwartete Wert der Prüfung ± 1 %). Ursache 1, belegt:
+    `SignalsmithStretch<float>` würfelt mit `std::default_random_engine`, und den legt jede Standardbibliothek selbst
+    fest: `minstd_rand` (Faktor 48271) in libc++ (macOS, iOS, Emscripten), `minstd_rand0` (16807) in libstdc++
+    (Linux). Gleicher Startwert 42, andere Zahlenfolge. Nachgestellt auf macOS mit Clang und den Headern von libstdc++
+    (Homebrew GCC 14): genau 9,83e-01 und 1,07e-02. Der Kern nennt den Generator jetzt selbst
+    (`SignalsmithStretch<float, std::minstd_rand>`, `core/src/engine.cpp`); die Ausgabe unter macOS bleibt bitgleich,
+    der libstdc++-Bau ist danach in allen Tempo-Fällen bitgleich zu libc++. x86_64 unter Rosetta war schon vorher
+    bitgleich zu arm64, die Architektur spielt keine Rolle. Ursache 2, nur mittelbar belegt: Der Stretch reagiert auf
+    1 ulp in `sincosf`. Setzt man die 168 von 320 532 Ergebnissen, die Apples libm nicht korrekt rundet, auf den korrekt
+    gerundeten Wert, weicht `tempo_2.0` um 1,99e-03 ab. musl (Emscripten) liefert dieselben Werte wie Apple, glibc
+    rechnet `sincosf` mit einem eigenen Verfahren; das erklärt wahrscheinlich den Rest bei 2,0×. Lokal ohne Linux nicht
+    nachstellbar; der nächste Lauf von `contract` zeigt es. Test: Vertragsfälle «#9/AK4 #94/AK2 #94/AK3 tempo …» in
+    `reference_tests.cpp`.
