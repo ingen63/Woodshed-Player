@@ -112,6 +112,11 @@ String libraryMessageText(AppLocalizations l, LibraryMessage m) => switch (m) {
   TrackNotOnDevice(:final title) => l.trackNotOnDevice(title),
   CloudStateUnreadable() => l.cloudStateUnreadable,
   CloudStateTooNew() => l.cloudStateTooNew,
+  CloudStateRestored() => l.cloudStateRestored,
+  CloudStateOverwritten() => l.cloudStateOverwritten,
+  CloudStateReadableAgain() => l.cloudStateReadableAgain,
+  CloudStateNoBackup() => l.cloudStateNoBackup,
+  CloudStateRepairFailed() => l.cloudStateRepairFailed,
 };
 
 String sortOrderLabel(AppLocalizations l, TrackSortOrder o) => switch (o) {

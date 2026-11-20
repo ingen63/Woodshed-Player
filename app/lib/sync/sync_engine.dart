@@ -24,6 +24,11 @@ class SyncTooNew implements Exception {
   final int version;
 }
 
+/// `state.json` in the cloud is damaged: the sync waits for the user's choice (#65).
+class _StateDamaged implements Exception {
+  const _StateDamaged();
+}
+
 /// A task of the queue: `state`, `up:<hash>`, `down:<hash>` or `rm:<hash>`.
 class SyncTask {
   SyncTask(this.key);
@@ -53,6 +58,9 @@ class CloudSync extends SyncService {
   static const stateName = 'state.json';
   static const backupCount = 5;
   static String backupName(int n) => 'backup/state-$n.json';
+
+  /// Where a repair keeps the damaged `state.json` before replacing it (#65).
+  static const damagedName = 'backup/state-damaged.json';
 
   final CloudProvider provider;
   final Library library;
@@ -146,7 +154,8 @@ class CloudSync extends SyncService {
       await _once();
     } while (_again &&
         _status != SyncStatus.offline &&
-        _status != SyncStatus.tooNew);
+        _status != SyncStatus.tooNew &&
+        _status != SyncStatus.damaged);
   }
 
   Future<void> _once() async {
@@ -176,6 +185,9 @@ class CloudSync extends SyncService {
       _setStatus(SyncStatus.offline);
     } on SyncTooNew {
       _setStatus(SyncStatus.tooNew);
+    } on _StateDamaged {
+      // #65: no automatic retry; the user chooses how to repair (start, foreground and changes still look).
+      _setStatus(SyncStatus.damaged);
     }
   }
 
@@ -224,6 +236,8 @@ class CloudSync extends SyncService {
       } on CloudOffline {
         rethrow;
       } on SyncTooNew {
+        rethrow;
+      } on _StateDamaged {
         rethrow;
       } catch (e) {
         task.lastError = e;
@@ -317,20 +331,36 @@ class CloudSync extends SyncService {
     throw CloudError('state.json: $maxConflicts conflicts in a row');
   }
 
-  /// Reads `state.json` and checks it before anything is merged (#10/AK7): a damaged file (not JSON, other
-  /// types, missing stamps, numbers beyond a double, stamps out of range, records the app cannot show)
-  /// leaves the library untouched. The user gets one message per damaged version, the sync stops with an
-  /// error and is retried. A newer format version stops the sync ([SyncTooNew]).
+  /// Reads `state.json` and checks it before anything is merged (#10/AK7): a damaged file leaves the
+  /// library untouched. The user gets one message per damaged version and the sync waits for a repair
+  /// ([repairCloudState], #65). A newer format version stops the sync ([SyncTooNew]).
   (SharedState, int) _readState(CloudFile remote) {
     try {
-      final j = jsonDecode(utf8.decode(remote.bytes));
+      return _decodeState(remote.bytes);
+    } on SyncTooNew catch (e) {
+      if (_reported != remote.version) {
+        library.report(CloudStateTooNew(e.version));
+      }
+      _reported = remote.version;
+      rethrow;
+    } on FormatException {
+      if (_reported != remote.version) {
+        library.report(const CloudStateUnreadable());
+      }
+      _reported = remote.version;
+      throw const _StateDamaged();
+    }
+  }
+
+  /// Decodes and checks a `state.json` (or a backup of it): not JSON, other types, missing stamps, numbers
+  /// beyond a double, stamps out of range or records the app cannot show give a [FormatException]; a newer
+  /// format version gives [SyncTooNew].
+  static (SharedState, int) _decodeState(Uint8List bytes) {
+    try {
+      final j = jsonDecode(utf8.decode(bytes));
       if (j is! Map) throw const FormatException('not an object');
       final v = j['formatVersion'];
-      if (v is int && v > SharedState.formatVersion) {
-        if (_reported != remote.version) library.report(CloudStateTooNew(v));
-        _reported = remote.version;
-        throw SyncTooNew(v);
-      }
+      if (v is int && v > SharedState.formatVersion) throw SyncTooNew(v);
       if (v != SharedState.formatVersion || !isFiniteJson(j)) {
         throw const FormatException('format version or numbers');
       }
@@ -347,13 +377,98 @@ class CloudSync extends SyncService {
       return (state, g is int && g >= 0 && g <= Hlc.maxCounter ? g : 0);
     } on SyncTooNew {
       rethrow;
+    } on FormatException {
+      rethrow;
     } catch (e) {
-      if (_reported != remote.version) {
-        library.report(const CloudStateUnreadable());
-      }
-      _reported = remote.version;
-      throw CloudError('state.json unreadable: $e');
+      throw FormatException('state.json unreadable: $e');
     }
+  }
+
+  @override
+  Future<CloudRepairResult> repairCloudState(CloudStateRepair how) async {
+    if (_disposed || library.readOnly) return CloudRepairResult.failed;
+    // one thing at a time: wait for a running sync, keep new ones waiting (they follow below)
+    for (var r = _running; r != null; r = _running) {
+      try {
+        await r;
+      } catch (_) {
+        // that sync's own problem; the repair looks for itself
+      }
+    }
+    final done = Completer<void>();
+    _running = done.future;
+    _changeTimer?.cancel();
+    var result = CloudRepairResult.failed;
+    try {
+      result = await _repair(how);
+    } catch (_) {
+      // offline, server error: nothing was replaced, this device keeps everything
+    } finally {
+      _running = null;
+      done.complete();
+    }
+    final repaired =
+        result != CloudRepairResult.failed &&
+        result != CloudRepairResult.noBackup;
+    if (repaired) {
+      _queue.remove('state');
+      _offline = 0;
+    }
+    if (repaired || _again) {
+      _again = false;
+      await sync();
+    }
+    return result;
+  }
+
+  /// #65: replaces a damaged `state.json`, conditionally on the damaged version. The damaged file is kept
+  /// under [damagedName]. Data on this device are never lost: way 1 merges the last valid backup into the
+  /// library (stamps per field, as any sync), way 2 writes the library as it is.
+  Future<CloudRepairResult> _repair(CloudStateRepair how) async {
+    for (var i = 0; i < maxConflicts; i++) {
+      final remote = await provider.get(stateName);
+      if (remote == null) return CloudRepairResult.notDamaged;
+      try {
+        _decodeState(remote.bytes);
+        // repaired elsewhere in the meantime
+        return CloudRepairResult.notDamaged;
+      } on SyncTooNew {
+        return CloudRepairResult.notDamaged; // the normal sync reports it
+      } on FormatException {
+        // damaged: repair below
+      }
+      // the last valid state: the backup with the highest generation the app can read
+      (SharedState, int)? last;
+      for (var n = 1; n <= backupCount; n++) {
+        final f = await provider.get(backupName(n));
+        if (f == null) continue;
+        try {
+          final b = _decodeState(f.bytes);
+          if (last == null || b.$2 > last.$2) last = b;
+        } on Object {
+          continue; // a damaged or newer backup is skipped
+        }
+      }
+      if (how == CloudStateRepair.restoreBackup) {
+        if (last == null) return CloudRepairResult.noBackup;
+        await library.mergeRemote(last.$1);
+      }
+      library.flush();
+      await provider.put(damagedName, remote.bytes);
+      try {
+        await provider.put(
+          stateName,
+          encodeState(library.state, (last?.$2 ?? 0) + 1),
+          ifVersion: remote.version,
+        );
+      } on VersionConflict {
+        continue; // someone else wrote in between: look again
+      }
+      return how == CloudStateRepair.restoreBackup
+          ? CloudRepairResult.restored
+          : CloudRepairResult.overwritten;
+    }
+    return CloudRepairResult.failed;
   }
 
   /// Version of `state.json` already reported as damaged or too new: one message per version.

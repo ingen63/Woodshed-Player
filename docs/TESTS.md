@@ -143,6 +143,7 @@ zugeordnet.
 | «Nicht hochladen» und «Synchronisieren» im Kontextmenü | vorhanden: `sync_test.dart` (#37/AK5), `sync_app_test.dart` (#37/AK5) | – |
 | Zufallsfolgen auf 2–4 Geräten: gleicher Stand, zweiter Abgleich ändert nichts, kein Verlust | vorhanden: `property/sync_property_test.dart` (#10/AK6) | – |
 | Verfälschte Sync-Dateien aus der Cloud ohne Absturz und ohne Datenverlust, mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7) | – |
+| Beschädigte `state.json` wiederherstellen: Sicherung aus `backup/` oder Stand des Geräts, ohne lokalen Verlust | vorhanden: `cloud_repair_test.dart` (#65/AK1–AK3), `property/sync_property_test.dart` (#65/AK4) | – |
 | Zusammenführen von 10'000 Titeln ≤ 2 s | vorhanden, nächtlich: `app/bench/library_bench_test.dart` (#59/AK3), `make bench` | – |
 | Nur die Anbietermodule (`app/lib/sync/providers/`) öffnen Verbindungen, keine Analyse- oder Werbepakete, kein Netzwerk im Kern | vorhanden: `make network-free`, `app/tool/network_free_test.dart` (#58) | – |
 | Anbieter Google Drive, OneDrive, direkte Verbindung | Lücke (noch nicht umgesetzt) | #54, #55, #56 |
@@ -472,9 +473,15 @@ riesige Texte), fremde Versionsnummer, fehlende oder unsinnige Stempel, abgeschn
   lädt ohne Meldung gleich wieder. Unbrauchbare Dateien prüft die Sync-Engine vor dem Zusammenführen
   (`CloudSync._readState`): Version genau 2, keine Zahl ausserhalb des Bereichs eines double, Stempel lesbar und im
   Bereich, jeder Datensatz darstellbar. Sonst bleibt die Bibliothek unberührt, die Datei in der Cloud ebenso, der
-  Abgleich scheitert und wird wiederholt, und die Meldung «Bibliothek in der Cloud beschädigt» bzw. «neuere
+  Abgleich wartet (Status `damaged`, ohne automatische Wiederholung) auf die Wahl der Reparatur (#65), und die Meldung «Bibliothek in der Cloud beschädigt» bzw. «neuere
   Version» erscheint einmal je Version der Datei. Stand 19.11.2026 bei 2 × 1000 Fällen: rund 69 % abgewiesen, 28 %
   noch gültig und übernommen, 3 % neuere Version.
+- `sync_property_test.dart` (#65/AK4): A gleicht mehrmals ab (Sicherungen unter `backup/`), B hat eigene Titel. Die
+  `state.json` wird so verfälscht, dass sie unbrauchbar ist (geprüft auf einem Wegwerf-Gerät), manche oder alle
+  Sicherungen ebenso; manchmal bricht vor der Reparatur die Verbindung ab. B wählt zufällig einen Weg (ohne gültige
+  Sicherung danach «Dieses Gerät verwenden»). Danach behält B jeden eigenen Titel unverändert samt Audiodatei, lädt
+  ohne Meldung wieder, und A und B kommen auf denselben Stand, ohne dass ein Titel verloren geht. Stand 20.11.2026
+  bei 3 × 90 Fällen: rund 52 % ersetzt, 43 % aus der Sicherung, 5 % ohne gültige Sicherung.
 - Kern (AK3): `player_tests.cpp` (`truncatedAndWrongAudioFiles`) schneidet WAV, FLAC und MP3 an 10 Stellen ab
   (leer, Teil des Kopfs, nur Kopf, Teile der Daten) und lädt falsche Inhalte hinter bekannten Endungen: Ergebnis ist
   immer der lesbare Teil oder `WP_ERR_UNSUPPORTED_FORMAT` (in der App «Format nicht unterstützt», `loadUnsupported`),
@@ -548,8 +555,8 @@ neue Golden-Datei.
 
 **Grenzen.** Der nächtliche Fuzz- und Zufallslauf lässt sich erst nach dem Push beobachten; lokal belegt sind
 `make fuzz` (60 s je Ziel), `make fuzz-wasm` und `make property` mit bis zu 2000 Fällen. libFuzzer selbst läuft
-nicht unter WebAssembly; dort werden nur die nativ gefundenen Eingaben nachgespielt (#67). Eine beschädigte `state.json` bleibt in der Cloud liegen, bis ein Gerät sie ersetzt; eine Wiederherstellung
-aus `backup/` gibt es noch nicht.
+nicht unter WebAssembly; dort werden nur die nativ gefundenen Eingaben nachgespielt (#67). Eine beschädigte `state.json` bleibt in der Cloud liegen, bis die Nutzerin oder der Nutzer
+eine Reparatur wählt (#65).
 
 ## Netzwerkfreiheit (#58)
 

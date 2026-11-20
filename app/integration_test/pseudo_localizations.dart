@@ -336,6 +336,22 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get cloudStateTooNew => pseudo(super.cloudStateTooNew);
   @override
+  String get cloudStateRestoreBackup => pseudo(super.cloudStateRestoreBackup);
+  @override
+  String get cloudStateOverwrite => pseudo(super.cloudStateOverwrite);
+  @override
+  String get cloudStateLater => pseudo(super.cloudStateLater);
+  @override
+  String get cloudStateRestored => pseudo(super.cloudStateRestored);
+  @override
+  String get cloudStateOverwritten => pseudo(super.cloudStateOverwritten);
+  @override
+  String get cloudStateReadableAgain => pseudo(super.cloudStateReadableAgain);
+  @override
+  String get cloudStateNoBackup => pseudo(super.cloudStateNoBackup);
+  @override
+  String get cloudStateRepairFailed => pseudo(super.cloudStateRepairFailed);
+  @override
   String trackNotOnDevice(String title) =>
       pseudo(super.trackNotOnDevice(title));
   @override

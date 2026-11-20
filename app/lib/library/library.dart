@@ -66,6 +66,31 @@ class CloudStateUnreadable extends LibraryMessage {
   const CloudStateUnreadable();
 }
 
+/// #65: the damaged `state.json` was restored from the last valid backup and merged with this device.
+class CloudStateRestored extends LibraryMessage {
+  const CloudStateRestored();
+}
+
+/// #65: the damaged `state.json` was replaced with the state of this device.
+class CloudStateOverwritten extends LibraryMessage {
+  const CloudStateOverwritten();
+}
+
+/// #65: `state.json` was readable again when the repair started; the sync goes on.
+class CloudStateReadableAgain extends LibraryMessage {
+  const CloudStateReadableAgain();
+}
+
+/// #65: no valid backup in `backup/`; only overwriting with this device's state is left.
+class CloudStateNoBackup extends LibraryMessage {
+  const CloudStateNoBackup();
+}
+
+/// #65: the repair did not get through (no connection, conflicts); this device keeps everything.
+class CloudStateRepairFailed extends LibraryMessage {
+  const CloudStateRepairFailed();
+}
+
 /// `state.json` in the cloud was written by a newer app ([version]); nothing is synced (#10/AK7).
 class CloudStateTooNew extends LibraryMessage {
   const CloudStateTooNew(this.version);

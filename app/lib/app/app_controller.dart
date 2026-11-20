@@ -39,6 +39,18 @@ class AppController extends ChangeNotifier {
   /// App back in the foreground (trigger «resume», #37).
   void resumed() => sync.resumed();
 
+  /// #65: repairs a damaged `state.json` in the cloud as the user chose and shows the outcome.
+  Future<void> repairCloudState(CloudStateRepair how) async {
+    final result = await sync.repairCloudState(how);
+    _show(switch (result) {
+      CloudRepairResult.restored => const CloudStateRestored(),
+      CloudRepairResult.overwritten => const CloudStateOverwritten(),
+      CloudRepairResult.notDamaged => const CloudStateReadableAgain(),
+      CloudRepairResult.noBackup => const CloudStateNoBackup(),
+      CloudRepairResult.failed => const CloudStateRepairFailed(),
+    });
+  }
+
   /// Message for a dialog (error or result); the UI words and shows it, then calls [clearMessage].
   LibraryMessage? message;
 

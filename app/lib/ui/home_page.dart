@@ -7,8 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app/app_controller.dart';
+import '../library/library.dart' show CloudStateNoBackup, CloudStateUnreadable;
 import '../metronome/metronome_panel.dart';
 import '../metronome/practice_shortcuts.dart';
+import '../sync/sync_service.dart' show CloudStateRepair;
 import 'about_dialog.dart';
 import 'library_view.dart';
 import 'messages.dart';
@@ -93,12 +95,40 @@ class _HomePageState extends State<HomePage> {
             libraryMessageText(context.l10n, m),
             key: const Key('message'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(context.l10n.ok),
-            ),
-          ],
+          actions: switch (m) {
+            // #65: damaged state.json: restoring the backup is the suggested way, overwriting the second
+            CloudStateUnreadable() || CloudStateNoBackup() => [
+              TextButton(
+                key: const Key('cloudStateLater'),
+                onPressed: () => Navigator.pop(context),
+                child: Text(context.l10n.cloudStateLater),
+              ),
+              TextButton(
+                key: const Key('cloudStateOverwrite'),
+                onPressed: () {
+                  Navigator.pop(context);
+                  c.repairCloudState(CloudStateRepair.overwriteWithLocal);
+                },
+                child: Text(context.l10n.cloudStateOverwrite),
+              ),
+              if (m is CloudStateUnreadable)
+                FilledButton(
+                  key: const Key('cloudStateRestoreBackup'),
+                  autofocus: true,
+                  onPressed: () {
+                    Navigator.pop(context);
+                    c.repairCloudState(CloudStateRepair.restoreBackup);
+                  },
+                  child: Text(context.l10n.cloudStateRestoreBackup),
+                ),
+            ],
+            _ => [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(context.l10n.ok),
+              ),
+            ],
+          },
         ),
       );
     });

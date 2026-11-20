@@ -19,6 +19,36 @@ enum SyncStatus {
 
   /// The cloud holds a newer format than this app writes; nothing is written.
   tooNew,
+
+  /// `state.json` in the cloud is damaged; syncing waits for the user's choice ([SyncService.repairCloudState]).
+  damaged,
+}
+
+/// How to repair a damaged `state.json` (#65).
+enum CloudStateRepair {
+  /// Restore the last valid state from `backup/` and merge it with this device (suggested first).
+  restoreBackup,
+
+  /// Replace it with the state of this device.
+  overwriteWithLocal,
+}
+
+/// Outcome of [SyncService.repairCloudState].
+enum CloudRepairResult {
+  /// Restored from the last valid backup, merged with this device and written.
+  restored,
+
+  /// Replaced with the state of this device.
+  overwritten,
+
+  /// `state.json` is readable again (or missing); the normal sync goes on.
+  notDamaged,
+
+  /// No valid backup; only [CloudStateRepair.overwriteWithLocal] is left.
+  noBackup,
+
+  /// Not repaired (no connection, conflicts); nothing on this device was lost.
+  failed,
 }
 
 abstract class SyncService extends ChangeNotifier {
@@ -35,6 +65,10 @@ abstract class SyncService extends ChangeNotifier {
 
   /// Syncs now, also retrying files that gave up (button «Sync now», #40).
   Future<void> syncNow();
+
+  /// Repairs a damaged `state.json` in the cloud ([SyncStatus.damaged], #65). Data on this device are
+  /// never lost: the backup is merged with them, never put in their place.
+  Future<CloudRepairResult> repairCloudState(CloudStateRepair how);
 
   /// The audio file of the track is in the cloud (as far as the last sync knows).
   bool inCloud(String trackId);
@@ -56,6 +90,9 @@ class NoSync extends SyncService {
   void localChanged() {}
   @override
   Future<void> syncNow() async {}
+  @override
+  Future<CloudRepairResult> repairCloudState(CloudStateRepair how) async =>
+      CloudRepairResult.failed;
   @override
   bool inCloud(String trackId) => false;
   @override

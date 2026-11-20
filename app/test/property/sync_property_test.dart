@@ -6,6 +6,9 @@
 // - AK7: a damaged `state.json` in the cloud (foreign version number, missing stamps, changed types,
 //   extreme values, truncated) never crashes the sync and never loses local data; the user gets an
 //   understandable message (in every language) when it cannot be used.
+// - #65/AK4: both repairs of a damaged `state.json` (restore the last valid backup, overwrite with this
+//   device), with damaged backups and dropped connections, never lose local data and bring the devices
+//   together again.
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -15,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/sync/in_memory_provider.dart';
 import 'package:woodshed_player/sync/sync_engine.dart';
+import 'package:woodshed_player/sync/sync_service.dart';
 import 'package:woodshed_player/ui/messages.dart';
 
 import '../fakes.dart';
@@ -58,6 +62,16 @@ class Device {
 }
 
 Map<String, Object?> stateJson(Library l) => l.state.toJson();
+
+/// A device with an empty library can use this `state.json` (scratch cloud, nothing else touched).
+Future<bool> usable(Uint8List bytes) async {
+  final cloud = InMemoryProvider()..putDirect(CloudSync.stateName, bytes);
+  final d = Device('scratch', cloud, Random(0), const {});
+  await d.library.load();
+  await d.sync.sync();
+  d.sync.dispose();
+  return d.sync.status != SyncStatus.damaged;
+}
 
 /// The same contents in every device's pool: the same file gives the same track ID everywhere.
 Map<String, Uint8List> pool(int n) => {
@@ -340,6 +354,139 @@ void main() {
     tearDownAll(() {
       // ignore: avoid_print
       print('damaged state.json: $outcomes');
+    });
+  });
+
+  group('#65/AK4 repairing a damaged state.json', () {
+    final outcomes = <String, int>{};
+    property('both ways never lose local data and the devices converge again', (
+      r,
+    ) async {
+      clock = DateTime.utc(2026, 11, 1);
+      final cloud = InMemoryProvider();
+      final sources = pool(8);
+      final a = Device('a', cloud, r, sources);
+      final b = Device('b', cloud, r, sources);
+      await a.library.load();
+      await b.library.load();
+      // a: several syncs, so backup/ holds states; b: its own tracks, never synced
+      for (final p in ['p0.mp3', 'p1.mp3', 'p2.mp3', 'p3.mp3']) {
+        if (r.nextBool() || a.library.tracks.isEmpty) {
+          await a.library.importFiles([p]);
+        }
+        if (r.nextBool() && a.library.tracks.isNotEmpty) {
+          a.library.editMetadata(
+            pick(r, a.library.tracks).id,
+            title: randomText(r),
+          );
+        }
+        clock = clock.add(const Duration(seconds: 1));
+        await a.sync.sync();
+      }
+      await b.library.importFiles([
+        for (final p in ['p4.mp3', 'p5.mp3', 'p6.mp3', 'p7.mp3'])
+          if (r.nextBool()) p,
+        'p4.mp3',
+      ]);
+      if (r.nextBool()) {
+        b.library.updateSettings(b.library.tracks.first.id, randomSettings(r));
+      }
+      final ids = [
+        ...a.library.tracks.map((t) => t.id),
+        ...b.library.tracks.map((t) => t.id),
+      ];
+      // damage state.json so that it is unusable (checked on a scratch device, so nothing usable is
+      // merged on the way), and sometimes some or all backups too
+      final state = jsonDecode(utf8.decode(cloud.files[CloudSync.stateName]!));
+      Uint8List? bad;
+      var damage = '';
+      for (var i = 0; i < 20 && bad == null; i++) {
+        final (bytes, d) = corrupt(r, state, ids: ids);
+        if (!await usable(bytes)) {
+          bad = bytes;
+          damage = '$d';
+        }
+      }
+      if (bad == null) return; // every damage was still usable (#10/AK7)
+      cloud.putDirect(CloudSync.stateName, bad);
+      clock = clock.add(const Duration(seconds: 1));
+      await b.sync.sync();
+      expect(b.sync.status, SyncStatus.damaged, reason: damage);
+      for (var n = 1; n <= CloudSync.backupCount; n++) {
+        if (cloud.files[CloudSync.backupName(n)] case final f?
+            when r.nextInt(3) == 0) {
+          // unusable for sure: the damaged state itself or the backup cut short
+          cloud.putDirect(
+            CloudSync.backupName(n),
+            r.nextBool() ? bad : f.sublist(0, r.nextInt(f.length)),
+          );
+        }
+      }
+      final mineB = {for (final t in b.library.tracks) t.id: t.toShared()};
+      final mineA = {for (final t in a.library.tracks) t.id: t.toShared()};
+      final what = 'damage $damage';
+
+      // sometimes the connection drops first: nothing changes, the user tries again
+      if (r.nextInt(4) == 0) {
+        cloud.offline = true;
+        final how = pick(r, CloudStateRepair.values);
+        expect(
+          await b.sync.repairCloudState(how),
+          CloudRepairResult.failed,
+          reason: what,
+        );
+        cloud.offline = false;
+      }
+      final how = pick(r, CloudStateRepair.values);
+      var result = await b.sync.repairCloudState(how);
+      final key = '${how.name}: ${result.name}';
+      outcomes[key] = (outcomes[key] ?? 0) + 1;
+      if (result == CloudRepairResult.noBackup) {
+        result = await b.sync.repairCloudState(
+          CloudStateRepair.overwriteWithLocal,
+        );
+      }
+      expect(result, isNot(CloudRepairResult.failed), reason: what);
+      expect(b.sync.status, isNot(SyncStatus.damaged), reason: what);
+
+      // b keeps every own track unchanged (a backup only adds what b has not seen)
+      for (final e in mineB.entries) {
+        expect(
+          b.library.track(e.key)?.toShared(),
+          e.value,
+          reason: 'local track changed or lost ($how): $what',
+        );
+      }
+      final again = b.open();
+      await again.load();
+      expect(again.lastError, isNull, reason: what);
+      expect(
+        {for (final t in again.tracks) t.id: t.toShared()},
+        {for (final t in b.library.tracks) t.id: t.toShared()},
+        reason: what,
+      );
+      // the cloud is readable again; a and b converge and keep all their tracks
+      clock = clock.add(const Duration(seconds: 1));
+      await a.sync.sync();
+      await b.sync.sync();
+      await a.sync.sync();
+      expect(a.sync.status, SyncStatus.idle, reason: what);
+      expect(b.sync.status, SyncStatus.idle, reason: what);
+      expect(stateJson(a.library), stateJson(b.library), reason: what);
+      for (final e in mineA.entries) {
+        expect(a.library.track(e.key)?.toShared(), e.value, reason: what);
+      }
+      for (final id in [...mineA.keys, ...mineB.keys]) {
+        expect(b.library.track(id), isNotNull, reason: 'lost $id: $what');
+        expect(b.library.hasFile(id), isTrue, reason: 'audio of $id: $what');
+      }
+      a.sync.dispose();
+      b.sync.dispose();
+    }, scale: 0.3);
+
+    tearDownAll(() {
+      // ignore: avoid_print
+      print('repairs: $outcomes');
     });
   });
 }
