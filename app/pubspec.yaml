@@ -89,6 +89,12 @@ flutter:
           weight: 500
         - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Bold.ttf
           weight: 700
+    # Flutter's web engine downloads Roboto as its default fallback unless the app declares a family
+    # of that name (#72). The alias points to Inter, so the web app needs no extra font file and makes
+    # no request for it; the app itself always asks for Inter.
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/inter/Inter-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

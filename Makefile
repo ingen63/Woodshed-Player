@@ -4,7 +4,7 @@
 .PHONY: help test test-core test-wasm test-app test-hook test-tools format format-check lint lint-dart \
         lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
         mutants-diff fuzz report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
-        test-ui test-web smoke-app pseudo-l10n bench
+        test-ui test-web test-web-start smoke-app pseudo-l10n bench
 
 SHELL := /bin/bash
 # A failing build must not be hidden by `| tail` (GNU Make 3.81 on macOS has no .SHELLFLAGS).
@@ -48,6 +48,7 @@ help:
 	@echo "make network-free   no network code outside the provider modules, blocked packages, core, CSP"
 	@echo "make test-ui        UI tests with the real core on macOS (integration_test)"
 	@echo "make test-web       web tests in Chrome: OPFS and the WASM core (needs Emscripten)"
+	@echo "make test-web-start the built web app starts without failed requests or console errors"
 	@echo "make smoke-app      builds the macOS app (release) and runs its smoke test"
 	@echo "make pseudo-l10n    regenerates the pseudo language of the UI tests after an ARB change"
 	@echo "make bench          performance and load tests of core and library (nightly, not in make test)"
@@ -88,7 +89,8 @@ test-app:
 # Tests of the tools in staged git repositories with fake tools: the hook after a commit (#7/AK7),
 # coverage check and diff, pre-push hook (#8/AK6)
 TOOL_TESTS = tool/after_commit_hook_test.dart tool/coverage_test.dart tool/pre_push_hook_test.dart \
-             tool/network_free_test.dart tool/mutants_test.dart tool/report/report_test.dart
+             tool/network_free_test.dart tool/mutants_test.dart tool/report/report_test.dart \
+             tool/web_start_check_test.dart
 test-tools:
 	@$(QA_DIRS)
 	cd app && flutter test --reporter failures-only $(call FLUTTER_JSON,tools) $(TOOL_TESTS)
@@ -239,6 +241,13 @@ test-web:
 	mkdir -p app/test/web/wp_core && cp app/web/wp_core/* app/test/web/wp_core/
 	cd app && CHROME_EXECUTABLE="$(CURDIR)/tools/chrome_autoplay.sh" \
 	  flutter test --platform chrome --reporter failures-only test/web/
+	$(MAKE) --no-print-directory test-web-start
+
+# #72/AK3: the built web app starts in headless Chrome without failed requests, foreign hosts or
+# console errors (app/tool/web_start_check.dart). Needs the WASM core in app/web/wp_core/.
+test-web-start:
+	cd app && $(PIPEFAIL) flutter build web --no-wasm-dry-run 2>&1 | tail -1
+	cd app && dart tool/web_start_check.dart build/web
 
 # #13/AK5: smoke test of the built app (release): start, play a generated file, exit code 0.
 smoke-app:

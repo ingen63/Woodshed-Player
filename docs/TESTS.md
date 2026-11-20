@@ -128,6 +128,7 @@ zugeordnet.
 | Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6), jede Funktion der C-API in einem Referenzfall | vorhanden: `reference_tests` (nativ `--dump`, WASM `--compare`), `reference_api_coverage` (#9/AK7), `core_build_flags_test.dart` (ohne FMA) | – |
 | `flutter build web` und `flutter test --platform chrome` bei jedem Push mit Web-Änderung | vorhanden: Job `web` in `test-quality.yml`, `make test-web` (#13/AK4) | – |
 | Content-Security-Policy mit erlaubten Hosts | vorhanden: `app/web/index.html`, `app/tool/network_free_test.dart` (#58/AK4), im Browser von Hand geprüft | – |
+| Gebaute Web-App startet ohne gescheiterte Anfrage, ohne fremde Hosts und ohne Konsolenfehler (fremde Hosts im Test nicht erreichbar, also wie offline) | vorhanden: `make test-web-start` (auch am Ende von `make test-web`), `app/tool/web_start_check.dart`, Tests `web_start_check_test.dart` (#72) | – |
 | Web-Audio auf iPhone und Android | vorhanden unter Node.js: `core/web/w0_test.mjs`; Lücke: auf echten Geräten nur von Hand | #32 |
 
 ### Abgleich/Sync
@@ -200,7 +201,8 @@ make format         # dart format (app/) und clang-format (core/, ohne third_par
 make format-check   # schlägt fehl, wenn eine Datei nicht formatiert ist
 make lint           # flutter analyze (streng), C++ mit -Werror, clang-tidy
 make test-ui        # Oberflächentests mit echtem Kern auf macOS; ohne Audiogerät WP_AUDIO_BACKEND=null
-make test-web       # Web-Tests in Chrome: OPFS und WASM-Kern (braucht Emscripten)
+make test-web       # Web-Tests in Chrome: OPFS und WASM-Kern (braucht Emscripten), danach test-web-start
+make test-web-start # gebaute Web-App startet in Chrome ohne gescheiterte Anfrage und Konsolenfehler (#72)
 make smoke-app      # macOS-App bauen (Release) und ihren Rauchtest ausführen
 make pseudo-l10n    # Pseudo-Sprache der Oberflächentests nach einer Änderung an den ARB-Dateien
 make bench          # Leistungs- und Lasttests von Kern und Bibliothek (nächtlich, nicht in make test, #59)
@@ -1094,3 +1096,12 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     die Taktart nur in der Nähe von Schlaggrenzen. Regressionstest: Referenzfall «#70/AK2 #70/AK3 #3/AK10 meter and
     subdivision change mid-beat» (`reference_tests.cpp`, nativ und WASM) und `meterAndSubdivisionChangeMidBeat`
     (`metronome_tests.cpp`). Die Golden-Datei bleibt unverändert.
+26. 20.11.2026, #72 (aus #58): Die Web-App forderte beim Start `fonts/fallback/roboto/…woff2` an und bekam einen
+    404 mit Fehler in der Konsole. Flutters Web-Engine lädt Roboto als Standard-Ersatzschrift von
+    `fontFallbackBaseUrl`, wenn die App keine Familie dieses Namens mitbringt; die Adresse zeigt seit #34 auf die
+    eigene Seite, dort liegt die Datei nicht. Behoben ohne neue Datei: `pubspec.yaml` meldet die Familie «Roboto»
+    als Alias auf `Inter-Regular.ttf`, die Anfrage entfällt. Hätte gefangen werden müssen von einem Starttest der
+    gebauten Web-App, der Netzwerk und Konsole prüft; die Web-Tests liefen nur mit `flutter test --platform
+    chrome`, das die Schriften nicht wie die gebaute App lädt. Regressionstest: `make test-web-start`
+    (`app/tool/web_start_check.dart`) und «#72/AK2 pubspec declares Roboto as an alias …»
+    (`web_start_check_test.dart`).
