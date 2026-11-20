@@ -7,11 +7,13 @@
 #   changes web code (web files, *_web.dart, the core, the web build).
 # - sanitize: AddressSanitizer and UndefinedBehaviorSanitizer (make sanitize, #57); when core/ changes.
 # - contract: contract native <-> WASM (#77, #9/AK7): the native reference_tests write their samples,
-#   then the WASM core under Node.js compares (tolerance 1e-6, every C API function); when core/ changes.
+#   then the WASM core under Node.js compares (tolerance 1e-6, every C API function) and replays the
+#   fuzz regressions and start corpus (#67); when core/ changes.
 # - network-free: the network check (make network-free, #58); every push, whatever it changes.
 # Nightly (02:17 UTC), only if main has a new commit since the last successful nightly run:
 # - macos: macOS and iOS build, UI tests (integration_test) and smoke test of the built app (#13).
-# - sanitize-thread: ThreadSanitizer (#57). fuzz: libFuzzer on decoder and C API (#10).
+# - sanitize-thread: ThreadSanitizer (#57). fuzz: libFuzzer on decoder and C API (#10), then every
+#   input of the night (regressions, start corpus, grown corpus) against the WASM core (#67).
 # - property: Dart random tests with many cases and a new seed (#10).
 # - bench: performance and load tests of core and library (make bench, #59), values in the run summary.
 # - mutants-diff: mutation tests (Mull for the core, own mutator for the Dart logic) of the lines changed
@@ -383,7 +385,7 @@ jobs:
       !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.nightly)
       || (github.event_name == 'schedule' && needs.nightly-gate.outputs.run == 'true'))
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     env:
       CC: clang
       CXX: clang++
@@ -399,6 +401,16 @@ jobs:
           restore-keys: fuzz-corpus-
       - name: make fuzz (#10/AK4, AK9), 20 min per target
         run: make fuzz FUZZ_SECONDS=1200
+      - name: Install Emscripten (fixed version)
+        run: |
+          git clone --quiet --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION" >/dev/null
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$EMSDK_VERSION" >/dev/null
+      - name: The same inputs against the WASM core under Node.js (#67/AK1-AK3)
+        # regressions, start corpus and the corpus grown by make fuzz (this night and earlier ones)
+        run: |
+          . "$RUNNER_TEMP/emsdk/emsdk_env.sh" >/dev/null
+          make fuzz-wasm
       - name: Inputs of the finding
         if: failure()
         uses: actions/upload-artifact@v4
@@ -407,6 +419,7 @@ jobs:
           path: |
             core/build-fuzz/artifacts/
             core/build-fuzz/fuzz_*.log
+            core/build-wasm/fuzz_*_replay.log
           if-no-files-found: ignore
 
   property:

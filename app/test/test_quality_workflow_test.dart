@@ -1,4 +1,4 @@
-// #57, #10, #58, #13, #59, #11, #64, #77: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
+// #57, #10, #58, #13, #59, #11, #64, #77, #67: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -100,6 +100,69 @@ void main() {
       expect(fuzz, contains('actions/upload-artifact@v4'));
       expect(fuzz, contains('core/build-fuzz/artifacts/'));
     });
+  });
+
+  group('#67 fuzz inputs against the WASM core', () {
+    /// The recipe of one make target, up to the next blank line.
+    String recipe(String name) {
+      final target = makefile.substring(makefile.indexOf('\n$name:'));
+      return target.substring(0, target.indexOf('\n\n'));
+    }
+
+    test('#67/AK1, AK3 the WASM build replays regressions and start corpus in make test-wasm', () {
+      // the same replay tests as natively (fuzz_<target>_replay, regressions first, whole folders)
+      final web = read('../core/web/web.cmake');
+      expect(web, contains('include(tests/fuzz/fuzz.cmake)'));
+      expect(
+        web.indexOf('include(tests/fuzz/fuzz.cmake)'),
+        greaterThan(web.indexOf('include(tests/reference.cmake)')),
+      );
+      final fuzz = read('../core/tests/fuzz/fuzz.cmake');
+      expect(
+        fuzz,
+        contains(
+          r'${WP_FUZZ_DIR}/regressions/${name} ${WP_FUZZ_DIR}/corpus/${name}',
+        ),
+      );
+      expect(
+        read('../core/tests/fuzz/replay_main.cpp'),
+        contains('fs::directory_iterator(arg)'),
+      );
+      expect(
+        recipe('test-wasm-compare'),
+        contains('ctest --test-dir core/build-wasm'),
+      );
+    });
+
+    test(
+      '#67/AK2, AK3 make fuzz-wasm runs every input of make fuzz under Node.js',
+      () {
+        final target = recipe('fuzz-wasm');
+        expect(target, contains('emcmake cmake -S core -B \$(FUZZ_WASM_DIR)'));
+        expect(target, contains('core/tests/fuzz/regressions/\$\$t'));
+        expect(target, contains('core/tests/fuzz/corpus/\$\$t'));
+        // the corpus grown by make fuzz, if there is one
+        expect(target, contains('\$(FUZZ_DIR)/corpus/\$\$t'));
+        expect(target, contains('node "fuzz_\$\${t}_replay.js" "\$\$@"'));
+        expect(target, contains('exit 1'));
+      },
+    );
+
+    test(
+      '#67/AK2 runs nightly in the fuzz job after make fuzz, Emscripten fixed',
+      () {
+        final fuzz = job(workflow, 'fuzz');
+        final native = fuzz.indexOf('run: make fuzz FUZZ_SECONDS=');
+        final emsdk = fuzz.indexOf(r'emsdk" install "$EMSDK_VERSION"');
+        final wasm = fuzz.indexOf('make fuzz-wasm\n');
+        expect(native, isNot(-1));
+        expect(emsdk, greaterThan(native));
+        expect(wasm, greaterThan(emsdk));
+        expect(fuzz, contains('emsdk_env.sh'));
+        expect(fuzz, isNot(contains('install latest')));
+        expect(fuzz, contains('core/build-wasm/fuzz_*_replay.log'));
+      },
+    );
   });
 
   group('#10/AK1, AK6 random tests', () {

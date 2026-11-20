@@ -64,7 +64,7 @@ zugeordnet.
 | Render-Pfad ohne Speicheranforderung und ohne Sperre, Befehle aus vielen Threads | vorhanden: `engine_tests.cpp` (`renderDoesNotAllocate`, `commandsFromManyThreadsWhileRendering`, Queue-Fälle), `realtime_tests.cpp` (#57/AK4, `Player::render` mit Tempo, Loop, Metronom), `player_tests.cpp` (`controlFromSecondThreadWhileRendering`, #57/AK2) | – |
 | Wellenform (Minimum/Maximum je Abschnitt, Grenzen) | vorhanden: `waveform_tests.cpp`, `wp_waveform_ffi_test.dart`, `web_binding_test.dart` (#34/AK3) | – |
 | Seek auf t beginnt bei Sample round(t × Abtastrate); Pause und Fortsetzen ohne verlorenes Sample | vorhanden: `reference_tests.cpp` (#9/AK3, Rampe, t knapp unter und über einem halben Sample, im Stand und beim Spielen) | – |
-| Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | vorhanden: `player_tests.cpp` (`truncatedAndWrongAudioFiles`, #10/AK3), `core/tests/fuzz/` mit Wiederholung von Korpus und Regressionsfällen in jedem Build (`fuzz_*_replay`), `make fuzz` (#10/AK4) | – |
+| Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | vorhanden: `player_tests.cpp` (`truncatedAndWrongAudioFiles`, #10/AK3), `core/tests/fuzz/` mit Wiederholung von Korpus und Regressionsfällen in jedem Build (`fuzz_*_replay`), `make fuzz` (#10/AK4), dieselben Eingaben gegen den WASM-Kern (`make test-wasm`, `make fuzz-wasm`, #67) | – |
 | AddressSanitizer, UBSan, ThreadSanitizer | vorhanden: `make sanitize`, `make sanitize-thread`, Selbsttest `tests/sanitizer/selftest.cpp`, Workflow `test-quality.yml` (#57) | – |
 | Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | vorhanden, nächtlich: `core/tests/bench_tests.cpp` (`bench_long_file`, #59/AK2), `make bench` | – |
 
@@ -165,7 +165,7 @@ zugeordnet.
 | macOS- und iOS-Build bei jeder Änderung an Kern oder Plugin | vorhanden: Hook nach dem Commit (`.claude/hooks/after-commit.sh`), geprüft in `app/tool/after_commit_hook_test.dart` | – |
 | Swift-Altprojekt: Tests und iOS-Build | vorhanden: `WoodshedPlayerTests/` über den Hook (`xcodebuild`) | – |
 | Workflow `test-quality.yml`: Sanitizer-Läufe des Kerns auf Linux | vorhanden: `test-quality.yml` (Jobs `sanitize`, `sanitize-thread`), `test_quality_workflow_test.dart` (#57) | – |
-| Workflow `test-quality.yml`: Fuzzing und Zufallstests nächtlich | vorhanden: Jobs `fuzz` und `property`, `test_quality_workflow_test.dart` (#10); beobachtbar erst nach dem Push | – |
+| Workflow `test-quality.yml`: Fuzzing und Zufallstests nächtlich | vorhanden: Jobs `fuzz` (mit `make fuzz-wasm`, #67) und `property`, `test_quality_workflow_test.dart` (#10); beobachtbar erst nach dem Push | – |
 | Workflow `test-quality.yml`: Format, Lint, Tests, Abdeckung auf Linux je Push; macOS/iOS-Build, Oberflächentests und Rauchtest der gebauten App nächtlich | vorhanden: Jobs `checks`, `web`, `macos`, `test_quality_workflow_test.dart`, `smoke_test.dart` (#13); beobachtbar erst nach dem Push | – |
 | Rauchtest der gebauten App auf Windows und Linux | Lücke | #60 |
 | Windows und Linux: Build, Tests, Windows-Pfade | Lücke | #60 |
@@ -193,6 +193,7 @@ make test-core-debug  # Kerntests im Debug-Build (core/build-debug), gleiche Tol
 make sanitize       # Kerntests mit AddressSanitizer und UBSan (core/build-asan)
 make sanitize-thread  # Kerntests mit ThreadSanitizer (core/build-tsan)
 make fuzz           # libFuzzer mit ASan/UBSan auf Decoder und C-API, FUZZ_SECONDS je Ziel (Vorgabe 60)
+make fuzz-wasm      # Regressionen, Startkorpus und gewachsener Korpus von make fuzz gegen den WASM-Kern (#67)
 make property       # Zufallstests der App mit PROPERTY_CASES Fällen und Startwert PROPERTY_SEED
 make coverage       # alle Tests mit Abdeckung, Prüfung je Teil gegen tools/coverage-min
 make coverage-diff  # Abdeckung der seit BASE geänderten Zeilen (Vorgabe origin/main), ein Hinweis
@@ -491,6 +492,18 @@ Zeitüberschreitung, Speicher) beendet den Lauf mit Fehler und legt die Eingabe 
 Eingabe nach `core/tests/fuzz/regressions/<ziel>/`. Stand 19.11.2026, je 60 s auf dem Mac: `fuzz_decoder` rund
 35 000–90 000 Eingaben, `fuzz_capi` rund 700–1100, ohne Fund.
 
+**Dieselben Eingaben gegen den WASM-Kern (#67).** Der Emscripten-Zweig (`core/web/web.cmake`) bindet `fuzz.cmake`
+ebenfalls ein: `fuzz_decoder_replay` und `fuzz_capi_replay` laufen als WebAssembly unter Node.js (`NODERAWFS`) im
+`ctest` von `core/build-wasm`, also in `make test-wasm` und im Job `contract` bei jedem Push, der `core/` ändert.
+`make fuzz-wasm` spielt zusätzlich den von `make fuzz` gewachsenen Korpus (`core/build-fuzz/corpus/<ziel>/`, falls
+vorhanden) nach; der Job `fuzz` ruft es nächtlich nach `make fuzz` auf, mit Emscripten in der festen Version
+(`EMSDK_VERSION`). Die Ordner werden ganz gelesen: Eine neu eingecheckte Regression oder neue Korpusdatei läuft ohne
+weitere Änderung auch unter WebAssembly. Ein Fund (verletzte Invariante mit `abort()`, WASM-Trap) beendet Node.js mit
+Exit-Code ungleich 0; die letzte Zeile `replay …` im Protokoll (`core/build-wasm/fuzz_<ziel>_replay.log`, im Workflow
+als Artefakt) nennt die Eingabe. Ohne Sanitizer: unter WebAssembly zählen nur Abstürze und Invarianten. Stand
+20.11.2026 auf dem Mac: 15 und 7 Eingaben im `ctest`, mit dem lokal gewachsenen Korpus 2080 (`decoder`) und 616
+(`capi`) Eingaben in rund 7 s, ohne Fund.
+
 **Durchsatz von `fuzz_capi` (#66).** Ein Profil zeigte, dass nicht das Rendern die meiste Zeit braucht, sondern das
 Laden: rund 78 % in `wp_web_load_pcm` (Umrechnen langer PCM-Titel auf die Geräterate, Peaks), 10 % im Anlegen des
 Players, 7 % im Rendern. `fuzz_capi` macht deshalb pro Eingabe nur, was die Befehlsfolge braucht:
@@ -524,8 +537,8 @@ die aktuelle Version `library_v2.json` inhaltlich unverändert wieder schreibt; 
 neue Golden-Datei.
 
 **Grenzen.** Der nächtliche Fuzz- und Zufallslauf lässt sich erst nach dem Push beobachten; lokal belegt sind
-`make fuzz` (60 s je Ziel) und `make property` mit bis zu 2000 Fällen. Die Fuzz-Ziele laufen nicht unter
-WebAssembly. Eine beschädigte `state.json` bleibt in der Cloud liegen, bis ein Gerät sie ersetzt; eine Wiederherstellung
+`make fuzz` (60 s je Ziel), `make fuzz-wasm` und `make property` mit bis zu 2000 Fällen. libFuzzer selbst läuft
+nicht unter WebAssembly; dort werden nur die nativ gefundenen Eingaben nachgespielt (#67). Eine beschädigte `state.json` bleibt in der Cloud liegen, bis ein Gerät sie ersetzt; eine Wiederherstellung
 aus `backup/` gibt es noch nicht.
 
 ## Netzwerkfreiheit (#58)
@@ -670,9 +683,9 @@ deutlich länger angesetzt.
 | `web` | ≈ 10 | 20 | ≈ 200 Linux |
 | `sanitize`, `network-free` | ≈ 8 und 3 | 30 und 80 | ≈ 480 Linux |
 | `contract` (emsdk 3, nativ 2, WASM 5) | ≈ 10 | 30 | ≈ 300 Linux |
-| `sanitize-thread`, `fuzz` (2 × 20 min), `property` | ≈ 10, 45, 10 | 22 | ≈ 1430 Linux |
+| `sanitize-thread`, `fuzz` (2 × 20 min, dazu emsdk 3 und WASM 2, #67), `property` | ≈ 10, 50, 10 | 22 | ≈ 1540 Linux |
 
-Das sind rund **400 macOS-Minuten** und rund **3300 Linux-Minuten** im Monat. Bei einem privaten Repository zählt
+Das sind rund **400 macOS-Minuten** und rund **3400 Linux-Minuten** im Monat. Bei einem privaten Repository zählt
 GitHub macOS-Minuten zehnfach: 400 × 10 = 4000 von 2000 Gratis-Minuten (GitHub Free), also über dem Kontingent; dann
 müssten die macOS-Läufe seltener werden (z. B. nur wöchentlich). Das Repository ist öffentlich (GitHub Pages), dort
 sind Standard-Runner kostenlos; die Grenze entfällt, die Schätzung bleibt als Richtwert.

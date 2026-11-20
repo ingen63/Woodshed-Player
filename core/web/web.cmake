@@ -48,6 +48,10 @@ add_test(NAME player_tests COMMAND player_tests)
 # #9: the same reference cases as natively; compared against the native outputs (#9/AK7)
 include(tests/reference.cmake)
 
+# #67: replay of the fuzz regressions and start corpus (tests/fuzz/fuzz.cmake) against the WASM build
+# under Node.js; checked-in findings in tests/fuzz/regressions/<target> come along automatically.
+include(tests/fuzz/fuzz.cmake)
+
 # ---- Kern fürs AudioWorklet ----
 add_executable(wp_core_web web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp src/miniaudio_impl.c ${WP_ENGINE_SOURCES})
 target_include_directories(wp_core_web PRIVATE include web ${WP_ENGINE_INCLUDES})

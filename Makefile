@@ -3,7 +3,7 @@
 # (clang-format, clang-tidy), actionlint. core/third_party/ is never formatted, linted or read.
 .PHONY: help test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools format format-check lint lint-dart \
         lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
-        mutants-diff fuzz report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
+        mutants-diff fuzz fuzz-wasm report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
         test-ui test-web test-web-start smoke-app pseudo-l10n bench
 
 SHELL := /bin/bash
@@ -39,7 +39,8 @@ help:
 	@echo "make sanitize       core tests with AddressSanitizer and UndefinedBehaviorSanitizer"
 	@echo "make sanitize-thread core tests with ThreadSanitizer"
 	@echo "make fuzz           libFuzzer with ASan/UBSan, FUZZ_SECONDS per target (default 60)"
-	@echo "make property       Dart random tests, PROPERTY_CASES cases, PROPERTY_SEED (printed on failure)"
+	@echo "make fuzz-wasm      fuzz regressions and corpus (also make fuzz's new files) against the WASM core"
+	@echo "make property      Dart random tests, PROPERTY_CASES cases, PROPERTY_SEED (printed on failure)"
 	@echo "make format         dart format and clang-format"
 	@echo "make format-check   fails if a file is not formatted"
 	@echo "make lint           flutter analyze (strict), C++ warnings as errors, clang-tidy, actionlint"
@@ -215,6 +216,25 @@ fuzz: fuzz-build
 	    $(FUZZ_DIR)/fuzz_$$t.log; \
 	  if [ $$rc -ne 0 ]; then tail -40 $(FUZZ_DIR)/fuzz_$$t.log; \
 	    echo "fuzz_$$t: finding, input in $(FUZZ_DIR)/artifacts/$$t/"; exit 1; fi; \
+	done
+
+# #67: the same inputs against the WASM core under Node.js (Emscripten): regressions, start corpus
+# and, if present, the corpus that make fuzz grew in core/build-fuzz/corpus/<target> (nightly in
+# the fuzz job). make test-wasm already replays regressions and start corpus (ctest
+# fuzz_<target>_replay); a finding (abort, trap) fails and names the input it was running.
+FUZZ_WASM_DIR = core/build-wasm
+fuzz-wasm:
+	emcmake cmake -S core -B $(FUZZ_WASM_DIR) -DCMAKE_BUILD_TYPE=Release >/dev/null
+	$(PIPEFAIL) cmake --build $(FUZZ_WASM_DIR) -j 8 \
+	  --target $(addsuffix _replay,$(addprefix fuzz_,$(FUZZ_TARGETS))) 2>&1 | tail -20
+	@for t in $(FUZZ_TARGETS); do \
+	  set -- "$(CURDIR)/core/tests/fuzz/regressions/$$t" "$(CURDIR)/core/tests/fuzz/corpus/$$t"; \
+	  if [ -d "$(FUZZ_DIR)/corpus/$$t" ]; then set -- "$$@" "$(CURDIR)/$(FUZZ_DIR)/corpus/$$t"; fi; \
+	  log="$(FUZZ_WASM_DIR)/fuzz_$${t}_replay.log"; \
+	  (cd $(FUZZ_WASM_DIR) && node "fuzz_$${t}_replay.js" "$$@") > "$$log" 2>&1; rc=$$?; \
+	  echo "fuzz_$$t (WASM): $$(tail -1 "$$log")"; \
+	  if [ $$rc -ne 0 ]; then tail -20 "$$log"; \
+	    echo "fuzz_$$t (WASM): finding, the last replayed input above is the cause"; exit 1; fi; \
 	done
 
 # ---- Random tests (#10), docs/TESTS.md ----
