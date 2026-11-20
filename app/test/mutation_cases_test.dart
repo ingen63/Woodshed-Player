@@ -95,6 +95,15 @@ void main() {
       expect(running, [true, false]);
     });
 
+    // #61: the UI shows the stored settings once they are restored
+    test('restore notifies', () async {
+      final c = MetronomeController(FakeMetronome());
+      var notifications = 0;
+      c.addListener(() => notifications++);
+      await c.restore();
+      expect(notifications, 1);
+    });
+
     test(
       'the settings file is written into a folder that does not exist yet',
       () async {

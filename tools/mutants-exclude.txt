@@ -23,10 +23,7 @@ core/src/engine.cpp | cxx_remove_void_call | publish(); | 5
 # gleichwertig: Mutanten in den Bedingungen der beiden assert(): Im unveränderten Code ist der
 # Puffer immer grösser als nötig (configure() legt 2 Frames Reserve an, die Gleichheit kommt nicht
 # vor), eine schwächere oder strengere Bedingung schlägt also ebenso nie an.
-core/src/engine.cpp | cxx_mul_to_div | assert(static_cast<size_t>(len) * ch <= st.seekBuf.size());
-core/src/engine.cpp | cxx_le_to_lt | assert(static_cast<size_t>(len) * ch <= st.seekBuf.size());
 core/src/engine.cpp | cxx_le_to_lt | assert(static_cast<size_t>(nIn) <= inStride && inStride * ch <= inPlanar_.size());
-core/src/engine.cpp | cxx_mul_to_div | assert(static_cast<size_t>(nIn) <= inStride && inStride * ch <= inPlanar_.size());
 # gleichwertig: Ohne Loop ist loopB_ = 0, dann ist «before < loopB_» für jeden Lesekopf (>= 0)
 # falsch; «loopB_ >= 0» statt «> 0» ändert das Ergebnis nicht. Und readPos_ == before kommt mit
 # Loop nicht vor: readNext() rückt immer um einen Frame vor oder springt zum Loop-Anfang, der
@@ -120,10 +117,6 @@ core/src/player_core.cpp | cxx_lt_to_le | return s < 0 ? s : kOk;
 # gleichwertig: Die Umrechnung liefert aus mindestens einem Frame immer mindestens einen (gemessen
 # auch für 1 Frame von 48 kHz auf 1 kHz); der Fall «kOk mit 0 Frames» tritt nicht ein.
 core/src/player_core.cpp | cxx_eq_to_ne | if (result == kOk && out.frames == 0)
-# Grenzfall: Eine Samplerate von genau 1 Hz (wird angenommen, siehe «Gefundene Fehler» 21).
-core/src/player_core.cpp | cxx_lt_to_le | if (!data || sampleRate < 1)
-core/src/player_core.cpp | cxx_lt_to_le | if (!interleaved || channels < 1 || frames < 1 || srcRate < 1 || dstRate < 1) | 61
-core/src/player_core.cpp | cxx_lt_to_le | if (!interleaved || channels < 1 || frames < 1 || srcRate < 1 || dstRate < 1) | 76
 
 # ---- core/src/recorder_core.cpp ----
 # gleichwertig: Ist der Block-Pegel gleich dem gespeicherten, schreibt «>=» denselben Wert noch einmal.
@@ -144,8 +137,6 @@ core/src/recorder_core.cpp | cxx_remove_void_call | WavFile::~WavFile() { close(
 core/src/recorder_core.cpp | cxx_remove_void_call | Capture::~Capture() { close(); }
 
 # ---- core/web/wp_core_web.cpp ----
-# Grenzfall: Eine Samplerate von genau 1 Hz (siehe «Gefundene Fehler» 21).
-core/web/wp_core_web.cpp | cxx_lt_to_le | if (sampleRate < 1)
 # gleichwertig: Die Begrenzung auf 1 … WP_WEB_MAX_BLOCK Frames: bei genau 1 bzw. genau
 # WP_WEB_MAX_BLOCK setzt die Zuweisung denselben Wert.
 core/web/wp_core_web.cpp | cxx_lt_to_le | if (frames < 1)
@@ -153,7 +144,6 @@ core/web/wp_core_web.cpp | cxx_gt_to_ge | if (frames > WP_WEB_MAX_BLOCK)
 # gleichwertig: Nur die Vorab-Reservierung; append prüft die Länge gegen pendingFrames, nicht gegen
 # die Kapazität, der Titel bleibt derselbe.
 core/web/wp_core_web.cpp | cxx_remove_void_call | s->data.reserve(static_cast<size_t>(frames) * wp::Player::kChannels); // no zero fill
-core/web/wp_core_web.cpp | cxx_mul_to_div | s->data.reserve(static_cast<size_t>(frames) * wp::Player::kChannels); // no zero fill
 # gleichwertig: Ein Track hat immer eine Samplerate ab 1 (wp_web_track_decode und _convert lehnen
 # kleinere ab), «> 0» und «>= 0» sind dort gleich.
 core/web/wp_core_web.cpp | cxx_gt_to_ge | return t && t->sampleRate > 0 ? static_cast<double>(t->source.frames) / t->sampleRate : 0.0;
@@ -331,3 +321,33 @@ app/lib/sync/sync_engine.dart | dart_remove_void_call | _retryTimer?.cancel();
 # gleichwertig: Der Vorgabewert der Schnittstelle gilt nie: Dart nimmt den Vorgabewert der
 # aufgerufenen Implementierung (InMemoryProvider und jeder Anbieter haben ihren eigenen).
 app/lib/sync/cloud_provider.dart | dart_false_to_true | bool ifAbsent = false,
+
+# ---- übrige Dart-Dateien (#61) ----
+# gleichwertig: Schlägt das Laden fehl (ok false) und ist derselbe Titel noch geladen, hat select()
+# seine Dauer schon beim ersten Laden eingetragen; fillDuration ändert eine bekannte Dauer nicht.
+app/lib/app/app_controller.dart | dart_and_to_or | if (ok && player.trackId == t.id) {
+# gleichwertig: flush betrifft nur, ob die Daten bei einem Absturz des Rechners schon auf dem Datenträger
+# stehen; was geschrieben und gelesen wird, bleibt gleich.
+app/lib/app/file_store_io.dart | dart_true_to_false | tmp.writeAsBytesSync(bytes, flush: true);
+# gleichwertig: Bei der Dauer 0 klemmen Anfang und Ende auf 0, «b <= a» liefert danach null wie die
+# Prüfung.
+app/lib/player/waveform_summary.dart | dart_le_to_lt | if (n == 0 || count <= 0 || duration <= 0) return null;
+# Grenzfall: Jeder Abschnitt beginnt vor dem Ende (a + step · i < b <= duration), also ist der feine
+# Abschnitt höchstens n − 1; die Klammer greift nur, wenn die Rundung genau n ergibt.
+app/lib/player/waveform_summary.dart | dart_sub_to_add | final from = ((a + step * i) * perSecond).floor().clamp(0, n - 1);
+# gleichwertig: Ist das gerundete Ende gleich from, läuft die innere Schleife mit from + 1 wie mit
+# from nicht; sonst ist das Ende ohnehin grösser.
+app/lib/player/waveform_summary.dart | dart_add_to_sub | from + 1,
+# gleichwertig: Bei gleichem Wert setzt «<=» bzw. «>=» denselben Wert noch einmal.
+app/lib/player/waveform_summary.dart | dart_lt_to_le | if (mins[j] < lo) lo = mins[j];
+app/lib/player/waveform_summary.dart | dart_gt_to_ge | if (maxs[j] > hi) hi = maxs[j];
+# Grenzfall: Nur eine Abweichung von genau seekTolerance bzw. seekPlayingLead (gerechnete Positionen).
+app/lib/player/player_service.dart | dart_le_to_lt | lead.abs() <= seekTolerance ||
+app/lib/player/player_service.dart | dart_le_to_lt | (_playing && lead >= 0 && lead <= seekPlayingLead);
+# gleichwertig: Ist lead genau 0, gilt schon die erste Bedingung (|lead| <= seekTolerance).
+app/lib/player/player_service.dart | dart_ge_to_gt | (_playing && lead >= 0 && lead <= seekPlayingLead);
+# gleichwertig: Der Zweig ist nicht erreichbar. Nach dem Laden sind die Grenzen nie enger als 1 s
+# (_normalized, «Ende nicht gesetzt» wird zum Titelende), und jede Änderung hält sie so; sind sie
+# danach enger als 1 s, hat sich der Anfang oder das Ende geändert, und die Zweige davor greifen.
+app/lib/player/player_service.dart | dart_and_to_or | } else if (next.loopEnabled && !old.loopEnabled) {
+app/lib/player/player_service.dart | dart_remove_negation | } else if (next.loopEnabled && !old.loopEnabled) {
