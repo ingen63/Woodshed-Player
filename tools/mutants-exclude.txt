@@ -294,3 +294,16 @@ app/lib/library/stamps.dart | dart_and_to_or | if (a is num && b is num) return 
 # gleichwertig: Gleiche kanonische Form heisst gleicher JSON-Wert; die Werte unterscheiden sich
 # höchstens als 47 und 47.0, die sameJson und jeder Vergleich danach gleich behandeln.
 app/lib/library/stamps.dart | dart_gt_to_ge | _canonical(o.values[k]).compareTo(_canonical(this.values[k])) > 0;
+
+# ---- app/lib/library/library.dart (#61) ----
+# gleichwertig: load() setzt _readOnly als Erstes auf false; jeder Aufrufer (AppController, Tests,
+# Abgleich) lädt die Bibliothek, bevor er sie ändert.
+app/lib/library/library.dart | dart_false_to_true | bool _readOnly = false;
+# gleichwertig: load() leert _absent schon am Anfang; bis zu dieser zweiten Stelle fügt nichts etwas
+# hinzu (Lesen, Nachführen, _materialize).
+app/lib/library/library.dart | dart_remove_void_call | _absent.clear();
+# gleichwertig: Fehlt keine Datei, ist die Menge «gone» leer; der Zweig setzt dann dieselben Listen.
+app/lib/library/library.dart | dart_lt_to_le | if (present.length < _tracks.length) {
+# gleichwertig: Bei genau 1 MiB wird der Hash in einem Isolate statt direkt berechnet; er ist derselbe.
+app/lib/library/library.dart | dart_gt_to_ge | final hash = bytes.length > _hashInline
+app/lib/library/library.dart | dart_gt_to_ge | final id = bytes.length > _hashInline
