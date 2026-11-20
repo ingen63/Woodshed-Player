@@ -201,3 +201,37 @@ core/src/player_core.cpp | cxx_remove_void_call | cancel_.store(true);
 core/web/wp_core_web.cpp | cxx_remove_void_call | p->out.assign(static_cast<size_t>(WP_WEB_MAX_BLOCK) * wp::Player::kChannels, 0.0f);
 core/web/wp_core_web.cpp | cxx_remove_void_call | p->core->metronome().setVolume(v);
 core/web/wp_core_web.cpp | cxx_remove_void_call | p->pending.reset();
+
+# ---- app/lib/library/metadata.dart (#61) ----
+# Grenzfall: Nur wenn die gesuchte Kennung genau am Ende der Daten steht. Dann folgt nichts Lesbares:
+# «fLaC» ohne Blöcke, «WAVE» ohne Chunks, «INFO» ohne Einträge; ein id3-Chunk aus genau «ID3» ist
+# ohnehin kein lesbares Tag (das unveränderte Lesen bricht dort ab und liefert leere Felder).
+app/lib/library/metadata.dart | dart_lt_to_le | if (b.length < at + s.length) return false;
+# gleichwertig: Eine Datei unter oder genau bei 14 Bytes (ID3-Kopf von 10 Bytes und «fLaC») hat für
+# kein Feld Platz; beide Wege (FLAC nach ID3 bzw. ID3 allein) liefern leere Felder.
+app/lib/library/metadata.dart | dart_lt_to_le | if (b.length < 14) return false;
+app/lib/library/metadata.dart | dart_false_to_true | if (b.length < 14) return false;
+# gleichwertig: copy betrifft nur, ob BytesBuilder die hinzugefügten Listen kopiert; addByte fügt
+# einzelne Bytes an, das Ergebnis ist dasselbe.
+app/lib/library/metadata.dart | dart_false_to_true | final out = BytesBuilder(copy: false);
+# gleichwertig: Der Anfangswert wird nie gelesen. Er zählt nur, wenn schon ein Bild da ist, und mit
+# dem ersten Bild wird er immer neu gesetzt (artworkIsFront = Bildart == 3); gilt für ID3 und FLAC.
+app/lib/library/metadata.dart | dart_false_to_true | var artworkIsFront = false;
+# gleichwertig: Bleibt genau ein Frame-Kopf übrig, liegen seine Daten hinter dem Tag (Grösse > 0)
+# oder er ist leer (Grösse 0); beides beendet das Lesen wie das Ende der Schleife.
+app/lib/library/metadata.dart | dart_le_to_lt | while (pos + headerLen <= tag.length) {
+# Grenzfall: Nur ein leerer Block, dessen 4 Bytes Kopf genau am Dateiende stehen. Er enthält kein
+# Feld; ein leerer Kommentar- oder Bildblock dort ist beschädigt (das unveränderte Lesen bricht ab).
+app/lib/library/metadata.dart | dart_le_to_lt | while (p + 4 <= b.length) {
+# Grenzfall: Nur eine Längenangabe, die genau am Ende des Kommentarblocks endet; ihr Wert läge
+# ausserhalb des Blocks (beschädigter Block).
+app/lib/library/metadata.dart | dart_le_to_lt | for (var i = 0; i < count && q + 4 <= start + len; i++) {
+# gleichwertig: Ein Eintrag mit leerem Namen («=x», eq == 0) passt zu keinem der Namen TITLE,
+# ARTIST, ALBUM; er wird so oder so übergangen.
+app/lib/library/metadata.dart | dart_lt_to_le | if (eq < 0) continue;
+# gleichwertig: Ein Chunk-Kopf genau am Ende hat keine Daten: weder «INFO» noch «ID3» kann folgen,
+# es wird nichts gelesen. Ebenso ein Unter-Chunk genau am Ende der Liste: sein Wert ist leer oder
+# reicht über die Liste hinaus, beides ergibt kein Feld.
+app/lib/library/metadata.dart | dart_le_to_lt | while (p + 8 <= b.length) {
+app/lib/library/metadata.dart | dart_le_to_lt | while (q + 8 <= end) {
+
