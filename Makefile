@@ -1,7 +1,7 @@
 # Test and hygiene targets for the Flutter app (app/) and the C++ audio core (core/), #7.
 # Strategy and test matrix: docs/TESTS.md. Developer tools: Flutter, CMake, Homebrew llvm
 # (clang-format, clang-tidy), actionlint. core/third_party/ is never formatted, linted or read.
-.PHONY: help test test-core test-wasm test-app test-hook test-tools format format-check lint lint-dart \
+.PHONY: help test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools format format-check lint lint-dart \
         lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
         mutants-diff fuzz report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
         test-ui test-web test-web-start smoke-app pseudo-l10n bench
@@ -73,11 +73,18 @@ test-core-debug:
 	ctest --test-dir core/build-debug --output-on-failure -j 4
 
 # #9/AK7: the WASM reference cases compare their samples with the native run
-# (core/build/reference_native.bin, tolerance 1e-6), so that one is rendered first.
-test-wasm:
+# (core/build/reference_native.bin, tolerance 1e-6), so that one is rendered first. The workflow
+# (#77) runs the two halves as separate steps: reference-native, then test-wasm-compare.
+test-wasm: reference-native
+	@$(MAKE) --no-print-directory test-wasm-compare
+
+reference-native:
 	cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release >/dev/null
 	$(PIPEFAIL) cmake --build core/build -j 8 --target reference_tests 2>&1 | tail -20
 	$(PIPEFAIL) core/build/reference_tests --dump core/build/reference_native.bin | tail -2
+
+test-wasm-compare:
+	@test -f core/build/reference_native.bin || { echo "core/build/reference_native.bin missing: run make reference-native first"; exit 1; }
 	emcmake cmake -S core -B core/build-wasm -DCMAKE_BUILD_TYPE=Release >/dev/null
 	$(PIPEFAIL) cmake --build core/build-wasm -j 8 2>&1 | tail -20
 	ctest --test-dir core/build-wasm --output-on-failure

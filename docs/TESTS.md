@@ -211,7 +211,7 @@ make mutants-diff   # Mutationstests der seit BASE geänderten Zeilen (Vorgabe o
 make report         # Übersichtsseite Testqualität aus den vorhandenen Ergebnissen (#12), local/test-quality/report/
 ```
 
-Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten für `test-wasm`, Homebrew `llvm` für
+Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten 7.0.0 für `test-wasm` (Homebrew `emscripten`, im Workflow dieselbe Version), Homebrew `llvm` für
 `clang-format`, `clang-tidy` und libFuzzer (`brew install llvm`; das Makefile findet sie unter
 `$(brew --prefix llvm)/bin`; Apple-Clang hat kein libFuzzer). `actionlint` 1.7.12 (MIT) für die GitHub-Workflows
 (`brew install actionlint`, #64); ist ShellCheck installiert, prüft actionlint damit auch die `run:`-Skripte.
@@ -407,7 +407,10 @@ GOLDEN_UPDATE=1 core/build/reference_tests
 `build-tsan`) und als WebAssembly unter Node.js (`core/build-wasm`). Der native Lauf schreibt jede aufgezeichnete
 Ausgabe nach `reference_native.bin` im eigenen Build-Ordner (`--dump`); der WASM-Lauf vergleicht mit
 `core/build/reference_native.bin` (`--compare`, Toleranz 1e-6, CMake-Variable `WP_REFERENCE_DUMP`) und verlangt, dass
-jede native Ausgabe auch dort entsteht. `make test-wasm` rendert den nativen Stand vorher. Stand 19.11.2026: alle
+jede native Ausgabe auch dort entsteht. `make test-wasm` rendert den nativen Stand vorher (`make reference-native`,
+danach `make test-wasm-compare`). Im Workflow läuft derselbe Ablauf bei jedem Push mit Änderung am Kern im Job
+`contract` (#77), auf Linux mit Emscripten 7.0.0 (`EMSDK_VERSION`, dieselbe Version wie lokal mit Homebrew
+`emscripten`). Stand 19.11.2026: alle
 12 Ausgaben bitgleich (grösste Abweichung 0). `reference_api_coverage` (`core/tests/reference_api_coverage.cmake`)
 liest alle `WP_API`-Funktionen aus `wp_core.h` und schlägt fehl, wenn eine davon in `reference_tests.cpp` nicht
 aufgerufen wird. Derselbe Test verlangt, dass die Referenzfälle keine Audiodatei aus `core/tests/audio/` lesen
@@ -607,6 +610,7 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
 | `checks` | Linux, jeder Push mit Code-Änderung (`core/`, `app/`, `tools/`, `Makefile`, Workflows), von Hand | `make format-check`, `make lint` (mit actionlint, #64), `make coverage-run`, Prüfung gegen `tools/coverage-min`, `coverage-diff`, Zusammenfassung |
 | `web` | Linux, jeder Push mit Web-Änderung (`app/web/`, `*_web.dart`, Kern, Web-Build), von Hand | WASM-Kern, `make test-web` in Chrome, `flutter build web` |
 | `sanitize` | Linux, Push mit Änderung am Kern, von Hand | ASan/UBSan (#57) |
+| `contract` | Linux, Push mit Änderung am Kern, von Hand | Vertrag nativ ↔ WASM (#77, #9/AK7): zuerst `make reference-native` (native Referenzfälle schreiben ihre Samples), danach `make test-wasm-compare` (WASM-Kern unter Node.js vergleicht, Toleranz 1e-6, jede Funktion der C-API) |
 | `network-free` | Linux, jeder Push, von Hand | Netzwerkfreiheit (#58) |
 | `macos` | macOS, nächtlich nach neuem Commit, von Hand mit `nightly=true` | macOS- und iOS-Build, Oberflächentests, Rauchtest der gebauten App |
 | `sanitize-thread`, `fuzz`, `property` | Linux, nächtlich nach neuem Commit, von Hand mit `nightly=true` | TSan (#57), Fuzzing und Zufallstests (#10) |
@@ -624,7 +628,8 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
   zeigt die Seite für sie «keine Daten».
 - **Werkzeuge:** Flutter in derselben Version wie `pages.yml` (`FLUTTER_VERSION`, `dart format` hängt davon ab),
   `clang-format` und `clang-tidy` in Hauptversion 23 wie Homebrew `llvm` (über `pipx`), der Kern mit clang-18 und
-  passendem `llvm-cov-18`, `actionlint` in fester Version mit Prüfsumme (#64). Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
+  passendem `llvm-cov-18`, `actionlint` in fester Version mit Prüfsumme (#64), im Job `contract` Emscripten 7.0.0
+über `emsdk` (`EMSDK_VERSION`, wie Homebrew `emscripten` lokal; nach einem Update beide nachführen, #77). Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
 - **Lokal geprüft** werden die Workflows mit `actionlint` und ShellCheck (`make lint`, #64) und über
   `test_quality_workflow_test.dart`. Ob alle Jobs auf den Runnern laufen, zeigen erst die Läufe nach dem Push.
 
@@ -639,9 +644,10 @@ deutlich länger angesetzt.
 | `checks` | ≈ 15 | 60 | ≈ 900 Linux |
 | `web` | ≈ 10 | 20 | ≈ 200 Linux |
 | `sanitize`, `network-free` | ≈ 8 und 3 | 30 und 80 | ≈ 480 Linux |
+| `contract` (emsdk 3, nativ 2, WASM 5) | ≈ 10 | 30 | ≈ 300 Linux |
 | `sanitize-thread`, `fuzz` (2 × 20 min), `property` | ≈ 10, 45, 10 | 22 | ≈ 1430 Linux |
 
-Das sind rund **400 macOS-Minuten** und rund **3000 Linux-Minuten** im Monat. Bei einem privaten Repository zählt
+Das sind rund **400 macOS-Minuten** und rund **3300 Linux-Minuten** im Monat. Bei einem privaten Repository zählt
 GitHub macOS-Minuten zehnfach: 400 × 10 = 4000 von 2000 Gratis-Minuten (GitHub Free), also über dem Kontingent; dann
 müssten die macOS-Läufe seltener werden (z. B. nur wöchentlich). Das Repository ist öffentlich (GitHub Pages), dort
 sind Standard-Runner kostenlos; die Grenze entfällt, die Schätzung bleibt als Richtwert.

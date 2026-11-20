@@ -6,6 +6,8 @@
 # - web: WASM core, web tests in Chrome (OPFS, WASM binding) and `flutter build web`; when the push
 #   changes web code (web files, *_web.dart, the core, the web build).
 # - sanitize: AddressSanitizer and UndefinedBehaviorSanitizer (make sanitize, #57); when core/ changes.
+# - contract: contract native <-> WASM (#77, #9/AK7): the native reference_tests write their samples,
+#   then the WASM core under Node.js compares (tolerance 1e-6, every C API function); when core/ changes.
 # - network-free: the network check (make network-free, #58); every push, whatever it changes.
 # Nightly (02:17 UTC), only if main has a new commit since the last successful nightly run:
 # - macos: macOS and iOS build, UI tests (integration_test) and smoke test of the built app (#13).
@@ -47,6 +49,7 @@ env:
   LLVM_TOOLS_VERSION: '23.*'  # clang-format and clang-tidy as on the developers' machines (Homebrew llvm)
   ACTIONLINT_VERSION: 1.7.12  # as on the developers' machines (Homebrew actionlint), docs/TESTS.md
   ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  # linux_amd64 archive
+  EMSDK_VERSION: 7.0.0  # Emscripten of the contract job (#77), as on the developers' machines (Homebrew emscripten), docs/TESTS.md
 
 jobs:
   changes:
@@ -252,6 +255,35 @@ jobs:
         run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: make sanitize (#57/AK1)
         run: make sanitize
+
+  contract:
+    name: Contract native and WASM (#77)
+    needs: changes
+    # after «changes» on push, and on manual start (then «changes» is skipped)
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'push' && needs.changes.outputs.core == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Emscripten (fixed version)
+        run: |
+          git clone --quiet --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION" >/dev/null
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$EMSDK_VERSION" >/dev/null
+      - name: Native reference cases write their samples (#77/AK1)
+        run: make reference-native
+      - name: WASM core under Node.js compares with the native samples (#77/AK1, AK2)
+        # a deviation above 1e-6 fails reference_tests, a C API function without a reference case
+        # fails reference_api_coverage
+        run: |
+          . "$RUNNER_TEMP/emsdk/emsdk_env.sh" >/dev/null
+          emcc --version | head -1
+          make test-wasm-compare
 
   network-free:
     name: Network freedom (#58)

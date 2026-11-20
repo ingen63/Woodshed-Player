@@ -1,4 +1,4 @@
-// #57, #10, #58, #13, #59, #11, #64: actionlint, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
+// #57, #10, #58, #13, #59, #11, #64, #77: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -178,7 +178,13 @@ void main() {
       expect(bench, contains('date -u'));
       expect(bench, contains('lscpu'));
       expect(bench, contains('GITHUB_STEP_SUMMARY'));
-      for (final push in ['checks', 'web', 'sanitize', 'network-free']) {
+      for (final push in [
+        'checks',
+        'web',
+        'sanitize',
+        'contract',
+        'network-free',
+      ]) {
         expect(
           job(workflow, push),
           isNot(contains('make bench')),
@@ -215,7 +221,13 @@ void main() {
       expect(j, contains('make mutants-diff BASE='));
       expect(j, contains('local/mutants/diff/summary.txt'));
       expect(j, contains('GITHUB_STEP_SUMMARY'));
-      for (final push in ['checks', 'web', 'sanitize', 'network-free']) {
+      for (final push in [
+        'checks',
+        'web',
+        'sanitize',
+        'contract',
+        'network-free',
+      ]) {
         expect(job(workflow, push), isNot(contains('mutants')), reason: push);
       }
     });
@@ -296,6 +308,86 @@ void main() {
       });
     },
   );
+
+  group('#77 contract native and WASM', () {
+    /// The recipe of one make target, up to the next blank line.
+    String recipe(String name) {
+      final target = makefile.substring(makefile.indexOf('\n$name:'));
+      return target.substring(0, target.indexOf('\n\n'));
+    }
+
+    test('#77/AK1 runs on Linux on a push that changes core/, and by hand', () {
+      final contract = job(workflow, 'contract');
+      expect(contract, contains('runs-on: ubuntu-latest'));
+      expect(contract, contains('needs: changes'));
+      expect(contract, contains("needs.changes.outputs.core == 'true'"));
+      expect(contract, contains("github.event_name == 'workflow_dispatch'"));
+      // core/ is part of the core path filter of «changes»
+      expect(
+        job(workflow, 'changes'),
+        contains(r'''echo "core=$(has '^(core/|'''),
+      );
+    });
+
+    test('#77/AK1 first the native reference cases, then the WASM compare', () {
+      final contract = job(workflow, 'contract');
+      final emsdk = contract.indexOf(r'emsdk" install "$EMSDK_VERSION"');
+      final native = contract.indexOf('run: make reference-native\n');
+      final wasm = contract.indexOf('make test-wasm-compare\n');
+      expect(emsdk, isNot(-1));
+      expect(native, greaterThan(emsdk));
+      expect(wasm, greaterThan(native));
+      expect(contract, contains('emsdk_env.sh'));
+      // make reference-native writes the dump the WASM run reads
+      expect(
+        recipe('reference-native'),
+        contains(
+          'core/build/reference_tests --dump core/build/reference_native.bin',
+        ),
+      );
+      final compare = recipe('test-wasm-compare');
+      expect(compare, contains('test -f core/build/reference_native.bin'));
+      expect(compare, contains('emcmake cmake -S core -B core/build-wasm'));
+      expect(compare, contains('ctest --test-dir core/build-wasm'));
+      // locally the same order in one target
+      expect(
+        makefile,
+        contains(
+          '\ntest-wasm: reference-native\n'
+          '\t@\$(MAKE) --no-print-directory test-wasm-compare\n',
+        ),
+      );
+    });
+
+    test(
+      '#77/AK2 the WASM run compares with 1e-6 and checks every C API function',
+      () {
+        final reference = read('../core/tests/reference.cmake');
+        expect(
+          reference,
+          contains(
+            'add_test(NAME reference_tests COMMAND reference_tests --compare \${WP_REFERENCE_DUMP})',
+          ),
+        );
+        expect(
+          reference,
+          contains('"\${CMAKE_CURRENT_SOURCE_DIR}/build/reference_native.bin"'),
+        );
+        expect(reference, contains('add_test(NAME reference_api_coverage'));
+        final cases = read('../core/tests/reference_tests.cpp');
+        expect(cases, contains('constexpr double kContractTolerance = 1e-6;'));
+      },
+    );
+
+    test('#77 Emscripten in a fixed version, the one in docs/TESTS.md', () {
+      final version = RegExp(r'EMSDK_VERSION: (\d+\.\d+\.\d+)')
+          .firstMatch(workflow);
+      expect(version, isNotNull);
+      final tests = read('../docs/TESTS.md');
+      expect(tests, contains('Emscripten ${version!.group(1)}'));
+      expect(job(workflow, 'contract'), isNot(contains('install latest')));
+    });
+  });
 
   group('#13/AK4 web build and web tests in Chrome', () {
     test('on a push with a web change, and by hand', () {
