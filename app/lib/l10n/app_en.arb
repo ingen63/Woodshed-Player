@@ -352,6 +352,7 @@
   },
   "loadCancelled": "Loading was cancelled.",
   "loadBusy": "The audio core is busy right now. Please try again.",
+  "loadUnsupportedSampleRate": "The audio output runs at too low a sample rate. At least 8 kHz is needed.",
   "loadInvalid": "Invalid file reference.",
   "loadUnknown": "Unknown error while loading (code {code}).",
   "@loadUnknown": {

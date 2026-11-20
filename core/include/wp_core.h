@@ -25,9 +25,14 @@ typedef struct wp_player wp_player;
 #define WP_ERR_UNSUPPORTED_FORMAT -3 /* Format unbekannt oder Datei beschädigt */
 #define WP_ERR_DEVICE_UNAVAILABLE -4 /* kein Audiogerät */
 #define WP_ERR_OUT_OF_MEMORY -5
-#define WP_ERR_FILE_UNREADABLE -6 /* keine Leserechte, Ordner statt Datei, Lesefehler */
-#define WP_ERR_CANCELLED -7       /* durch ein neueres Laden abgebrochen */
-#define WP_ERR_BUSY -8            /* Befehls-Queue voll */
+#define WP_ERR_FILE_UNREADABLE -6         /* keine Leserechte, Ordner statt Datei, Lesefehler */
+#define WP_ERR_CANCELLED -7               /* durch ein neueres Laden abgebrochen */
+#define WP_ERR_BUSY -8                    /* Befehls-Queue voll */
+#define WP_ERR_UNSUPPORTED_SAMPLE_RATE -9 /* sample rate below WP_MIN_SAMPLE_RATE (#76) */
+
+/* Lowest sample rate the core accepts (#76). A player configured below it renders silence and
+ * answers every load with WP_ERR_UNSUPPORTED_SAMPLE_RATE. */
+#define WP_MIN_SAMPLE_RATE 8000
 
 /* English text for an error code, static, never NULL. For logs only: the UI shows its own
  * localized text per code (ARB files in the app). */

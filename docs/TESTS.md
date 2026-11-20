@@ -1064,8 +1064,12 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     Behebung als eigenes Issue vorgeschlagen.
 21. 20.11.2026, #11, Mutationstests (UBSan im Mutationsbau): `wp_web_create(1)` (und `wp::Player` mit 1 Hz) wird
     angenommen, der Time-Stretch teilt bei 1 Hz aber durch 0 (`signalsmith-linear/stft.h`, Blockgrösse 0). Die
-    Prüfung lässt jede Samplerate ab 1 Hz zu; sinnvoll wäre eine Untergrenze (z. B. 8000 Hz). Nicht im Rahmen von #11
-    behoben, der Test prüft nur «unter 1 Hz kein Player». Behebung als eigenes Issue vorgeschlagen.
+    Prüfung lässt jede Samplerate ab 1 Hz zu; sinnvoll wäre eine Untergrenze (z. B. 8000 Hz). Behoben mit #76: Der
+    Kern nimmt erst ab `WP_MIN_SAMPLE_RATE` (8000 Hz) an; darunter bleibt der Player stumm, und jedes Laden (auch
+    Dekodieren und Wandeln in einen Track) meldet `WP_ERR_UNSUPPORTED_SAMPLE_RATE`, die App zeigt dazu
+    `loadUnsupportedSampleRate`. Regressionstest: Referenzfall «#76/AK1 #76/AK2 sample rate lower limit»
+    (`core/tests/reference_tests.cpp`, `sampleRateLowerLimit`, 8000 Hz, 7999 Hz, 1 Hz, 0 und −1), nativ (`make test`)
+    und im WASM-Kern (`make test-wasm`).
 22. 20.11.2026, #11, Mutationstests: Mehrere Regeln waren ausgeführt, aber nicht geprüft und sind jetzt getestet
     (Kanaltrennung und Lautstärke im gedehnten Pfad, Seek genau aufs Loop-Ende, Loop ab 0 s und knapp unter 1 s,
     mehrere Loop-Durchgänge in einem Block, Wellenform je Block, Klangform und Stopp des Metronoms, Neubeginn der

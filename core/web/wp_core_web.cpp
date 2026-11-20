@@ -43,8 +43,6 @@ wp_web_track *finishTrack(std::unique_ptr<wp_web_track> t, int r, int *err) {
 extern "C" {
 
 wp_player *wp_web_create(int sampleRate) {
-  if (sampleRate < 1)
-    return nullptr;
   try {
     auto *p = new wp_player();
     p->core = std::make_unique<wp::Player>(sampleRate);

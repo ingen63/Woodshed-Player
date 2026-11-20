@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <new>
 #include <vector>
 
@@ -29,6 +30,8 @@ const char *errorMessage(int code) {
     return "Loading cancelled";
   case kErrBusy:
     return "Audio core busy, try again";
+  case kErrUnsupportedSampleRate:
+    return "Sample rate too low for the audio core";
   default:
     return "Unknown error";
   }
@@ -188,7 +191,9 @@ double fileDuration(const std::string &path) {
 }
 
 int decodeMemory(const void *data, size_t size, int sampleRate, Source &out) {
-  if (!data || sampleRate < 1)
+  if (sampleRate < kMinSampleRate)
+    return kErrUnsupportedSampleRate;
+  if (!data)
     return kErrInvalidArgument;
   if (size == 0)
     return kErrUnsupportedFormat;
@@ -201,7 +206,9 @@ int decodeMemory(const void *data, size_t size, int sampleRate, Source &out) {
 
 int convertPcm(const float *interleaved, int channels, long long frames, int srcRate, int dstRate,
                Source &out) {
-  if (!interleaved || channels < 1 || frames < 1 || srcRate < 1 || dstRate < 1)
+  if (srcRate < kMinSampleRate || dstRate < kMinSampleRate)
+    return kErrUnsupportedSampleRate;
+  if (!interleaved || channels < 1 || frames < 1)
     return kErrInvalidArgument;
   ma_data_converter_config cfg = ma_data_converter_config_init(
       ma_format_f32, ma_format_f32, static_cast<ma_uint32>(channels), Player::kChannels,
@@ -251,9 +258,11 @@ int convertPcm(const float *interleaved, int channels, long long frames, int src
   return result;
 }
 
-Player::Player(int sampleRate) : sampleRate_(std::max(1, sampleRate)) {
-  engine_.configure(kChannels, sampleRate_);
-  metronome_.setSampleRate(sampleRate_);
+Player::Player(int sampleRate) : sampleRate_(sampleRate) {
+  // An unsupported rate never reaches the time stretch (#76); the player stays silent instead.
+  const int configured = std::max(kMinSampleRate, sampleRate_);
+  engine_.configure(kChannels, configured);
+  metronome_.setSampleRate(configured);
 }
 
 Player::~Player() {
@@ -262,6 +271,10 @@ Player::~Player() {
 }
 
 void Player::render(float *out, int frames) {
+  if (!sampleRateSupported()) {
+    std::fill(out, out + static_cast<ptrdiff_t>(frames) * kChannels, 0.0f);
+    return;
+  }
   engine_.render(out, frames);
   metronome_.renderAdd(out, frames, kChannels);
 }
@@ -281,6 +294,8 @@ int Player::loadAsync(const std::string &path) {
   int err = kOk;
   if (path.empty())
     err = kErrInvalidArgument;
+  else if (!sampleRateSupported())
+    err = kErrUnsupportedSampleRate;
   else if (!deviceAvailable())
     err = kErrDeviceUnavailable;
   if (err != kOk) {
@@ -314,6 +329,8 @@ void Player::runLoad(const std::string &path) {
 }
 
 int Player::setSource(std::unique_ptr<Source> source, bool withPeaks) {
+  if (!sampleRateSupported())
+    return kErrUnsupportedSampleRate;
   if (!source || source->frames < 1 ||
       source->data.size() != static_cast<size_t>(source->frames) * static_cast<size_t>(kChannels))
     return kErrInvalidArgument;

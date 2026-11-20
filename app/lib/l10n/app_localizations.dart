@@ -950,6 +950,12 @@ abstract class AppLocalizations {
   /// **'The audio core is busy right now. Please try again.'**
   String get loadBusy;
 
+  /// No description provided for @loadUnsupportedSampleRate.
+  ///
+  /// In en, this message translates to:
+  /// **'The audio output runs at too low a sample rate. At least 8 kHz is needed.'**
+  String get loadUnsupportedSampleRate;
+
   /// No description provided for @loadInvalid.
   ///
   /// In en, this message translates to:

@@ -31,13 +31,17 @@ void main() {
     expect(WpCode.fileUnreadable, define('WP_ERR_FILE_UNREADABLE'));
     expect(WpCode.cancelled, define('WP_ERR_CANCELLED'));
     expect(WpCode.busy, define('WP_ERR_BUSY'));
+    expect(
+      WpCode.unsupportedSampleRate,
+      define('WP_ERR_UNSUPPORTED_SAMPLE_RATE'),
+    );
     expect(WpCode.loadIdle, define('WP_LOAD_IDLE'));
     expect(WpCode.loadRunning, define('WP_LOAD_RUNNING'));
     expect(WpCode.loadReady, define('WP_LOAD_READY'));
     final errDefines = RegExp(r'#define WP_ERR_\w+').allMatches(header).length;
     expect(
       errDefines,
-      8,
+      9,
       reason: 'new WP_ERR_* in wp_core.h: update WpCode and loadErrorMessage',
     );
   });

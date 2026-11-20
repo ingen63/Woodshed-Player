@@ -539,6 +539,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loadBusy => 'The audio core is busy right now. Please try again.';
 
   @override
+  String get loadUnsupportedSampleRate =>
+      'The audio output runs at too low a sample rate. At least 8 kHz is needed.';
+
+  @override
   String get loadInvalid => 'Invalid file reference.';
 
   @override

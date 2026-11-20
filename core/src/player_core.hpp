@@ -26,7 +26,12 @@ enum ErrorCode {
   kErrFileUnreadable = -6,
   kErrCancelled = -7,
   kErrBusy = -8,
+  kErrUnsupportedSampleRate = -9,
 };
+
+// Lowest sample rate the core accepts, as WP_MIN_SAMPLE_RATE in wp_core.h (#76). Below it the
+// time stretch divides by zero (block size 0).
+constexpr int kMinSampleRate = 8000;
 
 // Deutscher Text zu einem Fehlercode (statisch, nie nullptr).
 const char *errorMessage(int code);
@@ -37,12 +42,12 @@ double fileDuration(const std::string &path);
 
 // Dekodiert MP3, WAV oder FLAC aus dem Speicher nach `out` (Stereo, f32, `sampleRate`), z. B. im
 // Browser, wo es keine Dateipfade gibt (#33). kOk, kErrInvalidArgument, kErrUnsupportedFormat oder
-// kErrOutOfMemory.
+// kErrOutOfMemory; kErrUnsupportedSampleRate below kMinSampleRate (#76).
 int decodeMemory(const void *data, size_t size, int sampleRate, Source &out);
 
 // Wandelt bereits dekodiertes PCM (interleaved, `channels` Kanäle, `srcRate`) nach `out` (Stereo,
 // `dstRate`), z. B. AAC/M4A, das der Browser dekodiert hat (#33). Mono wird auf beide Kanäle
-// gelegt.
+// gelegt. Both rates below kMinSampleRate give kErrUnsupportedSampleRate (#76).
 int convertPcm(const float *interleaved, int channels, long long frames, int srcRate, int dstRate,
                Source &out);
 
@@ -71,6 +76,9 @@ public:
   Engine &engine() { return engine_; }
   Metronome &metronome() { return metronome_; }
   int sampleRate() const { return sampleRate_; }
+  // Whether the rate given to the constructor is at least kMinSampleRate (#76). If not, render()
+  // outputs silence and every load reports kErrUnsupportedSampleRate.
+  bool sampleRateSupported() const { return sampleRate_ >= kMinSampleRate; }
 
   // Audio-Thread: Titel und Metronom nach `out` (interleaved, kChannels). Sperrt nicht, reserviert
   // nichts.

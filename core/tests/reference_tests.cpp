@@ -863,10 +863,73 @@ void webEntryPointsAtTheirLimits() {
     loud = std::max(loud, std::fabs(b[i]));
   CHECK(loud > 0.3f);
   wp_destroy(p);
+}
 
-  // Below 1 Hz there is no player. (1 Hz itself is accepted, but the time stretch divides by zero
-  // there, found by UBSan with #11; docs/TESTS.md «Gefundene Fehler».)
-  CHECK(wp_web_create(0) == nullptr);
+void sampleRateLowerLimit() {
+  // #76/AK1 #76/AK2: WP_MIN_SAMPLE_RATE (8000 Hz) is the lowest rate the core accepts. At the limit
+  // a player loads and plays; just below it (7999 Hz) and at nonsense rates (1 Hz, where the time
+  // stretch divided by zero, docs/TESTS.md «Gefundene Fehler» Nr. 21; 0 and negative) the player
+  // exists but stays silent, and every way of loading reports WP_ERR_UNSUPPORTED_SAMPLE_RATE
+  // instead of crashing. Decoding and converting into a track check the rate the same way.
+  CHECK(WP_MIN_SAMPLE_RATE == 8000);
+  CHECK(std::string(wp_error_message(WP_ERR_UNSUPPORTED_SAMPLE_RATE)) != wp_error_message(-100));
+  const auto wav = wavInMemory(8000, 800);
+  const float pcm[4] = {0.25f, -0.25f, 0.25f, -0.25f};
+  int err = -999;
+
+  wp_web_track *t = wp_web_track_decode(wav.data(), wav.size(), WP_MIN_SAMPLE_RATE, &err);
+  CHECK(t != nullptr && err == WP_OK);
+  wp_web_track_free(t);
+  t = wp_web_track_convert(pcm, 2, 2, WP_MIN_SAMPLE_RATE, WP_MIN_SAMPLE_RATE, &err);
+  CHECK(t != nullptr && err == WP_OK);
+  wp_web_track_free(t);
+
+  wp_player *p = wp_web_create(WP_MIN_SAMPLE_RATE);
+  CHECK(p != nullptr);
+  if (p) {
+    CHECK(wp_web_load_encoded(p, wav.data(), wav.size()) == WP_OK);
+    CHECK(wp_web_load_pcm(p, pcm, 2, 2, WP_MIN_SAMPLE_RATE) == WP_OK);
+    wp_play(p);
+    const float *b = wp_web_render(p, 2);
+    CHECK(b != nullptr && b[0] == 0.25f);
+    wp_destroy(p);
+  }
+
+  for (const int rate : {WP_MIN_SAMPLE_RATE - 1, 1, 0, -1}) {
+    err = -999;
+    CHECK(wp_web_track_decode(wav.data(), wav.size(), rate, &err) == nullptr);
+    CHECK(err == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
+    err = -999;
+    CHECK(wp_web_track_convert(pcm, 2, 2, rate, WP_MIN_SAMPLE_RATE, &err) == nullptr);
+    CHECK(err == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
+    err = -999;
+    CHECK(wp_web_track_convert(pcm, 2, 2, WP_MIN_SAMPLE_RATE, rate, &err) == nullptr);
+    CHECK(err == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
+
+    p = wp_web_create(rate);
+    CHECK(p != nullptr);
+    if (!p)
+      continue;
+    CHECK(wp_web_sample_rate(p) == rate);
+    CHECK(wp_web_load_encoded(p, wav.data(), wav.size()) == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
+    CHECK(wp_web_load_pcm(p, pcm, 2, 2, WP_MIN_SAMPLE_RATE) == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
+    CHECK(wp_web_pcm_begin(p, 2) == WP_OK);
+    CHECK(wp_web_pcm_append(p, pcm, 2) == WP_OK);
+    CHECK(wp_web_pcm_commit(p) == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
+    CHECK(wp_load(p, "any.wav") == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
+    CHECK(wp_load_state(p) == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
+    CHECK(wp_duration(p) == 0.0);
+    // Silent output, also with the metronome running.
+    wp_metro_set_volume(p, 1.0f);
+    wp_metro_start(p);
+    wp_play(p);
+    const float *b = wp_web_render(p, 400);
+    float peak = 0;
+    for (int i = 0; b && i < 800; ++i)
+      peak = std::max(peak, std::fabs(b[i]));
+    CHECK(b != nullptr && peak == 0.0f);
+    wp_destroy(p);
+  }
 }
 
 void run(const char *name, void (*test)()) {
@@ -904,6 +967,7 @@ int main(int argc, char **argv) {
   run("#9/AK7 load from file, waveform, errors", loadFromFile);
   run("#9/AK7 recording unavailable offline", recordingUnavailableOffline);
   run("#11 browser entry points at their limits", webEntryPointsAtTheirLimits);
+  run("#76/AK1 #76/AK2 sample rate lower limit", sampleRateLowerLimit);
 
   if (mode == Mode::Dump) {
     const bool ok = writeDump(contractPath);

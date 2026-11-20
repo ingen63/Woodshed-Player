@@ -142,6 +142,7 @@
   "loadOutOfMemory": "Die Datei «{file}» ist zu gross für den freien Arbeitsspeicher.",
   "loadCancelled": "Das Laden wurde abgebrochen.",
   "loadBusy": "Der Audio-Kern ist gerade ausgelastet. Bitte erneut versuchen.",
+  "loadUnsupportedSampleRate": "Die Audio-Ausgabe läuft mit zu niedriger Samplerate. Nötig sind mindestens 8 kHz.",
   "loadInvalid": "Ungültige Datei-Angabe.",
   "loadUnknown": "Unbekannter Fehler beim Laden (Code {code}).",
   "libraryCorrupt": "Die Bibliothek war beschädigt und wurde als «{backup}» aufgehoben.",

@@ -348,6 +348,7 @@ void main() {
         WpCode.fileUnreadable,
         WpCode.cancelled,
         WpCode.busy,
+        WpCode.unsupportedSampleRate,
       ];
       for (final l in [de, lookupAppLocalizations(const Locale('en'))]) {
         final texts = codes

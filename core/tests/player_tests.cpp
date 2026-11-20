@@ -28,7 +28,9 @@ static_assert(WP_OK == wp::kOk && WP_ERR_INVALID_ARGUMENT == wp::kErrInvalidArgu
                   WP_ERR_DEVICE_UNAVAILABLE == wp::kErrDeviceUnavailable &&
                   WP_ERR_OUT_OF_MEMORY == wp::kErrOutOfMemory &&
                   WP_ERR_FILE_UNREADABLE == wp::kErrFileUnreadable &&
-                  WP_ERR_CANCELLED == wp::kErrCancelled && WP_ERR_BUSY == wp::kErrBusy,
+                  WP_ERR_CANCELLED == wp::kErrCancelled && WP_ERR_BUSY == wp::kErrBusy &&
+                  WP_ERR_UNSUPPORTED_SAMPLE_RATE == wp::kErrUnsupportedSampleRate &&
+                  WP_MIN_SAMPLE_RATE == wp::kMinSampleRate,
               "error codes in wp_core.h and player_core.hpp must match");
 static_assert(WP_LOAD_IDLE == wp::kLoadIdle && WP_LOAD_RUNNING == wp::kLoadRunning &&
                   WP_LOAD_READY == wp::kLoadReady,
@@ -251,7 +253,7 @@ void loadErrorsHaveCodeAndText() { // #14/AK2, #14/AK5 Fehlerfälle
   p.setDeviceAvailable(true);
 
   // Jeder Code hat einen eigenen Text.
-  for (int c = wp::kErrInvalidArgument; c >= wp::kErrBusy; --c)
+  for (int c = wp::kErrInvalidArgument; c >= wp::kErrUnsupportedSampleRate; --c)
     CHECK(std::strcmp(wp::errorMessage(c), wp::errorMessage(-100)) != 0);
 }
 
@@ -572,7 +574,7 @@ void convertPcmToPlayerFormat() {
   CHECK(wp::convertPcm(nullptr, 2, 3, kSr, kSr, bad) == wp::kErrInvalidArgument);
   CHECK(wp::convertPcm(st.data(), 0, 3, kSr, kSr, bad) == wp::kErrInvalidArgument);
   CHECK(wp::convertPcm(st.data(), 2, 0, kSr, kSr, bad) == wp::kErrInvalidArgument);
-  CHECK(wp::convertPcm(st.data(), 2, 3, 0, kSr, bad) == wp::kErrInvalidArgument);
+  CHECK(wp::convertPcm(st.data(), 2, 3, 0, kSr, bad) == wp::kErrUnsupportedSampleRate); // #76
   wp::Player q(kSr);
   CHECK(q.setSource(nullptr) == wp::kErrInvalidArgument);
   CHECK(q.setSource(std::make_unique<wp::Source>()) == wp::kErrInvalidArgument);
@@ -662,6 +664,7 @@ void errorMessagesAreEnglishAscii() { // #46/AK1
                        WP_ERR_FILE_UNREADABLE,
                        WP_ERR_CANCELLED,
                        WP_ERR_BUSY,
+                       WP_ERR_UNSUPPORTED_SAMPLE_RATE,
                        -100};
   const char *german[] = {"datei",       "fehler",      "nicht",    "kein",
                           "unbekannt",   "laden",       "speicher", "aufruf",

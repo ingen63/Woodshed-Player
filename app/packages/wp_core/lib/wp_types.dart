@@ -15,6 +15,7 @@ abstract final class WpCode {
   static const fileUnreadable = -6;
   static const cancelled = -7;
   static const busy = -8;
+  static const unsupportedSampleRate = -9;
 
   static const loadIdle = 0;
   static const loadRunning = 1;
