@@ -1,6 +1,7 @@
 // Sanitizer self-test (#57/AK1, AK2): each mode contains one deliberate bug. In a sanitizer build
 // the sanitizer must report it and end the program with a non-zero exit code; expect_finding.cmake
 // checks both. Proves that a finding in the real tests fails the run.
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -9,6 +10,30 @@
 namespace {
 volatile int gSink = 0;
 int gShared = 0; // written by two threads without synchronisation (thread mode)
+
+// Fixed order for the race (#63): relaxed atomics create no happens-before edge for TSan, so the
+// two writes to gShared stay unordered while the schedule is the same in every run, under load
+// too. The second thread still lives when the main thread writes, so TSan can restore both stacks.
+std::atomic<int> gStep{0};
+
+void waitForStep(int step) {
+  while (gStep.load(std::memory_order_relaxed) < step) {
+    std::this_thread::yield();
+  }
+}
+
+void deterministicRace() {
+  std::thread t([] {
+    gShared = 1; // first write
+    gStep.store(1, std::memory_order_relaxed);
+    waitForStep(2); // stay alive until the main thread has written
+  });
+  waitForStep(1);
+  gShared = 2; // second write, races with the first one
+  gStep.store(2, std::memory_order_relaxed);
+  t.join();
+  gSink = gShared;
+}
 } // namespace
 
 int main(int argc, char **argv) {
@@ -22,10 +47,7 @@ int main(int argc, char **argv) {
     big += 1 + gSink; // signed integer overflow
     gSink = big;
   } else if (std::strcmp(mode, "thread") == 0) {
-    std::thread t([] { gShared = 1; }); // data race with the write below
-    gShared = 2;
-    t.join();
-    gSink = gShared;
+    deterministicRace();
   } else {
     std::printf("usage: sanitizer_selftest address|undefined|thread\n");
     return 2;

@@ -318,7 +318,9 @@ und lässt den Lauf scheitern. Die Builds liegen in eigenen Ordnern, `core/build
 Lokal laufen sie auf macOS mit Apple-Clang, im Workflow unter Linux mit Clang. Der Selbsttest
 `core/tests/sanitizer/selftest.cpp` enthält je Sanitizer einen absichtlichen Fehler (Pufferüberlauf,
 Ganzzahlüberlauf, Wettlauf); `expect_finding.cmake` verlangt Meldung und Fehlercode. Er beweist, dass ein Fund die
-Tests wirklich scheitern lässt.
+Tests wirklich scheitern lässt. Der Wettlauf hat einen festen Ablauf (#63): Die beiden Threads schreiben nacheinander,
+abgestimmt über `relaxed`-Atomics, die für TSan keine Ordnung herstellen. So meldet TSan ihn auch unter Last in jedem
+Lauf (geprüft mit 20 Läufen parallel zu `make coverage`).
 
 **Wettläufe (AK2).** Unter ThreadSanitizer steuern `engine_tests.cpp` (`commandsFromManyThreadsWhileRendering`: drei
 Threads mit Seek, Tempo, Lautstärke, Loop, Pause, Play) und `player_tests.cpp` (`controlFromSecondThreadWhileRendering`:
