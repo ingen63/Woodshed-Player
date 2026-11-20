@@ -464,10 +464,13 @@ void main() {
       final f = File('${dir.path}/Neu.flac')..writeAsStringSync('audio');
       await tester.runAsync(() async {
         app.files.drop!([f.path]);
-        for (var i = 0; i < 100 && app.library.tracks.isEmpty; i++) {
-          await Future<void>.delayed(const Duration(milliseconds: 5));
-        }
       });
+      // #78/AK1: wait for the state, a time limit only against a hang
+      await waitUntil(
+        tester,
+        () => app.library.tracks.isNotEmpty,
+        'dropped file in the library',
+      );
       await tester.pump();
       expect(find.byKey(const Key('track:Neu')), findsOneWidget);
     });

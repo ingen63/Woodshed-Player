@@ -203,18 +203,19 @@ void main() {
       final app = TestApp(Directory('${tmp.path}/lib'));
       await app.library.load();
       final wav = File('${tmp.path}/Recording.wav')..writeAsStringSync('wav');
-      final added = app.controller.addRecording(wav.path, title: 'Aufnahme 1');
-      for (
-        var i = 0;
-        i < 200 && app.core.loadState != WpCode.loadRunning;
-        i++
-      ) {
-        await Future<void>.delayed(const Duration(milliseconds: 5));
-      }
-      for (var i = 0; i < 20; i++) {
+      var finished = false;
+      final added = app.controller
+          .addRecording(wav.path, title: 'Aufnahme 1')
+          .whenComplete(() => finished = true);
+      // #78/AK1: wait for states, a time limit only against a hang
+      await eventually(
+        () => app.core.loadState == WpCode.loadRunning,
+        'recording is loading',
+      );
+      await eventually(() {
         app.finishLoads(30);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
-      }
+        return finished;
+      }, 'recording added');
       await added;
       expect(app.player.title, 'Aufnahme 1');
       app.player

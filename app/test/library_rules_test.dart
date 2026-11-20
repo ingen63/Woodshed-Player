@@ -414,9 +414,7 @@ void main() {
       a.library.updateSettings(t.id, t.settings.copyWith(speed: 0.6));
       expect(store.indexWrites, writes);
       // wait for the save (a state, not a time), then for as long again
-      for (var i = 0; i < 500 && store.indexWrites == writes; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
+      await eventually(() => store.indexWrites != writes, 'delayed save');
       await Future<void>.delayed(const Duration(milliseconds: 60));
       expect(store.indexWrites, writes + 1);
       final tracks = (a.saved['tracks'] as Map)[t.id] as Map;

@@ -79,22 +79,6 @@ int cloudGeneration(InMemoryProvider c) =>
 
 void tick([int ms = 1000]) => clock = clock.add(Duration(milliseconds: ms));
 
-/// Waits until [done] holds, polling in real time, instead of waiting a fixed time (#92). Fails only when the state
-/// is not reached within [hangGuard], so a loaded machine makes the test slower, never red.
-Future<void> eventually(
-  bool Function() done,
-  String what, {
-  Duration hangGuard = const Duration(seconds: 60),
-}) async {
-  final watch = Stopwatch()..start();
-  while (!done() && watch.elapsed < hangGuard) {
-    await Future<void>.delayed(const Duration(milliseconds: 5));
-  }
-  if (!done()) {
-    fail('hang: «$what» not reached within ${hangGuard.inSeconds} s');
-  }
-}
-
 void main() {
   setUp(() {
     clock = DateTime.utc(2026, 11, 1);

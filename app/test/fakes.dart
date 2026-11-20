@@ -359,12 +359,21 @@ Future<void> waitUntil(
   String what, {
   Duration hangGuard = const Duration(seconds: 60),
 }) async {
-  await tester.runAsync(() async {
-    final watch = Stopwatch()..start();
-    while (!done() && watch.elapsed < hangGuard) {
-      await Future<void>.delayed(const Duration(milliseconds: 5));
-    }
-  });
+  await tester.runAsync(() => eventually(done, what, hangGuard: hangGuard));
+}
+
+/// Waits until [done] holds, polling in real time, instead of waiting a fixed time (#92, #78). For plain tests
+/// without a [WidgetTester]. Fails only when the state is not reached within [hangGuard], so a loaded machine
+/// makes the test slower, never red.
+Future<void> eventually(
+  bool Function() done,
+  String what, {
+  Duration hangGuard = const Duration(seconds: 60),
+}) async {
+  final watch = Stopwatch()..start();
+  while (!done() && watch.elapsed < hangGuard) {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
   if (!done()) {
     fail('hang: «$what» not reached within ${hangGuard.inSeconds} s');
   }

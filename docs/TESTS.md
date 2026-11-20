@@ -1023,7 +1023,10 @@ Text «Alphabetisch» trifft darum den Menüeintrag, nicht den Text.
   `app/test/fakes.dart` pumpt Bild für Bild auf der Testuhr, bis der Zustand erreicht ist (Grenze: 500 Bilder).
   `waitUntil(tester, done, what)` wartet in Echtzeit auf Arbeit ausserhalb der Testuhr (Dateisystem) und scheitert
   nur nach 60 s als Hänger. Vorher wartete `recording_test.dart` (#4/AK4) höchstens 1 s in Echtzeit auf die
-  Aufnahme in der Bibliothek; das hätte unter Last wirklich scheitern können.
+  Aufnahme in der Bibliothek; das hätte unter Last wirklich scheitern können. Tests ohne `WidgetTester` warten mit
+  `eventually(done, what)` aus derselben Datei. Dass kein Test unter `app/test/` mehr in einer Schleife mit fester
+  Höchstzahl wartet (`Future.delayed` oder `sleep` in `for`/`while` ohne `hangGuard`), prüft «#78/AK2 …» in
+  `ui_test_rules_test.dart`. Einzelne Pausen ausserhalb einer Schleife erfasst die Prüfung nicht.
 
 **Kein globales `retry` in `dart_test.yaml`.** Entschieden am 20.11.2026: Ein wackelnder Test ist ein Fehler, dessen
 Ursache behoben wird. Eine Wiederholung würde ihn verstecken und auch echte Fehler mit zeitlicher Ursache (Rennen,
@@ -1204,3 +1207,13 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     von `state.json` und den Status `idle`, danach auf die fremde Sortierung. Er prüft weiterhin, dass fünf Änderungen
     genau einmal gesendet werden. Die übrigen Tests der Datei warten nicht auf feste Zeiten. Test: «#92/AK1 start and
     resume sync; several changes are sent together once» in `sync_test.dart`, 20 Läufe neben voller CPU-Last grün.
+29. 21.11.2026, #78 (aus #62): Zwei Widget-Tests warteten in `Future.delayed`-Schleifen mit fester Höchstzahl
+    (100 bzw. 200 und 20 Runden zu 5 ms, also höchstens rund 1 s Echtzeit) auf Arbeit ausserhalb der Testuhr:
+    `home_page_test.dart`, «ins Fenster gezogene Dateien erscheinen in der Liste», und `recording_test.dart`,
+    «#4/AK4: a recording plays with tempo and loop like any title». Unter Last hätten sie scheitern können, ohne dass
+    etwas falsch ist; beobachtet wurde kein Fehlschlag. Sie warten jetzt mit `waitUntil` bzw. `eventually`
+    (`app/test/fakes.dart`, Hänger nach 60 s) auf den Zustand. Die neue Prüfung fand zwei weitere solche Schleifen:
+    `until` in `app_controller_test.dart` (200 × 5 ms) und das Warten auf das verzögerte Speichern in
+    `library_rules_test.dart` (500 × 10 ms); beide warten jetzt ebenfalls mit `eventually`. Die Regelprüfung von
+    #13/AK2 deckte `app/test/` nicht ab. Test: «#78/AK2 widget tests wait for states, not in fixed-count loops» in `ui_test_rules_test.dart`, mit
+    den alten Schleifen als Regressionsfall.

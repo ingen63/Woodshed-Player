@@ -20,13 +20,8 @@ File src(String name) => File('${tmp.path}/quelle/$name')
     'audio $name',
   ); // distinct contents, otherwise a duplicate (#35)
 
-/// Wartet, bis [done] gilt (Datei-Operationen laufen wirklich asynchron).
-Future<void> until(bool Function() done) async {
-  for (var i = 0; i < 200 && !done(); i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 5));
-  }
-  expect(done(), isTrue, reason: 'timeout');
-}
+/// Waits until [done] holds (file operations really run asynchronously); #78: a time limit only against a hang.
+Future<void> until(bool Function() done) => eventually(done, 'state reached');
 
 void main() {
   setUp(() => tmp = Directory.systemTemp.createTempSync('wp_app_test'));
