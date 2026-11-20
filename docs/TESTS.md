@@ -489,7 +489,32 @@ eingecheckt; im Workflow über den Cache von Nacht zu Nacht). Ein Fund (Absturz,
 Zeitüberschreitung, Speicher) beendet den Lauf mit Fehler und legt die Eingabe unter
 `core/build-fuzz/artifacts/<ziel>/` ab; der Job `fuzz` lädt sie als Artefakt hoch. Nach der Behebung kommt die
 Eingabe nach `core/tests/fuzz/regressions/<ziel>/`. Stand 19.11.2026, je 60 s auf dem Mac: `fuzz_decoder` rund
-35 000–90 000 Eingaben, `fuzz_capi` rund 700–1100 (langsam, weil jede Eingabe bis zu 64 Blöcke rendert), ohne Fund.
+35 000–90 000 Eingaben, `fuzz_capi` rund 700–1100, ohne Fund.
+
+**Durchsatz von `fuzz_capi` (#66).** Ein Profil zeigte, dass nicht das Rendern die meiste Zeit braucht, sondern das
+Laden: rund 78 % in `wp_web_load_pcm` (Umrechnen langer PCM-Titel auf die Geräterate, Peaks), 10 % im Anlegen des
+Players, 7 % im Rendern. `fuzz_capi` macht deshalb pro Eingabe nur, was die Befehlsfolge braucht:
+
+- Ein erzeugter PCM-Titel ist 0–2 s lang, gleich verteilt (vorher bis 200 000 Frames, bei 8000 Hz 25 s). Der
+  Startkorpus nutzt 1,5 s und bleibt unverändert gültig.
+- Höchstens 4 Ladebefehle pro Eingabe; weitere lesen ihre Argumente und laden nichts, so bleibt jede Eingabe ein
+  gültiges Programm.
+- «Lang rendern» (bis 64 Blöcke) hört auf, sobald weiteres Rendern nichts mehr ändert: nach einem Block, wenn weder
+  Titel noch Metronom laufen, nach einem Loop-Durchgang und am Ende des Titels. Der Schlussblock entfällt, wenn das
+  Programm mit Rendern endet.
+
+Messung auf demselben Mac (Apple M1 Pro, `make fuzz`-Build mit ASan und UBSan), je 60 s nur vom eingecheckten Korpus
+aus, mit leerem Arbeitskorpus und festem Seed (1, 2, 11, 12, 13):
+
+| Stand | Eingaben pro Minute | Median |
+|---|---|---|
+| vorher (ef479d1) | 811, 1337, 1420, 1759, 2223 | 1420 |
+| nachher (#66) | 2158, 2668, 3178, 3198, 3354 | 3178 |
+
+Die Abdeckung blieb gleich oder stieg (cov 2367–2400 vorher, 2406–2462 nachher). Alle 29 Funktionen der C-API, die
+`fuzz_capi` aufruft, erreicht schon der Startkorpus allein; geprüft mit
+`core/build-fuzz/fuzz_capi -runs=0 -print_coverage=1 core/tests/fuzz/regressions/capi core/tests/fuzz/corpus/capi`
+(jede Funktion als `COVERED_FUNC`).
 
 **Golden-Dateien (AK5).** `app/test/golden/` hält `library.json` jeder Version mit erfundenen Titeln
 (`README.md` dort): Swift `[Track]`, Swift `{folders, tracks}`, Format 2 von #36 (ein Feld `loop`, erzeugt mit dem

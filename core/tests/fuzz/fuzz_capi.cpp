@@ -25,6 +25,16 @@ namespace {
 
 constexpr int kRates[] = {8000, 22050, 44100, 48000, 96000};
 
+// Longest generated title (#66): converting to the device rate and the peaks cost time in
+// proportion to its length, but a longer title reaches no other code; loops wrap and titles end
+// sooner. The start corpus uses 1.5 s.
+constexpr int kMaxPcmSeconds = 2;
+
+// Loads per input (#66): loading converts the whole title, the most expensive command. A program
+// needs few (a title, a replacement, a failed load after a good one); further load commands read
+// their arguments but load nothing, so every input stays a valid program.
+constexpr int kMaxLoads = 4;
+
 enum Op : uint8_t {
   kLoadEncoded, // u16 length, then that many bytes of an audio file (MP3, WAV, FLAC or garbage)
   kLoadPcm,     // channels, frames, source rate: a generated ramp
@@ -36,7 +46,7 @@ enum Op : uint8_t {
   kLoop,         // seconds a, seconds b
   kVolume,       // raw float or 0–1
   kRender,       // u16 frames (clamped to 1–WP_WEB_MAX_BLOCK by the API)
-  kRenderLong,   // 1–64 blocks of 512 frames, so loops wrap and files end
+  kRenderLong,   // up to 1–64 blocks of 512 frames, so loops wrap and files end (see renderLong)
   kMetroStart,   //
   kMetroStop,    //
   kMetroBpm,     // i32
@@ -61,6 +71,8 @@ float rawFloat(wp::fuzz::Reader &in) {
 struct State {
   wp_player *p = nullptr;
   long long passes = 0;
+  bool renderedLast = false; // the last command rendered, nothing changed since
+  int loads = 0;
 };
 
 void checkInvariants(State &s) {
@@ -84,10 +96,28 @@ void render(State &s, int frames) {
     WP_FUZZ_CHECK(std::isfinite(out[i]));
 }
 
+// #66: renders only as long as it can still change something. Without title or metronome
+// playing the output stays silent, so one block is checked; a loop pass or the end of the title
+// ends the command too, the next command can render on.
+void renderLong(State &s, int blocks) {
+  for (int i = 0; i < blocks; ++i) {
+    const long long passes = wp_loop_passes(s.p);
+    render(s, 512);
+    if (!wp_is_playing(s.p) && !wp_metro_is_running(s.p))
+      break;
+    if (wp_loop_passes(s.p) != passes)
+      break;
+  }
+}
+
 void loadPcm(State &s, wp::fuzz::Reader &in) {
   const int channels = 1 + in.byte() % 4;
-  const int frames = static_cast<int>(in.u32() % 200000); // up to ~4.5 s at 44.1 kHz
+  const uint32_t rawFrames = in.u32();
   const int rate = kRates[in.byte() % 5];
+  // 0 to kMaxPcmSeconds, evenly: most titles are short and cheap to load.
+  const int frames = static_cast<int>(rawFrames % static_cast<uint32_t>(kMaxPcmSeconds * rate + 1));
+  if (++s.loads > kMaxLoads)
+    return;
   std::vector<float> pcm(static_cast<size_t>(frames) * channels);
   for (size_t i = 0; i < pcm.size(); ++i)
     pcm[i] = static_cast<float>(static_cast<double>(i % 2000) / 1000.0 - 1.0);
@@ -98,10 +128,14 @@ void loadPcm(State &s, wp::fuzz::Reader &in) {
 }
 
 void step(State &s, wp::fuzz::Reader &in) {
-  switch (static_cast<Op>(in.byte() % kOpCount)) {
+  const auto op = static_cast<Op>(in.byte() % kOpCount);
+  s.renderedLast = op == kRender || op == kRenderLong;
+  switch (op) {
   case kLoadEncoded: {
     size_t got = 0;
     const uint8_t *bytes = in.take(in.u16(), got);
+    if (++s.loads > kMaxLoads)
+      break;
     const double before = wp_duration(s.p);
     const int r =
         wp_web_load_encoded(s.p, got ? bytes : reinterpret_cast<const uint8_t *>(""), got);
@@ -117,6 +151,8 @@ void step(State &s, wp::fuzz::Reader &in) {
   case kLoadFile: {
     size_t got = 0;
     const uint8_t *bytes = in.take(in.u16(), got);
+    if (++s.loads > kMaxLoads)
+      break;
     const std::string &path = wp::fuzz::tempFile("capi");
     if (!wp::fuzz::writeFile(path, bytes, got))
       break;
@@ -153,12 +189,9 @@ void step(State &s, wp::fuzz::Reader &in) {
   case kRender:
     render(s, static_cast<int>(in.u16()));
     break;
-  case kRenderLong: {
-    const int blocks = 1 + in.byte() % 64;
-    for (int i = 0; i < blocks; ++i)
-      render(s, 512);
+  case kRenderLong:
+    renderLong(s, 1 + in.byte() % 64);
     break;
-  }
   case kMetroStart:
     wp_metro_start(s.p);
     break;
@@ -216,8 +249,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     step(s, in);
     checkInvariants(s);
   }
-  render(s, 256);
-  checkInvariants(s);
+  // A last block after the final change of state; not needed if the program ended with one.
+  if (!s.renderedLast) {
+    render(s, 256);
+    checkInvariants(s);
+  }
   wp_destroy(s.p);
   return 0;
 }
