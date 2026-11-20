@@ -1,9 +1,11 @@
 // Tests des Metronoms (#3, #23) im Offline-Rendering. AKn = n-tes Abnahmekriterium im jeweiligen
 // Issue.
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "metronome.hpp"
@@ -478,6 +480,251 @@ void switchingModes() { // #23/AK1, AK2: Takte bleibt wie bisher, Wechsel der Ar
   CHECK(ok);
 }
 
+// ---------------------------------------------------------------------------
+// #11: cases found by mutation testing (make mutants).
+
+// One click by the rules of metronome.cpp: sine of its sound (accent 1600 Hz, level 1.0), rising
+// linearly over 1 ms (44.1 frames: factor (n + 1) / 44.1 up to 1), decaying with a time constant
+// of 12 ms (exp(-n / 529.2)), over after 50 ms (2205 frames), times the volume (0.7). renderAdd
+// adds it to what is in the buffer (here 0.25 in both channels).
+double expectedClick(int n) {
+  constexpr double kPi = 3.14159265358979323846;
+  if (n >= 2205)
+    return 0.0;
+  const double env = std::min(1.0, (n + 1) / 44.1) * std::exp(-n / 529.2);
+  return 0.7 * 1.0 * env * std::sin(2 * kPi * 1600.0 * n / 44100.0);
+}
+
+void clickShapeFollowsTheRules() {
+  Metronome m(44100);
+  m.start();
+  std::vector<float> out(4410 * 2, 0.25f);
+  m.renderAdd(out.data(), 4410, 2);
+  double worst = 0;
+  for (int n = 0; n < 4410; ++n)
+    for (int c = 0; c < 2; ++c)
+      worst = std::max(worst, std::fabs(double(out[2 * n + c]) - 0.25 - expectedClick(n)));
+  std::printf("  largest difference to the rule: %.2g\n", worst);
+  CHECK(worst < 1e-5);
+  // checks of the rule itself: rising for 1 ms, then falling, silent from frame 2205 on
+  CHECK(std::fabs(expectedClick(11)) < std::fabs(expectedClick(11 + 28))); // 1600 Hz: period 27.56
+  CHECK(out[2 * 2204] != 0.25f && out[2 * 2205] == 0.25f);
+}
+
+// A restart while clicks still ring lets them ring out under the new click (stop lets running
+// clicks ring out, #3): five starts 5 ms (220 frames) apart give the sum of the clicks started so
+// far. Four voices sound at most, the fifth start takes the oldest one: from then on the first
+// click is gone.
+void restartsLetRingingClicksRingOut() {
+  Metronome m(44100);
+  constexpr int r = 220;
+  std::vector<float> out(4410 * 2, 0.0f);
+  for (int k = 0; k < 5; ++k) {
+    m.start();
+    m.renderAdd(out.data() + static_cast<size_t>(k) * r * 2, k < 4 ? r : 4410 - 4 * r, 2);
+  }
+  double worst = 0;
+  for (int n = 0; n < 4410; ++n) {
+    double expected = 0;
+    for (int k = 0; k < 5; ++k)
+      if (n >= k * r && !(k == 0 && n >= 4 * r)) // the first click ends at the fifth start
+        expected += expectedClick(n - k * r);
+    worst = std::max(worst, std::fabs(double(out[2 * n]) - expected));
+  }
+  std::printf("  largest difference to the sum of the clicks: %.2g\n", worst);
+  CHECK(worst < 1e-5);
+}
+
+// Stop ends the clicks (running clicks ring out) and reports «not running»: started, 0.6 s played
+// (beats at 0 and 0.5 s), stopped: no click in the next 2 s, and after 50 ms silence.
+void stopEndsTheClicks() {
+  Metronome m(44100);
+  m.start();
+  CHECK(m.running());
+  CHECK(run(m, 26460).size() == 2);
+  m.stop();
+  CHECK(!m.running());
+  std::vector<Metronome::Tick> log;
+  m.tickLog = &log;
+  auto out = render(m, 88200);
+  m.tickLog = nullptr;
+  CHECK(log.empty());
+  float tail = 0;
+  for (size_t i = 2 * 2205; i < out.size(); ++i)
+    tail = std::max(tail, std::fabs(out[i]));
+  CHECK(tail == 0.0f);
+}
+
+// The bpm of the first bar that starts at or after `seconds`, or -1.
+int bpmOfFirstBarFrom(const std::vector<BarStart> &bars, double seconds) {
+  for (auto &b : bars)
+    if (b.seconds >= seconds - 1e-9)
+      return b.bpm;
+  return -1;
+}
+
+// Timed ramp 100 → 200 over 100 s: one BPM per second, at every bar the tempo is 100 + whole
+// seconds since the round began (#23/AK5). Setting the same values again while it runs changes
+// nothing; a new duration (50 s: a step every 0.5 s) starts the round anew from the running tempo
+// (#23/AK2): bpm = running tempo + whole half seconds since the change.
+void timedRampSameValuesAgainAndNewDuration() {
+  const int rate = 44100;
+  Metronome m(rate);
+  m.setTimedRamp(true, 100, 200, 100);
+  m.start();
+  run(m, rate * 5LL + rate / 2); // 5.5 s
+  m.setTimedRamp(true, 100, 200, 100);
+  auto bars = barStarts(run(m, rate * 10LL), rate);
+  bool ok = bars.size() >= 3;
+  for (auto &b : bars)
+    ok = ok && b.bpm == 100 + static_cast<int>(std::floor(b.seconds + 1e-9));
+  CHECK(ok);
+
+  Metronome n(rate);
+  n.setTimedRamp(true, 100, 200, 100);
+  n.start();
+  run(n, rate * 5LL + rate / 2);
+  const int cur = n.bpm();
+  CHECK(cur == 104); // the bar at 4.8 s (bars of 2.4 s at 100 .. 102 BPM) took 104
+  n.setTimedRamp(true, 100, 200, 50);
+  bars = barStarts(run(n, rate * 10LL), rate);
+  ok = bars.size() >= 3;
+  for (auto &b : bars)
+    ok = ok && b.bpm == cur + static_cast<int>(std::floor((b.seconds - 5.5) / 0.5 + 1e-9));
+  CHECK(ok);
+}
+
+// Switching from bars to time while playing starts the round anew from the running tempo, also if
+// start, target and duration stay as they were (#23/AK2): bars 100 → 200 in steps of 10 per bar,
+// then time 100 → 200 over 240 s (the stored duration): 2.4 s per step from the running tempo.
+void switchToTimedWithStoredValuesStartsAnew() {
+  const int rate = 44100;
+  Metronome m(rate);
+  m.setTimedRamp(true, 100, 200, 240);
+  m.setRamp(true, 100, 200, 10, 1);
+  m.start();
+  run(m, rate * 5LL);
+  const int cur = m.bpm();
+  CHECK(cur > 110 && cur < 200);
+  m.setTimedRamp(true, 100, 200, 240);
+  auto bars = barStarts(run(m, rate * 10LL), rate);
+  bool ok = bars.size() >= 3;
+  for (auto &b : bars)
+    ok = ok && b.bpm == cur + static_cast<int>(std::floor((b.seconds - 5.0) / 2.4 + 1e-9));
+  CHECK(ok);
+}
+
+// A round that starts anew in the middle still ends with the return to the start: timed ramp 100 →
+// 110 over 20 s (2 s per step, the target held for one step), started anew at 2 s with the running
+// tempo 105 (from a bars ramp in steps of 5): 105 counts as reached, 110 is reached 10 s later,
+// held 2 s, then 100 again, 12 s after the change at the latest one bar later. The rounds after
+// that last 22 s each (11 steps of 2 s): two more returns to 100.
+void restartedRoundReturnsToStart() {
+  const int rate = 44100;
+  Metronome m(rate);
+  m.setRamp(true, 100, 110, 5, 1);
+  m.start();
+  run(m, rate * 2LL); // bar 1 at 100, bar 2 at 2.4 s would take 105: still 100 here
+  CHECK(m.bpm() == 100);
+  run(m, rate / 2); // 2.5 s: bar 2 at 2.4 s took 105
+  CHECK(m.bpm() == 105);
+  m.setTimedRamp(true, 100, 110, 20);
+  auto bars = barStarts(run(m, rate * 70LL), rate);
+  std::vector<double> returns;
+  for (size_t i = 1; i < bars.size(); ++i)
+    if (bars[i].bpm < bars[i - 1].bpm) // 110 → 100, or 101 if the bar skipped the step of 100
+      returns.push_back(bars[i].seconds);
+  CHECK(returns.size() >= 3);
+  if (returns.size() >= 3) {
+    // ideal times 2.5 + 12 = 14.5 s, then every 22 s: 36.5 s, 58.5 s; a bar at 110 BPM is 2.18 s
+    const double ideal[3] = {14.5, 36.5, 58.5};
+    for (int i = 0; i < 3; ++i) {
+      std::printf("  return %d at %.2f s (ideal %.2f s)\n", i + 1, returns[i], ideal[i]);
+      CHECK(returns[i] >= ideal[i] - 1e-6 && returns[i] < ideal[i] + 2.2);
+    }
+  }
+}
+
+// Starting the round anew counts the running tempo as reached only if it lies between start and
+// target (both included); outside it starts from the start. Timed ramp 100 → 110 over 30 s (3 s per
+// step); the tempo set by hand to 90 or 150 → the next bar plays 100; at the target 110 → the next
+// bar still plays 110 (the held step).
+void restartWithTempoOutsideTheRange() {
+  const int rate = 44100;
+  for (const auto &[bpm, expected] : {std::pair{90, 100}, {150, 100}, {110, 110}, {105, 105}}) {
+    Metronome m(rate);
+    m.setTimedRamp(true, 100, 110, 60);
+    m.start();
+    run(m, rate);
+    m.setBpm(bpm);
+    m.setTimedRamp(true, 100, 110, 30); // new duration: the round starts anew
+    auto bars = barStarts(run(m, rate * 6LL), rate);
+    const int next = bpmOfFirstBarFrom(bars, 1.0);
+    std::printf("  tempo %d: next bar %d (expected %d)\n", bpm, next, expected);
+    CHECK(next == expected);
+  }
+}
+
+// Bars ramp with start = target and the tempo set by hand above it: it moves to the target in steps
+// (120 → 115 → 110 …), like any ramp, and then holds it.
+void rampWithStartEqualTargetMovesInSteps() {
+  Metronome m(44100);
+  m.setRamp(true, 100, 100, 5, 1);
+  m.start(); // with a ramp the start plays the start BPM; then set by hand
+  auto t = run(m, 100);
+  m.setBpm(120);
+  t = run(m, 44100LL * 14);
+  CHECK(bpmOfBar(t, 2) == 115);
+  CHECK(bpmOfBar(t, 3) == 110);
+  CHECK(bpmOfBar(t, 4) == 105);
+  CHECK(bpmOfBar(t, 5) == 100);
+  CHECK(bpmOfBar(t, 6) == 100);
+}
+
+// Subdivision changes within a beat: from 1 to 4 clicks, 12'000 frames after beat 2 (22'050):
+// sixteenths of 5512.5 frames, the next is the fourth sixteenth of beat 2 (k = floor(12'000 /
+// 5512.5) + 1 = 3) at 22'050 + 3 · 5512.5 = 38'587.5 (frame 38'588), then beat 3 at 44'100.
+// From 4 to 2 clicks between the third and the fourth sixteenth (14'000 frames after beat 2; the
+// third came at 11'025, the fourth would come at 16'537.5): the next eighth would be the third of
+// two (k = floor(14'000 / 11'025) + 1 = 2), so the next click is beat 3 at 44'100.
+void subdivisionChangeLateInTheBeat() {
+  {
+    Metronome m(44100);
+    m.start();
+    run(m, 22050 + 12000);
+    m.setSubdivision(4);
+    auto t = run(m, 22050);
+    CHECK(t.size() >= 2);
+    if (t.size() >= 2) {
+      CHECK(t[0].frame == 38588 && t[0].beat == 1 && t[0].sub == 3 && t[0].kind == Metronome::Sub);
+      CHECK(t[1].frame == 44100 && t[1].beat == 2 && t[1].sub == 0);
+    }
+  }
+  {
+    Metronome m(44100);
+    m.setSubdivision(4);
+    m.start();
+    run(m, 22050 + 14000);
+    m.setSubdivision(2);
+    auto t = run(m, 22050);
+    CHECK(!t.empty());
+    if (!t.empty())
+      CHECK(t[0].frame == 44100 && t[0].beat == 2 && t[0].sub == 0 && t[0].kind == Metronome::Beat);
+  }
+}
+
+// A shorter meter with the next beat outside it goes on with beat 1: beats 1–3 of 4/4 played, the
+// next would be beat 4; switched to 3/4 the next click is the accent of the next bar.
+void meterChangeWithNextBeatOutside() {
+  Metronome m(44100);
+  m.start();
+  auto t = run(m, 22050 * 2 + 100);
+  CHECK(t.size() == 3);
+  m.setMeter(3);
+  t = run(m, 22050);
+  CHECK(!t.empty() && t[0].beat == 0 && t[0].kind == Metronome::Accent && t[0].bar == 2);
+}
+
 } // namespace
 
 int main() {
@@ -502,6 +749,16 @@ int main() {
       {"timedRampStartEqualsTarget", timedRampStartEqualsTarget},
       {"timedRampFastStepsStayWithinOneBar", timedRampFastStepsStayWithinOneBar},
       {"switchingModes", switchingModes},
+      {"clickShapeFollowsTheRules", clickShapeFollowsTheRules},
+      {"restartsLetRingingClicksRingOut", restartsLetRingingClicksRingOut},
+      {"timedRampSameValuesAgainAndNewDuration", timedRampSameValuesAgainAndNewDuration},
+      {"switchToTimedWithStoredValuesStartsAnew", switchToTimedWithStoredValuesStartsAnew},
+      {"restartedRoundReturnsToStart", restartedRoundReturnsToStart},
+      {"restartWithTempoOutsideTheRange", restartWithTempoOutsideTheRange},
+      {"rampWithStartEqualTargetMovesInSteps", rampWithStartEqualTargetMovesInSteps},
+      {"subdivisionChangeLateInTheBeat", subdivisionChangeLateInTheBeat},
+      {"meterChangeWithNextBeatOutside", meterChangeWithNextBeatOutside},
+      {"stopEndsTheClicks", stopEndsTheClicks},
   };
   for (auto &[name, fn] : tests) {
     const int before = failures;

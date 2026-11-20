@@ -29,7 +29,7 @@ VivaPlan.
 | 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler, abgeschnittene Dateien), `library_files_property_test.dart`, `sync_property_test.dart`, `core/tests/fuzz/` (`make fuzz`); alle Kerntests unter ASan/UBSan und TSan (`make sanitize`, `make sanitize-thread`) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | vorhanden (#57, #10) |
 | 5 Golden-Dateien | `app/test/golden/` (`library.json` jeder Version: Swift alt und neu, Format 2 von #36 und #37), `golden_files_test.dart`, `core/tests/golden/metronome_positions.txt` | jede Version liest alle alten Stände; Klickpositionen des Metronoms (#9) | vorhanden (#9, #10) |
 | 6 Oberfläche | Widget-Tests in `app/test/`, Oberflächentests mit echtem Kern in `app/integration_test/` (Rauchtest, Tastenkürzel, Pseudo-Sprache), Web-Tests im Chrome `app/test/web/`, Rauchtest der gebauten App `tools/smoke_app.sh`, Prüfseiten im Browser `app/tool/web_*_check.dart` | Layout je Grösse, Bedienung, Texte, Tastenkürzel, OPFS und WASM-Anbindung im Browser | vorhanden (#13) |
-| Werkzeuge | `app/tool/after_commit_hook_test.dart`, `coverage_test.dart`, `pre_push_hook_test.dart` | Hook nach dem Commit, Abdeckung je Teil, `coverage-diff`, `pre-push` | vorhanden (#7, #8) |
+| Werkzeuge | `app/tool/after_commit_hook_test.dart`, `coverage_test.dart`, `pre_push_hook_test.dart`, `mutants_test.dart` | Hook nach dem Commit, Abdeckung je Teil, `coverage-diff`, `pre-push`, Mutationswerkzeug | vorhanden (#7, #8, #11) |
 
 ## Testmatrix und QA-Abgleich
 
@@ -176,7 +176,7 @@ zugeordnet.
 | Hook nach dem Commit mit eigenen Tests | vorhanden: `app/tool/after_commit_hook_test.dart` (#7/AK7) | – |
 | Abdeckung je Teil mit Untergrenze, `coverage-diff`, `pre-push` mit eigenen Tests | vorhanden: `tools/coverage-min`, `tools/git-hooks/pre-push`, `app/tool/coverage_test.dart`, `app/tool/pre_push_hook_test.dart` (#8) | – |
 | C-API (`player.cpp`) über die geteilte Bibliothek: Nullzeiger, Laden, Seek, Tempo, Loop, Wellenform, Metronom, Aufnahme im Ruhezustand | vorhanden: `core/tests/capi_tests.cpp` (#8) | – |
-| Mutationstests | Lücke | #11 |
+| Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug, `make mutants`, `make mutants-diff`, Job `mutants-diff` | vorhanden: `app/tool/mutants*.dart`, `core/tests/mutants/`, `tools/mutants-exclude.txt` (#11); offene Mutanten im Abschnitt «Mutationstests (#11)» | – |
 | Übersichtsseite Testqualität | Lücke; Platz im Workflow (Artefakt `test-quality-report` aus `build/report/`) ist vorbereitet | #12 |
 | Netzwerkfreiheit bei jedem Push: Prüfung mit eigenen Tests | vorhanden: `make network-free`, Job `network-free` in `test-quality.yml`, `test_quality_workflow_test.dart` (#58/AK6) | – |
 
@@ -201,10 +201,11 @@ make test-web       # Web-Tests in Chrome: OPFS und WASM-Kern (braucht Emscripte
 make smoke-app      # macOS-App bauen (Release) und ihren Rauchtest ausführen
 make pseudo-l10n    # Pseudo-Sprache der Oberflächentests nach einer Änderung an den ARB-Dateien
 make bench          # Leistungs- und Lasttests von Kern und Bibliothek (nächtlich, nicht in make test, #59)
+make mutants        # Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug (#11), local/mutants/full/
+make mutants-diff   # Mutationstests der seit BASE geänderten Zeilen (Vorgabe origin/main), local/mutants/diff/
 ```
 
-Noch nicht eingerichtet; die Ziele melden «noch nicht eingerichtet» mit Issue und brechen ab: `make mutants` (#11),
-`make report` (#12).
+Noch nicht eingerichtet; das Ziel meldet «noch nicht eingerichtet» mit Issue und bricht ab: `make report` (#12).
 
 Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten für `test-wasm`, Homebrew `llvm` für
 `clang-format`, `clang-tidy` und libFuzzer (`brew install llvm`; das Makefile findet sie unter
@@ -607,7 +608,7 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
   Job sie als Artefakt `test-quality-report` hoch.
 - **Werkzeuge:** Flutter in derselben Version wie `pages.yml` (`FLUTTER_VERSION`, `dart format` hängt davon ab),
   `clang-format` und `clang-tidy` in Hauptversion 23 wie Homebrew `llvm` (über `pipx`), der Kern mit clang-18 und
-  passendem `llvm-cov-18`. Mutationstests auf dem Diff kommen mit #11 als weiterer nächtlicher Job dazu.
+  passendem `llvm-cov-18`. Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
 - **Lokal geprüft** ist der Workflow nur als YAML (Aufbau, Bedingungen, Skripte mit `bash -n`, Pfadfilter mit
   Beispielen) und über `test_quality_workflow_test.dart`; `actionlint` ist nicht installiert. Ob alle Jobs auf den
   Runnern laufen, zeigen erst die Läufe nach dem Push.
@@ -693,6 +694,165 @@ Lauf werden sie hier nachgetragen und die Grenzen im Issue bestätigt oder angep
 
 Gefunden beim Messen (siehe «Gefundene Fehler» 19 und 20): Alphabetisches Sortieren brauchte 601 ms (jetzt 46 ms);
 ein 60-Minuten-Titel braucht beim Laden doppelt so viel Speicher wie seine Samples.
+
+## Mutationstests (#11)
+
+Mutationstests zeigen, ob die Tests Fehler wirklich erkennen: Ein Werkzeug ändert den Code an einer Stelle (aus `<`
+wird `<=`, aus `+` wird `-`, ein Aufruf fällt weg), lässt die Tests laufen und erwartet, dass einer scheitert. Abdeckung
+zeigt nur, was ausgeführt wird. Vorbild ist VivaPlan (cargo-mutants, #38/#40/#43/#116 dort).
+
+**Ausführen.** `make mutants` mutiert alles, `make mutants-diff` nur die seit `BASE` (Vorgabe `origin/main`) geänderten
+Zeilen (Commits seit der Basis und Arbeitsbaum, wie `coverage-diff`). Beides ruft `app/tool/mutants_run.dart` auf
+(`MUTANTS_JOBS`, Vorgabe 4; `MUTANTS_ARGS`, z. B. `--part core`, `--part dart`, `--file engine` oder `--fresh`). Die
+Ergebnisse liegen in `local/mutants/full/` bzw. `local/mutants/diff/` (nicht eingecheckt): `summary.txt` (Zahlen je
+Teil, jeder nicht erkannte Mutant mit Datei, Zeile und Spalte), `missed.txt` (nur die nicht erkannten) und
+`results.json` (alle Mutanten, für die Übersichtsseite #12). Das Werkzeug endet mit Code 3, wenn ein Mutant nicht
+erkannt und nicht begründet ausgeschlossen ist, mit 2 bei einem Werkzeugfehler, sonst mit 0 (`make` meldet jeden Code
+ausser 0 als Fehler). Zeitüberschreitungen zählen wie in
+VivaPlan als erkannt (Endlosschleife).
+
+**Werkzeuge und Lizenzen (AK6).**
+
+| Teil | Werkzeug | Lizenz | Begründung |
+|---|---|---|---|
+| C++-Kern (`core/src`, `core/web`) | [Mull](https://github.com/mull-project/mull) 0.39.1: Compiler-Plugin `mull-ir-frontend-<LLVM>` und `mull-runner` | Apache-2.0 | nur als Werkzeug genutzt, nichts davon geht in die App; Apache-2.0 ist MIT-verträglich. Mutiert auf LLVM-IR-Ebene und schaltet die Mutanten zur Laufzeit um: ein Bau für alle Mutanten statt einem je Mutant. |
+| Dart-Logik (`app/lib`) | eigenes Werkzeug `app/tool/mutants.dart` | MIT (Projekt) | keine neue Abhängigkeit (ein Paket ist nicht freigegeben, Vorschlag im Issue); einfache Mutationen reichen für die Logik |
+
+Installation von Mull (Entwicklerrechner, nicht Teil der App): das offizielle Paket der GitHub-Releases passend zur
+LLVM-Version von Homebrew (`clang --version` von `$(brew --prefix llvm)/bin`, Stand LLVM 23):
+`Mull-23-0.39.1-LLVM-23.1.4-macOS-aarch64-26.7.2.zip` (Plugin), `Mull-0.39.1-macOS-aarch64-26.7.2.zip` (`mull-runner`,
+`mull-reporter`), nach `~/.local/opt/mull` entpackt (`bin/`, `lib/`). Ein anderer Ort über `MULL_DIR` oder
+`MULL_RUNNER` und `MULL_PLUGIN`, ein anderer Compiler über `MULL_CC`/`MULL_CXX` (gleiche LLVM-Hauptversion wie das
+Plugin). Im Workflow: die Debian-Pakete für Ubuntu 24.04 und LLVM 18 (`clang-18`).
+
+**C++-Kern mit Mull.**
+
+- Eigener Bau `core/build-mutants` (Debug mit `-O1`, Asserts an; ASan und UBSan wie `make sanitize`). Nur die eigenen Ziele laden das Plugin (`wp_mutate` in `core/CMakeLists.txt`), mutiert werden laut
+  `core/tests/mutants/mull.yml` nur `core/src/` und `core/web/`; `core/third_party/`, die Tests, `recorder_mac.mm`
+  (Systemton-Aufnahme, braucht echten Ton und die Erlaubnis, #51), `miniaudio_impl.c` und `w0_bridge.cpp` nicht.
+  Operatoren: Arithmetik, Vergleiche und Grenzen, Logik, Negation, `++`/`--`, `+=`/`-=`, Wegfall eines
+  `void`-Aufrufs.
+- Mulls Prüfung, ob ein Mutant im Quelltext existiert (Junk-Erkennung), liest die mit `-grecord-command-line`
+  gespeicherte Befehlszeile und trennt sie an Leerzeichen; der Projektpfad hat eines. Das Werkzeug baut deshalb über
+  einen Link ohne Leerzeichen im temporären Ordner.
+- **Testauswahl (AK3):** Jedes Testprogramm des Kerns läuft einzeln unter `mull-runner` (`engine_tests`,
+  `metronome_tests`, `waveform_tests`, `player_tests`, `capi_tests --null-backend`, `realtime_tests`,
+  `reference_tests`, `fuzz_decoder_replay`, `fuzz_capi_replay`; nicht die Leistungstests aus #59) und führt jeden
+  Mutanten aus, der in ihm steckt. Ein Mutant ist erkannt, wenn ein Programm ihn erkennt. Mulls Abdeckungsfilter
+  (nur ausgeführte Zeilen mutieren) ist bewusst aus: Er übersprang Funktionen, die die Tests ausführen
+  (`Engine::apply` in `engine_tests`, die ganze geteilte Bibliothek in `capi_tests`). Mulls Zwischenspeicher
+  (`local/mutants/core-cache.db`) behält erkannte Mutanten auch nach einer Änderung des Testprogramms; nur die
+  übrigen laufen erneut. `--fresh` beginnt neu.
+- **Schneller Schalter:** Mull fragt bei jedem Aufruf einer mutierten Funktion `getenv(<Mutant>)`, ob der Mutant
+  aktiv ist. In den Render-Schleifen (je Sample) brauchten die Metronom-Tests so 65 s statt 0,7 s, die Engine-Tests
+  endeten nicht in 200 s. `core/tests/mutants/mutant_switch.cpp` ersetzt im Mutationsbau `getenv` und beantwortet die
+  Mutanten-Namen (Präfix `cxx_`) aus der beim Start gelesenen Umgebung; welcher Mutant läuft, ändert sich nicht.
+- Ein Mutant, der ausserhalb eines Puffers schreibt, wird von ASan erkannt wie im Workflow-Job `sanitize`. Lecks zählen
+  nicht (`detect_leaks=0`, LeakSanitizer läuft auf macOS nicht; so ergeben beide Systeme dieselben Mutanten).
+
+**Dart-Logik mit eigenem Werkzeug.**
+
+- **Umfang:** Dateien in `app/lib/` ohne Oberfläche (kein Import von `flutter/material`, `widgets`, `cupertino`,
+  `material_ui`) und ohne Web-Code (`dart:js_interop`, `package:web`, `*_web.dart`), ohne `main.dart`, `smoke.dart`
+  (Start der App, Rauchtest) und die erzeugten `l10n`-Dateien. Die Oberfläche prüfen Widget- und Oberflächentests, den
+  Web-Code die Web-Tests im Chrome (`make test-web`).
+- **Mutationen** nur im Code, nie in Kommentaren oder Zeichenketten: Vergleiche (`<`↔`<=`, `>`↔`>=`, `==`↔`!=`),
+  `&&`↔`||`, `+`↔`-`, `*`↔`/`, `~/`→`*`, `%`→`~/`, `+=`↔`-=`, `++`↔`--`, Wegfall eines vorangestellten `!`,
+  `true`↔`false`, Wegfall eines Aufrufs, der allein auf einer Zeile steht. Binäre Operatoren erkennt das Werkzeug an
+  den Leerzeichen, die `dart format` immer setzt (`List<int>` und `=>` bleiben unberührt).
+- **Testauswahl (AK3):** je Datei die Testdateien mit dem kürzesten Importweg: die, die sie direkt importieren; nur
+  wenn es keine gibt, die über eine Datei dazwischen, und so weiter. Die Widget-Tests erreichen über die Oberfläche
+  fast jede Datei und machten jeden Mutanten minutenlang; die Logik prüfen ihre eigenen Tests. Ein Mutant läuft in
+  einer von `MUTANTS_JOBS` Kopien von `app/` (`local/mutants/<Lauf>/dart/ws<n>`, ohne Build-Ordner; die Ordner neben
+  `app/` als Links) mit `flutter test --no-pub --concurrency 2 <Testdateien>`.
+- Ein Mutant, der nicht übersetzt, zählt als «nicht übersetzbar», nicht als erkannt.
+
+**Grenzen: Zeit, Speicher, Parallelität (AK3, AK4).**
+
+| | C++-Kern | Dart-Logik |
+|---|---|---|
+| Zeitlimit je Mutant | max(10 × Dauer des unveränderten Programms, 20 s) (`--minimum-timeout`); Aufwärm- und Basislauf 300 s | max(3 × Dauer des unveränderten Testlaufs der Datei, 60 s) |
+| Speicher je Testprozess | 1024 MiB (`WP_TEST_MEMORY_LIMIT_MB`, `--memory-mib`): Wächter-Thread in jedem Testprogramm (`core/tests/mutants/memory_guard.cpp`) prüft alle 2 ms den physischen Speicher (macOS `phys_footprint`, Linux `/proc/self/statm`) und beendet das Programm mit Code 86 (zählt als erkannt). Eine Adressraumgrenze (`RLIMIT_AS`) gibt es im Mutationsbau nicht: ASan reserviert Terabytes Adressraum für seinen Schattenspeicher | 4096 MiB für `flutter test` mit allen Kindprozessen (Compiler, Test-VM), von aussen alle 250 ms über `ps` gemessen; darüber wird der ganze Prozessbaum beendet (zählt als erkannt, Vermerk «memory limit») |
+| Parallele Prozesse | `MUTANTS_JOBS` Mutanten gleichzeitig (Vorgabe 4, `--workers`) | `MUTANTS_JOBS` Kopien, je `flutter test --concurrency 2` |
+| Grösster Speicherbedarf | 4 × 1 GiB | 4 × 4 GiB, gemessen je Lauf rund 1–1,7 GiB |
+
+macOS setzt `RLIMIT_AS` nicht durch (#59), deshalb messen beide Teile selbst. Ein Selbsttest beweist die Grenzen:
+`core/tests/mutants/selftest.cpp` hat zwei Schleifen, deren Mutant `i += 1` → `i -= 1` endlos läuft, einmal mit
+wachsendem Vektor, einmal ohne Speicher; `make mutants` verlangt «erkannt» (Speicherwächter) und «Zeitüberschreitung»
+(5 s), sonst bricht es ab. Für Dart prüfen `app/tool/mutants_test.dart` (`#11/AK4`) Endlosschleife und wachsenden
+Speicher in einem Kindprozess.
+
+**Einzeln beurteilen, kein Score-Ziel (AK2).** Jeder nicht erkannte Mutant wird mit einem Test getötet oder mit
+Begründung in `tools/mutants-exclude.txt` ausgeschlossen. Erlaubt sind zwei Arten: **gleichwertig** (das Ergebnis bleibt
+bei jeder Eingabe gleich) und **Grenzfall** (der Mutant ändert nur das Verhalten bei exakter Gleichheit gerechneter
+Werte oder innerhalb einer Toleranz). Ein Eintrag ohne Begründung bricht den Lauf ab. Die Einträge sind an Datei,
+Mutator und Quelltextzeile gebunden, nicht an die Zeilennummer; ändert sich die Zeile, erscheint der Mutant wieder und
+wird neu beurteilt. Ein voller Lauf meldet Einträge ohne Treffer. Einen Mutation Score als Zielwert gibt es nicht.
+
+**Vor dem Push und nächtlich (AK5).** Der `test-agent` lässt im Vollmodus `make mutants-diff` laufen und meldet jeden
+nicht erkannten Mutanten mit Datei und Zeile (`.claude/agents/test-agent.md`). Im Workflow läuft der Job `mutants-diff`
+nächtlich (nach einem neuen Commit, von Hand mit `nightly=true`) gegen den letzten erfolgreichen Nachtlauf, höchstens
+3 Tage zurück, sonst gegen den Stand vor 24 Stunden; die Zusammenfassung steht im Lauf, die Ergebnisse im Artefakt
+`mutants-diff`. Nicht erkannte Mutanten lassen den Job scheitern, Zeitüberschreitungen nicht.
+
+**Messung und Stand.** Gemessen am 20.11.2026 auf einem MacBook Pro M1 Pro (10 Kerne, 16 GB), macOS 26.7, Stand 871b6dc
+mit den Änderungen von #11, `make mutants` mit 4 parallelen Mutanten:
+
+| Teil | Mutanten | erkannt | Zeitüberschreitung | nicht übersetzbar | ausgeschlossen | nicht erkannt (offen) | Laufzeit |
+|---|---|---|---|---|---|---|---|
+| C++-Kern (Mull) | 585 | 481 | 11 | 0 | 64 | 29 | 26 min ohne Zwischenspeicher, 35 s mit |
+| Dart-Logik | 1022 | 651 | 26 | 74 | 12 | 259 | 72 min |
+
+Vor #11 erkannte der Kern im ersten Lauf (ohne ASan) rund 170 Mutanten nicht, die Dart-Logik 312. Dazugekommen sind
+Tests in `core/tests/engine_tests.cpp`, `metronome_tests.cpp`, `waveform_tests.cpp`, `player_tests.cpp`,
+`reference_tests.cpp` (Fall «#11 browser entry points at their limits») sowie `app/test/player_service_test.dart`
+(Gruppe «#11 PlayerService …») und `app/test/mutation_cases_test.dart`, alle mit `#11` im Namen oder Kommentar; dazu
+zwei `assert` an den Puffergrenzen von `core/src/engine.cpp`. Was dabei auffiel, steht unter «Gefundene Fehler» (21,
+22).
+
+**Grenze von Mull:** Einige Mutanten «Aufruf entfernen» schaltet Mull nicht wirksam: Mit gesetzter Umgebungsvariable
+des Mutanten verhält sich das Programm unverändert, obwohl ein Test sicher scheitern müsste (z. B. `Player` ohne
+`engine_.configure` liefe mit 44,1 statt 48 kHz, `loadAsync` ohne `cancelLoad` endete mit `std::terminate`). Betroffen
+sind vor allem Konstruktoren, Destruktoren und Funktionen mit `lock_guard` oder `try`. Gemessene Fälle sind als
+gleichwertig ausgeschlossen (Begründung in `tools/mutants-exclude.txt`); weitere Fälle derselben Art stehen unten als
+offen. Mulls Abdeckungsfilter ist aus demselben Grund aus (siehe oben).
+
+**Offen (AK2 nicht erfüllt):** 288 nicht erkannte Mutanten, je Datei mit den Zeilen (Stand des Laufs oben; die
+aktuelle Liste mit Spalte, Mutator und Quelltext steht nach jedem Lauf in `local/mutants/full/missed.txt`). Zuerst
+behandelt wurden Loop, Seek, Tempo und Metronom in Kern und Dart; dort bleibt im Kern nur der Abbau ersetzter Titel
+(`engine.cpp` 28, 54: Speicher wird später freigegeben) und in Dart `player_service.dart` 281 (Loop ohne Grenzen
+einschalten bei weniger als 1 s) sowie `metronome_controller.dart` 88 (Benachrichtigung nach `restore`).
+
+| Datei | offen | Zeilen |
+|---|---|---|
+| `app/lib/library/metadata.dart` | 93 | 13, 33, 48, 73, 85, 88, 98, 100, 103, 104, 108, 109, 113, 122, 123, 140, 144, 146, 148, 149, 154, 157, 168, 178, 193, 222, 227, 231, 236, 252, 253, 259, 265, 268, 271, 287, 291, 292, 314, 315, 316, 317, 318, 319, 321, 322, 323, 324, 325, 327, 338, 343, 346 |
+| `app/lib/library/library.dart` | 66 | 136, 204, 208, 221, 228, 244, 248, 259, 263, 268, 272, 379, 395, 403, 409, 422, 424, 425, 433, 436, 440, 457, 474, 484, 485, 488, 493, 497, 498, 509, 515, 518, 537, 543, 561, 562, 602, 614, 617, 618, 639, 649, 651, 656, 666, 670, 673, 681, 706, 708, 725, 731, 732, 756, 767, 779, 809, 810, 838, 849, 852, 868, 871 |
+| `app/lib/sync/sync_engine.dart` | 34 | 80, 117, 135, 137, 148, 149, 153, 157, 160, 162, 175, 184, 191, 211, 246, 253, 256, 264, 270, 276, 280, 286, 340, 343, 347, 391, 398, 399, 400, 401 |
+| `app/lib/library/stamps.dart` | 26 | 16, 25, 26, 45, 51, 93, 94, 102, 108, 109, 110, 112, 202, 300 |
+| `core/src/player.cpp` | 17 | 38, 41, 44, 47, 50, 63, 101, 102, 119, 130, 144, 159, 206, 210, 214 |
+| `app/lib/app/app_controller.dart` | 9 | 47, 52, 81, 82, 83, 91, 133, 136, 137 |
+| `app/lib/library/track.dart` | 8 | 125, 148, 165, 219, 223, 241, 252, 281 |
+| `app/lib/player/waveform_summary.dart` | 7 | 30, 37, 39, 44, 45 |
+| `core/src/player_core.cpp` | 6 | 126, 129, 245, 256, 295, 339 |
+| `app/lib/library/migration.dart` | 5 | 61, 90, 115, 130 |
+| `core/web/wp_core_web.cpp` | 4 | 63, 75, 92, 145 |
+| `app/lib/app/file_platform.dart` | 3 | 101, 103, 104 |
+| `app/lib/app/file_store_io.dart` | 2 | 33, 72 |
+| `app/lib/player/player_service.dart` | 2 | 281 |
+| `core/src/engine.cpp` | 2 | 28, 54 |
+| `app/lib/library/device_settings.dart` | 1 | 35 |
+| `app/lib/library/natural_compare.dart` | 1 | 70 |
+| `app/lib/metronome/metronome_controller.dart` | 1 | 88 |
+| `app/lib/sync/in_memory_provider.dart` | 1 | 89 |
+
+Gründe der offenen Kern-Mutanten: `player.cpp` ist die Hülle um das echte Audiogerät (Benachrichtigungen von
+miniaudio, Start des Geräts, Umgebungsvariable `WP_AUDIO_BACKEND`, Metronom-Setter ohne Abfrage über die C-API); die
+Testprogramme laufen auf dem Null-Gerät und können das nicht beobachten. `player_core.cpp` 126 (Fortschritt bei
+unbekannter Länge), 129 (Fehler des Decoders nach den ersten Frames), 245 (`ma_data_converter_uninit`, nur ein Leck),
+256, 339 (vermutlich dieselbe Grenze von Mull), 295 (Thread lässt sich nicht starten); `wp_core_web.cpp` 63, 75, 92,
+145 und `engine.cpp` 28, 54 geben Speicher frei, ohne dass sich ein Ergebnis ändert (Lecks zählen nicht, siehe
+oben). Die Dart-Mutanten in Metadaten, Bibliothek, Abgleich und Stempeln brauchen gezielte Tests je Regel; das ist
+ein Folgeauftrag (Issue-Vorschlag im Bericht zu #11).
 
 ## Hook nach dem Commit
 
@@ -791,3 +951,11 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     geometrisch; der letzte Schritt hält 40 und 80 min Platz zugleich, 20 min davon bleiben ungenutzt belegt. Nicht
     im Rahmen von #59 behoben (Änderung des Ladens); die Grenze des Tests (3 GiB) hält den heutigen Stand fest.
     Behebung als eigenes Issue vorgeschlagen.
+21. 20.11.2026, #11, Mutationstests (UBSan im Mutationsbau): `wp_web_create(1)` (und `wp::Player` mit 1 Hz) wird
+    angenommen, der Time-Stretch teilt bei 1 Hz aber durch 0 (`signalsmith-linear/stft.h`, Blockgrösse 0). Die
+    Prüfung lässt jede Samplerate ab 1 Hz zu; sinnvoll wäre eine Untergrenze (z. B. 8000 Hz). Nicht im Rahmen von #11
+    behoben, der Test prüft nur «unter 1 Hz kein Player». Behebung als eigenes Issue vorgeschlagen.
+22. 20.11.2026, #11, Mutationstests: Mehrere Regeln waren ausgeführt, aber nicht geprüft und sind jetzt getestet
+    (Kanaltrennung und Lautstärke im gedehnten Pfad, Seek genau aufs Loop-Ende, Loop ab 0 s und knapp unter 1 s,
+    mehrere Loop-Durchgänge in einem Block, Wellenform je Block, Klangform und Stopp des Metronoms, Neubeginn der
+    Steigerung nach Zeit, Ladezustand und Fortschritt). Fehlverhalten der App kam dabei nicht zutage.

@@ -2,8 +2,8 @@
 # Strategy and test matrix: docs/TESTS.md. Developer tools: Flutter, CMake, Homebrew llvm
 # (clang-format, clang-tidy). core/third_party/ is never formatted, linted or read.
 .PHONY: help test test-core test-wasm test-app test-hook test-tools format format-check lint lint-dart \
-        lint-core coverage coverage-run coverage-core coverage-app coverage-diff mutants fuzz report \
-        sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
+        lint-core coverage coverage-run coverage-core coverage-app coverage-diff mutants \
+        mutants-diff fuzz report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
         test-ui test-web smoke-app pseudo-l10n bench
 
 SHELL := /bin/bash
@@ -44,6 +44,8 @@ help:
 	@echo "make smoke-app      builds the macOS app (release) and runs its smoke test"
 	@echo "make pseudo-l10n    regenerates the pseudo language of the UI tests after an ARB change"
 	@echo "make bench          performance and load tests of core and library (nightly, not in make test)"
+	@echo "make mutants        mutation tests of core (Mull) and Dart logic, results in local/mutants/full/"
+	@echo "make mutants-diff   mutation tests of the lines changed since BASE (default origin/main)"
 
 # ---- Tests ----
 test: test-core test-app test-tools
@@ -76,7 +78,7 @@ test-app:
 # Tests of the tools in staged git repositories with fake tools: the hook after a commit (#7/AK7),
 # coverage check and diff, pre-push hook (#8/AK6)
 TOOL_TESTS = tool/after_commit_hook_test.dart tool/coverage_test.dart tool/pre_push_hook_test.dart \
-             tool/network_free_test.dart
+             tool/network_free_test.dart tool/mutants_test.dart
 test-tools:
 	cd app && flutter test --reporter failures-only $(TOOL_TESTS)
 test-hook: test-tools
@@ -245,10 +247,26 @@ bench:
 	  | grep -E 'BENCH|Expected|Actual|Reason|All tests passed|Some tests failed' \
 	  | tee -a ../$(BENCH_LOG)
 
+# ---- Mutation tests (#11), docs/TESTS.md ----
+# C++ core with Mull (core/build-mutants, Homebrew llvm; MULL_DIR, default ~/.local/opt/mull, or
+# MULL_RUNNER and MULL_PLUGIN), Dart logic of app/lib with an own mutator (app/tool/mutants.dart).
+# MUTANTS_JOBS mutants run at the same time (default 4); each core test process ends above 1024 MiB,
+# each Dart test run (flutter and its children) above 4096 MiB; time limit per mutant: core
+# max(10 x baseline, 20 s), Dart max(3 x baseline, 60 s). Results (summary.txt, missed.txt,
+# results.json) in local/mutants/full/ and local/mutants/diff/, not checked in. Exit code 3 if a
+# mutant is not detected and not excluded with a reason (tools/mutants-exclude.txt).
+# MUTANTS_ARGS e.g. "--part core", "--file engine", "--fresh" (forget the Mull cache).
+MUTANTS_JOBS ?= 4
+MUTANTS_ARGS ?=
+mutants:
+	dart app/tool/mutants_run.dart --jobs $(MUTANTS_JOBS) $(MUTANTS_ARGS)
+
+mutants-diff:
+	dart app/tool/mutants_run.dart --base $(BASE) --jobs $(MUTANTS_JOBS) $(MUTANTS_ARGS)
+
 # ---- Not set up yet ----
 define not_yet
 	@echo "make $@: noch nicht eingerichtet (#$(1))"; exit 1
 endef
 
-mutants:       ; $(call not_yet,11)
 report:        ; $(call not_yet,12)

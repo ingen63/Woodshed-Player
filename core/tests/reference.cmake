@@ -11,6 +11,7 @@ target_include_directories(wp_core_offline PUBLIC include web)
 target_compile_definitions(wp_core_offline PUBLIC WP_WEB_FILES)
 target_link_libraries(wp_core_offline PUBLIC wp_playercore)
 wp_strict_warnings(wp_core_offline)
+wp_mutate(wp_core_offline)
 
 add_executable(reference_tests tests/reference_tests.cpp)
 target_link_libraries(reference_tests PRIVATE wp_core_offline)

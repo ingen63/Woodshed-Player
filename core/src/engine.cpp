@@ -1,6 +1,7 @@
 #include "engine.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 
 #include "signalsmith-stretch/signalsmith-stretch.h"
@@ -242,6 +243,8 @@ void Engine::primeStretch(double rate) {
   const int len = st.s.outputSeekLength(static_cast<float>(rate));
   float frame[16];
   const int ch = std::min(channels_, 16);
+  // #11: the buffer of configure() holds the seek input of the highest rate for every channel
+  assert(static_cast<size_t>(len) * ch <= st.seekBuf.size());
   for (int c = 0; c < ch; ++c)
     st.in[c] = st.seekBuf.data() + static_cast<size_t>(c) * len;
   for (int i = 0; i < len; ++i) {
@@ -309,6 +312,8 @@ void Engine::render(float *out, int frames) {
     const int nIn = static_cast<int>(inAccum_);
     inAccum_ -= nIn;
     const size_t inStride = inPlanar_.size() / ch;
+    // #11: configure() sized the input for a full block at the highest rate
+    assert(static_cast<size_t>(nIn) <= inStride && inStride * ch <= inPlanar_.size());
     for (int c = 0; c < ch; ++c) {
       st.in[c] = inPlanar_.data() + c * inStride;
       st.out[c] = outPlanar_.data() + static_cast<size_t>(c) * kChunk;

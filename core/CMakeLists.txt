@@ -77,6 +77,41 @@ if(WP_FUZZ)
   add_compile_options(-fsanitize=fuzzer-no-link)
 endif()
 
+# #11: mutation build with Mull (make mutants, app/tool/mutants.dart, docs/TESTS.md). WP_MULL_PLUGIN
+# is the compiler plugin of Mull (mull-ir-frontend-<LLVM major>), it needs clang of the same major
+# version (Homebrew llvm, on Linux clang-<n>). Only our own targets load it (wp_mutate); the plugin
+# reads the configuration written below (tests/mutants/mull.yml; make mutants-diff adds the changed
+# lines, WP_MULL_RANGES).
+# Every test program gets the memory guard (tests/mutants/memory_guard.cpp, #11/AK4).
+set(WP_MULL_PLUGIN "" CACHE FILEPATH "Mull compiler plugin; builds the mutation test programs")
+set(WP_MULL_RANGES "" CACHE FILEPATH
+  "Only mutate these lines (make mutants-diff): one <path>:<first>-<last> per line")
+if(WP_MULL_PLUGIN)
+  # The effective configuration: tests/mutants/mull.yml and the line ranges of a diff run. Written
+  # only when it changes, so the sources compile again only then. Mull's AST check reads the command
+  # line recorded with -grecord-command-line and splits it at spaces; app/tool/mutants.dart therefore
+  # configures this build through a link without spaces when the project path has one.
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/tests/mutants/mull.yml wp_mull_yml)
+  if(WP_MULL_RANGES)
+    file(SHA256 ${WP_MULL_RANGES} wp_mull_ranges_hash)
+    string(APPEND wp_mull_yml "mutationRanges: '${WP_MULL_RANGES}'  # ${wp_mull_ranges_hash}\n")
+  endif()
+  set(WP_MULL_CONFIG ${CMAKE_BINARY_DIR}/mull.yml)
+  file(CONFIGURE OUTPUT ${WP_MULL_CONFIG} CONTENT "${wp_mull_yml}" @ONLY)
+  set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_COMMAND} -E env "MULL_CONFIG=${WP_MULL_CONFIG}")
+  set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_C_COMPILER_LAUNCHER})
+  set(CMAKE_OBJCXX_COMPILER_LAUNCHER ${CMAKE_C_COMPILER_LAUNCHER})
+endif()
+function(wp_mutate target)
+  if(WP_MULL_PLUGIN)
+    target_compile_options(${target} PRIVATE -fpass-plugin=${WP_MULL_PLUGIN} -g -grecord-command-line)
+    # a new configuration (another diff) compiles the mutated sources again
+    get_target_property(srcs ${target} SOURCES)
+    set_source_files_properties(${srcs} TARGET_DIRECTORY ${target} PROPERTIES
+      OBJECT_DEPENDS "${WP_MULL_CONFIG}")
+  endif()
+endfunction()
+
 if(EMSCRIPTEN)
   include(web/web.cmake)  # eigener Zweig: Tests unter Node.js, Kern fürs AudioWorklet
   return()
@@ -89,6 +124,7 @@ target_include_directories(wp_engine SYSTEM PUBLIC
   ${WP_THIRD_PARTY}/signalsmith-stretch/include
   ${WP_THIRD_PARTY}/signalsmith-linear/include)
 wp_strict_warnings(wp_engine)
+wp_mutate(wp_engine)
 
 add_library(wp_miniaudio STATIC src/miniaudio_impl.c)
 target_include_directories(wp_miniaudio SYSTEM PUBLIC ${WP_THIRD_PARTY}/miniaudio)
@@ -112,6 +148,7 @@ endif()
 add_library(wp_playercore STATIC src/player_core.cpp)
 target_link_libraries(wp_playercore PUBLIC wp_engine wp_miniaudio Threads::Threads)
 wp_strict_warnings(wp_playercore)
+wp_mutate(wp_playercore)
 
 # Kern mit C-API (wp_core.h)
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -124,6 +161,7 @@ target_include_directories(wp_core PUBLIC include)
 target_link_libraries(wp_core PRIVATE wp_playercore)
 set_target_properties(wp_core PROPERTIES CXX_VISIBILITY_PRESET hidden)
 wp_strict_warnings(wp_core)
+wp_mutate(wp_core)
 if(APPLE)
   target_compile_options(wp_core PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
   target_link_libraries(wp_core PRIVATE "-framework Foundation")
@@ -198,6 +236,24 @@ include(tests/reference.cmake)
 
 # #10: fuzz targets, replay of regression inputs and start corpus in every build
 include(tests/fuzz/fuzz.cmake)
+
+# #11: test programs of the mutation run (app/tool/mutants.dart runs each with mull-runner). Each
+# gets the memory guard and the fast mutant switch (tests/mutants/mutant_switch.cpp, #11/AK3);
+# mutants_selftest checks that an endless loop with and without growing
+# memory ends as killed or timeout (#11/AK4).
+if(WP_MULL_PLUGIN)
+  set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests capi_tests
+    realtime_tests reference_tests fuzz_decoder_replay fuzz_capi_replay)
+  foreach(t IN LISTS WP_MUTANT_TESTS)
+    target_sources(${t} PRIVATE tests/mutants/memory_guard.cpp tests/mutants/mutant_switch.cpp)
+  endforeach()
+  add_executable(mutants_selftest tests/mutants/selftest.cpp tests/mutants/memory_guard.cpp
+    tests/mutants/mutant_switch.cpp)
+  set_source_files_properties(tests/mutants/selftest.cpp PROPERTIES
+    COMPILE_OPTIONS "-fpass-plugin=${WP_MULL_PLUGIN};-g;-grecord-command-line"
+    OBJECT_DEPENDS "${WP_MULL_CONFIG}")
+  wp_strict_warnings(mutants_selftest)
+endif()
 
 # #57: in a sanitizer build every test runs with these options; a finding ends the test with a
 # non-zero exit code. Suppression files in tests/sanitizer/ (each entry with a reason).

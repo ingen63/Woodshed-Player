@@ -541,4 +541,156 @@ void main() {
       expect(h.service.settings.rampStart, 50);
     });
   });
+
+  // #11: cases found by mutation testing (make mutants).
+  group('#11 PlayerService: every change notifies, state after load, unload and dispose', () {
+    test('a new service is idle; play, pause, seek, volume, settings and ticks notify', () async {
+      final h = Harness();
+      expect(h.service.isPlaying, isFalse);
+      expect(h.service.isLoading, isFalse);
+      expect(h.service.isPolling, isFalse);
+      await h.loadReady('/a.wav', 60);
+      h.fire(); // stops polling: nothing plays
+      expect(h.service.isPolling, isFalse);
+      var n = h.notifications;
+      void notified(String what) {
+        expect(h.notifications, greaterThan(n), reason: what);
+        n = h.notifications;
+      }
+
+      h.service.play();
+      notified('play');
+      expect(h.service.isPolling, isTrue);
+      h.service.play(); // already playing: nothing to do
+      expect(h.core.calls.where((c) => c == 'play').length, 1);
+      expect(h.notifications, n);
+      h.service.pause();
+      notified('pause');
+      h.fire(2); // the last tick ends the polling
+      notified('tick');
+      expect(h.service.isPolling, isFalse);
+      h.service.seek(5);
+      notified('seek');
+      expect(h.service.isPolling, isTrue); // a seek fetches the final position
+      h.service.setVolume(0.5);
+      notified('volume');
+      h.service.setSpeed(0.75);
+      notified('settings');
+    });
+
+    test('play without a title does nothing', () {
+      final h = Harness();
+      h.service.play();
+      expect(h.core.calls, isNot(contains('play')));
+      expect(h.service.isPlaying, isFalse);
+      expect(h.notifications, 0);
+    });
+
+    test('an immediate load error notifies and is not «loading»', () {
+      final h = Harness();
+      h.core.immediateErrors['/x.wav'] = WpCode.fileNotFound;
+      h.service.load('/x.wav');
+      expect(h.service.isLoading, isFalse);
+      expect(h.service.error?.code, WpCode.fileNotFound);
+      expect(h.notifications, greaterThan(0));
+      final n = h.notifications;
+      h.service.clearError();
+      expect(h.service.error, isNull);
+      expect(h.notifications, n + 1);
+      h.service.clearError(); // no error: no notification
+      expect(h.notifications, n + 1);
+    });
+
+    test('a load that ends neither ready nor with an error code is an invalid argument', () async {
+      final h = Harness();
+      final f = h.service.load('/a.wav');
+      h.core.failLoad(WpCode.loadIdle);
+      h.fire();
+      expect(await f, isFalse);
+      expect(h.service.error?.code, WpCode.invalidArgument);
+    });
+
+    test('a new title starts paused, with the ramp counter at 0', () async {
+      final h = Harness();
+      await h.loadReady(
+        '/a.wav',
+        60,
+        settings: const PlaybackSettings(
+          loopEnabled: true,
+          loopStart: 10,
+          loopEnd: 20,
+        ),
+      );
+      h.service.setRamp(enabled: true);
+      h.service.play();
+      h.core.passes += 3;
+      h.fire();
+      expect(h.service.rampPasses, 3);
+      expect(h.service.isPlaying, isTrue);
+      h.service.load('/b.wav');
+      h.core.finishLoad(30);
+      h.fire();
+      expect(h.service.isPlaying, isFalse);
+      expect(h.service.rampPasses, 0);
+    });
+
+    test('changing the ramp step keeps the pass counter (#29/AK5 resets only on loop or speed)', () async {
+      final h = Harness();
+      await h.loadReady(
+        '/a.wav',
+        60,
+        settings: const PlaybackSettings(
+          loopEnabled: true,
+          loopStart: 10,
+          loopEnd: 20,
+        ),
+      );
+      h.service.setRamp(enabled: true);
+      h.service.play();
+      h.core.passes += 4;
+      h.fire();
+      expect(h.service.rampPasses, 4);
+      h.service.setRamp(step: 10);
+      expect(h.service.rampPasses, 4);
+      h.service.setRamp(passes: 12);
+      expect(h.service.rampPasses, 4);
+      h.service.setLoopEnabled(false);
+      expect(h.service.rampPasses, 0);
+    });
+
+    test(
+      'a loop of exactly 1 s is kept; setting the end switches the loop on',
+      () async {
+        final h = Harness();
+        await h.loadReady('/a.wav', 60);
+        h.service.setLoopEnd(11);
+        expect(h.service.settings.loopEnabled, isTrue);
+        h.service.setLoopStart(10);
+        expect(h.service.settings.loopStart, 10);
+        expect(h.service.settings.loopEnd, 11);
+        expect(h.service.activeLoop, (10.0, 11.0));
+      },
+    );
+
+    test('unload while playing stops and notifies', () async {
+      final h = Harness();
+      await h.loadReady('/a.wav', 60);
+      h.service.play();
+      final n = h.notifications;
+      h.service.unload();
+      expect(h.service.isPlaying, isFalse);
+      expect(h.service.hasTrack, isFalse);
+      expect(h.notifications, n + 1);
+    });
+
+    test('dispose stops polling and ends a running load with false', () async {
+      final h = Harness();
+      final f = h.service.load('/a.wav');
+      expect(h.activeTimer, isNotNull);
+      h.service.dispose();
+      expect(h.activeTimer, isNull);
+      expect(await f, isFalse);
+      expect(() => h.service.addListener(() {}), throwsStateError);
+    });
+  });
 }

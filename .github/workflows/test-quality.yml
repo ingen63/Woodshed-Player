@@ -12,7 +12,8 @@
 # - sanitize-thread: ThreadSanitizer (#57). fuzz: libFuzzer on decoder and C API (#10).
 # - property: Dart random tests with many cases and a new seed (#10).
 # - bench: performance and load tests of core and library (make bench, #59), values in the run summary.
-# - Mutation tests on the diff follow with #11 as a further nightly job.
+# - mutants-diff: mutation tests (Mull for the core, own mutator for the Dart logic) of the lines changed
+#   since the last successful nightly run (#11); a not detected mutant fails the job.
 # By hand (workflow_dispatch): the push jobs; with nightly=true also every nightly job, gate or not.
 # Nightly runs have their own concurrency group: a push never cancels them (#13/AK8).
 # The checks for changed paths live in the job «changes».
@@ -26,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       nightly:
-        description: 'Also run every nightly job (macOS/iOS, UI tests, app smoke test, TSan, fuzzing, random tests)'
+        description: 'Also run every nightly job (macOS/iOS, UI tests, app smoke test, TSan, fuzzing, random tests, mutation tests)'
         type: boolean
         default: false
 
@@ -400,3 +401,84 @@ jobs:
             cat core/build-bench/bench.txt 2>/dev/null || echo "no values (an earlier step failed)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  mutants-diff:
+    name: Mutation tests of the changed lines (#11)
+    needs: nightly-gate
+    if: >-
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.nightly)
+      || (github.event_name == 'schedule' && needs.nightly-gate.outputs.run == 'true'))
+    # the Mull package is built for Ubuntu 24.04 and LLVM 18
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      actions: read
+      contents: read
+    env:
+      MULL_VERSION: 0.39.1
+      MULL_CC: clang-18
+      MULL_CXX: clang++-18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Packages
+        working-directory: app
+        run: flutter pub get >/dev/null
+      - name: Address space layout for the sanitizers (the mutation build uses ASan and UBSan)
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Install Mull (Apache-2.0, a tool only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd "$RUNNER_TEMP"
+          gh release download "$MULL_VERSION" --repo mull-project/mull \
+            --pattern "Mull-$MULL_VERSION-ubuntu-amd64-24.04.deb" \
+            --pattern "Mull-18-$MULL_VERSION-LLVM-18.1.3-ubuntu-amd64-24.04.deb"
+          sudo apt-get install -y -qq ./Mull-*.deb >/dev/null
+          {
+            echo "MULL_RUNNER=$(command -v mull-runner-18 || command -v mull-runner)"
+            echo "MULL_PLUGIN=$(dpkg -L mull-18 | grep 'mull-ir-frontend-18$')"
+          } >> "$GITHUB_ENV"
+      - name: Base (last successful nightly run, at most 3 days back)
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow test-quality.yml \
+            --event schedule --status success --limit 1 --json headSha --jq '.[0].headSha // ""')
+          oldest=$(git rev-list -1 --before='3 days ago' HEAD || true)
+          if [ -n "$last" ] && git cat-file -e "$last^{commit}" 2>/dev/null \
+             && { [ -z "$oldest" ] || git merge-base --is-ancestor "$oldest" "$last"; }; then
+            base="$last"
+          else
+            base=$(git rev-list -1 --before='24 hours ago' HEAD || true)
+            [ -n "$base" ] || base=$(git rev-list --max-parents=0 HEAD | tail -1)
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "Base: $base"
+      - name: make mutants-diff (#11/AK1, AK5)
+        run: make mutants-diff BASE=${{ steps.base.outputs.base }} MUTANTS_JOBS=4
+      - name: Not detected mutants in the run summary
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "## Mutation tests of the changed lines (#11)"
+            echo "Base: \`${{ steps.base.outputs.base }}\`"
+            echo '```'
+            cat local/mutants/diff/summary.txt 2>/dev/null || echo "no results (an earlier step failed)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Results as artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants-diff
+          path: |
+            local/mutants/diff/summary.txt
+            local/mutants/diff/missed.txt
+            local/mutants/diff/results.json
+          if-no-files-found: ignore

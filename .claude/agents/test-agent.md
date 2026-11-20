@@ -16,9 +16,15 @@ Teststrategie, Schichten und Testmatrix stehen in `docs/TESTS.md`; neue Fälle f
 - **Schnellmodus (nach einem Commit, Standard):** Der Hook hat Build und vorhandene Tests schon laufen lassen.
   Du schreibst nur die fehlenden Tests für die geänderte Logik des Commits und lässt **nur diese** laufen. Builds nicht wiederholen.
   Ziel unter 3 Minuten, Bericht in wenigen Sätzen.
-- **Vollmodus (auf Anweisung, z. B. vor einem Release):** `make test`, `make test-wasm`, `make format-check`,
+- **Vollmodus (auf Anweisung, z. B. vor dem Push oder einem Release):** `make test`, `make test-wasm`, `make format-check`,
   `make lint`, dazu `flutter build macos --debug` und `flutter build ios --simulator --debug` (Befehle in `CLAUDE.md`).
   Abdeckung folgt mit #8 (`make coverage`). Das Swift-Altprojekt nur, wenn es geändert wurde (`xcodebuild … -quiet test`).
+  Zum Schluss **`make mutants-diff`** (#11, Mutationstests der seit `origin/main` geänderten Zeilen, Kern mit Mull,
+  Dart-Logik mit eigenem Werkzeug; im Hintergrund starten, Dauer je nach Änderung Minuten bis eine Stunde).
+  Endet er mit Code 3, stehen die nicht erkannten Mutanten in `local/mutants/diff/missed.txt`: **jeden mit Datei und
+  Zeile melden** (`datei:zeile:spalte: mutator | Quelltextzeile`). Einen Test schreibst Du dafür, wenn er im
+  Rahmen des Auftrags liegt; einen Ausschluss (`tools/mutants-exclude.txt`) nie selbst, das entscheidet Dein
+  Auftraggeber (Begründung «gleichwertig» oder «Grenzfall», `docs/TESTS.md`). Fehlt Mull (Code 2), das melden.
 
 ## Ausgaben kurz halten (verbindlich)
 

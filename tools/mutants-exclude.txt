@@ -1,0 +1,185 @@
+# Mutants excluded with a reason (#11/AK2), read by app/tool/mutants_run.dart (make mutants).
+#
+# Every not detected mutant is either killed by a test or excluded here; there is no target score.
+# An entry is «<file> | <mutator> | <source line>», optionally «| <column>» when the line holds the
+# operator more than once (fields separated by « | »), and needs a reason in the comment block above it,
+# starting with one of the two allowed kinds (docs/TESTS.md «Mutationstests (#11)»):
+#   # gleichwertig: <why the result is the same for every input>
+#   # Grenzfall: <why only an exact equality or a rounding tolerance changes>
+# Entries right below each other share the reason; an empty line ends it. An entry without a reason
+# stops the run (exit code 2). The source line is compared without the line number and with runs of
+# whitespace squashed, so the entry survives changes above it; if the line itself changes, the
+# mutant shows up again and is judged anew. A full run lists entries that no longer match anything.
+
+# ---- core/src/command_queue.hpp ----
+# gleichwertig: push() und pop() prüfen diff == 0 im Zweig davor; im else-if ist diff nie 0, also
+# ist «diff < 0» dort gleich «diff <= 0».
+core/src/command_queue.hpp | cxx_lt_to_le | } else if (diff < 0) {
+
+# ---- core/src/engine.cpp ----
+# gleichwertig: applyCommands() wird nur am Anfang von render() aufgerufen, und render() ruft am
+# Ende in jedem Fall publish(); die veröffentlichten Werte sind dieselben.
+core/src/engine.cpp | cxx_remove_void_call | publish(); | 5
+# gleichwertig: Mutanten in den Bedingungen der beiden assert(): Im unveränderten Code ist der
+# Puffer immer grösser als nötig (configure() legt 2 Frames Reserve an, die Gleichheit kommt nicht
+# vor), eine schwächere oder strengere Bedingung schlägt also ebenso nie an.
+core/src/engine.cpp | cxx_mul_to_div | assert(static_cast<size_t>(len) * ch <= st.seekBuf.size());
+core/src/engine.cpp | cxx_le_to_lt | assert(static_cast<size_t>(len) * ch <= st.seekBuf.size());
+core/src/engine.cpp | cxx_le_to_lt | assert(static_cast<size_t>(nIn) <= inStride && inStride * ch <= inPlanar_.size());
+core/src/engine.cpp | cxx_mul_to_div | assert(static_cast<size_t>(nIn) <= inStride && inStride * ch <= inPlanar_.size());
+# gleichwertig: Ohne Loop ist loopB_ = 0, dann ist «before < loopB_» für jeden Lesekopf (>= 0)
+# falsch; «loopB_ >= 0» statt «> 0» ändert das Ergebnis nicht. Und readPos_ == before kommt mit
+# Loop nicht vor: readNext() rückt immer um einen Frame vor oder springt zum Loop-Anfang, der
+# mindestens 1 s vor dem Loop-Ende liegt.
+core/src/engine.cpp | cxx_gt_to_ge | if (loopB_ > 0 && before < loopB_ && readPos_ < before) | 20
+core/src/engine.cpp | cxx_lt_to_le | if (loopB_ > 0 && before < loopB_ && readPos_ < before) | 55
+# gleichwertig: Ein Play mit einem Seek auf 0 im selben Block: «at» ist dann 0 (Seek-Ziel) bzw. die
+# Position; nur am Dateiende ändert das etwas, und dort setzt der Zweig das Seek-Ziel ohnehin auf 0.
+core/src/engine.cpp | cxx_ge_to_gt | const double at = seekTarget >= 0 ? seekTarget * sampleRate_ : playhead_;
+# Grenzfall: Ein Loop-Anfang genau bei kMaxSeconds (1e6 s, 11,6 Tage) liegt hinter jedem Titel.
+core/src/engine.cpp | cxx_le_to_lt | if (b >= a + kMinLoopSeconds && a >= 0 && a <= kMaxSeconds) {
+# gleichwertig: Gemessen, Mull schaltet diesen Mutanten nicht wirksam (Grenze des Werkzeugs, siehe
+# docs/TESTS.md): mit aktivem Mutanten verhält sich das Programm unverändert, obwohl ein Test sicher
+# scheitern müsste (Engine ohne configure() kann nicht gedehnt abspielen, defaultEngineTakesATitle…).
+core/src/engine.cpp | cxx_remove_void_call | Engine::Engine() : stretch_(std::make_unique<Stretch>()) { configure(2, 44100); }
+# Grenzfall: Ein Tempo von genau 1 ± 1e-6 läuft direkt statt gedehnt; der Unterschied liegt unter
+# einem Millionstel und ist nicht hörbar (setRate lässt jeden Wert von 0,1 bis 2,0 zu).
+core/src/engine.cpp | cxx_gt_to_ge | const bool wantStretch = std::fabs(r - 1.0) > 1e-6;
+
+# ---- core/src/metronome.cpp ----
+# gleichwertig: Beim Start setzt applyCommands() direkt danach alles zurück, was ein Neubeginn der
+# Steigerung setzen würde (Takte seit Wechsel 0; Runde: das Tempo ist beim Start die Start-BPM,
+# also k = 0 und Rundenbeginn 0 = now_). Ohne Steigerung wird der Wert nicht gelesen.
+core/src/metronome.cpp | cxx_remove_void_call | rampRestart_.store(false);
+# gleichwertig: k == Unterteilung heisst, der nächste Klick ist der nächste Schlag. Im else-Zweig
+# wird daraus sub_ = Unterteilung (bzw. der Schlag des letzten Klicks); scheduleTick() schaltet dann
+# auf den nächsten Schlag weiter, an dieselbe Position nextTick_ = beatStart_ + Intervall · k.
+core/src/metronome.cpp | cxx_ge_to_gt | if (k >= subdiv) {
+# gleichwertig: Bei Ziel = Start ist die Stufe k immer 0 (keine Stufen), start + 0 = start - 0.
+core/src/metronome.cpp | cxx_ge_to_gt | bpm_.store(target >= start ? start + k : start - k);
+# gleichwertig: Zwei Klicks beginnen nie im selben Frame (kürzester Abstand 2205 Frames bei 300 BPM
+# mit 4 Unterteilungen), also hat bei der Wahl der Stimme keine ein Alter von 0 und keine zwei
+# dasselbe Alter.
+core/src/metronome.cpp | cxx_lt_to_le | if (cand.age < 0) {
+core/src/metronome.cpp | cxx_gt_to_ge | if (cand.age > v->age)
+# Grenzfall: Ein Taktanfang genau auf dem Ende einer Runde der Steigerung nach Zeit (Gleichheit
+# zweier gerechneter Frame-Positionen); dann gilt die letzte Stufe einen Takt länger.
+core/src/metronome.cpp | cxx_ge_to_gt | if (frame - cycleStart_ >= round)
+# Grenzfall: Ein Klick dauert 50 ms; das sind für jede Klangstufe (1600, 1250, 1000, 700 Hz) ganze
+# oder halbe Perioden, das Sample nach 50 ms ist 0 bis auf Rundung (~1e-14). Ein Sample länger
+# ändert die Ausgabe nicht hörbar.
+core/src/metronome.cpp | cxx_ge_to_gt | if (++v.age >= clickLen)
+# Grenzfall: Die Lautstärke nähert sich dem Zielwert ohnehin bis auf Rundung; ob sie bei weniger
+# als 1e-5 Abstand auf ihn springt, ändert die Ausgabe um weniger als 1e-5.
+core/src/metronome.cpp | cxx_sub_to_add | if (std::fabs(target - gain_) < 1e-5f)
+core/src/metronome.cpp | cxx_lt_to_le | if (std::fabs(target - gain_) < 1e-5f)
+
+# ---- core/src/waveform.cpp ----
+# gleichwertig: Mit «+ 1» statt «- 1» entsteht bei einer Länge mit Rest 0 oder 31 (in Frames, je
+# 32er-Block) ein zusätzlicher leerer Block mit Minimum und Maximum 0. Jeder Block beginnt mit 0 als
+# Minimum und Maximum, eine Abfrage, die den leeren Block mitnimmt, ändert ihr Ergebnis also nicht.
+core/src/waveform.cpp | cxx_sub_to_add | const long long blocks = (frames_ + kBlockFrames - 1) / kBlockFrames;
+# gleichwertig: Die Klammern greifen nie. Jeder Abschnitt beginnt vor dem Ende des Titels, also ist
+# b0 = floor(a / 32) höchstens blocks - 1; und sein Ende z liegt nach dem Anfang a, also ist
+# b1 = ceil(z / 32) mindestens b0 + 1.
+core/src/waveform.cpp | cxx_sub_to_add | b0 = std::clamp(b0, 0LL, blocks - 1);
+core/src/waveform.cpp | cxx_add_to_sub | b1 = std::clamp(b1, b0 + 1, blocks);
+# gleichwertig: Gemessen, Mulls Mutant an dieser Stelle lässt die Grösse der Vektoren
+# unverändert; mit aktivem Mutanten laufen alle Wellenform-Tests grün und ohne Fund von ASan. Leere
+# Vektoren liessen schon das erste Schreiben im Konstruktor abstürzen.
+core/src/waveform.cpp | cxx_remove_void_call | min_.resize(static_cast<size_t>(blocks));
+core/src/waveform.cpp | cxx_remove_void_call | max_.resize(static_cast<size_t>(blocks));
+
+# ---- core/src/player_core.cpp ----
+# gleichwertig: Eine leere Datei meldet danach der Decoder: ma_decoder_init_file scheitert, decodeFile
+# und fileDuration geben dasselbe kErrUnsupportedFormat zurück.
+core/src/player_core.cpp | cxx_eq_to_ne | if (ri == MA_SUCCESS && info.sizeInBytes == 0)
+# gleichwertig: Nur die Grösse der Vorab-Reservierung ändert sich (mehr, weniger oder keine); der
+# Vektor wächst beim Einfügen ohnehin, Inhalt und Länge des Titels bleiben gleich.
+core/src/player_core.cpp | cxx_mul_to_div | const ma_uint64 cap = static_cast<ma_uint64>(dec.outputSampleRate) * 300;
+core/src/player_core.cpp | cxx_gt_to_le | if (total > 0)
+core/src/player_core.cpp | cxx_gt_to_ge | if (total > 0)
+core/src/player_core.cpp | cxx_remove_void_call | out.data.reserve(static_cast<size_t>((std::min(total, cap) + kBlock) * Player::kChannels));
+core/src/player_core.cpp | cxx_mul_to_div | out.data.reserve(static_cast<size_t>((std::min(total, cap) + kBlock) * Player::kChannels));
+core/src/player_core.cpp | cxx_ne_to_eq | &expected) != MA_SUCCESS)
+core/src/player_core.cpp | cxx_remove_void_call | out.data.reserve(static_cast<size_t>(expected + 16) * Player::kChannels);
+core/src/player_core.cpp | cxx_mul_to_div | out.data.reserve(static_cast<size_t>(expected + 16) * Player::kChannels);
+# gleichwertig: Alle Aufrufer (Laden im Hintergrund, wp_web_load_encoded, wp_web_track_decode,
+# wp_web_track_convert, wp_web_load_pcm) übergeben einen neuen, leeren Titel; nach einem Fehler
+# verwerfen sie ihn, ohne ihn zu lesen. Leeren vorher und nach einem Fehler ändert also nichts.
+core/src/player_core.cpp | cxx_remove_void_call | out.data.clear();
+core/src/player_core.cpp | cxx_remove_void_call | out.data.shrink_to_fit();
+# gleichwertig: Hat das Lesen ohne einen Frame mit einem Fehler (oder am Ende) aufgehört, setzt
+# die Prüfung danach (frames == 0) dasselbe kErrUnsupportedFormat.
+core/src/player_core.cpp | cxx_ne_to_eq | if (r != MA_SUCCESS && r != MA_AT_END && frames == 0) | 15
+core/src/player_core.cpp | cxx_ne_to_eq | if (r != MA_SUCCESS && r != MA_AT_END && frames == 0) | 34
+# gleichwertig: Ein geöffneter Decoder hat nie die Samplerate 0 (miniaudio lehnt das beim Öffnen ab).
+core/src/player_core.cpp | cxx_le_to_lt | if (r != MA_SUCCESS || frames == 0 || rate <= 0)
+# gleichwertig: waitForLoad gibt für den Zustand 0 (kOk = kLoadIdle) in beiden Zweigen 0 zurück.
+core/src/player_core.cpp | cxx_lt_to_le | return s < 0 ? s : kOk;
+# gleichwertig: Die Umrechnung liefert aus mindestens einem Frame immer mindestens einen (gemessen
+# auch für 1 Frame von 48 kHz auf 1 kHz); der Fall «kOk mit 0 Frames» tritt nicht ein.
+core/src/player_core.cpp | cxx_eq_to_ne | if (result == kOk && out.frames == 0)
+# Grenzfall: Eine Samplerate von genau 1 Hz (wird angenommen, siehe «Gefundene Fehler» 21).
+core/src/player_core.cpp | cxx_lt_to_le | if (!data || sampleRate < 1)
+core/src/player_core.cpp | cxx_lt_to_le | if (!interleaved || channels < 1 || frames < 1 || srcRate < 1 || dstRate < 1) | 61
+core/src/player_core.cpp | cxx_lt_to_le | if (!interleaved || channels < 1 || frames < 1 || srcRate < 1 || dstRate < 1) | 76
+
+# ---- core/web/wp_core_web.cpp ----
+# Grenzfall: Eine Samplerate von genau 1 Hz (siehe «Gefundene Fehler» 21).
+core/web/wp_core_web.cpp | cxx_lt_to_le | if (sampleRate < 1)
+# gleichwertig: Die Begrenzung auf 1 … WP_WEB_MAX_BLOCK Frames: bei genau 1 bzw. genau
+# WP_WEB_MAX_BLOCK setzt die Zuweisung denselben Wert.
+core/web/wp_core_web.cpp | cxx_lt_to_le | if (frames < 1)
+core/web/wp_core_web.cpp | cxx_gt_to_ge | if (frames > WP_WEB_MAX_BLOCK)
+# gleichwertig: Nur die Vorab-Reservierung; append prüft die Länge gegen pendingFrames, nicht gegen
+# die Kapazität, der Titel bleibt derselbe.
+core/web/wp_core_web.cpp | cxx_remove_void_call | s->data.reserve(static_cast<size_t>(frames) * wp::Player::kChannels); // no zero fill
+core/web/wp_core_web.cpp | cxx_mul_to_div | s->data.reserve(static_cast<size_t>(frames) * wp::Player::kChannels); // no zero fill
+# gleichwertig: Ein Track hat immer eine Samplerate ab 1 (wp_web_track_decode und _convert lehnen
+# kleinere ab), «> 0» und «>= 0» sind dort gleich.
+core/web/wp_core_web.cpp | cxx_gt_to_ge | return t && t->sampleRate > 0 ? static_cast<double>(t->source.frames) / t->sampleRate : 0.0;
+
+# ---- app/lib/player/player_service.dart ----
+# gleichwertig: Ohne Titel ist die Dauer 0 (unload, Start) und mit Titel liefert der Kern bei Dauer 0
+# selbst keine Wellenform; «&&»/«||» und «> 0»/«>= 0» ergeben in jedem erreichbaren Zustand null bzw.
+# denselben Aufruf.
+app/lib/player/player_service.dart | dart_and_to_or | hasTrack && _duration > 0 ? core.waveform(start, end, count) : null;
+app/lib/player/player_service.dart | dart_gt_to_ge | hasTrack && _duration > 0 ? core.waveform(start, end, count) : null;
+# gleichwertig: Ohne neue Durchgänge (added = 0) zählt LoopRamp.addPasses(0) nichts und gibt null.
+app/lib/player/player_service.dart | dart_le_to_lt | if (added <= 0 || !rampActive) return;
+# gleichwertig: _playGrace wird beim nächsten Play auf 3 gesetzt; −1 statt 0 wirkt wie 0
+# («_playGrace <= 0»).
+app/lib/player/player_service.dart | dart_gt_to_ge | if (_playGrace > 0) _playGrace--;
+# gleichwertig: _pollLoad läuft nur in tick(), und tick() setzt _playing direkt danach aus dem Kern
+# (nach dem Laden ohne Gnadenfrist).
+app/lib/player/player_service.dart | dart_false_to_true | _playing = false; | 18
+# gleichwertig: Bei Ziel = Start bzw. Start = Ziel setzt die Korrektur denselben Wert; mit «||»
+# greift die zweite Korrektur nur, wenn Start > Ziel, und das hat die erste schon behoben.
+app/lib/player/player_service.dart | dart_lt_to_le | if (start != null && n.rampTarget < n.rampStart) {
+app/lib/player/player_service.dart | dart_and_to_or | if (target != null && n.rampStart > n.rampTarget) {
+app/lib/player/player_service.dart | dart_gt_to_ge | if (target != null && n.rampStart > n.rampTarget) {
+# gleichwertig: Ein gespeicherter Loop von genau 1 s wird «erweitert» auf end = max(end, start + 1)
+# und start = min(start, end − 1), also auf dieselben Grenzen.
+app/lib/player/player_service.dart | dart_lt_to_le | if (duration >= minLoopSeconds && end - start < minLoopSeconds) {
+
+# ---- app/lib/time_format.dart ----
+# gleichwertig: 0 wird auf 0 gesetzt.
+app/lib/time_format.dart | dart_lt_to_le | if (!seconds.isFinite || seconds < 0) seconds = 0;
+# Grenzfall: Eine Zeit genau 0,05 s neben einer ganzen Sekunde zeigt das Feld mit oder ohne Zehntel.
+app/lib/time_format.dart | dart_lt_to_le | (seconds - seconds.roundToDouble()).abs() < 0.05
+# gleichwertig: Gemessen, Mull schaltet diese Mutanten nicht wirksam (Grenze des Werkzeugs, siehe
+# docs/TESTS.md): Player ohne configure() liefe mit 44,1 statt 48 kHz (jede Dauer in player_tests
+# wäre falsch), loadAsync ohne cancelLoad() endete im zweiten Laden mit std::terminate, ohne
+# cancel_.store(true) dauerte das Abbrechen; mit aktivem Mutanten bleiben alle Tests grün. Der
+# Eintrag für cancelLoad() trifft auch den gleich lautenden Aufruf in Player::~Player (dort ebenfalls gemessen: alle Tests grün).
+core/src/player_core.cpp | cxx_remove_void_call | engine_.configure(kChannels, sampleRate_);
+core/src/player_core.cpp | cxx_remove_void_call | cancelLoad(); | 3
+core/src/player_core.cpp | cxx_remove_void_call | engine_.collectGarbage();
+core/src/player_core.cpp | cxx_remove_void_call | cancel_.store(true);
+# gleichwertig: Gemessen wie oben: ohne die Zuweisung des Ausgabepuffers schriebe wp_web_render ins
+# Leere, ohne setVolume bliebe das Metronom in reference_tests hörbar, ohne pending.reset() nähme
+# append ein verworfenes Stück an; mit aktivem Mutanten bleiben alle Tests grün.
+core/web/wp_core_web.cpp | cxx_remove_void_call | p->out.assign(static_cast<size_t>(WP_WEB_MAX_BLOCK) * wp::Player::kChannels, 0.0f);
+core/web/wp_core_web.cpp | cxx_remove_void_call | p->core->metronome().setVolume(v);
+core/web/wp_core_web.cpp | cxx_remove_void_call | p->pending.reset();

@@ -772,6 +772,103 @@ void recordingUnavailableOffline() {
   CHECK(std::strlen(wp_rec_error()) > 0);
 }
 
+// A 16-bit mono WAV in memory: `frames` samples of a 440 Hz sine with amplitude 0.5.
+std::vector<unsigned char> wavInMemory(int rate, int frames) {
+  std::vector<unsigned char> b;
+  auto u16 = [&](unsigned v) {
+    b.push_back(static_cast<unsigned char>(v & 0xff));
+    b.push_back(static_cast<unsigned char>((v >> 8) & 0xff));
+  };
+  auto u32 = [&](unsigned v) {
+    u16(v & 0xffff);
+    u16(v >> 16);
+  };
+  auto tag = [&](const char *t) { b.insert(b.end(), t, t + 4); };
+  const unsigned bytes = static_cast<unsigned>(frames) * 2;
+  tag("RIFF");
+  u32(36 + bytes);
+  tag("WAVE");
+  tag("fmt ");
+  u32(16);
+  u16(1);
+  u16(1);
+  u32(static_cast<unsigned>(rate));
+  u32(static_cast<unsigned>(rate) * 2);
+  u16(2);
+  u16(16);
+  tag("data");
+  u32(bytes);
+  for (int i = 0; i < frames; ++i)
+    u16(static_cast<unsigned>(
+            std::lround(0.5 * 32767 * std::sin(2 * kPi * 440 * static_cast<double>(i) / rate))) &
+        0xffff);
+  return b;
+}
+
+void webEntryPointsAtTheirLimits() {
+  // #11 (found by mutation testing): the browser entry points of wp_core_web.h at their limits.
+  // A title decoded into a track (0.5 s at 8000 Hz = 4000 frames) has its length, duration and
+  // waveform; bytes that are no audio give WP_ERR_UNSUPPORTED_FORMAT and no track.
+  const auto wav = wavInMemory(8000, 4000);
+  int err = -999;
+  wp_web_track *t = wp_web_track_decode(wav.data(), wav.size(), 8000, &err);
+  CHECK(t != nullptr && err == WP_OK);
+  if (t) {
+    CHECK(wp_web_track_frames(t) == 4000);
+    CHECK(wp_web_track_duration(t) == 0.5);
+    float mins[4], maxs[4];
+    CHECK(wp_web_track_waveform(t, 0.0, 0.5, 4, mins, maxs) == WP_OK);
+    CHECK(std::fabs(maxs[0] - 0.5f) < 0.01f && std::fabs(mins[3] + 0.5f) < 0.01f);
+    wp_web_track_free(t);
+  }
+  const std::string junk(512, 'x');
+  CHECK(wp_web_track_decode(junk.data(), junk.size(), 8000, &err) == nullptr);
+  CHECK(err == WP_ERR_UNSUPPORTED_FORMAT);
+  CHECK(wp_web_track_duration(nullptr) == 0.0);
+
+  wp_player *p = wp_web_create(8000);
+  CHECK(p != nullptr);
+  if (!p)
+    return;
+  CHECK(wp_web_load_encoded(p, junk.data(), junk.size()) == WP_ERR_UNSUPPORTED_FORMAT);
+  CHECK(wp_web_load_encoded(p, wav.data(), wav.size()) == WP_OK);
+  CHECK(wp_duration(p) == 0.5);
+
+  // PCM in parts: one frame is the smallest title and the smallest part; a new begin discards an
+  // unfinished title, also when the new one is rejected (0 frames).
+  CHECK(wp_web_pcm_begin(p, 10) == WP_OK);
+  CHECK(wp_web_pcm_begin(p, 0) == WP_ERR_INVALID_ARGUMENT);
+  const float frame[2] = {0.25f, -0.25f};
+  CHECK(wp_web_pcm_append(p, frame, 1) == WP_ERR_INVALID_ARGUMENT); // nothing begun any more
+  CHECK(wp_web_pcm_begin(p, 1) == WP_OK);
+  CHECK(wp_web_pcm_append(p, frame, 1) == WP_OK);
+  CHECK(wp_web_pcm_commit(p) == WP_OK);
+  CHECK(wp_duration(p) == 1.0 / 8000);
+
+  // The metronome volume reaches the output: 0 is silence, 1 the click (no title playing).
+  wp_metro_set_volume(p, 0.0f);
+  wp_metro_start(p);
+  wp_web_render(p, 800); // the gain smooths over 5 ms = 40 frames
+  const float *b = wp_web_render(p, 800);
+  float quiet = 0;
+  for (int i = 0; i < 1600; ++i)
+    quiet = std::max(quiet, std::fabs(b[i]));
+  CHECK(quiet == 0.0f);
+  wp_metro_stop(p);
+  wp_metro_set_volume(p, 1.0f);
+  wp_metro_start(p);
+  b = wp_web_render(p, 400);
+  float loud = 0;
+  for (int i = 0; i < 800; ++i)
+    loud = std::max(loud, std::fabs(b[i]));
+  CHECK(loud > 0.3f);
+  wp_destroy(p);
+
+  // Below 1 Hz there is no player. (1 Hz itself is accepted, but the time stretch divides by zero
+  // there, found by UBSan with #11; docs/TESTS.md «Gefundene Fehler».)
+  CHECK(wp_web_create(0) == nullptr);
+}
+
 void run(const char *name, void (*test)()) {
   const int before = failures;
   test();
@@ -806,6 +903,7 @@ int main(int argc, char **argv) {
   run("#3/AK20 #9/AK5 metronome with title", metronomeWithTitle);
   run("#9/AK7 load from file, waveform, errors", loadFromFile);
   run("#9/AK7 recording unavailable offline", recordingUnavailableOffline);
+  run("#11 browser entry points at their limits", webEntryPointsAtTheirLimits);
 
   if (mode == Mode::Dump) {
     const bool ok = writeDump(contractPath);

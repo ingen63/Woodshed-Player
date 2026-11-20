@@ -331,7 +331,7 @@ void loadRunsInBackground() { // #14/AK3
 
   // Während des Ladens läuft die Wiedergabe weiter, Fortschritt steigt.
   double lastProgress = 0;
-  bool monotonic = true, sawRunning = false;
+  bool monotonic = true, sawRunning = false, sawPartial = false;
   std::vector<float> out(480 * 2);
   int state = 0;
   while ((state = p.loadState()) == wp::kLoadRunning) {
@@ -339,11 +339,16 @@ void loadRunsInBackground() { // #14/AK3
     p.render(out.data(), 480);
     const double prog = p.loadProgress();
     monotonic = monotonic && prog >= lastProgress && prog <= 1.0;
+    sawPartial = sawPartial || (prog > 0.0 && prog < 1.0); // #11: progress in steps
     lastProgress = prog;
     std::this_thread::sleep_for(std::chrono::microseconds(200));
   }
   CHECK(sawRunning || state == wp::kLoadReady);
   CHECK(monotonic);
+  // #11: 60 s are decoded in 352 blocks of 8192 frames; polled every 0.2 ms the state is seen as
+  // running (the previous title left it «ready») and the progress between 0 and 1
+  CHECK(sawRunning);
+  CHECK(sawPartial);
   CHECK(state == wp::kLoadReady);
   CHECK(p.waitForLoad() == wp::kOk);
   CHECK(p.loadProgress() == 1.0);
@@ -594,6 +599,59 @@ void setSourceWithoutPeaks() {
   CHECK(out[10] == 0.25f);
 }
 
+// #11, found by mutation testing: the load state follows every request. A rejected request (empty
+// path, no device) is the state, not the previous «ready»; a failed load leaves the progress at 0,
+// only success sets it to 1.
+void loadStateFollowsEveryRequest() {
+  wp::Player p(kSr);
+  CHECK(p.load(writeIndexWav("state.wav", kSr / 10).string()) == wp::kOk);
+  CHECK(p.loadState() == wp::kLoadReady);
+  CHECK(p.loadAsync("") == wp::kErrInvalidArgument);
+  CHECK(p.loadState() == wp::kErrInvalidArgument);
+  p.setDeviceAvailable(false);
+  CHECK(p.loadAsync(writeIndexWav("state2.wav", kSr / 10).string()) == wp::kErrDeviceUnavailable);
+  CHECK(p.loadState() == wp::kErrDeviceUnavailable);
+  // the device reports «started»: available again
+  p.onDeviceEvent(wp::DeviceEvent::Started);
+  CHECK(p.deviceAvailable());
+
+  wp::Player q(kSr);
+  CHECK(q.load(writeBytes("noaudio.wav", std::string(4096, 'x')).string()) ==
+        wp::kErrUnsupportedFormat);
+  CHECK(q.loadState() == wp::kErrUnsupportedFormat);
+  CHECK(q.loadProgress() == 0.0);
+}
+
+// The shortest title is one frame; conversion keeps one frame (same rate), and samples that are not
+// finite become silence, the rest is limited to ±8 (#10) also when converting.
+void oneFrameAndBadSamplesWhenConverting() {
+  wp::Player p(kSr);
+  auto one = std::make_unique<wp::Source>();
+  one->data = {0.25f, -0.25f};
+  one->frames = 1;
+  CHECK(p.setSource(std::move(one)) == wp::kOk);
+  CHECK_NEAR(p.engine().duration(), 1.0 / kSr, 1e-15);
+
+  const float in[2] = {0.5f, -0.5f};
+  wp::Source single;
+  CHECK(wp::convertPcm(in, 2, 1, kSr, kSr, single) == wp::kOk);
+  CHECK(single.frames == 1 && single.data[0] == 0.5f && single.data[1] == -0.5f);
+
+  std::vector<float> bad(2 * 20000, 0.25f);
+  bad[2 * 19000] = std::nanf("");
+  bad[2 * 19001 + 1] = INFINITY;
+  bad[2 * 19002] = 100.0f;
+  wp::Source clean;
+  CHECK(wp::convertPcm(bad.data(), 2, 20000, kSr, kSr, clean) == wp::kOk);
+  CHECK(clean.frames == 20000);
+  bool finite = true;
+  for (float v : clean.data)
+    finite = finite && std::isfinite(v) && std::fabs(v) <= 8.0f;
+  CHECK(finite);
+  CHECK(clean.data[2 * 19000] == 0.0f && clean.data[2 * 19001 + 1] == 0.0f);
+  CHECK(clean.data[2 * 19002] == 8.0f);
+}
+
 void errorMessagesAreEnglishAscii() { // #46/AK1
   const int codes[] = {WP_OK,
                        WP_ERR_INVALID_ARGUMENT,
@@ -714,6 +772,8 @@ int main() {
       {"loadErrorsHaveCodeAndText", loadErrorsHaveCodeAndText},
       {"truncatedAndWrongAudioFiles", truncatedAndWrongAudioFiles},
       {"errorMessagesAreEnglishAscii", errorMessagesAreEnglishAscii},
+      {"loadStateFollowsEveryRequest", loadStateFollowsEveryRequest},
+      {"oneFrameAndBadSamplesWhenConverting", oneFrameAndBadSamplesWhenConverting},
       {"errorDuringPlaybackKeepsPlaying", errorDuringPlaybackKeepsPlaying},
       {"loadRunsInBackground", loadRunsInBackground},
       {"newerLoadReplacesRunningLoad", newerLoadReplacesRunningLoad},

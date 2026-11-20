@@ -1,0 +1,36 @@
+# Mull configuration of the core (#11), read by the compiler plugin while core/build-mutants is
+# built (MULL_CONFIG, set by core/CMakeLists.txt). Strategy and limits: docs/TESTS.md «Mutationstests».
+#
+# Only our own sources are mutated: core/src and core/web (the offline C API of the reference tests).
+# The plugin is only added to our own targets, but signalsmith's headers and the C++ library are
+# compiled into them; includePaths keeps those out. Tests and third_party are never mutated, except
+# the self-test of the mutation run (tests/mutants/selftest.cpp, #11/AK4).
+# Excluded on purpose:
+# - core/src/recorder_mac.mm: recording of the system sound (Core Audio process tap) needs real
+#   system sound and the user's permission; no test program can drive it (docs/TESTS.md «Aufnahme»,
+#   gap #51).
+# - core/src/miniaudio_impl.c: only includes miniaudio.
+# - core/web/w0_bridge.cpp: the browser bridge of the web prototype, not part of a native test
+#   program.
+# Single mutants are excluded in the source with `// mull-ignore-next: <mutator>` and a reason in
+# the line above (docs/TESTS.md lists them).
+mutators:
+  - cxx_arithmetic
+  - cxx_arithmetic_assignment
+  - cxx_comparison
+  - cxx_boundary
+  - cxx_logical
+  - cxx_remove_negation
+  - cxx_increment
+  - cxx_decrement
+  - cxx_remove_void_call
+includePaths:
+  - '.*/core/src/.*'
+  - '.*/core/web/.*'
+  - '.*/core/tests/mutants/selftest\.cpp'
+excludePaths:
+  - '.*/third_party/.*'
+  - '.*/recorder_mac\.mm'
+  - '.*/miniaudio_impl\.c'
+  - '.*/w0_bridge\.cpp'
+quiet: true

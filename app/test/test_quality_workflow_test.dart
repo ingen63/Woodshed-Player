@@ -1,4 +1,4 @@
-// #57, #10, #58, #13, #59: sanitizer, fuzzing, random test, network check, checks, web, macOS, UI and bench runs in
+// #57, #10, #58, #13, #59, #11: sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -188,7 +188,47 @@ void main() {
     });
   });
 
-  final nightlyJobs = ['macos', 'sanitize-thread', 'fuzz', 'property', 'bench'];
+  group('#11/AK1, AK5 mutation tests', () {
+    test('make mutants and make mutants-diff run the mutation tool', () {
+      expect(makefile, isNot(contains('mutants:       ; \$(call not_yet')));
+      expect(
+        makefile,
+        contains(
+          '\nmutants:\n\tdart app/tool/mutants_run.dart --jobs \$(MUTANTS_JOBS)',
+        ),
+      );
+      expect(
+        makefile,
+        contains(
+          '\nmutants-diff:\n\tdart app/tool/mutants_run.dart --base \$(BASE) --jobs',
+        ),
+      );
+      expect(makefile, contains('BASE ?= origin/main'));
+      expect(makefile, contains('tool/mutants_test.dart'));
+    });
+
+    test('the mutants-diff job runs nightly against the last nightly run and reports the missed', () {
+      final j = job(workflow, 'mutants-diff');
+      expect(j, contains('mull-project/mull'));
+      expect(j, contains('--event schedule --status success'));
+      expect(j, contains("--before='3 days ago'"));
+      expect(j, contains('make mutants-diff BASE='));
+      expect(j, contains('local/mutants/diff/summary.txt'));
+      expect(j, contains('GITHUB_STEP_SUMMARY'));
+      for (final push in ['checks', 'web', 'sanitize', 'network-free']) {
+        expect(job(workflow, push), isNot(contains('mutants')), reason: push);
+      }
+    });
+  });
+
+  final nightlyJobs = [
+    'macos',
+    'sanitize-thread',
+    'fuzz',
+    'property',
+    'bench',
+    'mutants-diff',
+  ];
 
   group('#13/AK3 checks on Linux on every push with a code change', () {
     test('changes reports code and web changes', () {
@@ -250,11 +290,9 @@ void main() {
         ); // make test-ui
       });
 
-      test('mutation tests on the diff are planned as a nightly job (#11)', () {
-        expect(
-          workflow,
-          contains('Mutation tests on the diff follow with #11'),
-        );
+      test('mutation tests on the diff run as a nightly job (#11)', () {
+        expect(workflow, contains('# - mutants-diff: mutation tests'));
+        expect(job(workflow, 'mutants-diff'), contains('needs: nightly-gate'));
       });
     },
   );
