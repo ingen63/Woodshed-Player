@@ -2,6 +2,17 @@
 
 Woodshed Player ist ein Übe-Player für Musiker (Bibliothek, Tempo ohne Tonhöhenänderung, Loops, Metronom, später Aufnahme und Cloud-Sync). Umbau von SwiftUI (`WoodshedPlayer/`, macOS 14+/iOS 17+) auf Flutter (`app/`) mit C++-Audio-Kern (`core/`), Plan in `docs/UMBAUPLAN-FLUTTER.md`. Überblick in `README.md`, Lizenz MIT.
 
+## Technik
+
+- **App:** Flutter/Dart (`app/`) für macOS, iOS und Web. Dart-Pakete stehen in `app/pubspec.yaml`.
+- **Audio-Kern:** C++17 mit CMake (`core/`) und C-API `core/include/wp_core.h`.
+  - Nativ (macOS, iOS) bindet das FFI-Plugin `app/packages/wp_core/` den Kern über `dart:ffi` an.
+  - Im Web wird der Kern mit Emscripten zu WebAssembly gebaut (`core/web/`, `core/build-wasm/`) und läuft in einem AudioWorklet. AAC/M4A dekodiert dort der Browser.
+- **Bibliotheken im Kern** (header-only, in `core/third_party/`, Versionen dort im README): miniaudio für Dekodieren und Audiogerät, signalsmith-stretch mit signalsmith-linear für Tempo ohne Tonhöhenänderung.
+- **Schriften:** Inter und JetBrains Mono (SIL OFL 1.1, `app/assets/fonts/`).
+- **Werkzeuge:** clang-format, clang-tidy, `dart format`, `flutter analyze`. Node.js für die WASM-Tests, Python für die Website (`site/`). CI mit GitHub Actions (`.github/workflows/`): `test-quality.yml` für Tests und Qualität, `pages.yml` für Web-App und Website auf GitHub Pages.
+- **Altprojekt:** Swift/SwiftUI mit AVFoundation (`WoodshedPlayer/`), gebaut mit Xcode.
+
 ## Sprache
 
 - **Mit Dir, in Commits, Issues und Dokumenten** (`docs/`, `README.md`): Deutsch mit «ss» statt «ß», Anrede **«Du»**.
@@ -39,12 +50,14 @@ make lint                  # flutter analyze (streng), C++ mit -Wall -Wextra -We
 cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release && cmake --build core/build 2>&1 | tail -20 && ctest --test-dir core/build --output-on-failure
 cd app && flutter analyze --no-pub && flutter test --reporter failures-only
 cd app && flutter build macos --debug && flutter build ios --simulator --debug
+cd app && flutter build web --release --no-wasm-dry-run                          # Web-App
+make test-wasm             # Kern als WASM (Emscripten) unter Node.js, verglichen mit dem nativen Kern
+make test-web              # Web-Tests in Chrome: OPFS und WASM-Kern (braucht Emscripten)
 xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' -quiet test        # Swift-Altprojekt
 xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO -quiet build
 tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitTimePitch
 ```
 
-- Kern: C-API `core/include/wp_core.h`, Dart-Anbindung als FFI-Plugin `app/packages/wp_core/`, Bibliotheken in `core/third_party/` (Versionen dort im README).
 - **Hook nach dem Commit** baut und testet die betroffenen Teile selbst. Nur bei Fehlern oder geänderter Logik ohne Tests meldet er sich; dann Fehler beheben bzw. den `test-agent` (Schnellmodus) starten. Testdetails stehen im Agenten.
 - Flutter-App und Kern werden mit `flutter test` und `ctest` geprüft; `xcodebuild` nur noch für das Swift-Altprojekt.
 - Neuer Code ist formatiert (`make format`) und ohne Warnungen (`make lint`); Ausnahmen nur mit Begründung (`core/.clang-tidy`, `NOLINT(<Prüfung>)`).
@@ -58,4 +71,4 @@ tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitT
 - **Lizenzen:** nur MIT-verträglich (MIT, BSD, Apache-2.0, Public Domain/MIT-0), keine GPL/AGPL. Schriften zusätzlich unter SIL OFL 1.1 (unverändert einbinden, Lizenztext und Copyright-Hinweis ins Repo). Neue Abhängigkeiten nur nach Rückfrage.
 - Audio und Oberfläche trennen: Audio in `core/` (Swift: `Audio/`), Daten in `Model/`, Darstellung in `Views/`.
 - `README.md` (Funktionstabelle, Datenschutz) im selben Zug nachführen, wenn sich Verhalten oder Begriffe ändern.
-- Jede Änderung muss auf macOS und iOS bauen. Aufnahme gibt es auf iPhone/iPad nicht.
+- Jede Änderung muss auf macOS, iOS und Web bauen; Änderungen am Kern auch als WASM. Aufnahme gibt es auf iPhone/iPad nicht.
