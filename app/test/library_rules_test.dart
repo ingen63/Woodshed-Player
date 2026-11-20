@@ -471,13 +471,14 @@ void main() {
       a.library.dispose();
     });
 
-    test('dispose saves a pending change', () async {
+    test('dispose saves a pending change and ends the notifier', () async {
       final a = await _loaded(saveDelay: const Duration(hours: 1));
       final t = await a.add('a.mp3');
       a.library.updateSettings(t.id, t.settings.copyWith(speed: 0.25));
       a.library.dispose();
       final tracks = (a.saved['tracks'] as Map)[t.id] as Map;
       expect((tracks['values'] as Map)['speed'], 0.25);
+      expect(() => a.library.addListener(() {}), throwsA(isA<Error>()));
     });
 
     test(

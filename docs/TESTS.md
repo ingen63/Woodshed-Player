@@ -183,7 +183,8 @@ zugeordnet.
 | Hook nach dem Commit mit eigenen Tests | vorhanden: `app/tool/after_commit_hook_test.dart` (#7/AK7) | – |
 | Abdeckung je Teil mit Untergrenze, `coverage-diff`, `pre-push` mit eigenen Tests | vorhanden: `tools/coverage-min`, `tools/git-hooks/pre-push`, `app/tool/coverage_test.dart`, `app/tool/pre_push_hook_test.dart` (#8) | – |
 | C-API (`player.cpp`) über die geteilte Bibliothek: Nullzeiger, Laden, Seek, Tempo, Loop, Wellenform, Metronom, Aufnahme im Ruhezustand | vorhanden: `core/tests/capi_tests.cpp` (#8) | – |
-| Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug, `make mutants`, `make mutants-diff`, Job `mutants-diff` | vorhanden: `app/tool/mutants*.dart`, `core/tests/mutants/`, `tools/mutants-exclude.txt` (#11); offene Mutanten im Abschnitt «Mutationstests (#11)» | – |
+| Gerätehülle (`player.cpp`) von innen auf dem Null-Gerät: Meldungen von miniaudio, Neustart des Geräts, Metronom über die C-API | vorhanden: `core/tests/device_tests.cpp` (#61) | – |
+| Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug, `make mutants`, `make mutants-diff`, Job `mutants-diff` | vorhanden: `app/tool/mutants*.dart`, `core/tests/mutants/`, `tools/mutants-exclude.txt` (#11); kein offener Mutant mehr (#61, Abschnitt «Mutationstests (#11)») | – |
 | Übersichtsseite Testqualität: vier Schichten mit Status, Zuordnung `#nn/AKn`, Verlauf, «keine Daten» | vorhanden: `make report`, `app/tool/report/` mit `report_test.dart`, Artefakt `test-quality-report` im Job `checks` (#12) | – |
 | Netzwerkfreiheit bei jedem Push: Prüfung mit eigenen Tests | vorhanden: `make network-free`, Job `network-free` in `test-quality.yml`, `test_quality_workflow_test.dart` (#58/AK6) | – |
 
@@ -813,7 +814,7 @@ Plugin). Im Workflow: die Debian-Pakete für Ubuntu 24.04 und LLVM 18 (`clang-18
   gespeicherte Befehlszeile und trennt sie an Leerzeichen; der Projektpfad hat eines. Das Werkzeug baut deshalb über
   einen Link ohne Leerzeichen im temporären Ordner.
 - **Testauswahl (AK3):** Jedes Testprogramm des Kerns läuft einzeln unter `mull-runner` (`engine_tests`,
-  `metronome_tests`, `waveform_tests`, `player_tests`, `recorder_tests`, `capi_tests --null-backend`,
+  `metronome_tests`, `waveform_tests`, `player_tests`, `recorder_tests`, `capi_tests --null-backend`, `device_tests`,
   `realtime_tests`, `reference_tests`, `fuzz_decoder_replay`, `fuzz_capi_replay`; nicht die Leistungstests aus #59) und führt jeden
   Mutanten aus, der in ihm steckt. Ein Mutant ist erkannt, wenn ein Programm ihn erkennt. Mulls Abdeckungsfilter
   (nur ausgeführte Zeilen mutieren) ist bewusst aus: Er übersprang Funktionen, die die Tests ausführen
@@ -860,9 +861,12 @@ wachsendem Vektor, einmal ohne Speicher; `make mutants` verlangt «erkannt» (Sp
 Speicher in einem Kindprozess.
 
 **Einzeln beurteilen, kein Score-Ziel (AK2).** Jeder nicht erkannte Mutant wird mit einem Test getötet oder mit
-Begründung in `tools/mutants-exclude.txt` ausgeschlossen. Erlaubt sind zwei Arten: **gleichwertig** (das Ergebnis bleibt
-bei jeder Eingabe gleich) und **Grenzfall** (der Mutant ändert nur das Verhalten bei exakter Gleichheit gerechneter
-Werte oder innerhalb einer Toleranz). Ein Eintrag ohne Begründung bricht den Lauf ab. Die Einträge sind an Datei,
+Begründung in `tools/mutants-exclude.txt` ausgeschlossen. Erlaubt sind vier Arten: **gleichwertig** (das Ergebnis bleibt
+bei jeder Eingabe gleich), **Grenzfall** (der Mutant ändert nur das Verhalten bei exakter Gleichheit gerechneter
+Werte oder innerhalb einer Toleranz), im Kern dazu **Speicherfreigabe** (nur ein Leck, ohne beobachtbare Wirkung;
+Lecks zählen im Mutationslauf nicht) und **Mull-Grenze** (Mull schaltet den Mutanten nicht wirksam; von Hand
+gemessen: ohne den Aufruf scheitert ein Test, der Eintrag nennt ihn) (#61/AK3). Ein Eintrag ohne Begründung bricht
+den Lauf ab. Die Einträge sind an Datei,
 Mutator und Quelltextzeile gebunden, nicht an die Zeilennummer; ändert sich die Zeile, erscheint der Mutant wieder und
 wird neu beurteilt. Ein voller Lauf meldet Einträge ohne Treffer. Einen Mutation Score als Zielwert gibt es nicht.
 
@@ -890,50 +894,50 @@ zwei `assert` an den Puffergrenzen von `core/src/engine.cpp`. Was dabei auffiel,
 **Grenze von Mull:** Einige Mutanten «Aufruf entfernen» schaltet Mull nicht wirksam: Mit gesetzter Umgebungsvariable
 des Mutanten verhält sich das Programm unverändert, obwohl ein Test sicher scheitern müsste (z. B. `Player` ohne
 `engine_.configure` liefe mit 44,1 statt 48 kHz, `loadAsync` ohne `cancelLoad` endete mit `std::terminate`). Betroffen
-sind vor allem Konstruktoren, Destruktoren und Funktionen mit `lock_guard` oder `try`. Gemessene Fälle sind als
-gleichwertig ausgeschlossen (Begründung in `tools/mutants-exclude.txt`); weitere Fälle derselben Art stehen unten als
-offen. Mulls Abdeckungsfilter ist aus demselben Grund aus (siehe oben).
+sind vor allem Konstruktoren, Destruktoren und Funktionen mit `lock_guard` oder `try`. Gemessene Fälle sind
+ausgeschlossen (in #11 als «gleichwertig», seit #61 als «Mull-Grenze», mit dem Test, der den von Hand entfernten
+Aufruf erkennt). Mulls Abdeckungsfilter ist aus demselben Grund aus (siehe oben).
 
 **Aufnahme (#68):** `recorder_core.cpp` (aus `recorder_mac.mm` herausgelöst) wird mutiert und von `recorder_tests`
 geprüft: 65 Mutanten, 51 erkannt, 8 Zeitüberschreitungen, 6 begründet ausgeschlossen (drei gleichwertige, drei in
 Destruktoren nach der Grenze oben, von Hand gemessen), keiner offen.
 
-**Offen (AK2 nicht erfüllt):** 288 nicht erkannte Mutanten, je Datei mit den Zeilen (Stand des Laufs oben; die
-aktuelle Liste mit Spalte, Mutator und Quelltext steht nach jedem Lauf in `local/mutants/full/missed.txt`). Zuerst
-behandelt wurden Loop, Seek, Tempo und Metronom in Kern und Dart; dort bleibt im Kern nur der Abbau ersetzter Titel
-(`engine.cpp` 28, 54: Speicher wird später freigegeben) und in Dart `player_service.dart` 281 (Loop ohne Grenzen
-einschalten bei weniger als 1 s) sowie `metronome_controller.dart` 88 (Benachrichtigung nach `restore`).
+**Stand nach #61 (AK2 erfüllt):** Der volle Lauf meldet keinen offenen Mutanten mehr. Gemessen am 20.11.2026, Stand
+8c26733 mit dem Test zu `Library.dispose` aus dem Abschluss-Commit von #61, `make mutants` mit 6 parallelen
+Mutanten:
 
-| Datei | offen | Zeilen |
+| Teil | Mutanten | erkannt | Zeitüberschreitung | nicht übersetzbar | ausgeschlossen | nicht erkannt (offen) | Laufzeit |
+|---|---|---|---|---|---|---|---|
+| C++-Kern (Mull) | 666 | 584 | 19 | 0 | 63 | 0 | 37 s mit Zwischenspeicher (20 min nach neuem Bau) |
+| Dart-Logik | 1065 | 703 | 254 | 57 | 51 | 0 | 98 min |
+
+Zeitüberschreitungen zählen als erkannt; ihre Zahl hängt von der Last ab (6 parallele Mutanten, daneben andere
+Läufe). Darum meldet der Lauf 16 Ausschlüsse ohne Treffer: Ihre Mutanten endeten diesmal mit Zeitüberschreitung oder
+wurden in den Fuzz- und Referenzläufen erkannt. Die Einträge bleiben stehen, solange ihre Begründung stimmt.
+
+Ausgangslage war der Lauf aus #11 mit 288 offenen Mutanten (29 Kern, 259 Dart); vor #61 waren es nach #62–#76 noch
+172 (39 Kern, 133 Dart, die Zeilen hatten sich teils verschoben). Jeder davon ist jetzt von einem Test erkannt oder in
+`tools/mutants-exclude.txt` begründet ausgeschlossen. Neue Tests, je Regel ein Test mit `#nn/AKn` (dem Kriterium, das
+er belegt) oder `#61`:
+
+| Bereich | Tests | Was sie prüfen |
 |---|---|---|
-| `app/lib/library/metadata.dart` | 93 | 13, 33, 48, 73, 85, 88, 98, 100, 103, 104, 108, 109, 113, 122, 123, 140, 144, 146, 148, 149, 154, 157, 168, 178, 193, 222, 227, 231, 236, 252, 253, 259, 265, 268, 271, 287, 291, 292, 314, 315, 316, 317, 318, 319, 321, 322, 323, 324, 325, 327, 338, 343, 346 |
-| `app/lib/library/library.dart` | 66 | 136, 204, 208, 221, 228, 244, 248, 259, 263, 268, 272, 379, 395, 403, 409, 422, 424, 425, 433, 436, 440, 457, 474, 484, 485, 488, 493, 497, 498, 509, 515, 518, 537, 543, 561, 562, 602, 614, 617, 618, 639, 649, 651, 656, 666, 670, 673, 681, 706, 708, 725, 731, 732, 756, 767, 779, 809, 810, 838, 849, 852, 868, 871 |
-| `app/lib/sync/sync_engine.dart` | 34 | 80, 117, 135, 137, 148, 149, 153, 157, 160, 162, 175, 184, 191, 211, 246, 253, 256, 264, 270, 276, 280, 286, 340, 343, 347, 391, 398, 399, 400, 401 |
-| `app/lib/library/stamps.dart` | 26 | 16, 25, 26, 45, 51, 93, 94, 102, 108, 109, 110, 112, 202, 300 |
-| `core/src/player.cpp` | 17 | 38, 41, 44, 47, 50, 63, 101, 102, 119, 130, 144, 159, 206, 210, 214 |
-| `app/lib/app/app_controller.dart` | 9 | 47, 52, 81, 82, 83, 91, 133, 136, 137 |
-| `app/lib/library/track.dart` | 8 | 125, 148, 165, 219, 223, 241, 252, 281 |
-| `app/lib/player/waveform_summary.dart` | 7 | 30, 37, 39, 44, 45 |
-| `core/src/player_core.cpp` | 6 | 126, 129, 245, 256, 295, 339 |
-| `app/lib/library/migration.dart` | 5 | 61, 90, 115, 130 |
-| `core/web/wp_core_web.cpp` | 4 | 63, 75, 92, 145 |
-| `app/lib/app/file_platform.dart` | 3 | 101, 103, 104 |
-| `app/lib/app/file_store_io.dart` | 2 | 33, 72 |
-| `app/lib/player/player_service.dart` | 2 | 281 |
-| `core/src/engine.cpp` | 2 | 28, 54 |
-| `app/lib/library/device_settings.dart` | 1 | 35 |
-| `app/lib/library/natural_compare.dart` | 1 | 70 |
-| `app/lib/metronome/metronome_controller.dart` | 1 | 88 |
-| `app/lib/sync/in_memory_provider.dart` | 1 | 89 |
+| `metadata.dart` | `app/test/metadata_test.dart` (Gruppen «#16/AK4 … (#61)») | ID3v2-Kodierungen (UTF-16 mit und ohne BOM, ungerade Länge, Terminator), Struktur (Versionen, Frame-Grenzen, erweiterter Kopf, Unsynchronisation, Kompression), Bilder, FLAC (Blockgrenzen, Kommentarzahl, Bild mit Beschreibung), WAV (LIST/INFO, Füllbytes, id3-Chunk) |
+| `stamps.dart` | `app/test/stamps_test.dart` | Stempel (UTC, Vergleich, `parse` und Grenzen), Uhr (`observe`), JSON-Vergleich, Frist der Grabsteine genau 90 Tage |
+| `track.dart` | `app/test/track_rules_test.dart` | Loop-ID beim Verschieben und Anlegen, `LoopRange`, alte Einträge, Vorgaben fehlender geteilter Felder |
+| `library.dart` | `app/test/library_rules_test.dart` | Benachrichtigung bei jedem Laden, fehlende Dateien, Stempel nach Laden und Abgleich, Abwesenheit von Dateien, Audio aus der Cloud, Speichern (Entprellen mit der Testuhr von `testWidgets`, `flush`, `dispose`), Import, Ordner, Verschieben, Titel und Dauer |
+| `sync_engine.dart` | `app/test/sync_rules_test.dart` | Zeitgeber (Testuhr), Wiederholungen ohne Verbindung, Abgleich während eines Abgleichs, Status, Audiodateien, Konflikte, Inhalt von `state.json`, Reparatur, `dispose` |
+| übrige Dart-Dateien | `app/test/app_controller_rules_test.dart`, `migration_rules_test.dart`, `support_rules_test.dart`, `mutation_cases_test.dart` | Meldungen und `dispose` des AppController, Titel nur auf einem anderen Gerät, Migration, natürliche Sortierung, Geräte-ID, Dateispeicher, Plattformkanal, Wellenform im Browser, Cloud im Speicher, Metronom nach `restore` |
+| Kern | `core/tests/device_tests.cpp` (neu), `core/tests/player_tests.cpp` | Gerätehülle von innen: `player.cpp` wird in das Testprogramm übersetzt, Meldungen von miniaudio und Neustart des Null-Geräts; Reservierung beim Laden aus Datei und Speicher (grösste einzelne Reservierung, stilles FLAC mit falscher oder unplausibler Länge), Fortschritt nach dem Laden, kein Speicher für den Lade-Thread, Stille und Metronom-Rate bei nicht unterstützter Rate |
 
-Gründe der offenen Kern-Mutanten: `player.cpp` ist die Hülle um das echte Audiogerät (Benachrichtigungen von
-miniaudio, Start des Geräts, Umgebungsvariable `WP_AUDIO_BACKEND`, Metronom-Setter ohne Abfrage über die C-API); die
-Testprogramme laufen auf dem Null-Gerät und können das nicht beobachten. `player_core.cpp` 126 (Fortschritt bei
-unbekannter Länge), 129 (Fehler des Decoders nach den ersten Frames), 245 (`ma_data_converter_uninit`, nur ein Leck),
-256, 339 (vermutlich dieselbe Grenze von Mull), 295 (Thread lässt sich nicht starten); `wp_core_web.cpp` 63, 75, 92,
-145 und `engine.cpp` 28, 54 geben Speicher frei, ohne dass sich ein Ergebnis ändert (Lecks zählen nicht, siehe
-oben). Die Dart-Mutanten in Metadaten, Bibliothek, Abgleich und Stempeln brauchen gezielte Tests je Regel; das ist
-ein Folgeauftrag (Issue-Vorschlag im Bericht zu #11).
+Ausgeschlossen mit Begründung (Auswahl): im Kern gibt `collectGarbage` bzw. `ma_data_converter_uninit` nur Speicher
+frei (Speicherfreigabe), `data.reserve`, `setSampleRate` im Konstruktor und `loader_.join` schaltet Mull nicht wirksam
+(Mull-Grenze, von Hand gemessen), die Decoder von miniaudio enden immer mit `MA_AT_END` (gemessen mit ganzen,
+abgeschnittenen und verfälschten FLAC-, MP3- und WAV-Dateien); in Dart Anfangswerte, die nie gelesen werden,
+Grenzen genau am Datenende, gleiche Werte in Vergleichen und ein nicht erreichbarer Zweig in
+`PlayerService.updateSettings`. Am Produktivcode ist für #61 nichts geändert: Kein Mutant zeigte einen Fehler, der eine
+Änderung verlangte. Zwei Beobachtungen ohne Änderung stehen im Bericht zu #61 als Vorschlag (ein beschädigter letzter
+Block in FLAC oder ein abgeschnittener id3-Chunk in WAV verwirft alle Metadaten der Datei).
 
 ## Übersichtsseite Testqualität (#12)
 
