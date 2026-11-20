@@ -95,6 +95,20 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
   int _playGrace = 0; // Ticks, in denen «spielt» gilt, bis der Audio-Thread den Befehl übernommen hat
   _PendingLoad? _pending;
 
+  /// #73: target of the last seek until the core reports it. A slow audio device applies the seek only
+  /// after several ticks; until then the core still reports the old position.
+  double? _seekTarget;
+  int _seekWait = 0;
+
+  /// #73: ticks to wait for the core to apply a seek (about one second), then its position counts.
+  static const seekSettleTicks = 30;
+
+  /// #73: the core has applied a seek when its position is this close to the target (seconds).
+  static const seekTolerance = 0.05;
+
+  /// #73: while playing, the core may already have moved on from the target by up to this (seconds).
+  static const seekPlayingLead = 1.0;
+
   /// #15/AK2: Timer läuft nur, solange gespielt oder geladen wird (plus ein Tick danach).
   bool get isPolling => _timer != null;
 
@@ -110,14 +124,31 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
       final corePlaying = core.isPlaying;
       if (corePlaying || _playGrace <= 0) _playing = corePlaying;
       if (_playGrace > 0) _playGrace--;
-      _position = core.position.clamp(0, _duration).toDouble();
+      _updatePosition(core.position.clamp(0, _duration).toDouble());
       _countLoopPasses();
     }
-    if (!_playing && _pending == null) {
+    if (!_playing && _pending == null && _seekTarget == null) {
       _timer?.cancel();
       _timer = null;
     }
     notifyListeners();
+  }
+
+  /// Takes the core's position, unless a seek is still on its way to the core (#73).
+  void _updatePosition(double corePosition) {
+    final target = _seekTarget;
+    if (target != null) {
+      final lead = corePosition - target;
+      final applied =
+          lead.abs() <= seekTolerance ||
+          (_playing && lead >= 0 && lead <= seekPlayingLead);
+      if (!applied && _seekWait < seekSettleTicks) {
+        _seekWait++;
+        return;
+      }
+      _seekTarget = null;
+    }
+    _position = corePosition;
   }
 
   // ---- Laden ----
@@ -162,6 +193,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
       _trackId = p.trackId;
       _duration = core.duration;
       _position = 0;
+      _seekTarget = null;
       _playing = false;
       _playGrace = 0;
       _error = null;
@@ -187,6 +219,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
     if (_playing) core.pause();
     _path = _title = _trackId = null;
     _playing = false;
+    _seekTarget = null;
     _position = _duration = 0;
     _settings = const PlaybackSettings();
     notifyListeners();
@@ -235,6 +268,8 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
     final t = seconds.clamp(0, _duration).toDouble();
     core.seek(t);
     _position = t;
+    _seekTarget = t;
+    _seekWait = 0;
     _ensurePolling();
     notifyListeners();
   }

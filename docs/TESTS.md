@@ -1051,7 +1051,10 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     Position nur einmal ab und hört dann auf. Antwortet das Gerät langsamer als ein Abfragetakt (33 ms, so beim
     Null-Gerät), bleibt die alte Position stehen, bis wieder gespielt wird; Knöpfe wie «Anfang hier» nehmen dann die
     alte Position. Mit echtem Gerät nicht beobachtet. Die Tests setzen den Loop deshalb aus dem Zustand nach Pause
-    und während der Wiedergabe; Behebung als eigenes Issue vorgeschlagen.
+    und während der Wiedergabe; Behebung als eigenes Issue vorgeschlagen. Behoben in #73: Nach einem Seek fragt
+    `PlayerService` weiter ab, bis der Kern die neue Position meldet (höchstens 30 Takte, etwa 1 s), und zeigt bis
+    dahin das Ziel statt der alten Position. Regressionstest: Gruppe «#73 position after a seek while paused» in
+    `player_service_test.dart` (verzögerter Ersatzkern, Takte von Hand ausgelöst).
 19. 20.11.2026, #59/AK3, Lasttest Bibliothek: Alphabetisches Sortieren von 10'000 Titeln brauchte 601 ms (Grenze 1 s,
     auf einem langsameren Rechner darüber). `naturalCompare` faltete und zerlegte beide Titel bei jedem der rund
     130'000 Vergleiche neu. Behoben: `NaturalKey` wird einmal je Titel berechnet (`sortedNaturally`, für Titel und

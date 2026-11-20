@@ -40,6 +40,16 @@ class FakeCore implements AudioCore {
   bool applyPlayImmediately =
       true; // false: Audio-Thread übernimmt «play» erst später
   double pos = 0;
+
+  /// false: the audio thread applies a seek only on [applySeek] (slow device, #73).
+  bool applySeekImmediately = true;
+  double? pendingSeek;
+  void applySeek() {
+    final t = pendingSeek;
+    if (t != null) pos = t;
+    pendingSeek = null;
+  }
+
   double rateValue = 1;
   double volumeValue = 1;
   (double, double)? loop;
@@ -93,7 +103,11 @@ class FakeCore implements AudioCore {
   @override
   void seek(double seconds) {
     calls.add('seek $seconds');
-    pos = seconds;
+    if (applySeekImmediately) {
+      pos = seconds;
+    } else {
+      pendingSeek = seconds;
+    }
   }
 
   @override

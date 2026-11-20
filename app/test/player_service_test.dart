@@ -694,4 +694,73 @@ void main() {
       expect(() => h.service.addListener(() {}), throwsStateError);
     });
   });
+
+  group('#73 position after a seek while paused', () {
+    test('#73/AK1+AK2: a slow device shows the new position', () async {
+      final h = Harness();
+      await h.loadReady('/a.mp3', 100);
+      h.core.pos = 20;
+      h.core.applySeekImmediately = false;
+      h.service.seek(60);
+      expect(h.service.position, 60);
+      // The device has not applied the seek yet: the old position must not come back.
+      h.fire(5);
+      expect(h.service.position, 60);
+      expect(h.service.isPolling, isTrue);
+      h.core.applySeek();
+      h.fire();
+      expect(h.service.position, 60);
+      expect(h.service.isPolling, isFalse);
+    });
+
+    test(
+      '#73/AK1: the position the device reports after the seek counts',
+      () async {
+        final h = Harness();
+        await h.loadReady('/a.mp3', 100);
+        h.core.applySeekImmediately = false;
+        h.service.seek(60);
+        h.fire(2);
+        h.core.applySeek();
+        h.core.pos = 59.99; // rounded to a frame by the core
+        h.fire();
+        expect(h.service.position, 59.99);
+        expect(h.service.isPolling, isFalse);
+      },
+    );
+
+    test(
+      '#73/AK1: a device that never applies the seek does not poll forever',
+      () async {
+        final h = Harness();
+        await h.loadReady('/a.mp3', 100);
+        h.core.pos = 20;
+        h.core.applySeekImmediately = false;
+        h.service.seek(60);
+        h.fire(PlayerService.seekSettleTicks);
+        expect(h.service.isPolling, isTrue);
+        h.fire();
+        expect(h.service.position, 20);
+        expect(h.service.isPolling, isFalse);
+      },
+    );
+
+    test('#73/AK1: playing on after a slow seek follows the core', () async {
+      final h = Harness();
+      await h.loadReady('/a.mp3', 100);
+      h.core.pos = 20;
+      h.core.applySeekImmediately = false;
+      h.service.seek(60);
+      h.service.play();
+      h.fire();
+      expect(h.service.position, 60);
+      h.core.applySeek();
+      h.core.pos = 60.3;
+      h.fire();
+      expect(h.service.position, 60.3);
+      h.core.pos = 61;
+      h.fire();
+      expect(h.service.position, 61);
+    });
+  });
 }
