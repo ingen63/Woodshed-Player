@@ -22,8 +22,7 @@ List<String> _where(List<Finding> found) => [
 String _html({
   String connect =
       "'self' https://www.googleapis.com https://oauth2.googleapis.com "
-      'https://accounts.google.com https://api.dropboxapi.com '
-      'https://content.dropboxapi.com https://graph.microsoft.com '
+      'https://accounts.google.com https://graph.microsoft.com '
       'https://login.microsoftonline.com',
   String? scriptSrc,
   String script = "\n  console.log('start');\n",
@@ -336,6 +335,21 @@ void main() {
       );
     });
 
+    test('#71/AK1 a Dropbox host is no longer allowed', () {
+      const dropbox = 'https://api.dropboxapi.com';
+      expect(allowedConnectSrc.any((h) => h.contains('dropbox')), isFalse);
+      final found = checkCsp(
+        'i.html',
+        _html(
+          connect:
+              "'self' https://www.googleapis.com https://oauth2.googleapis.com "
+              'https://accounts.google.com https://graph.microsoft.com '
+              'https://login.microsoftonline.com $dropbox',
+        ),
+      );
+      expect(found.single.what, contains(dropbox));
+    });
+
     test('an inline script without its hash is named with the new hash', () {
       final found = checkCsp('i.html', _html(scriptSrc: "'sha256-old='"));
       expect(found.single.line, 7);
@@ -345,29 +359,24 @@ void main() {
       );
     });
 
-    test(
-      'the web app allows exactly its own origin and the three providers',
-      () {
-        final html = File('$_repo/app/web/index.html').readAsStringSync();
-        final d = cspDirectives(cspOf(html)!);
-        expect(d['connect-src']!.toSet(), {
-          "'self'",
-          'https://www.googleapis.com',
-          'https://oauth2.googleapis.com',
-          'https://accounts.google.com',
-          'https://api.dropboxapi.com',
-          'https://content.dropboxapi.com',
-          'https://graph.microsoft.com',
-          'https://login.microsoftonline.com',
-        });
-        expect(d['connect-src'], hasLength(8));
-        expect(d['default-src'], ["'self'"]);
-        expect(d['object-src'], ["'none'"]);
-        expect(d['script-src'], isNot(contains("'unsafe-inline'")));
-        expect(d['script-src'], isNot(contains("'unsafe-eval'")));
-        expect(checkCsp('app/web/index.html', html), isEmpty);
-      },
-    );
+    test('the web app allows exactly its own origin, Google and Microsoft (#71/AK1)', () {
+      final html = File('$_repo/app/web/index.html').readAsStringSync();
+      final d = cspDirectives(cspOf(html)!);
+      expect(d['connect-src']!.toSet(), {
+        "'self'",
+        'https://www.googleapis.com',
+        'https://oauth2.googleapis.com',
+        'https://accounts.google.com',
+        'https://graph.microsoft.com',
+        'https://login.microsoftonline.com',
+      });
+      expect(d['connect-src'], hasLength(6));
+      expect(d['default-src'], ["'self'"]);
+      expect(d['object-src'], ["'none'"]);
+      expect(d['script-src'], isNot(contains("'unsafe-inline'")));
+      expect(d['script-src'], isNot(contains("'unsafe-eval'")));
+      expect(checkCsp('app/web/index.html', html), isEmpty);
+    });
 
     test('the policy comes before the inline script', () {
       final html = File('$_repo/app/web/index.html').readAsStringSync();

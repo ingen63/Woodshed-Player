@@ -531,10 +531,9 @@ Paket dieser Art kommt mit seinem Namen auf die Liste.
 
 **Content Security Policy der Web-App** (`app/web/index.html`, `<meta http-equiv>`, GitHub Pages erlaubt keine
 eigenen Header). `connect-src` enthält genau `'self'` und die API- und Anmelde-Hosts der Anbieter: Google
-(`https://www.googleapis.com`, `https://oauth2.googleapis.com`, `https://accounts.google.com`), Dropbox
-(`https://api.dropboxapi.com`, `https://content.dropboxapi.com`; vorgegeben im Auftrag zu #58, obwohl Dropbox laut
-`docs/KONZEPT-SYNC.md` entfällt) und Microsoft (`https://graph.microsoft.com`,
-`https://login.microsoftonline.com`). Ein neuer Host braucht einen Kommentar im Issue und gehört in
+(`https://www.googleapis.com`, `https://oauth2.googleapis.com`, `https://accounts.google.com`) und Microsoft (`https://graph.microsoft.com`,
+`https://login.microsoftonline.com`). Dropbox entfällt laut `docs/KONZEPT-SYNC.md`; seine Hosts sind seit #71 nicht
+mehr erlaubt. Ein neuer Host braucht einen Kommentar im Issue und gehört in
 `allowedConnectSrc` und den Test. Die übrigen Direktiven:
 
 | Direktive | Wert | Grund |

@@ -137,9 +137,6 @@ const allowedConnectSrc = {
   'https://www.googleapis.com',
   'https://oauth2.googleapis.com',
   'https://accounts.google.com',
-  // Dropbox
-  'https://api.dropboxapi.com',
-  'https://content.dropboxapi.com',
   // Microsoft OneDrive (#55)
   'https://graph.microsoft.com',
   'https://login.microsoftonline.com',
