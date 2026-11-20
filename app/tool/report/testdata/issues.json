@@ -1,0 +1,109 @@
+[
+ {
+  "number": 901,
+  "title": "Kriterien aller Arten",
+  "state": "OPEN",
+  "stateReason": "",
+  "labels": [
+   {
+    "name": "enhancement"
+   }
+  ],
+  "body": "**Abnahmekriterien**\n- [ ] AK1: mit Test\n- [x] AK2: geprüft\n- [x] AK3: nur vom Anwender abgenommen\n- [ ] AK4: ohne alles\n- [x] AK5: erst geprüft, dann zurückgenommen\n",
+  "comments": [
+   {
+    "createdAt": "2026-11-01T10:00:00Z",
+    "body": "Prüfung #901 (Commit abc1234):\n- **AK2 erfüllt.** belegt von Hand\n- **AK5 Rücknahme** ✅ zunächst gut\n- AK4 offen (fehlt noch)"
+   },
+   {
+    "createdAt": "2026-11-02T10:00:00Z",
+    "body": "Prüfung vom 2.11. durch den Anwender\n- AK3 erfüllt"
+   },
+   {
+    "createdAt": "2026-11-03T10:00:00Z",
+    "body": "Erneute Prüfung #901:\n- AK5 **nicht erfüllt**, Fehler gefunden"
+   },
+   {
+    "createdAt": "2026-11-04T10:00:00Z",
+    "body": "Nur ein Hinweis, keine Prüfung:\n- AK4 erfüllt"
+   }
+  ]
+ },
+ {
+  "number": 902,
+  "title": "Abgelehnt",
+  "state": "CLOSED",
+  "stateReason": "NOT_PLANNED",
+  "labels": [
+   {
+    "name": "wontfix"
+   }
+  ],
+  "body": "- [ ] AK1: zählt nicht\n",
+  "comments": []
+ },
+ {
+  "number": 903,
+  "title": "Fehler mit Antworten",
+  "state": "CLOSED",
+  "stateReason": "COMPLETED",
+  "labels": [
+   {
+    "name": "bug"
+   },
+   {
+    "name": "found:usage"
+   }
+  ],
+  "body": "**Was ist passiert?** (erwartet / tatsächlich)\nAbsturz.\n\n**Gefunden bei** (Label `found:usage`)\n\n**Welcher Test hätte ihn fangen müssen?** (nach der Analyse)\nDer Ladetest mit leerer Datei.\n\n**Regressionstest:** (nach der Behebung: Datei und Name)\n`test/load_test.dart` «leere Datei»\n\n**Umgebung**\nmacOS\n",
+  "comments": []
+ },
+ {
+  "number": 904,
+  "title": "Fehler ohne Antworten",
+  "state": "OPEN",
+  "stateReason": "",
+  "labels": [
+   {
+    "name": "bug"
+   },
+   {
+    "name": "found:test"
+   }
+  ],
+  "body": "**Was ist passiert?** (erwartet / tatsächlich)\nFalscher Wert.\n\n**Welcher Test hätte ihn fangen müssen?** (nach der Analyse)\n\n**Regressionstest:** (nach der Behebung: Datei und Name)\n\n**Umgebung**\niOS\n",
+  "comments": []
+ },
+ {
+  "number": 905,
+  "title": "Alles in einem Satz geprüft",
+  "state": "CLOSED",
+  "stateReason": "COMPLETED",
+  "labels": [],
+  "body": "- [ ] AK1: eins\n- [ ] AK2: zwei\n",
+  "comments": [
+   {
+    "createdAt": "2026-11-05T10:00:00Z",
+    "body": "Prüfung #905 (Commit def5678), lokal. Alle 2 Kriterien sind erfüllt.\n"
+   }
+  ]
+ },
+ {
+  "number": 906,
+  "title": "Mehrere Kriterien in einer Zeile",
+  "state": "OPEN",
+  "stateReason": "",
+  "labels": [
+   {
+    "name": "bug"
+   }
+  ],
+  "body": "- [ ] AK1: eins\n- [ ] AK2: zwei\n- [ ] AK3: drei\n",
+  "comments": [
+   {
+    "createdAt": "2026-11-06T10:00:00Z",
+    "body": "AK1 erfüllt in 1a2b3c4\n- **AK1, AK2 ok**\n- AK3 teilweise"
+   }
+  ]
+ }
+]

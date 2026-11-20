@@ -369,10 +369,13 @@ void main() {
       expect(checks, contains(r'>> "$GITHUB_STEP_SUMMARY"'));
       expect(checks, contains('cat coverage-check.txt'));
       expect(checks, contains('cat coverage-diff.txt'));
-      // overview page of #12 as an artifact as soon as make report exists
+      // overview page of #12 as an artifact, its summary in the run summary
       expect(checks, contains('name: test-quality-report'));
-      expect(checks, contains('path: build/report/'));
-      expect(checks, contains('make report'));
+      expect(checks, contains('local/test-quality/report/'));
+      expect(checks, contains('make -s report'));
+      expect(checks, contains('cat report-summary.md'));
+      expect(checks, contains('issues: read'));
+      expect(checks, contains(r'GH_TOKEN: ${{ github.token }}'));
     });
   });
 }

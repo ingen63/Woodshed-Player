@@ -177,7 +177,7 @@ zugeordnet.
 | Abdeckung je Teil mit Untergrenze, `coverage-diff`, `pre-push` mit eigenen Tests | vorhanden: `tools/coverage-min`, `tools/git-hooks/pre-push`, `app/tool/coverage_test.dart`, `app/tool/pre_push_hook_test.dart` (#8) | – |
 | C-API (`player.cpp`) über die geteilte Bibliothek: Nullzeiger, Laden, Seek, Tempo, Loop, Wellenform, Metronom, Aufnahme im Ruhezustand | vorhanden: `core/tests/capi_tests.cpp` (#8) | – |
 | Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug, `make mutants`, `make mutants-diff`, Job `mutants-diff` | vorhanden: `app/tool/mutants*.dart`, `core/tests/mutants/`, `tools/mutants-exclude.txt` (#11); offene Mutanten im Abschnitt «Mutationstests (#11)» | – |
-| Übersichtsseite Testqualität | Lücke; Platz im Workflow (Artefakt `test-quality-report` aus `build/report/`) ist vorbereitet | #12 |
+| Übersichtsseite Testqualität: vier Schichten mit Status, Zuordnung `#nn/AKn`, Verlauf, «keine Daten» | vorhanden: `make report`, `app/tool/report/` mit `report_test.dart`, Artefakt `test-quality-report` im Job `checks` (#12) | – |
 | Netzwerkfreiheit bei jedem Push: Prüfung mit eigenen Tests | vorhanden: `make network-free`, Job `network-free` in `test-quality.yml`, `test_quality_workflow_test.dart` (#58/AK6) | – |
 
 ## Ausführen
@@ -203,9 +203,8 @@ make pseudo-l10n    # Pseudo-Sprache der Oberflächentests nach einer Änderung 
 make bench          # Leistungs- und Lasttests von Kern und Bibliothek (nächtlich, nicht in make test, #59)
 make mutants        # Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug (#11), local/mutants/full/
 make mutants-diff   # Mutationstests der seit BASE geänderten Zeilen (Vorgabe origin/main), local/mutants/diff/
+make report         # Übersichtsseite Testqualität aus den vorhandenen Ergebnissen (#12), local/test-quality/report/
 ```
-
-Noch nicht eingerichtet; das Ziel meldet «noch nicht eingerichtet» mit Issue und bricht ab: `make report` (#12).
 
 Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten für `test-wasm`, Homebrew `llvm` für
 `clang-format`, `clang-tidy` und libFuzzer (`brew install llvm`; das Makefile findet sie unter
@@ -604,8 +603,10 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
   und werden nie abgebrochen; ein Push bricht nur einen älteren Push-Lauf derselben Branch ab.
 - **Zusammenfassung** (#13/AK9): Der Job `checks` schreibt die Abdeckung je Teil, `coverage-diff` (Basis: Commit vor
   dem Push) und den Stand der Übersichtsseite in die Zusammenfassung des Laufs; die lcov-Dateien sind ein Artefakt.
-  Die Übersichtsseite kommt mit #12: Sobald `make report` eingerichtet ist und nach `build/report/` schreibt, lädt der
-  Job sie als Artefakt `test-quality-report` hoch.
+  Danach erzeugt er die Übersichtsseite (#12, `make report` mit der Basis des Pushs, Issues über `gh` mit dem
+  Token des Laufs und der Berechtigung `issues: read`), schreibt ihre Kurzfassung in die Zusammenfassung und lädt
+  Seite und JUnit-Dateien als Artefakt `test-quality-report` hoch. Mutationsläufe sind eigene Jobs; im Job `checks`
+  zeigt die Seite für sie «keine Daten».
 - **Werkzeuge:** Flutter in derselben Version wie `pages.yml` (`FLUTTER_VERSION`, `dart format` hängt davon ab),
   `clang-format` und `clang-tidy` in Hauptversion 23 wie Homebrew `llvm` (über `pipx`), der Kern mit clang-18 und
   passendem `llvm-cov-18`. Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
@@ -853,6 +854,61 @@ unbekannter Länge), 129 (Fehler des Decoders nach den ersten Frames), 245 (`ma_
 145 und `engine.cpp` 28, 54 geben Speicher frei, ohne dass sich ein Ergebnis ändert (Lecks zählen nicht, siehe
 oben). Die Dart-Mutanten in Metadaten, Bibliothek, Abgleich und Stempeln brauchen gezielte Tests je Regel; das ist
 ein Folgeauftrag (Issue-Vorschlag im Bericht zu #11).
+
+## Übersichtsseite Testqualität (#12)
+
+`make report` erzeugt `local/test-quality/report/index.html` aus den vorhandenen Ergebnissen. Die Seite ist statisch
+(kein Skript, keine Schrift oder Grafik von aussen), funktioniert ohne Netzwerk und wird nicht eingecheckt (`/local/`
+in `.gitignore`). Das Werkzeug ist in Dart ohne Paket geschrieben (`app/tool/report/report.dart`, Aufruf
+`report_run.dart`), die Texte der Seite stehen in `app/tool/report/texts_de.json`. Es braucht wenige Sekunden.
+
+| Eingabe | Herkunft |
+|---|---|
+| JUnit des Kerns | `make test-core` und `make coverage-core`: `ctest --output-junit local/test-quality/junit/core.xml` |
+| Ergebnisse der App und der Werkzeuge | `make test-app`, `make test-tools`, `make coverage-app`: `flutter test --file-reporter json:local/test-quality/flutter/app.json` bzw. `tools.json`; `make report` wandelt sie in `junit/app.xml` und `junit/tools.xml` um |
+| Abdeckung je Teil | `app/coverage/lcov.info`, `core/build-cov/lcov.info` (`make coverage-run`), Untergrenze `tools/coverage-min`, Teile wie `coverage_check` (#8); dazu die Abdeckung der geänderten Zeilen gegenüber `--base` (Vorgabe `DIFF_BASE`, sonst `origin/main`) |
+| Mutationen | `local/mutants/full/results.json` (`make mutants`) für den Status, `local/mutants/diff/results.json` (`make mutants-diff`) als Zusatz (#11) |
+| Issues und Kommentare | `gh issue list --state all --json …`, nur beim Erzeugen der Seite (nicht die App) |
+
+Es gibt **keine Gesamtnote**. Jede Schicht hat ihren eigenen Status nach einer Regel, die auf der Seite steht:
+
+| Schicht | erfüllt | Hinweis | nicht erfüllt | keine Daten |
+|---|---|---|---|---|
+| 1 Hygiene | kein fehlgeschlagener, kein flaky Test | flaky Tests | ein Test schlägt fehl (auch eine Testdatei, die nicht lädt) | keine JUnit-Datei |
+| 2 Angemessenheit | C++-Kern und Dart-Logik ≥ Untergrenze, kein nicht erkannter Mutant | Untergrenze erreicht, aber nicht erkannte Mutanten, kein voller Mutationslauf oder ein Teil ohne Daten | ein Teil unter der Untergrenze oder eine Logikdatei, die kein Test lädt | keine Abdeckung |
+| 3 Anforderungsbezug | jedes Kriterium mit Test, geprüft oder abgehakt | Kriterien ohne Test, ohne Prüfung und ohne Haken | – | `gh` nicht erreichbar |
+| 4 Ergebnis | jeder Fehler mit `found:*` nennt den Test, der ihn hätte fangen müssen, und den Regressionstest | eine Antwort fehlt | – | `gh` nicht erreichbar oder noch kein Fehler mit `found:*` |
+
+Fehlende oder unlesbare Daten erscheinen als «keine Daten», nie als Fehler; die übrige Seite bleibt vollständig.
+Flaky heisst: ein Test schlug fehl und bestand bei der Wiederholung im selben Lauf (JUnit `flakyFailure`,
+`rerunFailure`, oder derselbe Test zweimal im JSON von `flutter test`). Die Dart-Oberfläche hat keine Untergrenze und
+wird nur gezeigt.
+
+**Zuordnung der Tests (Schicht 3):** Ein Test belegt ein Kriterium mit `#nn/AKn` im Testnamen oder in einem Kommentar
+(Dart, C++ unter `core/tests/`), führende Nullen zählen nicht (`#08/AK4` = `#8/AK4`). Steht ein Dart-Test in einer
+`group(...)`, deren Titel genau eine Issue-Nummer nennt, genügt `AKn` im eigenen Namen; ohne `AKn` erbt er das
+Kriterium der Gruppe (`group('#22/AK2 …')`). Nennt der Titel mehrere Nummern, zählt `AKn` im Testnamen nicht.
+`AKn` ist das n-te Kriterium der Häkchen-Liste des Issues. Gelesen werden `app/test/`, `app/integration_test/`,
+`app/bench/`, `app/tool/*_test.dart`, `app/packages/*/test/` und `core/tests/`.
+
+**Arten je Kriterium**, in dieser Rangfolge: *mit Test* (gekennzeichneter Test), *geprüft* (Prüfung nach `CLAUDE.md`),
+*nur manuell* (abgehakt ohne Test und ohne Prüfung, etwa bei einer Abnahme durch den Anwender), *ohne*. Als Prüfung
+zählt ein Kommentar, dessen erste Zeile mit «Prüfung …», «Erneute Prüfung …», «Nacharbeit AKn …» oder «AKn erfüllt in
+<Commit>» beginnt und nicht «durch den Anwender» enthält. Darin macht eine Zeile «AKn erfüllt», «AKn ok», «AKn ist
+belegt» oder «**AKn Titel** ✅» (auch «AK1, AK3 ok») das Kriterium geprüft, ebenso «Alle n Kriterien sind erfüllt»;
+«nicht», «offen», «teilweise», «überholt» oder ❌ nehmen es zurück. Je Kriterium zählt die letzte Aussage. Als «nicht
+geplant» geschlossene Issues zählen nicht.
+
+**Verlauf:** Die Kennzahlen (Tests, fehlgeschlagene und flaky Tests, Abdeckung je Teil, nicht erkannte Mutanten,
+Anteile der Kriterien mit Test und geprüft, durchgerutschte Fehler) liegen je Version (`version` in
+`app/pubspec.yaml`) in `local/test-quality/history/<Version>.json`. Die Seite vergleicht mit der zuletzt erzeugten
+anderen Version und zeigt die Richtung (▲ besser, ▼ schlechter). Ein neuer Lauf derselben Version überschreibt ihren
+Stand.
+
+**Aufrufe:** `make report REPORT_ARGS="--out build/report --no-gh --summary"` (anderer Zielordner, ohne GitHub, mit
+Kurzfassung in Markdown auf der Standardausgabe). Die Tests des Werkzeugs (`app/tool/report/report_test.dart`, Namen
+`#12/AKn`, in `make test-tools`) prüfen die Regeln, die Zuordnung, die Prüfkommentare (erfundene Issues in
+`app/tool/report/testdata/issues.json`), den Verlauf und einen Lauf in einem gestellten Repository mit und ohne Daten.
 
 ## Hook nach dem Commit
 

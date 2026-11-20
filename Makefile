@@ -18,6 +18,12 @@ RUN_TIDY     ?= $(shell command -v run-clang-tidy 2>/dev/null || echo $(LLVM_BIN
 LLVM_COV      ?= $(shell xcrun --find llvm-cov 2>/dev/null || command -v llvm-cov 2>/dev/null || echo $(LLVM_BIN)/llvm-cov)
 LLVM_PROFDATA ?= $(shell xcrun --find llvm-profdata 2>/dev/null || command -v llvm-profdata 2>/dev/null || echo $(LLVM_BIN)/llvm-profdata)
 BASE ?= origin/main
+# Test results for the overview page (#12): JUnit from ctest, the JSON reporter of flutter test
+# (converted to JUnit by make report). Not checked in (local/).
+QA_DIR   = $(CURDIR)/local/test-quality
+JUNIT    = --output-junit "$(QA_DIR)/junit/core.xml"
+FLUTTER_JSON = "--file-reporter=json:$(QA_DIR)/flutter/$(1).json"
+QA_DIRS  = mkdir -p "$(QA_DIR)/junit" "$(QA_DIR)/flutter"
 
 # Our own sources from git, tracked and new (not ignored); none has a space in its path.
 # Generated l10n files are excluded.
@@ -46,6 +52,7 @@ help:
 	@echo "make bench          performance and load tests of core and library (nightly, not in make test)"
 	@echo "make mutants        mutation tests of core (Mull) and Dart logic, results in local/mutants/full/"
 	@echo "make mutants-diff   mutation tests of the lines changed since BASE (default origin/main)"
+	@echo "make report         overview page of the test quality: local/test-quality/report/index.html"
 
 # ---- Tests ----
 test: test-core test-app test-tools
@@ -53,7 +60,8 @@ test: test-core test-app test-tools
 test-core:
 	cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release >/dev/null
 	$(PIPEFAIL) cmake --build core/build -j 8 2>&1 | tail -20
-	ctest --test-dir core/build --output-on-failure
+	@$(QA_DIRS)
+	ctest --test-dir core/build --output-on-failure $(JUNIT)
 
 # #57/AK3: the same tests in Debug (asserts on, no optimisation), same tolerances as Release.
 # Only time limits are skipped there (core/tests/test_timing.hpp).
@@ -73,14 +81,16 @@ test-wasm:
 	ctest --test-dir core/build-wasm --output-on-failure
 
 test-app:
-	cd app && flutter test --reporter failures-only
+	@$(QA_DIRS)
+	cd app && flutter test --reporter failures-only $(call FLUTTER_JSON,app)
 
 # Tests of the tools in staged git repositories with fake tools: the hook after a commit (#7/AK7),
 # coverage check and diff, pre-push hook (#8/AK6)
 TOOL_TESTS = tool/after_commit_hook_test.dart tool/coverage_test.dart tool/pre_push_hook_test.dart \
-             tool/network_free_test.dart tool/mutants_test.dart
+             tool/network_free_test.dart tool/mutants_test.dart tool/report/report_test.dart
 test-tools:
-	cd app && flutter test --reporter failures-only $(TOOL_TESTS)
+	@$(QA_DIRS)
+	cd app && flutter test --reporter failures-only $(call FLUTTER_JSON,tools) $(TOOL_TESTS)
 test-hook: test-tools
 
 # ---- Formatting (#7/AK2) ----
@@ -122,15 +132,17 @@ coverage-core:
 	cmake -S core -B $(COV_DIR) -DCMAKE_BUILD_TYPE=Release -DWP_COVERAGE=ON >/dev/null
 	$(PIPEFAIL) cmake --build $(COV_DIR) -j 8 2>&1 | tail -20
 	mkdir -p $(COV_DIR)/prof && find $(COV_DIR)/prof -name '*.profraw' -delete
-	LLVM_PROFILE_FILE="$(CURDIR)/$(COV_DIR)/prof/%p-%m.profraw" ctest --test-dir $(COV_DIR) --output-on-failure
+	@$(QA_DIRS)
+	LLVM_PROFILE_FILE="$(CURDIR)/$(COV_DIR)/prof/%p-%m.profraw" ctest --test-dir $(COV_DIR) --output-on-failure $(JUNIT)
 	"$(LLVM_PROFDATA)" merge -sparse $(COV_DIR)/prof/*.profraw -o $(COV_DIR)/wp.profdata
 	objs=$$(find $(COV_DIR) -maxdepth 1 -type f \( -name '*_tests' -o -name 'libwp_core.*' \) | sort | sed 's/^/-object=/'); \
 	  "$(LLVM_COV)" export -format=lcov -instr-profile=$(COV_DIR)/wp.profdata $$objs \
 	  -ignore-filename-regex='/(third_party|tests)/' > $(COV_DIR)/lcov.info 2>$(COV_DIR)/llvm-cov.log
 
 coverage-app:
-	cd app && flutter test --coverage --reporter failures-only
-	cd app && flutter test --reporter failures-only $(TOOL_TESTS)
+	@$(QA_DIRS)
+	cd app && flutter test --coverage --reporter failures-only $(call FLUTTER_JSON,app)
+	cd app && flutter test --reporter failures-only $(call FLUTTER_JSON,tools) $(TOOL_TESTS)
 
 # #8/AK3: a hint, not a gate
 coverage-diff: coverage-run
@@ -264,9 +276,10 @@ mutants:
 mutants-diff:
 	dart app/tool/mutants_run.dart --base $(BASE) --jobs $(MUTANTS_JOBS) $(MUTANTS_ARGS)
 
-# ---- Not set up yet ----
-define not_yet
-	@echo "make $@: noch nicht eingerichtet (#$(1))"; exit 1
-endef
-
-report:        ; $(call not_yet,12)
+# ---- Overview page of the test quality (#12), docs/TESTS.md ----
+# Reads what is there (JUnit of make test, coverage of make coverage-run, local/mutants/, issues via
+# gh) and writes local/test-quality/report/index.html (offline, not checked in); missing data is
+# shown as «keine Daten». REPORT_ARGS e.g. "--out build/report", "--no-gh", "--summary".
+REPORT_ARGS ?=
+report:
+	dart app/tool/report/report_run.dart $(REPORT_ARGS)

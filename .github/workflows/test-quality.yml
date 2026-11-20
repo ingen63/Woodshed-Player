@@ -2,7 +2,7 @@
 # On every push to main (Linux runners only):
 # - checks: format, lint, tests and coverage (minimum from tools/coverage-min) of the core and the Dart
 #   code, with coverage, coverage-diff and the overview page in the run summary; when the push changes
-#   code (core/, app/, tools/, Makefile, this workflow).
+#   code (core/, app/, tools/, Makefile, this workflow); the overview page of #12 as an artifact.
 # - web: WASM core, web tests in Chrome (OPFS, WASM binding) and `flutter build web`; when the push
 #   changes web code (web files, *_web.dart, the core, the web build).
 # - sanitize: AddressSanitizer and UndefinedBehaviorSanitizer (make sanitize, #57); when core/ changes.
@@ -84,6 +84,9 @@ jobs:
       || (github.event_name == 'push' && needs.changes.outputs.code == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    permissions:
+      contents: read
+      issues: read  # the overview page (#12) reads issues and comments via gh
     env:
       CC: clang-18
       CXX: clang++-18
@@ -136,19 +139,23 @@ jobs:
       - name: Overview page (#12)
         id: report
         if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          # place for the overview page of #12: `make report` writes build/report/ once #12 sets it up
-          if grep -q '^report: *; \$(call not_yet' Makefile; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          else
-            make report && echo "available=true" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Overview page as artifact (#13/AK9)
+          # JUnit and coverage of the steps above; mutation runs are separate jobs (no data here).
+          base="$BEFORE"
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then base=HEAD~1; fi
+          make -s report REPORT_ARGS="--base $base --summary" > report-summary.md
+          echo "available=true" >> "$GITHUB_OUTPUT"
+      - name: Overview page as artifact (#13/AK9, #12)
         if: ${{ !cancelled() && steps.report.outputs.available == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: test-quality-report
-          path: build/report/
+          path: |
+            local/test-quality/report/
+            local/test-quality/junit/
           if-no-files-found: ignore
       - name: Coverage data as artifact
         if: ${{ !cancelled() }}
@@ -175,9 +182,11 @@ jobs:
             echo '```'
             echo "## Overview page"
             if [ "$REPORT" = "true" ]; then
-              echo "Artifact **test-quality-report** (build/report/)."
+              cat report-summary.md
+              echo
+              echo "Artifact **test-quality-report** (report/index.html, junit/)."
             else
-              echo "Follows with #12 (\`make report\` not set up yet)."
+              echo "No overview page (make report failed)."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 

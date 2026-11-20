@@ -49,6 +49,26 @@ const _allowed = <(String, String)>{
     "'«C++-Kern bauen» ist fehlgeschlagen'",
   ),
   ('app/tool/after_commit_hook_test.dart', "'nicht das Format «Titel (#22)»'"),
+  // Patterns of the German check comments in the issues (CLAUDE.md «Prüfe #22»), read by the
+  // overview page (#12/AK3). The texts of the page itself live in tool/report/texts_de.json.
+  (
+    'app/tool/report/report.dart',
+    r"'^\W*(?:(?:Erneute )?Prüfung\b|Nacharbeit AK\d+|AK\d+ (?:erfüllt|ok) in [0-9a-f]{7})'",
+  ),
+  ('app/tool/report/report.dart', "'durch den Anwender'"),
+  (
+    'app/tool/report/report.dart',
+    r"'^\s*(?:[-*]\s+)?\**\s*((?:AK\d+(?:\s*,\s*|\s+und\s+)?)+)(.*)$'",
+  ),
+  (
+    'app/tool/report/report.dart',
+    r"'✅|❌|\bnicht\b|\boffen\b|\bteilweise\b|überholt|erfüllt|\bok\b|ist belegt'",
+  ),
+  (
+    'app/tool/report/report.dart',
+    r"'\balle (?:\d+ |\w+ )?Kriterien (?:sind )?(?:erfüllt|ok)|Ergebnis: \d+ von \d+ Kriterien ok'",
+  ),
+  ('app/tool/report/report.dart', r"'^(?:❌|nicht|offen|teilweise|überholt)$'"),
   // German words that the English error texts must not contain (#46).
   ('core/tests/player_tests.cpp', '"datei"'),
   ('core/tests/player_tests.cpp', '"fehler"'),
