@@ -307,3 +307,27 @@ app/lib/library/library.dart | dart_lt_to_le | if (present.length < _tracks.leng
 # gleichwertig: Bei genau 1 MiB wird der Hash in einem Isolate statt direkt berechnet; er ist derselbe.
 app/lib/library/library.dart | dart_gt_to_ge | final hash = bytes.length > _hashInline
 app/lib/library/library.dart | dart_gt_to_ge | final id = bytes.length > _hashInline
+
+# ---- app/lib/sync (#61) ----
+# gleichwertig: Ein Name mit dem Punkt an erster Stelle (z. B. «audio/.mp3») ergibt als Hash «» bzw.
+# «.mp3»; keines davon ist die ID eines Titels (64 Hex-Ziffern), beide werden gleich übergangen.
+app/lib/sync/sync_engine.dart | dart_lt_to_le | return dot < 0 ? base : base.substring(0, dot);
+# gleichwertig: Bei der Generation 0 ergeben beide Zweige 0.
+app/lib/sync/sync_engine.dart | dart_ge_to_gt | return (state, g is int && g >= 0 && g <= Hlc.maxCounter ? g : 0);
+# Grenzfall: Nur eine Generation von genau Hlc.maxCounter (2^31 − 1 Schreibvorgänge) zählt mit «<»
+# als 0; der Sicherungsplatz wechselt dann einmal anders.
+app/lib/sync/sync_engine.dart | dart_le_to_lt | return (state, g is int && g >= 0 && g <= Hlc.maxCounter ? g : 0);
+# gleichwertig: Direkt danach ruft die Reparatur sync(); dessen Schleife setzt _again als Erstes auf
+# false (sync() kehrt nur früher zurück, wenn der Abgleich beendet ist, und dann wird es nie gelesen).
+app/lib/sync/sync_engine.dart | dart_false_to_true | _again = false;
+# Grenzfall: Zwei Sicherungen mit derselben Generation schreibt die App nicht (der Platz folgt der
+# Generation); nur dann wählt «>=» die spätere statt der früheren.
+app/lib/sync/sync_engine.dart | dart_gt_to_ge | if (last == null || b.$2 > last.$2) last = b;
+# gleichwertig: _retryIn wird nur in _once aufgerufen, nachdem dessen erste Zeilen den geplanten
+# Versuch schon abgebrochen und auf null gesetzt haben. Gleich lautend stehen auch der Anfang von
+# _once und dispose da; diese beiden erkennen die Tests (sync_rules_test.dart), der Eintrag greift
+# nur für nicht erkannte Mutanten.
+app/lib/sync/sync_engine.dart | dart_remove_void_call | _retryTimer?.cancel();
+# gleichwertig: Der Vorgabewert der Schnittstelle gilt nie: Dart nimmt den Vorgabewert der
+# aufgerufenen Implementierung (InMemoryProvider und jeder Anbieter haben ihren eigenen).
+app/lib/sync/cloud_provider.dart | dart_false_to_true | bool ifAbsent = false,
