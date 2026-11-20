@@ -122,14 +122,17 @@ String _escapeXml(String s) => s
 
 /// Converts the output of `flutter test --file-reporter json:<file>` (one JSON event per line) into
 /// JUnit XML. Hidden tests (loading a suite) only count when they fail (a suite that does not
-/// load). A test that ran more than once (retry) and passed in the end is flaky; one that failed
+/// load). A test that passed in the end after an error is flaky: with `retry:` the JSON reporter
+/// sends one testStart, an `error` event per failed attempt and testDone «success»; a test that
+/// shows up twice with the same name and passes the second time counts the same. One that failed
 /// in the end failed. Lines that are no JSON are skipped (an aborted run).
 String flutterJsonToJUnit(String jsonLines, {String suiteName = 'flutter'}) {
   final suites = <int, String>{};
   final tests = <int, ({String name, int suite, bool hidden, int start})>{};
   final errors = <int, List<String>>{};
   // key «suite path␟name» -> results in order
-  final results = <String, List<({String result, bool skipped, double s})>>{};
+  final results =
+      <String, List<({String result, bool skipped, bool errors, double s})>>{};
   final order = <String>[];
   for (final line in const LineSplitter().convert(jsonLines)) {
     Object? e;
@@ -166,6 +169,7 @@ String flutterJsonToJUnit(String jsonLines, {String suiteName = 'flutter'}) {
         results.putIfAbsent(key, () => []).add((
           result: result,
           skipped: e['skipped'] == true,
+          errors: errors.containsKey(id),
           s: (((e['time'] as int?) ?? t.start) - t.start) / 1000,
         ));
     }
@@ -183,7 +187,8 @@ String flutterJsonToJUnit(String jsonLines, {String suiteName = 'flutter'}) {
       'name="${_escapeXml(parts[1])}" time="${seconds.toStringAsFixed(3)}"',
     );
     final failedEnd = last.result != 'success';
-    final flaky = !failedEnd && runs.any((r) => r.result != 'success');
+    final flaky =
+        !failedEnd && runs.any((r) => r.result != 'success' || r.errors);
     if (failedEnd) failures++;
     if (!failedEnd && !flaky && !last.skipped) {
       cases.writeln('/>');

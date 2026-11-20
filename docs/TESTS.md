@@ -880,8 +880,10 @@ Es gibt **keine Gesamtnote**. Jede Schicht hat ihren eigenen Status nach einer R
 | 4 Ergebnis | jeder Fehler mit `found:*` nennt den Test, der ihn hätte fangen müssen, und den Regressionstest | eine Antwort fehlt | – | `gh` nicht erreichbar oder noch kein Fehler mit `found:*` |
 
 Fehlende oder unlesbare Daten erscheinen als «keine Daten», nie als Fehler; die übrige Seite bleibt vollständig.
-Flaky heisst: ein Test schlug fehl und bestand bei der Wiederholung im selben Lauf (JUnit `flakyFailure`,
-`rerunFailure`, oder derselbe Test zweimal im JSON von `flutter test`). Die Dart-Oberfläche hat keine Untergrenze und
+Flaky heisst: ein Test schlug fehl und bestand bei der Wiederholung im selben Lauf (JUnit `flakyFailure` oder
+`rerunFailure`; bei `flutter test` ein Test mit `retry:`, der erst einen Fehler meldet und dann besteht, oder derselbe
+Test zweimal mit Fehlschlag und danach Erfolg). `make test` und `ctest` wiederholen von sich aus nichts: Flaky Tests
+erscheinen nur, wenn ein Test eine Wiederholung erlaubt; sonst zählen sie als fehlgeschlagen. Die Dart-Oberfläche hat keine Untergrenze und
 wird nur gezeigt.
 
 **Zuordnung der Tests (Schicht 3):** Ein Test belegt ein Kriterium mit `#nn/AKn` im Testnamen oder in einem Kommentar

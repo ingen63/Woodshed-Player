@@ -81,7 +81,8 @@ const _ctestJUnit = '''<?xml version="1.0" encoding="UTF-8"?>
 ''';
 
 /// Events of `flutter test --file-reporter json:…`: a passing test, a failing one, a flaky one
-/// (failed, passed on retry), a skipped one and the hidden loading test of the suite.
+/// (failed, passed on retry), a skipped one and the hidden loading test of the suite. The retry
+/// with `retry: 1` as flutter test 3.50 reports it: one testStart, an error, testDone «success».
 String _flutterJson() => [
   {
     'type': 'suite',
@@ -120,6 +121,21 @@ String _flutterJson() => [
       'time': 600,
     },
   ],
+  // retry: 1 in flutter test: one start, an error of the first attempt, success
+  {
+    'type': 'testStart',
+    'test': {'id': 7, 'name': 'retried', 'suiteID': 0},
+    'time': 700,
+  },
+  {'type': 'error', 'testID': 7, 'error': 'Expected: <2>', 'isFailure': true},
+  {
+    'type': 'testDone',
+    'testID': 7,
+    'result': 'success',
+    'skipped': false,
+    'hidden': false,
+    'time': 900,
+  },
   {'type': 'done', 'success': false},
 ].map(jsonEncode).join('\n');
 
@@ -330,10 +346,11 @@ void main() {
           'test/a_test.dart fails',
           'test/a_test.dart flaky <1>',
           'test/a_test.dart skipped',
+          'test/a_test.dart retried',
         ]);
-        expect(cases.map((c) => c.failed), [false, true, false, false]);
-        expect(cases.map((c) => c.flaky), [false, false, true, false]);
-        expect(cases.map((c) => c.skipped), [false, false, false, true]);
+        expect(cases.map((c) => c.failed), [false, true, false, false, false]);
+        expect(cases.map((c) => c.flaky), [false, false, true, false, true]);
+        expect(cases.map((c) => c.skipped), [false, false, false, true, false]);
         expect(cases.first.seconds, 0.5);
       },
     );
