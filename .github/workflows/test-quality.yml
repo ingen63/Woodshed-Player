@@ -11,6 +11,7 @@
 # - macos: macOS and iOS build, UI tests (integration_test) and smoke test of the built app (#13).
 # - sanitize-thread: ThreadSanitizer (#57). fuzz: libFuzzer on decoder and C API (#10).
 # - property: Dart random tests with many cases and a new seed (#10).
+# - bench: performance and load tests of core and library (make bench, #59), values in the run summary.
 # - Mutation tests on the diff follow with #11 as a further nightly job.
 # By hand (workflow_dispatch): the push jobs; with nightly=true also every nightly job, gate or not.
 # Nightly runs have their own concurrency group: a push never cancels them (#13/AK8).
@@ -366,3 +367,36 @@ jobs:
       - name: Random tests with many cases and a new seed (#10/AK1, AK6)
         # The seed is printed by every test; repeat a failure locally with the same WP_PROPERTY_SEED.
         run: make property PROPERTY_CASES=3000 PROPERTY_SEED=${{ github.run_id }}
+
+  bench:
+    name: Performance and load tests (#59)
+    needs: nightly-gate
+    if: >-
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.nightly)
+      || (github.event_name == 'schedule' && needs.nightly-gate.outputs.run == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Packages
+        working-directory: app
+        run: flutter pub get >/dev/null
+      - name: make bench (#59/AK1-AK4)
+        run: make bench
+      - name: Measured values with machine and date (#59/AK5)
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "## Performance and load tests (#59)"
+            echo "$(date -u +%Y-%m-%d), $(lscpu | sed -n 's/^Model name: *//p'), $(nproc) CPUs," \
+              "$(free -g | awk '/^Mem:/ {print $2}') GB RAM, ${{ runner.os }} ${{ runner.arch }}"
+            echo '```'
+            cat core/build-bench/bench.txt 2>/dev/null || echo "no values (an earlier step failed)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

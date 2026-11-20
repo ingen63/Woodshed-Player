@@ -387,6 +387,32 @@ void main() {
     expect(naturalCompare('abc', 'ABD'), lessThan(0));
     expect(naturalCompare('Straße', 'Strasse'), isNot(0));
   });
+
+  test('#59 sortedNaturally (one key per item) sorts like naturalCompare', () {
+    final r = Random(59);
+    const pieces = [
+      'a',
+      'B',
+      'ä',
+      'Ö',
+      'o',
+      ' ',
+      '2',
+      '10',
+      '007',
+      'ß',
+      'ss',
+      'x-1',
+    ];
+    final texts = [
+      for (var i = 0; i < 500; i++)
+        [
+          for (var j = r.nextInt(5); j >= 0; j--)
+            pieces[r.nextInt(pieces.length)],
+        ].join(),
+    ];
+    expect(sortedNaturally(texts, (t) => t), [...texts]..sort(naturalCompare));
+  });
 }
 
 /// WAV mit LIST/INFO-Block (Titel, Künstler).

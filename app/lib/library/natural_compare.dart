@@ -44,19 +44,46 @@ String _key(String s) {
   return out.toString();
 }
 
-final _parts = RegExp(r'\d+|\D+');
+final _partPattern = RegExp(r'\d+|\D+');
 
-int naturalCompare(String a, String b) {
-  final pa = _parts.allMatches(_key(a)).map((m) => m[0]!).toList();
-  final pb = _parts.allMatches(_key(b)).map((m) => m[0]!).toList();
-  for (var i = 0; i < pa.length && i < pb.length; i++) {
-    final x = pa[i], y = pb[i];
-    final nx = int.tryParse(x), ny = int.tryParse(y);
-    final c = (nx != null && ny != null)
-        ? (nx != ny ? nx.compareTo(ny) : x.length.compareTo(y.length))
-        : x.compareTo(y);
-    if (c != 0) return c;
+/// Sort key of [naturalCompare], computed once per text (#59: sorting 10'000 titles folded and split
+/// every title again in each of the ~130'000 comparisons).
+class NaturalKey implements Comparable<NaturalKey> {
+  factory NaturalKey(String text) {
+    final parts = [for (final m in _partPattern.allMatches(_key(text))) m[0]!];
+    return NaturalKey._(text, parts, [for (final p in parts) int.tryParse(p)]);
   }
-  if (pa.length != pb.length) return pa.length.compareTo(pb.length);
-  return a.compareTo(b); // gleich nach Regeln: stabil nach Originaltext
+
+  NaturalKey._(this.text, this._parts, this._numbers);
+
+  final String text;
+  final List<String> _parts;
+  final List<int?> _numbers;
+
+  @override
+  int compareTo(NaturalKey o) {
+    final pa = _parts, pb = o._parts;
+    for (var i = 0; i < pa.length && i < pb.length; i++) {
+      final x = pa[i], y = pb[i];
+      final nx = _numbers[i], ny = o._numbers[i];
+      final c = (nx != null && ny != null)
+          ? (nx != ny ? nx.compareTo(ny) : x.length.compareTo(y.length))
+          : x.compareTo(y);
+      if (c != 0) return c;
+    }
+    if (pa.length != pb.length) return pa.length.compareTo(pb.length);
+    return text.compareTo(
+      o.text,
+    ); // gleich nach Regeln: stabil nach Originaltext
+  }
+}
+
+int naturalCompare(String a, String b) =>
+    NaturalKey(a).compareTo(NaturalKey(b));
+
+/// Sorts [items] by [naturalCompare] of [text], with one key per item.
+List<T> sortedNaturally<T>(Iterable<T> items, String Function(T) text) {
+  final keyed = [for (final i in items) (NaturalKey(text(i)), i)];
+  keyed.sort((a, b) => a.$1.compareTo(b.$1));
+  return [for (final k in keyed) k.$2];
 }

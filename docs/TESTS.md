@@ -51,7 +51,7 @@ zugeordnet.
 | Sortieren und Verschieben verlieren und verdoppeln keinen Titel; Speichern und Laden ergibt denselben Stand (Zufallstests) | vorhanden: `property/library_property_test.dart` (#10/AK1) | – |
 | Verfälschte `library.json` (Typwechsel, fehlende Felder, falsche Verweise, Extremwerte, abgeschnitten) ohne Absturz, mit Meldung | vorhanden: `property/library_files_property_test.dart` (#10/AK3) | – |
 | Golden-Dateien jeder Version (auch Format 2), Migration idempotent | vorhanden: `golden_files_test.dart` (#10/AK5), `property/library_files_property_test.dart` (#10/AK8) | – |
-| 10'000 Titel in 500 Ordnern: Laden, Sortieren, Speichern je ≤ 1 s | Lücke | #59 |
+| 10'000 Titel in 500 Ordnern: Laden, Sortieren, Speichern je ≤ 1 s | vorhanden, nächtlich: `app/bench/library_bench_test.dart` (#59/AK3), `make bench` | – |
 
 ### Wiedergabe
 
@@ -66,7 +66,7 @@ zugeordnet.
 | Seek auf t beginnt bei Sample round(t × Abtastrate); Pause und Fortsetzen ohne verlorenes Sample | vorhanden: `reference_tests.cpp` (#9/AK3, Rampe, t knapp unter und über einem halben Sample, im Stand und beim Spielen) | – |
 | Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | vorhanden: `player_tests.cpp` (`truncatedAndWrongAudioFiles`, #10/AK3), `core/tests/fuzz/` mit Wiederholung von Korpus und Regressionsfällen in jedem Build (`fuzz_*_replay`), `make fuzz` (#10/AK4) | – |
 | AddressSanitizer, UBSan, ThreadSanitizer | vorhanden: `make sanitize`, `make sanitize-thread`, Selbsttest `tests/sanitizer/selftest.cpp`, Workflow `test-quality.yml` (#57) | – |
-| Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | Lücke | #59 |
+| Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | vorhanden, nächtlich: `core/tests/bench_tests.cpp` (`bench_long_file`, #59/AK2), `make bench` | – |
 
 ### Tempo
 
@@ -76,7 +76,7 @@ zugeordnet.
 | Tonhöhe bleibt, Länge = Eingabe / Rate (0,25 / 0,5 / 1,5 / 2,0) | vorhanden: `engine_tests.cpp` (`stretchKeepsPitchAndChangesLength`, `stretchIsDeterministic`, `rateChangeKeepsPositionAndSignal`, `positionFollowsRate`) | – |
 | Dieselbe Prüfung für 0,1 / 0,5 / 1,0 / 2,0 mit 1 % Toleranz; Stille bleibt Stille | vorhanden: `reference_tests.cpp` (#9/AK4, #9/AK1) | – |
 | Klang gegen AVAudioUnitTimePitch | vorhanden, von Hand (Hörvergleich, nicht automatisierbar): `tools/hoervergleich.sh` | – |
-| Rechenzeit je Puffer ≤ 50 % des Echtzeitbudgets | Lücke | #59 |
+| Rechenzeit je Puffer ≤ 50 % des Echtzeitbudgets | vorhanden, nächtlich: `core/tests/bench_tests.cpp` (`bench_stretch`, #59/AK1), `make bench` | – |
 
 ### Loop
 
@@ -139,7 +139,7 @@ zugeordnet.
 | «Nicht hochladen» und «Synchronisieren» im Kontextmenü | vorhanden: `sync_test.dart` (#37/AK5), `sync_app_test.dart` (#37/AK5) | – |
 | Zufallsfolgen auf 2–4 Geräten: gleicher Stand, zweiter Abgleich ändert nichts, kein Verlust | vorhanden: `property/sync_property_test.dart` (#10/AK6) | – |
 | Verfälschte Sync-Dateien aus der Cloud ohne Absturz und ohne Datenverlust, mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7) | – |
-| Zusammenführen von 10'000 Titeln ≤ 2 s | Lücke | #59 |
+| Zusammenführen von 10'000 Titeln ≤ 2 s | vorhanden, nächtlich: `app/bench/library_bench_test.dart` (#59/AK3), `make bench` | – |
 | Nur die Anbietermodule (`app/lib/sync/providers/`) öffnen Verbindungen, keine Analyse- oder Werbepakete, kein Netzwerk im Kern | vorhanden: `make network-free`, `app/tool/network_free_test.dart` (#58) | – |
 | Anbieter Google Drive, OneDrive, direkte Verbindung | Lücke (noch nicht umgesetzt) | #54, #55, #56 |
 
@@ -200,6 +200,7 @@ make test-ui        # Oberflächentests mit echtem Kern auf macOS; ohne Audioger
 make test-web       # Web-Tests in Chrome: OPFS und WASM-Kern (braucht Emscripten)
 make smoke-app      # macOS-App bauen (Release) und ihren Rauchtest ausführen
 make pseudo-l10n    # Pseudo-Sprache der Oberflächentests nach einer Änderung an den ARB-Dateien
+make bench          # Leistungs- und Lasttests von Kern und Bibliothek (nächtlich, nicht in make test, #59)
 ```
 
 Noch nicht eingerichtet; die Ziele melden «noch nicht eingerichtet» mit Issue und brechen ab: `make mutants` (#11),
@@ -629,6 +630,70 @@ GitHub macOS-Minuten zehnfach: 400 × 10 = 4000 von 2000 Gratis-Minuten (GitHub 
 müssten die macOS-Läufe seltener werden (z. B. nur wöchentlich). Das Repository ist öffentlich (GitHub Pages), dort
 sind Standard-Runner kostenlos; die Grenze entfällt, die Schätzung bleibt als Richtwert.
 
+## Leistungs- und Lasttests (#59)
+
+Gegenstück zu `bench.rs`, Stresstest und Messtabelle in VivaPlan: Rechenzeit und Speicher von Audio-Kern und
+Bibliothek haben Grenzen, damit eine Verschlechterung auffällt, bevor sie hörbar wird. Die Tests laufen **nächtlich**
+(Job `bench` in `test-quality.yml`, nur nach einem neuen Commit, von Hand mit `nightly=true`) und mit `make bench`,
+nicht bei jedem Push und nicht in `make test`:
+
+- Kern: `core/tests/bench_tests.cpp` wird immer gebaut (Formatierung, `-Werror`, clang-tidy), als ctest-Fall aber nur
+  mit `-DWP_BENCH=ON` angemeldet (Label `bench`, `ctest -L bench`, Release-Build in `core/build-bench`).
+- Dart: `app/bench/library_bench_test.dart` (Tag `bench`, `app/dart_test.yaml`) liegt ausserhalb von `test/`;
+  `flutter test` ohne Pfad erreicht es nicht.
+- `make bench` schreibt die Messwerte (Zeilen `BENCH …`) nach `core/build-bench/bench.txt`; der Workflow stellt sie
+  mit Rechner und Datum in die Zusammenfassung des Laufs. Eine überschrittene Grenze lässt den Lauf scheitern.
+
+| Fall | Was | Grenze |
+|---|---|---|
+| `bench_stretch` (#59/AK1) | Time-Stretch je Puffer (512 Frames, 44,1 kHz, Stereo) für 0,1 / 0,25 / 0,5 / 1,0 / 2,0, je 2000 Puffer nach 200 zum Einschwingen; Testsignal mit Teiltönen und Rauschen | Mittelwert und 99. Perzentil je ≤ 50 % des Echtzeitbudgets (11,6 ms) |
+| `bench_long_file` (#59/AK2) | 60 min Stereo (16-Bit-WAV, 605 MiB, im Test erzeugt und danach gelöscht): Laden mit Wellenform, zwei Wellenform-Abfragen, vollständiges Offline-Rendern bis zum Ende | Spitzenspeicher Heap ≤ 3 GiB |
+| `bench_memory_limit` (#59/AK4) | Selbsttest der Speichergrenze: 128 MiB über der Grenze werfen `bad_alloc`, Laden meldet «kein Speicher», unter Linux scheitert auch `malloc` | – |
+| `library_bench_test.dart` (#59/AK3) | 10'000 erfundene Titel in 500 Ordnern (je mit Einstellungen und Loop) in einem temporären Ordner mit leeren Titeldateien: Laden, Sortieren (alle drei Reihenfolgen, Ordner, ein Ordner), Speichern nach einer Änderung, Zusammenführen mit dem Stand eines zweiten Geräts (ein Fünftel bearbeitet, 500 gelöscht, 1000 neu, 50 Ordner umbenannt; `SharedState.merge` und `Library.mergeRemote` mit Schreiben) | Laden, Sortieren, Speichern je ≤ 1 s; Zusammenführen ≤ 2 s |
+
+**Speichergrenze je Testprozess** (#59/AK4):
+
+- Kern, alle Plattformen: `bench_tests` ersetzt `operator new`/`delete`, zählt die belegten Bytes (Grösse vom
+  Allokator, `malloc_size` bzw. `malloc_usable_size`) und wirft über der Grenze des Falls `std::bad_alloc`; der Kern
+  meldet das als `kErrOutOfMemory`, der Test scheitert. Dekodierte Titel, Wellenform und Stretch-Puffer sind
+  `std::vector`, liegen also darunter. Grenzen: Stretch 256 MiB, lange Datei 3 GiB.
+- Kern, Linux (Workflow): zusätzlich `setrlimit(RLIMIT_AS)` auf Grenze + 1 GiB (Code, Thread-Stacks, malloc-Arenen);
+  das erfasst auch `malloc` in miniaudio. macOS setzt `RLIMIT_AS`, `RLIMIT_DATA` und `RLIMIT_RSS` für mmap-Speicher
+  nicht durch, dort gilt der zählende Allokator.
+- Kern, nach jedem Fall: Heap-Spitze ≤ Grenze, Spitze des Arbeitsspeichers (`getrusage`, `ru_maxrss`) ≤ Grenze +
+  512 MiB. Der Zuschlag deckt Code, Stacks und vom Allokator behaltenen Speicher; auf macOS schwankte `ru_maxrss` beim
+  gleichen Fall zwischen 1910 und 2771 MiB (Speicherkompression), die Heap-Spitze gar nicht.
+- Dart: Eine harte Grenze wie im Kern gibt es für die Test-VM nicht: `ulimit -v` greift auf macOS nicht, und die VM
+  reserviert Adressraum weit über ihrem tatsächlichen Bedarf, eine Adressraumgrenze träfe also nicht den Speicher.
+  Der Test prüft deshalb nach jedem Schritt `ProcessInfo.maxRss` (macOS und Linux gleich) gegen 1 GiB und bricht beim
+  ersten Überschreiten ab.
+
+**Messwerte** (Release-Build bzw. Test-VM im JIT-Modus; die App läuft AOT und ist schneller):
+
+| Messung | 20.11.2026, MacBook Pro M1 Pro, 16 GB, macOS 26.7 | Grenze |
+|---|---|---|
+| Stretch 0,1× je Puffer: Mittel / p99 / max | 0,10 / 0,28 / 0,38 ms (0,9 / 2,4 / 3,2 %) | 50 % |
+| Stretch 0,25× | 0,10 / 0,28 / 0,37 ms (0,9 / 2,4 / 3,2 %) | 50 % |
+| Stretch 0,5× | 0,10 / 0,30 / 0,64 ms (0,9 / 2,5 / 5,5 %) | 50 % |
+| Stretch 1,0× (ohne Stretch) | 0,002 / 0,003 / 0,009 ms | 50 % |
+| Stretch 2,0× | 0,11 / 0,28 / 0,29 ms (0,9 / 2,4 / 2,5 %) | 50 % |
+| Stretch: Heap-Spitze / RSS | 82 / 89 MiB (mit 42 MiB Testsignal) | 256 MiB |
+| 60 min: Datei schreiben / Laden mit Wellenform / Rendern | 5,5 s / 2,3 s / 2,3 s (1550× Echtzeit) | – |
+| 60 min: Wellenform, 2 Abfragen | 6,3 ms | – |
+| 60 min: Heap-Spitze / RSS | 2425 / 1910–2771 MiB | 3 GiB / 3,5 GiB |
+| Bibliothek laden (10'000 Titel, 500 Ordner) | 446 ms | 1 s |
+| Sortieren alphabetisch / hinzugefügt / eigene / Ordner / in einem Ordner | 46 / 3 / 1 / 1 / 2 ms | je 1 s |
+| Speichern | 266 ms | 1 s |
+| Zusammenführen `SharedState.merge` / `Library.mergeRemote` | 171 / 643 ms | 2 s |
+| Dart-Testprozess, `maxRss` | 424 MiB | 1 GiB |
+| Ganzes `make bench` | 20 s | – |
+
+Die Werte auf dem GitHub-Runner (Linux) stehen nach jedem nächtlichen Lauf in dessen Zusammenfassung; nach dem ersten
+Lauf werden sie hier nachgetragen und die Grenzen im Issue bestätigt oder angepasst.
+
+Gefunden beim Messen (siehe «Gefundene Fehler» 19 und 20): Alphabetisches Sortieren brauchte 601 ms (jetzt 46 ms);
+ein 60-Minuten-Titel braucht beim Laden doppelt so viel Speicher wie seine Samples.
+
 ## Hook nach dem Commit
 
 `.claude/hooks/after-commit.sh` läuft nach jedem `git commit` aus Claude Code. Er prüft das Format der Nachricht
@@ -716,3 +781,13 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     Null-Gerät), bleibt die alte Position stehen, bis wieder gespielt wird; Knöpfe wie «Anfang hier» nehmen dann die
     alte Position. Mit echtem Gerät nicht beobachtet. Die Tests setzen den Loop deshalb aus dem Zustand nach Pause
     und während der Wiedergabe; Behebung als eigenes Issue vorgeschlagen.
+19. 20.11.2026, #59/AK3, Lasttest Bibliothek: Alphabetisches Sortieren von 10'000 Titeln brauchte 601 ms (Grenze 1 s,
+    auf einem langsameren Rechner darüber). `naturalCompare` faltete und zerlegte beide Titel bei jedem der rund
+    130'000 Vergleiche neu. Behoben: `NaturalKey` wird einmal je Titel berechnet (`sortedNaturally`, für Titel und
+    Ordner), jetzt 46 ms bei gleicher Reihenfolge. Test «#59 sortedNaturally … sorts like naturalCompare»
+    (`library_test.dart`).
+20. 20.11.2026, #59/AK2, Lasttest lange Datei: Ein 60-Minuten-Titel (1211 MiB Samples) braucht beim Laden 2425 MiB
+    Heap und behält danach 1615 MiB. `readAll` reserviert höchstens 5 min im Voraus (Fall 8), darüber wächst der Puffer
+    geometrisch; der letzte Schritt hält 40 und 80 min Platz zugleich, 20 min davon bleiben ungenutzt belegt. Nicht
+    im Rahmen von #59 behoben (Änderung des Ladens); die Grenze des Tests (3 GiB) hält den heutigen Stand fest.
+    Behebung als eigenes Issue vorgeschlagen.

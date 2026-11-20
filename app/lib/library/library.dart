@@ -568,7 +568,7 @@ class Library extends ChangeNotifier {
     final list = [..._tracks];
     switch (_sortOrder) {
       case TrackSortOrder.alphabetical:
-        list.sort((a, b) => naturalCompare(a.title, b.title));
+        return sortedNaturally(_tracks, (t) => t.title);
       case TrackSortOrder.dateAdded:
         list.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
       case TrackSortOrder.custom:
@@ -578,7 +578,7 @@ class Library extends ChangeNotifier {
   }
 
   List<TrackFolder> get sortedFolders =>
-      [..._folders]..sort((a, b) => naturalCompare(a.name, b.name));
+      sortedNaturally(_folders, (f) => f.name);
 
   /// Titel eines Ordners (null = ohne Ordner) in der aktuellen Sortierung.
   List<Track> sortedTracksIn(String? folderId) =>

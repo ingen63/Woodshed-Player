@@ -4,7 +4,7 @@
 .PHONY: help test test-core test-wasm test-app test-hook test-tools format format-check lint lint-dart \
         lint-core coverage coverage-run coverage-core coverage-app coverage-diff mutants fuzz report \
         sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
-        test-ui test-web smoke-app pseudo-l10n
+        test-ui test-web smoke-app pseudo-l10n bench
 
 SHELL := /bin/bash
 # A failing build must not be hidden by `| tail` (GNU Make 3.81 on macOS has no .SHELLFLAGS).
@@ -43,6 +43,7 @@ help:
 	@echo "make test-web       web tests in Chrome: OPFS and the WASM core (needs Emscripten)"
 	@echo "make smoke-app      builds the macOS app (release) and runs its smoke test"
 	@echo "make pseudo-l10n    regenerates the pseudo language of the UI tests after an ARB change"
+	@echo "make bench          performance and load tests of core and library (nightly, not in make test)"
 
 # ---- Tests ----
 test: test-core test-app test-tools
@@ -227,6 +228,22 @@ smoke-app:
 # #13/AK7: the pseudo language follows the English texts (checked by test/pseudo_l10n_test.dart).
 pseudo-l10n:
 	cd app && flutter gen-l10n && dart run tool/pseudo_l10n.dart
+
+# ---- Performance and load tests (#59), docs/TESTS.md ----
+# Nightly in the workflow, not in make test: the core registers its cases only with -DWP_BENCH=ON
+# (label «bench»: time stretch per buffer, 60-minute file, memory limit), the Dart cases live in
+# app/bench/ (tag «bench»), outside test/. Release build. The measured values (lines «BENCH …») go to
+# $(BENCH_LOG) as well; a limit exceeded fails.
+BENCH_LOG ?= core/build-bench/bench.txt
+bench:
+	cmake -S core -B core/build-bench -DCMAKE_BUILD_TYPE=Release -DWP_BENCH=ON >/dev/null
+	$(PIPEFAIL) cmake --build core/build-bench -j 8 --target bench_tests 2>&1 | tail -20
+	$(PIPEFAIL) ctest --test-dir core/build-bench -L bench -V 2>&1 \
+	  | grep -E 'BENCH|FAILED|memory limit|load under|tests passed|tests failed|\*\*\*' \
+	  | sed -E 's/^[0-9]+: //' | tee $(BENCH_LOG)
+	$(PIPEFAIL) cd app && flutter test --tags bench --reporter expanded bench/ 2>&1 \
+	  | grep -E 'BENCH|Expected|Actual|Reason|All tests passed|Some tests failed' \
+	  | tee -a ../$(BENCH_LOG)
 
 # ---- Not set up yet ----
 define not_yet

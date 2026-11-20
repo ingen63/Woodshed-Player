@@ -1,4 +1,4 @@
-// #57, #10, #58, #13: sanitizer, fuzzing, random test, network check, checks, web, macOS and UI runs in
+// #57, #10, #58, #13, #59: sanitizer, fuzzing, random test, network check, checks, web, macOS, UI and bench runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -143,7 +143,52 @@ void main() {
     });
   });
 
-  final nightlyJobs = ['macos', 'sanitize-thread', 'fuzz', 'property'];
+  group('#59/AK5 performance and load tests nightly, not on every push', () {
+    test('make bench runs the core cases with label bench and the Dart cases with tag bench', () {
+      expect(makefile, contains('\nbench:\n'));
+      expect(
+        makefile,
+        contains(
+          '-B core/build-bench -DCMAKE_BUILD_TYPE=Release -DWP_BENCH=ON',
+        ),
+      );
+      expect(makefile, contains('ctest --test-dir core/build-bench -L bench'));
+      expect(
+        makefile,
+        contains('flutter test --tags bench --reporter expanded bench/'),
+      );
+      // make test never runs them: the core registers them only with WP_BENCH, the Dart cases are outside test/
+      final cmake = read('../core/CMakeLists.txt');
+      expect(cmake, contains('if(WP_BENCH)\n  add_test(NAME bench_stretch'));
+      expect(
+        cmake,
+        contains(
+          'option(WP_BENCH "Register the performance and load tests (#59)" OFF)',
+        ),
+      );
+      expect(File('bench/library_bench_test.dart').existsSync(), isTrue);
+      expect(Directory('test/bench').existsSync(), isFalse);
+    });
+
+    test('the bench job runs nightly and puts the values with machine and date into the summary', () {
+      final bench = job(workflow, 'bench');
+      expect(bench, contains("needs.nightly-gate.outputs.run == 'true'"));
+      expect(bench, contains('run: make bench\n'));
+      expect(bench, contains('core/build-bench/bench.txt'));
+      expect(bench, contains('date -u'));
+      expect(bench, contains('lscpu'));
+      expect(bench, contains('GITHUB_STEP_SUMMARY'));
+      for (final push in ['checks', 'web', 'sanitize', 'network-free']) {
+        expect(
+          job(workflow, push),
+          isNot(contains('make bench')),
+          reason: push,
+        );
+      }
+    });
+  });
+
+  final nightlyJobs = ['macos', 'sanitize-thread', 'fuzz', 'property', 'bench'];
 
   group('#13/AK3 checks on Linux on every push with a code change', () {
     test('changes reports code and web changes', () {

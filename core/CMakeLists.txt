@@ -178,6 +178,21 @@ target_link_libraries(realtime_tests PRIVATE wp_playercore ${CMAKE_DL_LIBS})
 wp_strict_warnings(realtime_tests)
 add_test(NAME realtime_tests COMMAND realtime_tests)
 
+# #59: performance and load tests (make bench, nightly). Always built, so format, lint and the
+# compiler see them; registered only with WP_BENCH=ON and the label «bench», so ctest in make test
+# never runs them. They write a 605 MiB WAV to the temp folder and need about 1.5 GiB of memory.
+add_executable(bench_tests tests/bench_tests.cpp)
+target_link_libraries(bench_tests PRIVATE wp_playercore)
+wp_strict_warnings(bench_tests)
+option(WP_BENCH "Register the performance and load tests (#59)" OFF)
+if(WP_BENCH)
+  add_test(NAME bench_stretch COMMAND bench_tests stretch)
+  add_test(NAME bench_long_file COMMAND bench_tests long-file)
+  add_test(NAME bench_memory_limit COMMAND bench_tests memory-limit)
+  set_tests_properties(bench_stretch bench_long_file bench_memory_limit PROPERTIES LABELS bench RUN_SERIAL ON
+    TIMEOUT 900)
+endif()
+
 # #9: audio reference cases against the offline C API, natively and under WASM (tests/reference.cmake)
 include(tests/reference.cmake)
 

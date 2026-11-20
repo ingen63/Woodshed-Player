@@ -1,0 +1,5 @@
+# Test tags (#59). «bench»: performance and load tests in bench/, run nightly by `make bench`; `flutter test`
+# without a path only runs test/ and never reaches them.
+tags:
+  bench:
+    timeout: 5m
