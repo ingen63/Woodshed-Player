@@ -127,7 +127,7 @@ zugeordnet.
 | Dart-Anbindung per bedingtem Import, Wellenform im Browser | vorhanden: `web_binding_test.dart` (#34) | – |
 | Auslieferung auf GitHub Pages, Service Worker für COOP/COEP | vorhanden: `web_hosting_test.dart` (#41) | – |
 | Im echten Browser: Position, Pegel, Tempo, Loop, Metronom, Laden ohne Aussetzer, OPFS | automatisch: `app/test/web/web_core_test.dart`, `web_storage_test.dart` (#13/AK4, Laden, Play/Pause, Tempo, Loop, Metronom, OPFS); Pegel und Aussetzer weiter von Hand: `app/tool/web_core_check.sh`, `app/tool/web_store_check.sh` (#34, #35, #42) | – |
-| Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6), jede Funktion der C-API in einem Referenzfall | vorhanden: `reference_tests` (nativ `--dump`, WASM `--compare`), `reference_api_coverage` (#9/AK7), `core_build_flags_test.dart` (ohne FMA) | – |
+| Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6, gestreckte Tempo-Fälle 5e-2, #94), jede Funktion der C-API in einem Referenzfall | vorhanden: `reference_tests` (nativ `--dump`, WASM `--compare`), `reference_api_coverage` (#9/AK7), `core_build_flags_test.dart` (ohne FMA) | – |
 | `flutter build web` und `flutter test --platform chrome` bei jedem Push mit Web-Änderung | vorhanden: Job `web` in `test-quality.yml`, `make test-web` (#13/AK4) | – |
 | Content-Security-Policy mit erlaubten Hosts | vorhanden: `app/web/index.html`, `app/tool/network_free_test.dart` (#58/AK4), im Browser von Hand geprüft | – |
 | Gebaute Web-App startet ohne gescheiterte Anfrage, ohne fremde Hosts und ohne Konsolenfehler (fremde Hosts im Test nicht erreichbar, also wie offline) | vorhanden: `make test-web-start` (auch am Ende von `make test-web`), `app/tool/web_start_check.dart`, Tests `web_start_check_test.dart` (#72) | – |
@@ -419,12 +419,15 @@ GOLDEN_UPDATE=1 core/build/reference_tests
 **Vertrag nativ ↔ Web (AK7).** Derselbe Quelltext läuft nativ (`ctest` in `core/build`, `build-debug`, `build-asan`,
 `build-tsan`) und als WebAssembly unter Node.js (`core/build-wasm`). Der native Lauf schreibt jede aufgezeichnete
 Ausgabe nach `reference_native.bin` im eigenen Build-Ordner (`--dump`); der WASM-Lauf vergleicht mit
-`core/build/reference_native.bin` (`--compare`, Toleranz 1e-6, CMake-Variable `WP_REFERENCE_DUMP`) und verlangt, dass
+`core/build/reference_native.bin` (`--compare`, Toleranz 1e-6, die gestreckten Tempo-Fälle 5e-2, siehe unten, CMake-Variable `WP_REFERENCE_DUMP`) und verlangt, dass
 jede native Ausgabe auch dort entsteht. `make test-wasm` rendert den nativen Stand vorher (`make reference-native`,
 danach `make test-wasm-compare`). Im Workflow läuft derselbe Ablauf bei jedem Push mit Änderung am Kern im Job
 `contract` (#77), auf Linux mit Emscripten 7.0.0 (`EMSDK_VERSION`, dieselbe Version wie lokal mit Homebrew
 `emscripten`). Stand 19.11.2026: alle
-12 Ausgaben bitgleich (grösste Abweichung 0). `reference_api_coverage` (`core/tests/reference_api_coverage.cmake`)
+12 Ausgaben bitgleich (grösste Abweichung 0). Unter Linux weichen die gestreckten Tempo-Fälle (`tempo_0.1`,
+`tempo_0.5`, `tempo_2.0`) ab, weil glibc `sincosf` anders rundet als Apple und musl (#94, «Gefundene Fehler» 27):
+bis 2,12e-02. Für sie gilt deshalb 5e-2 (`kStretchTolerance`); ein falscher Stretch weicht um rund 1 ab. Unter
+macOS bleiben auch sie bitgleich; `make test-wasm` zeigt die grösste Abweichung je Fall. `reference_api_coverage` (`core/tests/reference_api_coverage.cmake`)
 liest alle `WP_API`-Funktionen aus `wp_core.h` und schlägt fehl, wenn eine davon in `reference_tests.cpp` nicht
 aufgerufen wird. Derselbe Test verlangt, dass die Referenzfälle keine Audiodatei aus `core/tests/audio/` lesen
 (#9/AK1); dort liegen nur die Dateien für die Decoder-Tests von `player_tests.cpp` und `capi_tests.cpp`, erzeugt von
@@ -666,7 +669,7 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
 | `checks` | Linux, jeder Push mit Code-Änderung (`core/`, `app/`, `tools/`, `Makefile`, Workflows), von Hand | `make format-check`, `make lint` (mit actionlint, #64), `make coverage-run`, Prüfung gegen `tools/coverage-min`, `coverage-diff`, Zusammenfassung |
 | `web` | Linux, jeder Push mit Web-Änderung (`app/web/`, `*_web.dart`, Kern, Web-Build), von Hand | WASM-Kern, `make test-web` in Chrome, `flutter build web` |
 | `sanitize` | Linux, Push mit Änderung am Kern, von Hand | ASan/UBSan (#57) |
-| `contract` | Linux, Push mit Änderung am Kern, von Hand | Vertrag nativ ↔ WASM (#77, #9/AK7): zuerst `make reference-native` (native Referenzfälle schreiben ihre Samples), danach `make test-wasm-compare` (WASM-Kern unter Node.js vergleicht, Toleranz 1e-6, jede Funktion der C-API) |
+| `contract` | Linux, Push mit Änderung am Kern, von Hand | Vertrag nativ ↔ WASM (#77, #9/AK7): zuerst `make reference-native` (native Referenzfälle schreiben ihre Samples), danach `make test-wasm-compare` (WASM-Kern unter Node.js vergleicht, Toleranz 1e-6, gestreckte Tempo-Fälle 5e-2, jede Funktion der C-API) |
 | `network-free` | Linux, jeder Push, von Hand | Netzwerkfreiheit (#58) |
 | `macos` | macOS, nächtlich nach neuem Commit, von Hand mit `nightly=true` | macOS- und iOS-Build, Oberflächentests, Rauchtest der gebauten App |
 | `sanitize-thread`, `fuzz`, `property` | Linux, nächtlich nach neuem Commit, von Hand mit `nightly=true` | TSan (#57), Fuzzing und Zufallstests (#10) |
@@ -1189,6 +1192,7 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     bitgleich zu arm64, die Architektur spielt keine Rolle. Ursache 2, nur mittelbar belegt: Der Stretch reagiert auf
     1 ulp in `sincosf`. Setzt man die 168 von 320 532 Ergebnissen, die Apples libm nicht korrekt rundet, auf den korrekt
     gerundeten Wert, weicht `tempo_2.0` um 1,99e-03 ab. musl (Emscripten) liefert dieselben Werte wie Apple, glibc
-    rechnet `sincosf` mit einem eigenen Verfahren; das erklärt wahrscheinlich den Rest bei 2,0×. Lokal ohne Linux nicht
-    nachstellbar; der nächste Lauf von `contract` zeigt es. Test: Vertragsfälle «#9/AK4 #94/AK2 #94/AK3 tempo …» in
+    rechnet `sincosf` mit einem eigenen Verfahren. Der Lauf 44809822849 mit dem festen Generator bestätigt das: Es
+    blieben 2,12e-02 (0,1×), 1,83e-05 (0,5×) und 2,17e-03 (2,0×), dieselbe Grösse wie im Versuch mit `sincosf`. Die
+    gestreckten Tempo-Fälle vergleicht der Vertrag deshalb mit 5e-2 statt 1e-6 (`kStretchTolerance`). Test: Vertragsfälle «#9/AK4 #94/AK2 #94/AK3 tempo …» in
     `reference_tests.cpp`.

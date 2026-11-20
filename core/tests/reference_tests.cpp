@@ -9,8 +9,8 @@
 // The same program runs natively (ctest in core/build, build-debug, build-asan, build-tsan) and as
 // WebAssembly under Node.js (core/build-wasm). Natively it writes every recorded output to a dump
 // (--dump); the WASM run compares its own output against that dump with a tolerance of 1e-6
-// (--compare, #9/AK7). reference_api_coverage.cmake checks that every WP_API function of wp_core.h
-// is called here.
+// (--compare, #9/AK7), stretched tempo cases with 5e-2 (kStretchTolerance, #94).
+// reference_api_coverage.cmake checks that every WP_API function of wp_core.h is called here.
 //
 // Test audio is generated here (#9/AK1): a 440 Hz sine, a ramp whose sample values encode their
 // frame index, and silence. No audio file is read. Every case derives its expected value in the
@@ -65,9 +65,16 @@ std::vector<std::pair<std::string, std::vector<float>>> dumped;
 std::map<std::string, std::vector<float>> reference;
 std::set<std::string> compared;
 constexpr double kContractTolerance = 1e-6;
+// Stretched tempo cases (rate != 1) on Linux (#94/AK2): the stretch turns 1-ulp differences of
+// sincosf into sample differences, and glibc rounds sincosf differently from Apple's libm and musl
+// (WASM). Measured in workflow run 44809822849: up to 2.12e-2 at rate 0.1, 1.83e-5 at 0.5, 2.17e-3
+// at 2.0 (amplitude 0.5). macOS and WASM stay bit-identical. A wrong stretch (other random numbers,
+// other phase) differs by about 1, so 5e-2 still catches it.
+constexpr double kStretchTolerance = 5e-2;
 
-// Keeps an output for the contract: written natively, compared under WASM.
-void record(const std::string &name, const std::vector<float> &samples) {
+// Keeps an output for the contract: written natively, compared under WASM within tolerance.
+void record(const std::string &name, const std::vector<float> &samples,
+            double tolerance = kContractTolerance) {
   if (mode == Mode::Dump) {
     dumped.emplace_back(name, samples);
   } else if (mode == Mode::Compare) {
@@ -85,7 +92,7 @@ void record(const std::string &name, const std::vector<float> &samples) {
     for (size_t i = 0; i < n; ++i)
       maxDiff = std::max(maxDiff, std::fabs(static_cast<double>(it->second[i]) - samples[i]));
     std::printf("  contract %-28s %8zu samples, max diff %.2e\n", name.c_str(), n, maxDiff);
-    CHECK(maxDiff <= kContractTolerance);
+    CHECK(maxDiff <= tolerance);
   }
 }
 
@@ -463,7 +470,8 @@ void tempoLengthAndPitch() {
     CHECK(std::fabs(f - 440.0) <= 4.4);
     char name[32];
     std::snprintf(name, sizeof name, "tempo_%.1f", r);
-    record(name, out);
+    // At 1.0 the stretch is bypassed: exact contract. Otherwise libm may differ (#94/AK2).
+    record(name, out, r == 1.0 ? kContractTolerance : kStretchTolerance);
   }
 }
 
