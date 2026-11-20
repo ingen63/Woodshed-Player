@@ -216,7 +216,7 @@ make mutants-diff   # Mutationstests der seit BASE geänderten Zeilen (Vorgabe o
 make report         # Übersichtsseite Testqualität aus den vorhandenen Ergebnissen (#12), local/test-quality/report/
 ```
 
-Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten 7.0.0 für `test-wasm` (Homebrew `emscripten`, im Workflow dieselbe Version), Homebrew `llvm` für
+Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten 7.0.0 für `test-wasm` (Homebrew `emscripten`, in beiden Workflows dieselbe Version), Homebrew `llvm` für
 `clang-format`, `clang-tidy` und libFuzzer (`brew install llvm`; das Makefile findet sie unter
 `$(brew --prefix llvm)/bin`; Apple-Clang hat kein libFuzzer). `actionlint` 1.7.12 (MIT) für die GitHub-Workflows
 (`brew install actionlint`, #64); ist ShellCheck installiert, prüft actionlint damit auch die `run:`-Skripte.
@@ -687,8 +687,9 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
   zeigt die Seite für sie «keine Daten».
 - **Werkzeuge:** Flutter in derselben Version wie `pages.yml` (`FLUTTER_VERSION`, `dart format` hängt davon ab),
   `clang-format` und `clang-tidy` in Hauptversion 23 wie Homebrew `llvm` (über `pipx`), der Kern mit clang-18 und
-  passendem `llvm-cov-18`, `actionlint` in fester Version mit Prüfsumme (#64), im Job `contract` Emscripten 7.0.0
-über `emsdk` (`EMSDK_VERSION`, wie Homebrew `emscripten` lokal; nach einem Update beide nachführen, #77). Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
+  passendem `llvm-cov-18`, `actionlint` in fester Version mit Prüfsumme (#64), in den Jobs `contract`, `fuzz` und `web` sowie in `pages.yml`
+Emscripten 7.0.0 über `emsdk` (`EMSDK_VERSION`, je Workflow an einer Stelle, nie `latest`, wie Homebrew `emscripten`
+lokal; nach einem Update alle drei nachführen, #77, #79). Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
 - **Lokal geprüft** werden die Workflows mit `actionlint` und ShellCheck (`make lint`, #64) und über
   `test_quality_workflow_test.dart`. Ob alle Jobs auf den Runnern laufen, zeigen erst die Läufe nach dem Push.
 

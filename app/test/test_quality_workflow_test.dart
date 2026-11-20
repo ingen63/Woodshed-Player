@@ -16,6 +16,47 @@ String job(String workflow, String name) {
   return next == null ? rest : rest.substring(0, next.start + 1);
 }
 
+/// #79: what keeps the workflows from using one fixed Emscripten version.
+/// Empty when every workflow sets `EMSDK_VERSION` exactly once, installs and
+/// activates emsdk only with it (never `latest` or a literal version), all
+/// workflows agree and docs/TESTS.md names only that version.
+List<String> emsdkProblems(Map<String, String> workflows, String docs) {
+  final problems = <String>[];
+  final versions = <String>{};
+  for (final MapEntry(key: name, value: text) in workflows.entries) {
+    final settings = RegExp(r'EMSDK_VERSION: *(\S+)').allMatches(text).toList();
+    if (settings.length != 1) {
+      problems.add('$name sets EMSDK_VERSION ${settings.length} times');
+    }
+    for (final setting in settings) {
+      final version = setting.group(1)!;
+      if (!RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version)) {
+        problems.add('$name: EMSDK_VERSION $version is not fixed');
+      }
+      versions.add(version);
+    }
+    final calls = RegExp(r'emsdk" (install|activate) (\S+)').allMatches(text);
+    if (calls.isEmpty) problems.add('$name installs no Emscripten');
+    for (final call in calls) {
+      if (call.group(2) != r'"$EMSDK_VERSION"') {
+        problems.add('$name: ${call.group(0)}');
+      }
+    }
+    if (text.contains('latest >')) problems.add('$name uses latest');
+  }
+  if (versions.length != 1) problems.add('versions differ: $versions');
+  final documented = RegExp(r'Emscripten (\d+\.\d+\.\d+)')
+      .allMatches(docs)
+      .map((m) => m.group(1)!)
+      .toSet();
+  if (documented.isEmpty ||
+      !documented.containsAll(versions) ||
+      !versions.containsAll(documented)) {
+    problems.add('docs/TESTS.md names $documented, workflows $versions');
+  }
+  return problems;
+}
+
 void main() {
   final workflow = read('../.github/workflows/test-quality.yml');
   final makefile = read('../Makefile');
@@ -449,6 +490,91 @@ void main() {
       final tests = read('../docs/TESTS.md');
       expect(tests, contains('Emscripten ${version!.group(1)}'));
       expect(job(workflow, 'contract'), isNot(contains('install latest')));
+    });
+  });
+
+  group('#79 one fixed Emscripten version in all workflows', () {
+    final pages = read('../.github/workflows/pages.yml');
+    final docs = read('../docs/TESTS.md');
+    final workflows = {'test-quality.yml': workflow, 'pages.yml': pages};
+
+    test(
+      '#79/AK1 job web and pages.yml install EMSDK_VERSION, none latest',
+      () {
+        expect(emsdkProblems(workflows, docs), isEmpty);
+        final web = job(workflow, 'web');
+        expect(web, contains(r'emsdk" install "$EMSDK_VERSION"'));
+        expect(web, contains(r'emsdk" activate "$EMSDK_VERSION"'));
+        expect(job(workflow, 'fuzz'), contains(r'install "$EMSDK_VERSION"'));
+        expect(
+          job(workflow, 'contract'),
+          contains(r'install "$EMSDK_VERSION"'),
+        );
+        final deploy = job(pages, 'deploy');
+        expect(deploy, contains(r'emsdk" install "$EMSDK_VERSION"'));
+        expect(deploy, contains(r'emsdk" activate "$EMSDK_VERSION"'));
+      },
+    );
+
+    test(
+      '#79/AK2 one place per workflow, same version, as in docs/TESTS.md',
+      () {
+        final setting = RegExp(
+          r'^  EMSDK_VERSION: (\d+\.\d+\.\d+) ',
+          multiLine: true,
+        );
+        final versions = <String>{};
+        for (final text in workflows.values) {
+          expect(RegExp('EMSDK_VERSION:').allMatches(text), hasLength(1));
+          // workflow-wide env, not inside a job
+          versions.add(setting.firstMatch(text)!.group(1)!);
+        }
+        expect(versions, hasLength(1));
+        expect(docs, contains('Emscripten ${versions.single}'));
+      },
+    );
+
+    test('#79/AK3 the check fails on latest or a differing version', () {
+      Map<String, String> variant(String name, String text) => {
+        ...workflows,
+        name: text,
+      };
+      final latestPages = pages.replaceFirst(
+        r'install "$EMSDK_VERSION"',
+        'install latest',
+      );
+      expect(
+        emsdkProblems(variant('pages.yml', latestPages), docs),
+        isNotEmpty,
+      );
+      final latestWeb = workflow.replaceFirst(
+        r'activate "$EMSDK_VERSION"',
+        'activate latest',
+      );
+      expect(
+        emsdkProblems(variant('test-quality.yml', latestWeb), docs),
+        isNotEmpty,
+      );
+      final literal = workflow.replaceFirst(
+        r'install "$EMSDK_VERSION"',
+        'install 7.0.0',
+      );
+      expect(
+        emsdkProblems(variant('test-quality.yml', literal), docs),
+        isNotEmpty,
+      );
+      final other = pages.replaceFirst(
+        'EMSDK_VERSION: 7.0.0',
+        'EMSDK_VERSION: 6.0.0',
+      );
+      expect(emsdkProblems(variant('pages.yml', other), docs), isNotEmpty);
+      final twice = pages.replaceFirst(
+        '    runs-on: ubuntu-latest\n',
+        '    runs-on: ubuntu-latest\n    env:\n      EMSDK_VERSION: 7.0.0\n',
+      );
+      expect(emsdkProblems(variant('pages.yml', twice), docs), isNotEmpty);
+      final oldDocs = docs.replaceFirst('Emscripten 7.0.0', 'Emscripten 6.0.0');
+      expect(emsdkProblems(workflows, oldDocs), isNotEmpty);
     });
   });
 

@@ -51,7 +51,7 @@ env:
   LLVM_TOOLS_VERSION: '23.*'  # clang-format and clang-tidy as on the developers' machines (Homebrew llvm)
   ACTIONLINT_VERSION: 1.7.12  # as on the developers' machines (Homebrew actionlint), docs/TESTS.md
   ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  # linux_amd64 archive
-  EMSDK_VERSION: 7.0.0  # Emscripten of the contract job (#77), as on the developers' machines (Homebrew emscripten), docs/TESTS.md
+  EMSDK_VERSION: 7.0.0  # Emscripten of the jobs contract (#77), fuzz and web (#79), same as pages.yml and the developers' machines (Homebrew emscripten), docs/TESTS.md
 
 jobs:
   changes:
@@ -224,11 +224,11 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - name: Install Emscripten
+      - name: Install Emscripten (fixed version, #79)
         run: |
           git clone --quiet --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
-          "$RUNNER_TEMP/emsdk/emsdk" install latest >/dev/null
-          "$RUNNER_TEMP/emsdk/emsdk" activate latest >/dev/null
+          "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION" >/dev/null
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$EMSDK_VERSION" >/dev/null
       - name: make test-web (WASM core, OPFS, binding in Chrome)
         run: |
           . "$RUNNER_TEMP/emsdk/emsdk_env.sh" >/dev/null

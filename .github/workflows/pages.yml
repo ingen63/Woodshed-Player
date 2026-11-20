@@ -24,6 +24,7 @@ permissions:
 
 env:
   FLUTTER_VERSION: 3.50.0
+  EMSDK_VERSION: 7.0.0  # same as test-quality.yml and the developers' machines (Homebrew emscripten), docs/TESTS.md (#79)
 
 jobs:
   redeploy:
@@ -78,12 +79,12 @@ jobs:
           curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" \
             | tar -xJ -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
-      - name: Install Emscripten
+      - name: Install Emscripten (fixed version, #79)
         if: steps.tag.outputs.tag != ''
         run: |
           git clone --quiet --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
-          "$RUNNER_TEMP/emsdk/emsdk" install latest >/dev/null
-          "$RUNNER_TEMP/emsdk/emsdk" activate latest >/dev/null
+          "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION" >/dev/null
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$EMSDK_VERSION" >/dev/null
       - name: Build WASM core of the app (#33)
         if: steps.tag.outputs.tag != ''
         run: |
