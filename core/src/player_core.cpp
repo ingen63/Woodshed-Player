@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <new>
+#include <stdexcept>
 #include <vector>
 
 #include "miniaudio_impl.hpp"
@@ -80,7 +81,8 @@ int mapOpenError(ma_result r) {
 }
 
 // Prüft vorab, ob die Datei existiert und lesbar ist; miniaudio meldet sonst nur «kein Decoder».
-int checkReadable(const std::string &path) {
+// `size` (optional) receives the file size in bytes, 0 if unknown.
+int checkReadable(const std::string &path, size_t *size = nullptr) {
   ma_default_vfs vfs; // Standard-Dateisystem von miniaudio (UTF-8 auch unter Windows)
   if (ma_default_vfs_init(&vfs, nullptr) != MA_SUCCESS)
     return kErrFileUnreadable;
@@ -93,12 +95,32 @@ int checkReadable(const std::string &path) {
   ma_vfs_close(&vfs, f);
   if (ri == MA_SUCCESS && info.sizeInBytes == 0)
     return kErrUnsupportedFormat;
+  if (size)
+    *size = ri == MA_SUCCESS ? static_cast<size_t>(info.sizeInBytes) : 0;
   return kOk;
 }
 
+// #75: fewest bytes per second of audio a supported file plausibly has (MP3 at 8 kbit/s has 1000).
+// A header claiming more audio than its file can hold this way is not trusted for the reservation.
+constexpr double kMinBytesPerSecond = 500;
+
+// #75: reserves `count` samples; false if there is not enough memory (or, on 32-bit WASM, more
+// than a vector can hold).
+bool tryReserve(std::vector<float> &data, size_t count) {
+  try {
+    data.reserve(count);
+    return true;
+  } catch (const std::bad_alloc &) {
+    return false;
+  } catch (const std::length_error &) {
+    return false;
+  }
+}
+
 // Liest einen geöffneten Decoder vollständig nach `out` (Stereo, f32, Samplerate des Decoders).
+// `inputBytes` is the size of the encoded input, 0 if unknown.
 int readAll(ma_decoder &dec, const std::atomic<bool> *cancel, std::atomic<double> *progress,
-            Source &out) {
+            size_t inputBytes, Source &out) {
   ma_uint64 total = 0;
   if (ma_decoder_get_length_in_pcm_frames(&dec, &total) != MA_SUCCESS)
     total = 0;
@@ -113,6 +135,15 @@ int readAll(ma_decoder &dec, const std::atomic<bool> *cancel, std::atomic<double
     const ma_uint64 cap = static_cast<ma_uint64>(dec.outputSampleRate) * 300;
     if (total > 0)
       out.data.reserve(static_cast<size_t>((std::min(total, cap) + kBlock) * Player::kChannels));
+    // #75: growing geometrically beyond 5 minutes held two buffers at once (60 min: 2425 MiB peak
+    // for 1211 MiB of samples). Once the decoder has really delivered those 5 minutes, the header
+    // length is reserved once, if the input size makes it plausible. If that fails, or the length
+    // is unknown or implausible, the buffer keeps growing as before. A wrong length only costs
+    // memory: decoding still runs until the decoder ends.
+    const double plausibleFrames = static_cast<double>(inputBytes) / kMinBytesPerSecond *
+                                   static_cast<double>(dec.outputSampleRate);
+    const bool reserveTotal = total > cap && static_cast<double>(total) <= plausibleFrames;
+    bool reserveTried = false;
     std::vector<float> buf(kBlock * Player::kChannels);
     long long frames = 0;
     for (;;) {
@@ -123,8 +154,14 @@ int readAll(ma_decoder &dec, const std::atomic<bool> *cancel, std::atomic<double
       ma_uint64 read = 0;
       const ma_result r = ma_decoder_read_pcm_frames(&dec, buf.data(), kBlock, &read);
       sanitizeSamples(buf.data(), static_cast<size_t>(read * Player::kChannels));
-      out.data.insert(out.data.end(), buf.begin(),
-                      buf.begin() + static_cast<long>(read * Player::kChannels));
+      const auto n = static_cast<size_t>(read * Player::kChannels);
+      if (reserveTotal && !reserveTried && out.data.size() + n > out.data.capacity()) {
+        reserveTried = true;
+        // if this fails, the buffer keeps growing step by step; only that failing too is out of
+        // memory
+        tryReserve(out.data, static_cast<size_t>((total + kBlock) * Player::kChannels));
+      }
+      out.data.insert(out.data.end(), buf.begin(), buf.begin() + static_cast<long>(n));
       frames += static_cast<long long>(read);
       if (progress && total > 0)
         progress->store(std::min(1.0, static_cast<double>(frames) / static_cast<double>(total)));
@@ -156,7 +193,8 @@ ma_decoder_config decoderConfig(int sampleRate) {
 
 int decodeFile(const std::string &path, int sampleRate, const std::atomic<bool> &cancel,
                std::atomic<double> &progress, Source &out) {
-  if (int err = checkReadable(path); err != kOk)
+  size_t size = 0;
+  if (int err = checkReadable(path, &size); err != kOk)
     return err;
 
   ma_decoder_config cfg = decoderConfig(sampleRate);
@@ -165,7 +203,7 @@ int decodeFile(const std::string &path, int sampleRate, const std::atomic<bool> 
     return r == MA_DOES_NOT_EXIST || r == MA_ACCESS_DENIED ? mapOpenError(r)
                                                            : kErrUnsupportedFormat;
   }
-  return readAll(dec, &cancel, &progress, out);
+  return readAll(dec, &cancel, &progress, size, out);
 }
 
 } // namespace
@@ -201,7 +239,7 @@ int decodeMemory(const void *data, size_t size, int sampleRate, Source &out) {
   ma_decoder dec;
   if (ma_decoder_init_memory(data, size, &cfg, &dec) != MA_SUCCESS)
     return kErrUnsupportedFormat;
-  return readAll(dec, nullptr, nullptr, out);
+  return readAll(dec, nullptr, nullptr, size, out);
 }
 
 int convertPcm(const float *interleaved, int channels, long long frames, int srcRate, int dstRate,

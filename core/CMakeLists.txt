@@ -244,8 +244,9 @@ if(WP_BENCH)
   add_test(NAME bench_stretch COMMAND bench_tests stretch)
   add_test(NAME bench_long_file COMMAND bench_tests long-file)
   add_test(NAME bench_memory_limit COMMAND bench_tests memory-limit)
-  set_tests_properties(bench_stretch bench_long_file bench_memory_limit PROPERTIES LABELS bench RUN_SERIAL ON
-    TIMEOUT 900)
+  add_test(NAME bench_reserve_fallback COMMAND bench_tests reserve-fallback)
+  set_tests_properties(bench_stretch bench_long_file bench_memory_limit bench_reserve_fallback
+    PROPERTIES LABELS bench RUN_SERIAL ON TIMEOUT 900)
 endif()
 
 # #9: audio reference cases against the offline C API, natively and under WASM (tests/reference.cmake)

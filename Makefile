@@ -287,8 +287,8 @@ pseudo-l10n:
 
 # ---- Performance and load tests (#59), docs/TESTS.md ----
 # Nightly in the workflow, not in make test: the core registers its cases only with -DWP_BENCH=ON
-# (label «bench»: time stretch per buffer, 60-minute file, memory limit), the Dart cases live in
-# app/bench/ (tag «bench»), outside test/. Release build. The measured values (lines «BENCH …») go to
+# (label «bench»: time stretch per buffer, 60-minute file, memory limit, reservation fallback), the
+# Dart cases live in app/bench/ (tag «bench»), outside test/. Release build. The measured values (lines «BENCH …») go to
 # $(BENCH_LOG) as well; a limit exceeded fails.
 BENCH_LOG ?= core/build-bench/bench.txt
 bench:

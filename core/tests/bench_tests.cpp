@@ -10,6 +10,8 @@
 //                          deleted afterwards) is loaded, its waveform computed and the whole title
 //                          rendered offline; the peak memory is measured against kLongFileLimit.
 //   bench_tests memory-limit  #59/AK4: the limit itself works (self-test).
+//   bench_tests reserve-fallback  #75/AK1: a 6-minute title still loads when reserving its length
+//                          from the header fails (the allocator fails that request once).
 //
 // #59/AK4: every run has a memory limit, so that a bug cannot bring the machine down:
 // - all platforms: the program counts the bytes of every operator new/delete (the decoded audio,
@@ -63,6 +65,8 @@ constexpr std::size_t kMinAlign = alignof(std::max_align_t);
 std::atomic<long long> gLive{0};
 std::atomic<long long> gPeak{0};
 std::atomic<long long> gLimit{LLONG_MAX};
+// #75/AK1: the first allocation of at least this many bytes fails once (reserve-fallback)
+std::atomic<long long> gFailOnceFrom{LLONG_MAX};
 
 std::size_t blockSize(void *p) {
 #if defined(__APPLE__)
@@ -73,6 +77,9 @@ std::size_t blockSize(void *p) {
 }
 
 void *countedNew(std::size_t n, std::size_t align) {
+  if (static_cast<long long>(n) >= gFailOnceFrom.load(std::memory_order_relaxed) &&
+      gFailOnceFrom.exchange(LLONG_MAX) != LLONG_MAX)
+    throw std::bad_alloc();
   void *p = nullptr;
   if (posix_memalign(&p, std::max(align, kMinAlign), n ? n : 1) != 0)
     throw std::bad_alloc();
@@ -149,11 +156,14 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr double kMaxBudgetShare = 0.5;
 // #59/AK4: memory limits of the cases (heap and peak resident size)
 constexpr std::size_t kStretchLimit = 256 * kMiB;
-// 60 min stereo f32 are 1211 MiB of decoded audio, the waveform 38 MiB more. Measured peak 2425
-// MiB (docs/TESTS.md): beyond the first 5 minutes the decode buffer grows geometrically, so the
-// last step holds 40 and 80 minutes of capacity at once.
-constexpr std::size_t kLongFileLimit = 3072 * kMiB;
 constexpr int kLongFileMinutes = 60;
+// 60 min stereo f32 are 1211 MiB of decoded audio, the waveform 38 MiB more. #75/AK2: at most 1.2
+// times the samples. Before #75 the peak was 2425 MiB: beyond the first 5 minutes the decode
+// buffer grew geometrically and held 40 and 80 minutes of capacity at once; now the length from
+// the header is reserved once after 5 minutes (5 + 60 minutes at once).
+constexpr std::size_t kLongFileSamples =
+    static_cast<std::size_t>(kLongFileMinutes) * 60 * kSr * 2 * sizeof(float);
+constexpr std::size_t kLongFileLimit = kLongFileSamples * 6 / 5;
 // The resident size adds code, thread stacks and memory the allocator keeps after a free; on macOS
 // it varied by 860 MiB between runs of the same case (memory compression), the heap peak not at
 // all.
@@ -381,6 +391,32 @@ void longFile() {
   checkMemory("long_file", kLongFileLimit);
 }
 
+// ---- #75/AK1: a failed reservation falls back to growing ----
+
+void reserveFallback() {
+  std::printf("#75/AK1 reserving the header length fails, loading keeps growing\n");
+  const long long frames = 6LL * 60 * kSr; // 6 min: decodes to 121 MiB
+  const std::string path =
+      (std::filesystem::temp_directory_path() /
+       ("wp_bench_fallback_" + std::to_string(static_cast<long long>(getpid())) + ".wav"))
+          .string();
+  CHECK(writeLongWav(path, frames));
+  wp::Player p(kSr);
+  // above the first 5 minutes (101 MiB) and below the reservation of 6 minutes (121 MiB)
+  gFailOnceFrom = 110LL * static_cast<long long>(kMiB);
+  const int loaded = p.load(path);
+  std::filesystem::remove(path);
+  std::printf("  load: %s\n", wp::errorMessage(loaded));
+  CHECK(gFailOnceFrom.load() == LLONG_MAX); // the reservation was tried and failed
+  CHECK(loaded == wp::kOk);
+  CHECK(p.engine().frames() == frames);
+  std::vector<float> out(kBuffer * 2);
+  p.engine().seek(p.engine().duration() - 1.0);
+  p.engine().play();
+  p.render(out.data(), kBuffer);
+  CHECK(*std::max_element(out.begin(), out.end()) > 0.01f);
+}
+
 // ---- #59/AK4: the limit holds ----
 
 void memoryLimitHolds() {
@@ -426,8 +462,10 @@ int main(int argc, char **argv) {
     longFile();
   } else if (mode == "memory-limit") {
     memoryLimitHolds();
+  } else if (mode == "reserve-fallback") {
+    reserveFallback();
   } else {
-    std::printf("usage: bench_tests stretch|long-file|memory-limit\n");
+    std::printf("usage: bench_tests stretch|long-file|memory-limit|reserve-fallback\n");
     return 2;
   }
   if (!kTimingChecks)

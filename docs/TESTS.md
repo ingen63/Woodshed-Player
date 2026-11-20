@@ -66,7 +66,8 @@ zugeordnet.
 | Seek auf t beginnt bei Sample round(t × Abtastrate); Pause und Fortsetzen ohne verlorenes Sample | vorhanden: `reference_tests.cpp` (#9/AK3, Rampe, t knapp unter und über einem halben Sample, im Stand und beim Spielen) | – |
 | Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | vorhanden: `player_tests.cpp` (`truncatedAndWrongAudioFiles`, #10/AK3), `core/tests/fuzz/` mit Wiederholung von Korpus und Regressionsfällen in jedem Build (`fuzz_*_replay`), `make fuzz` (#10/AK4), dieselben Eingaben gegen den WASM-Kern (`make test-wasm`, `make fuzz-wasm`, #67) | – |
 | AddressSanitizer, UBSan, ThreadSanitizer | vorhanden: `make sanitize`, `make sanitize-thread`, Selbsttest `tests/sanitizer/selftest.cpp`, Workflow `test-quality.yml` (#57) | – |
-| Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | vorhanden, nächtlich: `core/tests/bench_tests.cpp` (`bench_long_file`, #59/AK2), `make bench` | – |
+| Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | vorhanden, nächtlich: `core/tests/bench_tests.cpp` (`bench_long_file`, #59/AK2, Grenze #75/AK2), `make bench` | – |
+| Lange Titel (über 5 min): Länge aus dem Dateikopf einmal reservieren, Rückfall bei `bad_alloc`, falsche Längenangabe | vorhanden: `player_tests.cpp` (`longTitleReservesHeaderLength`, #75/AK1; `longTitleWithWrongHeaderLength`, #75/AK3), nächtlich `bench_tests.cpp` (`bench_reserve_fallback`, #75/AK1) | – |
 
 ### Tempo
 
@@ -716,7 +717,8 @@ nicht bei jedem Push und nicht in `make test`:
 | Fall | Was | Grenze |
 |---|---|---|
 | `bench_stretch` (#59/AK1) | Time-Stretch je Puffer (512 Frames, 44,1 kHz, Stereo) für 0,1 / 0,25 / 0,5 / 1,0 / 2,0, je 2000 Puffer nach 200 zum Einschwingen; Testsignal mit Teiltönen und Rauschen | Mittelwert und 99. Perzentil je ≤ 50 % des Echtzeitbudgets (11,6 ms) |
-| `bench_long_file` (#59/AK2) | 60 min Stereo (16-Bit-WAV, 605 MiB, im Test erzeugt und danach gelöscht): Laden mit Wellenform, zwei Wellenform-Abfragen, vollständiges Offline-Rendern bis zum Ende | Spitzenspeicher Heap ≤ 3 GiB |
+| `bench_long_file` (#59/AK2) | 60 min Stereo (16-Bit-WAV, 605 MiB, im Test erzeugt und danach gelöscht): Laden mit Wellenform, zwei Wellenform-Abfragen, vollständiges Offline-Rendern bis zum Ende | Spitzenspeicher Heap ≤ 1,2 × Samples (1211 MiB → 1453 MiB, #75/AK2) |
+| `bench_reserve_fallback` (#75/AK1) | 6 min Stereo (WAV, im Test erzeugt); der zählende Allokator lässt die erste Anforderung ab 110 MiB einmal scheitern, also die Reservierung der Länge aus dem Dateikopf (121 MiB): Laden gelingt trotzdem mit allen Frames | – |
 | `bench_memory_limit` (#59/AK4) | Selbsttest der Speichergrenze: 128 MiB über der Grenze werfen `bad_alloc`, Laden meldet «kein Speicher», unter Linux scheitert auch `malloc` | – |
 | `library_bench_test.dart` (#59/AK3) | 10'000 erfundene Titel in 500 Ordnern (je mit Einstellungen und Loop) in einem temporären Ordner mit leeren Titeldateien: Laden, Sortieren (alle drei Reihenfolgen, Ordner, ein Ordner), Speichern nach einer Änderung, Zusammenführen mit dem Stand eines zweiten Geräts (ein Fünftel bearbeitet, 500 gelöscht, 1000 neu, 50 Ordner umbenannt; `SharedState.merge` und `Library.mergeRemote` mit Schreiben) | Laden, Sortieren, Speichern je ≤ 1 s; Zusammenführen ≤ 2 s |
 
@@ -725,7 +727,7 @@ nicht bei jedem Push und nicht in `make test`:
 - Kern, alle Plattformen: `bench_tests` ersetzt `operator new`/`delete`, zählt die belegten Bytes (Grösse vom
   Allokator, `malloc_size` bzw. `malloc_usable_size`) und wirft über der Grenze des Falls `std::bad_alloc`; der Kern
   meldet das als `kErrOutOfMemory`, der Test scheitert. Dekodierte Titel, Wellenform und Stretch-Puffer sind
-  `std::vector`, liegen also darunter. Grenzen: Stretch 256 MiB, lange Datei 3 GiB.
+  `std::vector`, liegen also darunter. Grenzen: Stretch 256 MiB, lange Datei 1,2 × Samples = 1453 MiB (#75/AK2).
 - Kern, Linux (Workflow): zusätzlich `setrlimit(RLIMIT_AS)` auf Grenze + 1 GiB (Code, Thread-Stacks, malloc-Arenen);
   das erfasst auch `malloc` in miniaudio. macOS setzt `RLIMIT_AS`, `RLIMIT_DATA` und `RLIMIT_RSS` für mmap-Speicher
   nicht durch, dort gilt der zählende Allokator.
@@ -749,7 +751,7 @@ nicht bei jedem Push und nicht in `make test`:
 | Stretch: Heap-Spitze / RSS | 82 / 89 MiB (mit 42 MiB Testsignal) | 256 MiB |
 | 60 min: Datei schreiben / Laden mit Wellenform / Rendern | 5,5 s / 2,3 s / 2,3 s (1550× Echtzeit) | – |
 | 60 min: Wellenform, 2 Abfragen | 6,3 ms | – |
-| 60 min: Heap-Spitze / RSS | 2425 / 1910–2771 MiB | 3 GiB / 3,5 GiB |
+| 60 min: Heap-Spitze / RSS | 1314 / 1351 MiB (1,08 × Samples; vor #75: 2425 / 1910–2771 MiB) | 1453 / 1965 MiB |
 | Bibliothek laden (10'000 Titel, 500 Ordner) | 446 ms | 1 s |
 | Sortieren alphabetisch / hinzugefügt / eigene / Ordner / in einem Ordner | 46 / 3 / 1 / 1 / 2 ms | je 1 s |
 | Speichern | 266 ms | 1 s |
@@ -1123,8 +1125,11 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
 20. 20.11.2026, #59/AK2, Lasttest lange Datei: Ein 60-Minuten-Titel (1211 MiB Samples) braucht beim Laden 2425 MiB
     Heap und behält danach 1615 MiB. `readAll` reserviert höchstens 5 min im Voraus (Fall 8), darüber wächst der Puffer
     geometrisch; der letzte Schritt hält 40 und 80 min Platz zugleich, 20 min davon bleiben ungenutzt belegt. Nicht
-    im Rahmen von #59 behoben (Änderung des Ladens); die Grenze des Tests (3 GiB) hält den heutigen Stand fest.
-    Behebung als eigenes Issue vorgeschlagen.
+    im Rahmen von #59 behoben (Änderung des Ladens); die Grenze des Tests (3 GiB) hielt den damaligen Stand fest.
+    Behoben mit #75: Sobald 5 min dekodiert sind, reserviert `readAll` einmal die Länge aus dem Dateikopf, wenn die
+    Dateigrösse sie plausibel macht (mindestens 500 Byte je Sekunde); scheitert das mit `bad_alloc`, wächst der Puffer
+    wie bisher. Spitze jetzt 1314 MiB (1,08 × Samples), Grenze 1,2 × Samples. Tests `longTitleReservesHeaderLength`,
+    `longTitleWithWrongHeaderLength` (`player_tests.cpp`) und `bench_reserve_fallback`.
 21. 20.11.2026, #11, Mutationstests (UBSan im Mutationsbau): `wp_web_create(1)` (und `wp::Player` mit 1 Hz) wird
     angenommen, der Time-Stretch teilt bei 1 Hz aber durch 0 (`signalsmith-linear/stft.h`, Blockgrösse 0). Die
     Prüfung lässt jede Samplerate ab 1 Hz zu; sinnvoll wäre eine Untergrenze (z. B. 8000 Hz). Behoben mit #76: Der

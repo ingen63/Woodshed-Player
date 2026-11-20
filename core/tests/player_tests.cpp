@@ -539,6 +539,71 @@ void decodeMemoryMatchesFile() {
   CHECK(wp::decodeMemory(nullptr, 10, kSr, out) == wp::kErrInvalidArgument);
 }
 
+// #75: titles longer than 5 minutes, here 6 minutes at the lowest rate (8 kHz, 23 MB decoded).
+constexpr int kLongSr = wp::kMinSampleRate;
+constexpr long long kLongFrames = 6LL * 60 * kLongSr;
+
+// The frame index pattern of writeIndexWav at a few places, and the length.
+void checkIndexSource(const wp::Source &src, long long frames) {
+  CHECK(src.frames == frames);
+  CHECK(src.data.size() == static_cast<size_t>(frames) * 2);
+  if (src.frames != frames)
+    return;
+  for (const long long i : {0LL, 1LL, frames / 3, frames / 2, frames - 2, frames - 1})
+    CHECK(frameIndex(&src.data[static_cast<size_t>(i) * 2]) == i);
+}
+
+// The WAV of writeIndexWav with another length in its header (RIFF and data chunk size).
+std::string withHeaderFrames(std::string wav, unsigned long long frames) {
+  const auto put = [&wav](size_t at, unsigned long long v) {
+    const auto u = static_cast<unsigned>(std::min<unsigned long long>(v, 0xffffffffULL));
+    for (int b = 0; b < 4; ++b)
+      wav[at + static_cast<size_t>(b)] = static_cast<char>((u >> (8 * b)) & 0xff);
+  };
+  put(4, 36 + frames * 4);
+  put(40, frames * 4);
+  return wav;
+}
+
+// #75/AK1: a long title with a correct header reserves its length once instead of growing
+// geometrically: the buffer ends up no larger than the samples plus one decode block.
+void longTitleReservesHeaderLength() {
+  const fs::path file = writeIndexWav("long6min.wav", kLongFrames, kLongSr);
+  const std::string bytes = readBytes(file);
+  wp::Source out;
+  CHECK(wp::decodeMemory(bytes.data(), bytes.size(), kLongSr, out) == wp::kOk);
+  checkIndexSource(out, kLongFrames);
+  CHECK(out.data.capacity() <= static_cast<size_t>(kLongFrames + 8192) * 2);
+  // the same from the file (size from the file system)
+  wp::Player p(kLongSr);
+  CHECK(p.load(file.string()) == wp::kOk);
+  CHECK(p.engine().frames() == kLongFrames);
+}
+
+// #75/AK3: a wrong length in the header still loads correctly. Too long (twice, and far beyond
+// what the file can hold) reads up to the end of the data; too short reads what the header
+// claims, as before. Implausible lengths are not reserved.
+void longTitleWithWrongHeaderLength() {
+  const std::string wav = readBytes(writeIndexWav("long6min-wrong.wav", kLongFrames, kLongSr));
+  for (const unsigned long long claimed :
+       {2ULL * kLongFrames, 0xffffffffULL / 4, static_cast<unsigned long long>(kLongFrames) - 1}) {
+    const std::string bytes = withHeaderFrames(wav, claimed);
+    wp::Source out;
+    CHECK(wp::decodeMemory(bytes.data(), bytes.size(), kLongSr, out) == wp::kOk);
+    const long long expected = std::min<long long>(kLongFrames, static_cast<long long>(claimed));
+    checkIndexSource(out, expected);
+    // twice the length is plausible for the file size and reserves at most that; the claim of
+    // 4 GB of samples from 11.5 MB is not, the buffer only grows to what was decoded
+    if (claimed == 2ULL * kLongFrames)
+      CHECK(out.data.capacity() <= static_cast<size_t>(claimed + 8192) * 2);
+    else
+      CHECK(out.data.capacity() < static_cast<size_t>(4 * kLongFrames) * 2);
+    wp::Player p(kLongSr);
+    CHECK(p.load(writeBytes("long6min-claimed.wav", bytes).string()) == wp::kOk);
+    CHECK(p.engine().frames() == expected);
+  }
+}
+
 // Fremd dekodiertes PCM (AAC/M4A aus dem Browser) wird auf Stereo und die Rate des Kerns gewandelt
 // (#33/AK4).
 void convertPcmToPlayerFormat() {
@@ -785,6 +850,8 @@ int main() {
       {"devicePolicy", devicePolicy},
       {"deviceChangePausesAndKeepsPosition", deviceChangePausesAndKeepsPosition},
       {"decodeMemoryMatchesFile", decodeMemoryMatchesFile},
+      {"longTitleReservesHeaderLength", longTitleReservesHeaderLength},
+      {"longTitleWithWrongHeaderLength", longTitleWithWrongHeaderLength},
       {"unreadableFileIsReported", unreadableFileIsReported},
       {"emptyAudioIsUnsupported", emptyAudioIsUnsupported},
       {"convertPcmToPlayerFormat", convertPcmToPlayerFormat},
