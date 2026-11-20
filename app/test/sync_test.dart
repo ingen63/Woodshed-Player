@@ -79,6 +79,22 @@ int cloudGeneration(InMemoryProvider c) =>
 
 void tick([int ms = 1000]) => clock = clock.add(Duration(milliseconds: ms));
 
+/// Waits until [done] holds, polling in real time, instead of waiting a fixed time (#92). Fails only when the state
+/// is not reached within [hangGuard], so a loaded machine makes the test slower, never red.
+Future<void> eventually(
+  bool Function() done,
+  String what, {
+  Duration hangGuard = const Duration(seconds: 60),
+}) async {
+  final watch = Stopwatch()..start();
+  while (!done() && watch.elapsed < hangGuard) {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  if (!done()) {
+    fail('hang: «$what» not reached within ${hangGuard.inSeconds} s');
+  }
+}
+
 void main() {
   setUp(() {
     clock = DateTime.utc(2026, 11, 1);
@@ -727,7 +743,7 @@ void main() {
 
   group('#37 triggers: start, change (delayed, combined), foreground', () {
     test(
-      'start and resume sync; several changes are sent together once',
+      '#92/AK1 start and resume sync; several changes are sent together once',
       () async {
         final cloud = InMemoryProvider();
         final a = await device(cloud, 1);
@@ -745,8 +761,18 @@ void main() {
           writes,
           reason: 'delayed',
         );
-        await Future<void>.delayed(const Duration(milliseconds: 80));
-        expect(cloud.countOf('put ${CloudSync.stateName}'), writes + 1);
+        // #92/AK1: wait for the delayed sync to finish, not for a fixed time
+        await eventually(
+          () =>
+              cloud.countOf('put ${CloudSync.stateName}') > writes &&
+              a.sync.status == SyncStatus.idle,
+          'delayed sync after the last change',
+        );
+        expect(
+          cloud.countOf('put ${CloudSync.stateName}'),
+          writes + 1,
+          reason: 'five changes are sent together once',
+        );
         expect(cloudState(cloud).tracks[t.id]!.values['title'], 'T4');
         // another device changed something; coming back to the foreground fetches it
         cloud.putDirect(
@@ -762,7 +788,12 @@ void main() {
           ),
         );
         a.sync.resumed();
-        await Future<void>.delayed(const Duration(milliseconds: 20));
+        await eventually(
+          () =>
+              a.library.sortOrder == TrackSortOrder.alphabetical &&
+              a.sync.status == SyncStatus.idle,
+          'resumed() fetches the other device\'s state',
+        );
         expect(a.library.sortOrder, TrackSortOrder.alphabetical);
       },
     );

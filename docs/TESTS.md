@@ -1196,3 +1196,11 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     blieben 2,12e-02 (0,1×), 1,83e-05 (0,5×) und 2,17e-03 (2,0×), dieselbe Grösse wie im Versuch mit `sincosf`. Die
     gestreckten Tempo-Fälle vergleicht der Vertrag deshalb mit 5e-2 statt 1e-6 (`kStretchTolerance`). Test: Vertragsfälle «#9/AK4 #94/AK2 #94/AK3 tempo …» in
     `reference_tests.cpp`.
+28. 21.11.2026, #92 (aus #61): `sync_test.dart`, «#37 triggers … several changes are sent together once», wartete
+    fest 80 ms echter Zeit auf den Abgleich, der 20 ms nach der letzten Änderung startet, und danach fest 20 ms auf
+    das Ergebnis von `resumed()`. Unter Last (paralleler Mutationslauf) kam der Abgleich zu spät: «Expected: <2>
+    Actual: <1>», danach «A CloudSync was used after being disposed», weil der Abgleich nach dem Testende weiterlief.
+    Der Test wartet jetzt mit `eventually` (in `sync_test.dart`, Hänger nach 60 s) auf Zustände: den Schreibvorgang
+    von `state.json` und den Status `idle`, danach auf die fremde Sortierung. Er prüft weiterhin, dass fünf Änderungen
+    genau einmal gesendet werden. Die übrigen Tests der Datei warten nicht auf feste Zeiten. Test: «#92/AK1 start and
+    resume sync; several changes are sent together once» in `sync_test.dart`, 20 Läufe neben voller CPU-Last grün.
