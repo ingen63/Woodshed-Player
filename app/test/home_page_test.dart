@@ -247,7 +247,8 @@ void main() {
       final app = await pumpApp(tester, titles: ['b', 'a', 'c']);
       await tester.tap(find.byKey(const Key('sortMenu')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Alphabetisch'));
+      // #62: tap the menu entry, not its text; CheckedPopupMenuItem puts its content in an IgnorePointer.
+      await tester.tap(find.byKey(const Key('sort-alphabetical')));
       await tester.pumpAndSettle();
       expect(app.library.sortOrder, TrackSortOrder.alphabetical);
       final ys = [

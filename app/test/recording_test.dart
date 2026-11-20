@@ -91,7 +91,11 @@ void main() {
       rec
         ..seconds = 75
         ..level = 0.6;
-      await tester.pump(const Duration(milliseconds: 100));
+      await pumpUntil(
+        tester,
+        () => find.text('01:15').evaluate().isNotEmpty,
+        'duration shown',
+      );
       expect(find.text('01:15'), findsOneWidget);
       final bar = tester.widget<LinearProgressIndicator>(
         find.byKey(const Key('recordingLevel')),
@@ -112,8 +116,13 @@ void main() {
       rec
         ..seconds = 4
         ..onlySilence = true;
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.byKey(const Key('recordingProblem')));
+      final problem = find.byKey(const Key('recordingProblem'));
+      await pumpUntil(
+        tester,
+        () => problem.evaluate().isNotEmpty,
+        'silence reported',
+      );
+      await tester.tap(problem);
       await tester.pumpAndSettle();
       expect(find.text(de.recordingSilent), findsOneWidget);
       expect(
@@ -139,7 +148,16 @@ void main() {
       final (_, rec) = await pump(tester);
       const error = WpRecordingException(WpRecCode.tap, -1, 'log');
       rec.failWith = error;
-      await tapRecord(tester);
+      // #62: the refused start is logged; captured here instead of printed into the test output.
+      final logged = <String?>[];
+      final print = debugPrint;
+      debugPrint = (m, {wrapWidth}) => logged.add(m);
+      try {
+        await tapRecord(tester);
+      } finally {
+        debugPrint = print;
+      }
+      expect(logged, [error.toString()]);
       expect(rec.recording, isFalse);
       expect(find.byKey(const Key('recordingDuration')), findsNothing);
       final problem = tester.widget<IconButton>(
@@ -158,12 +176,12 @@ void main() {
       final (app, rec) = await pump(tester);
       await tapRecord(tester);
       expect(rec.path, endsWith('Aufnahme 2026-11-19 14.05.09.wav'));
-      await tester.runAsync(() async {
-        await tapRecord(tester);
-        for (var i = 0; i < 200 && app.library.tracks.isEmpty; i++) {
-          await Future<void>.delayed(const Duration(milliseconds: 5));
-        }
-      });
+      await tester.runAsync(() => tapRecord(tester));
+      await waitUntil(
+        tester,
+        () => app.library.tracks.isNotEmpty,
+        'recording in the library',
+      );
       final t = app.library.tracks.single;
       expect(t.title, 'Aufnahme 19.11.2026 14:05:09');
       // Renamable like any title (#24).

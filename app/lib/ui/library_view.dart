@@ -426,6 +426,7 @@ class _Header extends StatelessWidget {
             itemBuilder: (_) => [
               for (final o in TrackSortOrder.values)
                 CheckedPopupMenuItem(
+                  key: Key('sort-${o.name}'),
                   value: o,
                   checked: lib.sortOrder == o,
                   child: Text(sortOrderLabel(l, o)),

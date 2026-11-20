@@ -154,6 +154,7 @@ zugeordnet.
 | Tastenkürzel im `integration_test` (Leertaste, S, E, ←/→, M, T, ↑/↓) | vorhanden: `shortcuts_test.dart` (#13/AK1) | – |
 | Pseudo-Sprache: nichts abgeschnitten, nichts läuft über | vorhanden: `pseudo_locale_test.dart`, `pseudo_l10n_test.dart` (#13/AK7) | – |
 | Regeln der Oberflächentests: auf Zustände warten, feste Sprache | vorhanden: `ui_test_rules_test.dart` (#13/AK2, AK7) | – |
+| Widget-Tests warten auf Zustände, ein danebengehendes Tippen scheitert | vorhanden: `pumpUntil`/`waitUntil` in `fakes.dart`, `test/flutter_test_config.dart` (#62) | – |
 
 ### Plattformen
 
@@ -912,6 +913,43 @@ Kurzfassung in Markdown auf der Standardausgabe). Die Tests des Werkzeugs (`app/
 `#12/AKn`, in `make test-tools`) prüfen die Regeln, die Zuordnung, die Prüfkommentare (erfundene Issues in
 `app/tool/report/testdata/issues.json`), den Verlauf und einen Lauf in einem gestellten Repository mit und ohne Daten.
 
+## Wackelnde Tests (#62)
+
+**Ursache der vermeintlich wackelnden Widget-Tests.** «#17/AK1 Liste Sortierung umstellen» und «#4/AK3: a refused
+start …» sind nie gescheitert. Beide gaben bei jedem Lauf etwas aus: der erste die Warnung von `tap()` «would not hit
+test on the specified widget», der zweite die Fehlermeldung aus `debugPrint`. Der Reporter `failures-only` schreibt
+dann die Zeile `+402 -1: …/recording_test.dart: #4/AK3 …` mit dem Zähler der bisherigen Fehlschläge, aber ohne
+`[E]`. Gescheitert waren in jenen Läufen andere Tests, die gerade in Arbeit waren (#45, #46, `file_store_test.dart`
+bei #10). Nachgestellt mit sechs vollen Läufen unter Last (12 CPU-Brenner auf 10 Kernen): alle grün, beide Namen
+jedes Mal in der Ausgabe.
+
+Die Warnung kommt daher, dass `CheckedPopupMenuItem` seinen Inhalt in ein `IgnorePointer` legt. Das Tippen auf den
+Text «Alphabetisch» trifft darum den Menüeintrag, nicht den Text.
+
+**Behoben:**
+
+- Die Einträge des Sortiermenüs haben Schlüssel (`sort-<name>`, wie `appearance-<name>`); der Test tippt auf den
+  Eintrag selbst.
+- `test/flutter_test_config.dart` setzt `WidgetController.hitTestWarningShouldBeFatal`: Ein Tippen, das sein Widget
+  nicht trifft, lässt den Test scheitern, statt eine Warnung auszugeben. Das gilt für alle Tests unter `app/test/`.
+- `recording_test.dart` fängt die Meldung des abgelehnten Starts ab und prüft sie, statt sie auszugeben.
+- Widget-Tests warten auf Zustände wie die Oberflächentests (#13/AK2): `pumpUntil(tester, done, what)` in
+  `app/test/fakes.dart` pumpt Bild für Bild auf der Testuhr, bis der Zustand erreicht ist (Grenze: 500 Bilder).
+  `waitUntil(tester, done, what)` wartet in Echtzeit auf Arbeit ausserhalb der Testuhr (Dateisystem) und scheitert
+  nur nach 60 s als Hänger. Vorher wartete `recording_test.dart` (#4/AK4) höchstens 1 s in Echtzeit auf die
+  Aufnahme in der Bibliothek; das hätte unter Last wirklich scheitern können.
+
+**Kein globales `retry` in `dart_test.yaml`.** Entschieden am 20.11.2026: Ein wackelnder Test ist ein Fehler, dessen
+Ursache behoben wird. Eine Wiederholung würde ihn verstecken und auch echte Fehler mit zeitlicher Ursache (Rennen,
+Echtzeit-Grenzen) durchlassen. Die Übersichtsseite (#12) erkennt wackelnde Tests deshalb nur, wo ein einzelner Test
+`retry:` ausdrücklich setzt; heute tut das keiner.
+
+**Ausgabe lesen:** Im Reporter `failures-only` ist nur eine Zeile mit `[E]` ein Fehlschlag. Eine Zeile ohne `[E]`
+heisst nur, dass der Test etwas ausgegeben hat. Absichtlich geben nur die Zufallstests (#10) ihren Startwert aus.
+
+**Nachweis (AK2):** 20 volle Läufe von `flutter test` hintereinander am 20.11.2026, davon 8 unter Last (12 CPU-Brenner
+auf 10 Kernen), alle grün; MacBook Pro M1 Pro, macOS 26.7.
+
 ## Hook nach dem Commit
 
 `.claude/hooks/after-commit.sh` läuft nach jedem `git commit` aus Claude Code. Er prüft das Format der Nachricht
@@ -938,7 +976,10 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
 3. 19.11.2026, #7: Im vollen, parallelen Lauf von `flutter test` schlugen `home_page_test.dart` («#17/AK1 Liste
    Sortierung umstellen», Tippen ging daneben) und `recording_test.dart` (#4/AK3) in zwei von sechs Läufen
    gemeinsam fehl; einzeln immer grün. Vermutlich abhängig von der Rechnerlast (parallele Testprozesse), noch nicht
-   behoben und noch keinem Issue zugeordnet.
+   behoben und noch keinem Issue zugeordnet. Geklärt in #62: kein Fehlschlag, nur Ausgabe, die im Reporter
+   `failures-only` wie ein Fehler aussah (Abschnitt «Wackelnde Tests (#62)»). Regressionstest: «#17/AK1 Liste
+   Sortierung umstellen» mit `hitTestWarningShouldBeFatal` (`test/flutter_test_config.dart`) und «#4/AK3: a refused
+   start …», der die Meldung abfängt und prüft.
 4. 19.11.2026, #9: Das Metronom übersprang einen Schlag, wenn die Unterteilung genau an einer Schlaggrenze oder
    im Rest eines Schlags nach dessen letztem Klick wechselte (`Metronome::applyCommands`): Der Zähler war schon auf
    den nächsten Schlag weitergerückt und wurde beim Neuplanen ein zweites Mal weitergezählt. Folge: Die Betonung des
@@ -989,7 +1030,9 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     als ungültig (`Hlc.parse`), Meldungen `cloudStateUnreadable` und `cloudStateTooNew`. Regressionsfall und Test
     «one message per damaged version».
 16. 19.11.2026, #10: Im vollen Lauf von `flutter test` schlug `home_page_test.dart` («#17/AK1 Liste Sortierung
-    umstellen») erneut einmal fehl, einzeln grün; wie Fall 3, noch nicht behoben.
+    umstellen») erneut einmal fehl, einzeln grün; wie Fall 3, noch nicht behoben. Geklärt in #62 wie Fall 3:
+    Gescheitert war `file_store_test.dart`, der Test gab nur die Warnung von `tap()` aus. Regressionstest wie bei
+    Fall 3.
 17. 20.11.2026, #13/AK4, Web-Test in Chrome: In Debug-Builds der Web-App (`flutter run -d chrome`, DDC) scheiterte
     jedes Laden eines Titels mit «Format nicht unterstützt». `postMessage` konnte die konstante leere Argumentliste
     (`const []` mit `toJS`) nicht klonen (`DataCloneError`); im Release-Build (dart2js) trat es nicht auf. Behoben in

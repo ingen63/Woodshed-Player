@@ -5,6 +5,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
+import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/app/file_platform.dart';
@@ -315,5 +316,42 @@ class MemoryFileStore extends FileStore {
   Future<bool?> requestPersistence() async {
     persistRequests++;
     return persisted = true;
+  }
+}
+
+/// Pumps frames until [done] holds (#62): widget tests wait for a state, never for a guessed time. Same
+/// form as `pumpUntil` of the UI tests (`integration_test/ui_helpers.dart`), but on the fake clock: fails
+/// after [maxFrames] frames of [step] instead of a real-time limit.
+Future<void> pumpUntil(
+  WidgetTester tester,
+  bool Function() done,
+  String what, {
+  Duration step = const Duration(milliseconds: 10),
+  int maxFrames = 500,
+}) async {
+  for (var i = 0; i < maxFrames && !done(); i++) {
+    await tester.pump(step);
+  }
+  if (!done()) {
+    fail('«$what» not reached after $maxFrames frames');
+  }
+}
+
+/// Waits in real time until [done] holds (#62), for work outside the fake clock (file system,
+/// isolates). [hangGuard] only catches a hang; under load the wait simply takes longer.
+Future<void> waitUntil(
+  WidgetTester tester,
+  bool Function() done,
+  String what, {
+  Duration hangGuard = const Duration(seconds: 60),
+}) async {
+  await tester.runAsync(() async {
+    final watch = Stopwatch()..start();
+    while (!done() && watch.elapsed < hangGuard) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+  });
+  if (!done()) {
+    fail('hang: «$what» not reached within ${hangGuard.inSeconds} s');
   }
 }
