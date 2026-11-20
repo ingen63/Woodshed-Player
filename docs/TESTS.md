@@ -174,6 +174,7 @@ zugeordnet.
 |---|---|---|
 | Formatierung `dart format` und `clang-format`, `make format-check` | vorhanden: `Makefile`, `core/.clang-format` (#7) | – |
 | Warnungen sind Fehler: strenge Dart-Analyse, `-Wall -Wextra -Werror`, `clang-tidy` | vorhanden: `app/analysis_options.yaml`, `core/CMakeLists.txt`, `core/.clang-tidy` (#7) | – |
+| GitHub-Workflows ohne Fund von `actionlint` (mit ShellCheck), in `make lint` und im Job `checks` | vorhanden: `make lint-workflows`, `test_quality_workflow_test.dart` mit Gegenprobe (#64) | – |
 | Hook nach dem Commit mit eigenen Tests | vorhanden: `app/tool/after_commit_hook_test.dart` (#7/AK7) | – |
 | Abdeckung je Teil mit Untergrenze, `coverage-diff`, `pre-push` mit eigenen Tests | vorhanden: `tools/coverage-min`, `tools/git-hooks/pre-push`, `app/tool/coverage_test.dart`, `app/tool/pre_push_hook_test.dart` (#8) | – |
 | C-API (`player.cpp`) über die geteilte Bibliothek: Nullzeiger, Laden, Seek, Tempo, Loop, Wellenform, Metronom, Aufnahme im Ruhezustand | vorhanden: `core/tests/capi_tests.cpp` (#8) | – |
@@ -209,7 +210,8 @@ make report         # Übersichtsseite Testqualität aus den vorhandenen Ergebni
 
 Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten für `test-wasm`, Homebrew `llvm` für
 `clang-format`, `clang-tidy` und libFuzzer (`brew install llvm`; das Makefile findet sie unter
-`$(brew --prefix llvm)/bin`; Apple-Clang hat kein libFuzzer).
+`$(brew --prefix llvm)/bin`; Apple-Clang hat kein libFuzzer). `actionlint` 1.7.12 (MIT) für die GitHub-Workflows
+(`brew install actionlint`, #64); ist ShellCheck installiert, prüft actionlint damit auch die `run:`-Skripte.
 `llvm-cov` und `llvm-profdata` für `make coverage` müssen zum Compiler passen; auf macOS nimmt das Makefile die aus
 Xcode (`xcrun`), sonst die aus dem `PATH` bzw. Homebrew.
 
@@ -228,6 +230,13 @@ Xcode (`xcrun`), sonst die aus dem `PATH` bzw. Homebrew.
 - **clang-tidy:** schlanke Auswahl in `core/.clang-tidy` (`bugprone-*`, `clang-analyzer-*`, `performance-*` und
   einzelne weitere), jeder Fund ist ein Fehler. Abgeschaltete Prüfungen stehen dort mit Begründung; einzelne
   Ausnahmen im Code nur als `NOLINT(<Prüfung>)` mit Begründung.
+- **GitHub-Workflows** (#64): `make lint` ruft `make lint-workflows`, also `actionlint` über alle Dateien in
+  `.github/workflows/` (Aufbau, Ausdrücke `${{ }}`, Bedingungen, Aktionen und mit ShellCheck die `run:`-Skripte).
+  Jeder Fund lässt `make lint` scheitern. Der Job `checks` in `test-quality.yml` führt dieselbe Prüfung aus.
+  Version: lokal Homebrew `actionlint` (Stand 1.7.12), im Workflow fest `ACTIONLINT_VERSION` 1.7.12 mit Prüfsumme
+  `ACTIONLINT_SHA256` des Linux-Archivs; beim Aktualisieren beide Werte und diese Zeile nachführen. Gegenprobe:
+  `test_quality_workflow_test.dart` lässt actionlint auf einen absichtlich fehlerhaften Workflow los und erwartet
+  einen Fund (übersprungen, wenn actionlint fehlt).
 
 ## Abdeckung (#8)
 
@@ -592,7 +601,7 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
 
 | Job | Läuft | Inhalt |
 |---|---|---|
-| `checks` | Linux, jeder Push mit Code-Änderung (`core/`, `app/`, `tools/`, `Makefile`, Workflow), von Hand | `make format-check`, `make lint`, `make coverage-run`, Prüfung gegen `tools/coverage-min`, `coverage-diff`, Zusammenfassung |
+| `checks` | Linux, jeder Push mit Code-Änderung (`core/`, `app/`, `tools/`, `Makefile`, Workflows), von Hand | `make format-check`, `make lint` (mit actionlint, #64), `make coverage-run`, Prüfung gegen `tools/coverage-min`, `coverage-diff`, Zusammenfassung |
 | `web` | Linux, jeder Push mit Web-Änderung (`app/web/`, `*_web.dart`, Kern, Web-Build), von Hand | WASM-Kern, `make test-web` in Chrome, `flutter build web` |
 | `sanitize` | Linux, Push mit Änderung am Kern, von Hand | ASan/UBSan (#57) |
 | `network-free` | Linux, jeder Push, von Hand | Netzwerkfreiheit (#58) |
@@ -612,10 +621,9 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
   zeigt die Seite für sie «keine Daten».
 - **Werkzeuge:** Flutter in derselben Version wie `pages.yml` (`FLUTTER_VERSION`, `dart format` hängt davon ab),
   `clang-format` und `clang-tidy` in Hauptversion 23 wie Homebrew `llvm` (über `pipx`), der Kern mit clang-18 und
-  passendem `llvm-cov-18`. Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
-- **Lokal geprüft** ist der Workflow nur als YAML (Aufbau, Bedingungen, Skripte mit `bash -n`, Pfadfilter mit
-  Beispielen) und über `test_quality_workflow_test.dart`; `actionlint` ist nicht installiert. Ob alle Jobs auf den
-  Runnern laufen, zeigen erst die Läufe nach dem Push.
+  passendem `llvm-cov-18`, `actionlint` in fester Version mit Prüfsumme (#64). Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
+- **Lokal geprüft** werden die Workflows mit `actionlint` und ShellCheck (`make lint`, #64) und über
+  `test_quality_workflow_test.dart`. Ob alle Jobs auf den Runnern laufen, zeigen erst die Läufe nach dem Push.
 
 **Verbrauch an Minuten** (#13/AK10, Schätzung vom 20.11.2026, nach den ersten Läufen nachführen). Annahmen: ungefähr
 20 Nächte im Monat mit neuem Commit, 60 Pushes mit Code-Änderung, davon 20 mit Web-Änderung, 2 Läufe von Hand mit
@@ -1062,3 +1070,9 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     (Kanaltrennung und Lautstärke im gedehnten Pfad, Seek genau aufs Loop-Ende, Loop ab 0 s und knapp unter 1 s,
     mehrere Loop-Durchgänge in einem Block, Wellenform je Block, Klangform und Stopp des Metronoms, Neubeginn der
     Steigerung nach Zeit, Ladezustand und Fortschritt). Fehlverhalten der App kam dabei nicht zutage.
+23. 20.11.2026, #64, actionlint (ShellCheck SC2086): `pages.yml`, Schritt «Build site», übergab die Schalter für die
+    Web-App als ungequotete Variable `$APP_ARGS` (Worttrennung beabsichtigt, aber fehleranfällig bei Leerzeichen im
+    Pfad). Jetzt `${APP_DIR:+--app "$APP_DIR"}`. Geprüft von `make lint`.
+24. 20.11.2026, #64, actionlint (ShellCheck SC2129, Stil): `test-quality.yml`, Job `changes`, schrieb drei Zeilen
+    einzeln nach `$GITHUB_OUTPUT`; jetzt in einem Block. Dabei den Pfadfilter `code` auf alle Workflows erweitert,
+    damit eine Änderung an `pages.yml` den Job `checks` (mit actionlint) auslöst. Geprüft von `make lint`.

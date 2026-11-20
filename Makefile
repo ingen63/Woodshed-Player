@@ -1,8 +1,8 @@
 # Test and hygiene targets for the Flutter app (app/) and the C++ audio core (core/), #7.
 # Strategy and test matrix: docs/TESTS.md. Developer tools: Flutter, CMake, Homebrew llvm
-# (clang-format, clang-tidy). core/third_party/ is never formatted, linted or read.
+# (clang-format, clang-tidy), actionlint. core/third_party/ is never formatted, linted or read.
 .PHONY: help test test-core test-wasm test-app test-hook test-tools format format-check lint lint-dart \
-        lint-core coverage coverage-run coverage-core coverage-app coverage-diff mutants \
+        lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
         mutants-diff fuzz report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
         test-ui test-web smoke-app pseudo-l10n bench
 
@@ -14,6 +14,7 @@ LLVM_BIN     ?= $(shell brew --prefix llvm 2>/dev/null)/bin
 CLANG_FORMAT ?= $(shell command -v clang-format 2>/dev/null || echo $(LLVM_BIN)/clang-format)
 CLANG_TIDY   ?= $(shell command -v clang-tidy 2>/dev/null || echo $(LLVM_BIN)/clang-tidy)
 RUN_TIDY     ?= $(shell command -v run-clang-tidy 2>/dev/null || echo $(LLVM_BIN)/run-clang-tidy)
+ACTIONLINT   ?= actionlint
 # Coverage (#8): llvm-cov and llvm-profdata must match the compiler, on macOS the Xcode ones.
 LLVM_COV      ?= $(shell xcrun --find llvm-cov 2>/dev/null || command -v llvm-cov 2>/dev/null || echo $(LLVM_BIN)/llvm-cov)
 LLVM_PROFDATA ?= $(shell xcrun --find llvm-profdata 2>/dev/null || command -v llvm-profdata 2>/dev/null || echo $(LLVM_BIN)/llvm-profdata)
@@ -41,7 +42,7 @@ help:
 	@echo "make property       Dart random tests, PROPERTY_CASES cases, PROPERTY_SEED (printed on failure)"
 	@echo "make format         dart format and clang-format"
 	@echo "make format-check   fails if a file is not formatted"
-	@echo "make lint           flutter analyze (strict), C++ warnings as errors, clang-tidy"
+	@echo "make lint           flutter analyze (strict), C++ warnings as errors, clang-tidy, actionlint"
 	@echo "make coverage       all tests with line coverage, checked per part against tools/coverage-min"
 	@echo "make coverage-diff  coverage of the lines changed since BASE (default origin/main), a hint"
 	@echo "make network-free   no network code outside the provider modules, blocked packages, core, CSP"
@@ -103,7 +104,7 @@ format-check:
 	$(CPP_FILES) | xargs "$(CLANG_FORMAT)" --dry-run --Werror
 
 # ---- Warnings are errors (#7/AK3) ----
-lint: lint-dart lint-core
+lint: lint-dart lint-core lint-workflows
 
 lint-dart:
 	cd app && flutter analyze --no-pub
@@ -117,6 +118,11 @@ lint-core:
 	"$(RUN_TIDY)" -p core/build -quiet -config-file core/.clang-tidy -clang-tidy-binary "$(CLANG_TIDY)" \
 	  'core/(src|tests|tools)/.*\.(cpp|mm)$$' 2>&1 | { grep -E 'error:|warning:' || true; }; \
 	  exit $${PIPESTATUS[0]}
+
+# Every workflow in .github/workflows/ (#64); actionlint runs shellcheck on the run: scripts when it is
+# installed. Any finding fails.
+lint-workflows:
+	"$(ACTIONLINT)" $(wildcard .github/workflows/*.yml .github/workflows/*.yaml)
 
 # ---- Coverage (#8), strategy in docs/TESTS.md ----
 coverage: coverage-run

@@ -2,7 +2,7 @@
 # On every push to main (Linux runners only):
 # - checks: format, lint, tests and coverage (minimum from tools/coverage-min) of the core and the Dart
 #   code, with coverage, coverage-diff and the overview page in the run summary; when the push changes
-#   code (core/, app/, tools/, Makefile, this workflow); the overview page of #12 as an artifact.
+#   code (core/, app/, tools/, Makefile, the workflows); actionlint on every workflow (#64); the overview page of #12 as an artifact.
 # - web: WASM core, web tests in Chrome (OPFS, WASM binding) and `flutter build web`; when the push
 #   changes web code (web files, *_web.dart, the core, the web build).
 # - sanitize: AddressSanitizer and UndefinedBehaviorSanitizer (make sanitize, #57); when core/ changes.
@@ -45,6 +45,8 @@ concurrency:
 env:
   FLUTTER_VERSION: 3.50.0  # same as pages.yml and the developers' machines (dart format depends on it)
   LLVM_TOOLS_VERSION: '23.*'  # clang-format and clang-tidy as on the developers' machines (Homebrew llvm)
+  ACTIONLINT_VERSION: 1.7.12  # as on the developers' machines (Homebrew actionlint), docs/TESTS.md
+  ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  # linux_amd64 archive
 
 jobs:
   changes:
@@ -71,9 +73,11 @@ jobs:
           fi
           changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
           has() { if printf '%s\n' "$changed" | grep -qE "$1"; then echo true; else echo false; fi; }
-          echo "core=$(has '^(core/|Makefile$|\.github/workflows/test-quality\.yml$)')" >> "$GITHUB_OUTPUT"
-          echo "code=$(has '^(core/|app/|tools/|Makefile$|\.github/workflows/test-quality\.yml$)')" >> "$GITHUB_OUTPUT"
-          echo "web=$(has '^(app/web/|app/lib/.*_web\.dart$|app/test/web/|app/tool/build_web_core\.sh$|app/pubspec\.(yaml|lock)$|core/(src|include|web)/|tools/chrome_autoplay\.sh$|Makefile$|\.github/workflows/test-quality\.yml$)')" >> "$GITHUB_OUTPUT"
+          {
+            echo "core=$(has '^(core/|Makefile$|\.github/workflows/test-quality\.yml$)')"
+            echo "code=$(has '^(core/|app/|tools/|Makefile$|\.github/workflows/)')"
+            echo "web=$(has '^(app/web/|app/lib/.*_web\.dart$|app/test/web/|app/tool/build_web_core\.sh$|app/pubspec\.(yaml|lock)$|core/(src|include|web)/|tools/chrome_autoplay\.sh$|Makefile$|\.github/workflows/test-quality\.yml$)')"
+          } >> "$GITHUB_OUTPUT"
 
   checks:
     name: Format, lint, tests, coverage (Linux, #13)
@@ -114,13 +118,25 @@ jobs:
           } >> "$GITHUB_ENV"
           "$bin/clang-format" --version
           "$bin/clang-tidy" --version | head -1
+      - name: actionlint (#64), fixed version with checksum
+        run: |
+          # actionlint also runs ShellCheck on the run: scripts; the Ubuntu runners have it preinstalled
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/$archive"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c --quiet
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/actionlint" actionlint
+          echo "ACTIONLINT=$RUNNER_TEMP/actionlint/actionlint" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/actionlint/actionlint" --version | head -1
+          shellcheck --version | sed -n 2p
       - name: Packages
         run: |
           (cd app && flutter pub get >/dev/null)
           (cd app/packages/wp_core && flutter pub get >/dev/null)
       - name: make format-check (#7/AK2)
         run: make format-check
-      - name: make lint (#7/AK3)
+      - name: make lint (#7/AK3, actionlint #64)
         run: make lint
       - name: make coverage (tests of core and app with coverage, #8)
         id: coverage

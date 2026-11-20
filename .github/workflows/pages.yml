@@ -114,8 +114,8 @@ jobs:
           CONTROLLER_NAME: ${{ secrets.CONTROLLER_NAME }}
           CONTROLLER_ADDRESS: ${{ secrets.CONTROLLER_ADDRESS }}
           CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
-          APP_ARGS: ${{ steps.tag.outputs.tag != '' && '--app app-src/app/build/web' || '' }}
-        run: python3 site/build_site.py _site $APP_ARGS
+          APP_DIR: ${{ steps.tag.outputs.tag != '' && 'app-src/app/build/web' || '' }}
+        run: python3 site/build_site.py _site ${APP_DIR:+--app "$APP_DIR"}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

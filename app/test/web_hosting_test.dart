@@ -43,7 +43,9 @@ void main() {
       expect(core < node && node < build && flutterTest < build, isTrue);
       expect(workflow, contains('--base-href "\$BASE_HREF"'));
       expect(workflow, contains('/app/'));
-      expect(workflow, contains('--app app-src/app/build/web'));
+      // the site gets the built app (--app) only when a tag exists (#64: quoted, without word splitting)
+      expect(workflow, contains("&& 'app-src/app/build/web' || ''"));
+      expect(workflow, contains(r'${APP_DIR:+--app "$APP_DIR"}'));
     });
   });
 

@@ -1,4 +1,4 @@
-// #57, #10, #58, #13, #59, #11: sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
+// #57, #10, #58, #13, #59, #11, #64: actionlint, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -238,7 +238,7 @@ void main() {
       expect(
         changes,
         contains(
-          r"code=$(has '^(core/|app/|tools/|Makefile$|\.github/workflows/test-quality\.yml$)')",
+          r'''echo "code=$(has '^(core/|app/|tools/|Makefile$|\.github/workflows/)')"''',
         ),
       );
       expect(changes, contains(r'app/lib/.*_web\.dart$'));
@@ -376,6 +376,79 @@ void main() {
       expect(checks, contains('cat report-summary.md'));
       expect(checks, contains('issues: read'));
       expect(checks, contains(r'GH_TOKEN: ${{ github.token }}'));
+    });
+  });
+
+  group('#64 actionlint in make lint', () {
+    test('#64/AK1 fixed version with checksum in the workflow, documented', () {
+      final version = RegExp(r'ACTIONLINT_VERSION: (\d+\.\d+\.\d+)')
+          .firstMatch(workflow);
+      expect(version, isNotNull);
+      expect(workflow, matches(RegExp(r'ACTIONLINT_SHA256: [0-9a-f]{64}')));
+      final tests = read('../docs/TESTS.md');
+      expect(tests, contains('`actionlint` ${version!.group(1)}'));
+      expect(tests, contains('brew install actionlint'));
+    });
+
+    test('#64/AK2 make lint checks every file in .github/workflows/', () {
+      expect(
+        makefile,
+        contains('\nlint: lint-dart lint-core lint-workflows\n'),
+      );
+      expect(
+        makefile,
+        contains(
+          '\nlint-workflows:\n\t"\$(ACTIONLINT)" '
+          r'$(wildcard .github/workflows/*.yml .github/workflows/*.yaml)',
+        ),
+      );
+    });
+
+    test(
+      '#64/AK3 the Linux job checks installs actionlint and runs make lint',
+      () {
+        final checks = job(workflow, 'checks');
+        expect(checks, contains('runs-on: ubuntu-latest'));
+        expect(checks, contains(r'sha256sum -c'));
+        expect(
+          checks,
+          contains(r'echo "ACTIONLINT=$RUNNER_TEMP/actionlint/actionlint"'),
+        );
+        // installed before make lint runs
+        expect(
+          checks.indexOf('ACTIONLINT='),
+          lessThan(checks.indexOf('run: make lint\n')),
+        );
+      },
+    );
+
+    test('#64/AK4 a deliberate error in a workflow is reported', () {
+      final actionlint = Platform.environment['ACTIONLINT'] ?? 'actionlint';
+      final ProcessResult version;
+      try {
+        version = Process.runSync(actionlint, ['--version']);
+      } on ProcessException {
+        markTestSkipped('actionlint not installed');
+        return;
+      }
+      expect(version.exitCode, 0);
+      final dir = Directory.systemTemp.createTempSync('wp_actionlint_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final good = File('${dir.path}/good.yml')
+        ..writeAsStringSync(
+          'on: push\njobs:\n  x:\n    runs-on: ubuntu-latest\n'
+          '    steps:\n      - run: echo "\${{ github.sha }}"\n',
+        );
+      final bad = File('${dir.path}/bad.yml')
+        ..writeAsStringSync(
+          'on: push\njobs:\n  x:\n    runs-on: ubuntu-latest\n'
+          '    steps:\n      - run: echo "\${{ github.no_such_property }}"\n',
+        );
+      final ok = Process.runSync(actionlint, [good.path]);
+      expect(ok.exitCode, 0, reason: '${ok.stdout}');
+      final found = Process.runSync(actionlint, [bad.path]);
+      expect(found.exitCode, isNot(0));
+      expect('${found.stdout}', contains('no_such_property'));
     });
   });
 }
