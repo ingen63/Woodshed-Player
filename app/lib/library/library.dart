@@ -379,6 +379,7 @@ class Library extends ChangeNotifier {
         for (final f in _folders) f.id: f.toShared(),
       }),
       settings: _state.settings.update(_chosenSettings(), stamp),
+      purged: _state.purged,
     );
   }
 

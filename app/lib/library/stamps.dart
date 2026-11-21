@@ -1,6 +1,8 @@
 // Data model for merging changes from several devices (#36, plan W4): every shared field carries a hybrid
 // logical clock stamp (time, counter, device ID); per field the higher stamp wins. Deleted tracks and folders
-// stay as tombstones for 90 days. Pure Dart without I/O, so the sync engine (#37) can merge with it.
+// stay as tombstones for 90 days; after that the newest removed deletion is kept as the purge horizon, so a
+// device offline for longer cannot bring them back (#98). Pure Dart without I/O, so the sync engine (#37) can
+// merge with it.
 import 'dart:convert';
 
 /// Hybrid logical clock stamp: wall time in milliseconds, a counter for events within the same millisecond
@@ -242,6 +244,7 @@ class SharedState {
     this.tracks = const {},
     this.folders = const {},
     this.settings = const StampedRecord({}, {}),
+    this.purged,
   });
 
   static const empty = SharedState();
@@ -256,6 +259,13 @@ class SharedState {
   final Map<String, StampedRecord> folders;
   final StampedRecord settings;
 
+  /// Purge horizon (#98): the newest deletion whose tombstone [purge] removed; null if none was removed
+  /// yet. A record deleted and purged here was last changed before this stamp. So a record the other side
+  /// of a [merge] does not know may be one deleted here: it is deleted at this stamp, which kills it if it
+  /// was last changed before (a device offline for longer than the tombstones). Records changed later (a
+  /// new import) stay alive.
+  final Hlc? purged;
+
   Hlc? get latest => Hlc.maxOf([
     for (final r in [...tracks.values, ...folders.values, settings]) ...[
       r.latest,
@@ -267,14 +277,24 @@ class SharedState {
     Map<String, StampedRecord>? tracks,
     Map<String, StampedRecord>? folders,
     StampedRecord? settings,
+    Hlc? purged,
   }) => SharedState(
     tracks: tracks ?? this.tracks,
     folders: folders ?? this.folders,
     settings: settings ?? this.settings,
+    purged: purged ?? this.purged,
   );
 
-  /// Merges record by record; records only one side knows are taken over as they are.
+  /// Merges record by record. A record only one side knows is merged with a tombstone at the other side's
+  /// purge horizon (#98): a record last changed before the horizon may have been deleted there and is dead
+  /// afterwards, a later one stays alive. The result keeps the higher horizon. Being a merge of records
+  /// throughout, it is commutative, associative and idempotent.
   SharedState merge(SharedState o) {
+    StampedRecord against(StampedRecord r, Hlc? horizon) {
+      final d = Hlc.maxOf([r.deleted, horizon]);
+      return d == r.deleted ? r : StampedRecord(r.values, r.stamps, d);
+    }
+
     Map<String, StampedRecord> both(
       Map<String, StampedRecord> a,
       Map<String, StampedRecord> b,
@@ -282,8 +302,8 @@ class SharedState {
       for (final k in {...a.keys, ...b.keys})
         k: switch ((a[k], b[k])) {
           (final x?, final y?) => x.merge(y),
-          (final x?, null) => x,
-          (null, final y?) => y,
+          (final x?, null) => against(x, o.purged),
+          (null, final y?) => against(y, purged),
           _ => throw StateError('unreachable'),
         },
     };
@@ -291,14 +311,16 @@ class SharedState {
       tracks: both(tracks, o.tracks),
       folders: both(folders, o.folders),
       settings: settings.merge(o.settings),
+      purged: Hlc.maxOf([purged, o.purged]),
     );
   }
 
-  /// Removes tombstones whose deletion is older than [tombstoneLifetime].
+  /// Removes tombstones whose deletion is older than [tombstoneLifetime] and moves the purge horizon up to
+  /// the newest deletion removed (#98).
   SharedState purge(DateTime now) {
     final limit = now.millisecondsSinceEpoch - tombstoneLifetime.inMilliseconds;
     bool keep(StampedRecord r) => r.alive || r.deleted!.millis >= limit;
-    return copyWith(
+    return SharedState(
       tracks: {
         for (final e in tracks.entries)
           if (keep(e.value)) e.key: e.value,
@@ -307,11 +329,18 @@ class SharedState {
         for (final e in folders.entries)
           if (keep(e.value)) e.key: e.value,
       },
+      settings: settings,
+      purged: Hlc.maxOf([
+        purged,
+        for (final r in [...tracks.values, ...folders.values])
+          if (!keep(r)) r.deleted,
+      ]),
     );
   }
 
   Map<String, Object?> toJson() => {
     'formatVersion': formatVersion,
+    if (purged != null) 'purged': '$purged',
     'settings': settings.toJson(),
     'folders': {for (final e in folders.entries) e.key: e.value.toJson()},
     'tracks': {for (final e in tracks.entries) e.key: e.value.toJson()},
@@ -331,6 +360,7 @@ class SharedState {
       settings: j['settings'] is Map
           ? StampedRecord.fromJson((j['settings'] as Map).cast())
           : const StampedRecord({}, {}),
+      purged: j['purged'] is String ? Hlc.parse(j['purged'] as String) : null,
     );
   }
 }

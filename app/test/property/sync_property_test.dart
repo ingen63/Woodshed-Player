@@ -3,6 +3,9 @@
 // - AK6: any sequence of imports, edits, deletions, folder moves and syncs (some offline) converges: after
 //   syncing every device all have the same state, whatever the order; merging the states in any order
 //   gives that state; a second sync changes nothing; no track that was never deleted is lost.
+// - #98/AK5: the clock sometimes jumps by more than the 90 days of a tombstone, so devices stay offline that
+//   long; no deleted track or folder comes back, and only tracks last changed before the purge horizon may be
+//   lost (decision in #98).
 // - AK7: a damaged `state.json` in the cloud (foreign version number, missing stamps, changed types,
 //   extreme values, truncated) never crashes the sync and never loses local data; the user gets an
 //   understandable message (in every language) when it cannot be used.
@@ -16,6 +19,7 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/library/library.dart';
+import 'package:woodshed_player/library/stamps.dart' show sameJson;
 import 'package:woodshed_player/sync/in_memory_provider.dart';
 import 'package:woodshed_player/sync/sync_engine.dart';
 import 'package:woodshed_player/sync/sync_service.dart';
@@ -96,6 +100,10 @@ void main() {
       }
       final imported = <String>{};
       final deleted = <String>{};
+      // #98/AK5: stamp of every deletion of a track or folder
+      final deletions = <(String, Hlc)>[];
+      // #98/AK5: newest change of each track seen on any device
+      final lastChange = <String, Hlc>{};
       final log = <String>[];
       for (var step = 0, n = 10 + r.nextInt(30); step < n; step++) {
         final d = pick(r, devices);
@@ -103,6 +111,11 @@ void main() {
         final ids = lib.tracks.map((t) => t.id).toList();
         final folders = [null, ...lib.folders.map((f) => f.id)];
         clock = clock.add(Duration(milliseconds: r.nextInt(3) * 700));
+        if (r.nextInt(8) == 0) {
+          // #98/AK5: devices not syncing now stay offline beyond the tombstones
+          clock = clock.add(Duration(days: 85 + r.nextInt(20)));
+          log.add('+days');
+        }
         switch (r.nextInt(9)) {
           case 0 || 1:
             final names = [
@@ -120,6 +133,7 @@ void main() {
               final id = pick(r, ids);
               lib.delete({id});
               deleted.add(id);
+              deletions.add(('t$id', lib.state.tracks[id]!.deleted!));
               log.add('${d.name} delete');
             }
           case 3:
@@ -131,7 +145,9 @@ void main() {
             if (r.nextBool() || folders.length == 1) {
               lib.createFolder(randomText(r));
             } else {
-              lib.deleteFolder(pick(r, folders.whereType<String>().toList()));
+              final f = pick(r, folders.whereType<String>().toList());
+              lib.deleteFolder(f);
+              deletions.add(('f$f', lib.state.folders[f]!.deleted!));
             }
             log.add('${d.name} folder');
           case 5:
@@ -150,6 +166,10 @@ void main() {
             cloud.offline = false;
             log.add('${d.name} sync');
         }
+        for (final e in devices.expand((d) => d.library.state.tracks.entries)) {
+          final l = Hlc.maxOf([lastChange[e.key], e.value.latest]);
+          if (l != null) lastChange[e.key] = l;
+        }
       }
       final reason = log.join(', ');
 
@@ -164,11 +184,19 @@ void main() {
         reason: 'merge depends on the order: $reason',
       );
 
-      // Converge: every device syncs, twice, in a random order.
-      for (var round = 0; round < 2; round++) {
+      // Converge: every device syncs, in a random order, until a round changes nothing (at least twice).
+      // #98/AK5: a purged tombstone may have held field values that a device offline since then brings back
+      // once the track was revived by a newer change; that takes another round.
+      for (var round = 0, changed = true; changed; round++) {
+        expect(round, lessThan(5), reason: 'no end state: $reason');
+        final before = [for (final d in devices) stateJson(d.library)];
         for (final d in [...devices]..shuffle(r)) {
           await d.sync.sync();
         }
+        changed =
+            round == 0 ||
+            [for (final d in devices) stateJson(d.library)].indexed
+                .any((e) => !sameJson(e.$2, before[e.$1]));
       }
       // compared as maps: the order of keys carries no meaning
       final first = stateJson(devices.first.library);
@@ -193,8 +221,25 @@ void main() {
         reason: 'a second sync wrote: $reason',
       );
 
-      // No track lost that was never deleted, with its audio on every device and in the cloud.
+      // #98/AK5: no deleted track or folder comes back unless changed after its deletion (a new import).
+      final end = devices.first.library.state;
+      for (final (key, stamp) in deletions) {
+        final id = key.substring(1);
+        final rec = key.startsWith('t') ? end.tracks[id] : end.folders[id];
+        if (rec != null && rec.alive) {
+          expect(
+            rec.latest! > stamp,
+            isTrue,
+            reason: '$key came back: $reason',
+          );
+        }
+      }
+
+      // No track lost that was never deleted, with its audio on every device and in the cloud; #98/AK5:
+      // except one last changed before the purge horizon.
       for (final id in imported.difference(deleted)) {
+        final horizon = end.purged;
+        if (horizon != null && lastChange[id]! < horizon) continue;
         for (final d in devices) {
           expect(d.library.track(id), isNotNull, reason: '$id lost: $reason');
           expect(d.library.hasFile(id), isTrue, reason: 'audio: $reason');
@@ -246,6 +291,52 @@ void main() {
       b.sync.dispose();
     },
   );
+
+  test('#98/AK2, AK3, AK4 a device offline beyond the tombstones does not revive deleted tracks and folders', () async {
+    clock = DateTime.utc(2026, 1, 1);
+    final cloud = InMemoryProvider();
+    final sources = pool(1);
+    final a = Device('a', cloud, Random(1), sources);
+    final b = Device('b', cloud, Random(2), sources);
+    await a.library.load();
+    await b.library.load();
+    final x = (await a.library.importFiles(['p0.mp3'])).imported.single.id;
+    final f = a.library.createFolder('Etüden').id;
+    await a.sync.sync();
+    await b.sync.sync();
+    expect(b.library.track(x), isNotNull);
+    clock = DateTime.utc(2026, 1, 2); // a deletes, b stays offline from now on
+    a.library.delete({x});
+    a.library.deleteFolder(f);
+    await a.sync.sync();
+    // horizon 2026-01-03: a's sync purges the tombstones
+    clock = DateTime.utc(2026, 4, 3);
+    await a.sync.sync();
+    expect(a.library.state.tracks, isEmpty);
+    expect(a.library.state.purged, isNotNull);
+    // b comes back (both directions of the merge itself: stamps_test.dart)
+    await b.sync.sync();
+    await a.sync.sync();
+    for (final d in [a, b]) {
+      expect(d.library.track(x), isNull, reason: d.name);
+      expect(d.library.folders, isEmpty, reason: d.name);
+    }
+    // #98/AK4: importing the same audio file again after the horizon revives the track everywhere
+    clock = DateTime.utc(2026, 4, 4);
+    await b.library.importFiles(['p0.mp3']);
+    await b.sync.sync();
+    await a.sync.sync();
+    for (final d in [a, b]) {
+      expect(d.library.track(x), isNotNull);
+      expect(d.library.hasFile(x), isTrue);
+    }
+    // the horizon survives saving and loading
+    final again = a.open();
+    await again.load();
+    expect(again.state.purged, a.library.state.purged);
+    a.sync.dispose();
+    b.sync.dispose();
+  });
 
   group('#10/AK7 damaged state.json', () {
     final outcomes = <String, int>{};

@@ -142,6 +142,7 @@ zugeordnet.
 | Warteschlange offline, Wiederholung, Sicherungen unter `backup/`, Auslöser | vorhanden: `sync_test.dart` (#37/AK3, #37/AK6, Auslöser), `sync_app_test.dart` | – |
 | «Nicht hochladen» und «Synchronisieren» im Kontextmenü | vorhanden: `sync_test.dart` (#37/AK5), `sync_app_test.dart` (#37/AK5) | – |
 | Zufallsfolgen auf 2–4 Geräten: gleicher Stand, zweiter Abgleich ändert nichts, kein Verlust | vorhanden: `property/sync_property_test.dart` (#10/AK6) | – |
+| Gerät länger als 90 Tage offline: gelöschte Titel und Ordner kommen nach dem Bereinigen der Grabsteine nicht zurück, erneuter Import belebt | vorhanden: `stamps_test.dart` (#98/AK2–AK4), `property/sync_property_test.dart` (#98/AK2–AK5) | – |
 | Verfälschte Sync-Dateien aus der Cloud ohne Absturz und ohne Datenverlust, mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7) | – |
 | Beschädigte `state.json` wiederherstellen: Sicherung aus `backup/` oder Stand des Geräts, ohne lokalen Verlust | vorhanden: `cloud_repair_test.dart` (#65/AK1–AK3), `property/sync_property_test.dart` (#65/AK4) | – |
 | Zusammenführen von 10'000 Titeln ≤ 2 s | vorhanden, nächtlich: `app/bench/library_bench_test.dart` (#59/AK3), `make bench` | – |
@@ -463,7 +464,7 @@ Lauf **zuerst**, vor den Zufallsfällen. Nächtlich läuft `make property PROPER
 | Speichern und Laden | `library_property_test.dart` | geladener Stand = gespeicherter Stand; erneutes Speichern schreibt dieselbe Datei |
 | Loop-Grenzen | `player_property_test.dart` | nach Laden (gespeicherte Grenzen, auch ausserhalb der Datei) und jeder Änderung: 0 ≤ Anfang, Ende ≤ Dauer; ab 1 s Dauer Ende ≥ Anfang + 1 s; der Kern hat genau den aktiven Loop |
 | Zeitformat | `player_property_test.dart` | `parseTime(formatTime(x)) == x` (ganze Sekunden bis 100 h), dasselbe mit Zehnteln und im Zeitfeld; beliebiges x ergibt ⌊x⌋ |
-| Abgleich | `sync_property_test.dart` | 2–4 Geräte, 10–40 Schritte (Import aus gemeinsamem Vorrat, Löschen, Titel, Ordner, Verschieben, Loops, Abgleich, teils offline): Zusammenführen in jeder Reihenfolge gleich; nach zwei Runden Abgleich alle Geräte gleich; ein weiterer Abgleich schreibt nichts; jeder nie gelöschte Titel ist auf allen Geräten, mit Audiodatei dort und in der Cloud; der gespeicherte Stand lädt wieder gleich |
+| Abgleich | `sync_property_test.dart` | 2–4 Geräte, 10–40 Schritte (Import aus gemeinsamem Vorrat, Löschen, Titel, Ordner, Verschieben, Loops, Abgleich, teils offline, Zeitsprünge von 85–104 Tagen, also Geräte länger offline als die Grabsteine, #98/AK5): Zusammenführen in jeder Reihenfolge gleich; nach Runden Abgleich, bis eine Runde nichts mehr ändert (mindestens zwei, höchstens fünf), alle Geräte gleich; ein weiterer Abgleich schreibt nichts; kein gelöschter Titel oder Ordner kommt zurück, ausser nach einer jüngeren Änderung; jeder nie gelöschte Titel ist auf allen Geräten, mit Audiodatei dort und in der Cloud, ausser er wurde zuletzt vor dem Bereinigungs-Horizont geändert (Entscheid in #98); der gespeicherte Stand lädt wieder gleich |
 
 **Robustheit (AK3, AK7, AK8).** `app/test/property/corrupt.dart` verfälscht eine Datei zufällig: Typwechsel,
 fehlendes Feld, falscher Verweis (Ordner, Loop, ID, Dateiname), Extremwerte (`1e400`, 30-stellige Zahlen, 2⁵³ + 1,
@@ -1336,3 +1337,12 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     ohne Bedingung erhöht. Der Test schlug also mit und ohne Limit fehl. Jetzt läuft `malloc` über einen
     `volatile`-Funktionszeiger; der Aufruf bleibt im erzeugten Code, ohne Limit liefert er einen Zeiger und der Test
     scheitert (Gegenprobe unter macOS). Hätte gefangen werden müssen vom Bench-Job, der vorher nie unter Linux lief.
+34. 21.11.2026, #98 (aus #87, Lücke G1): Nach dem Bereinigen der Grabsteine (90 Tage) belebte ein Gerät, das länger
+    nicht abgeglichen hatte, gelöschte Titel und Ordner wieder, beim Titel ohne Audiodatei. `SharedState.merge` übernahm
+    Einträge, die nur eine Seite kannte, unverändert. Jetzt merkt sich der Stand beim Bereinigen den Horizont
+    (`purged`), und solche Einträge werden gegen ihn wie gegen einen Grabstein zusammengeführt
+    (`docs/PLAN-WEB-UND-SYNC.md`, Umsetzung W4). Der Zufallstest mit Zeitsprüngen fand dabei zwei weitere Fehler:
+    `Library._commit` verlor den Horizont beim nächsten Speichern, und ein blosses Weglassen alter Einträge war nicht
+    assoziativ (Feldwerte hingen von der Reihenfolge ab). Regressionstests: `stamps_test.dart` (#98/AK2–AK4) und
+    `property/sync_property_test.dart` (#98/AK2–AK5). Hätte gefangen werden müssen von `sync_property_test.dart`
+    (#10/AK6), dessen Uhr nur um Millisekunden lief.
