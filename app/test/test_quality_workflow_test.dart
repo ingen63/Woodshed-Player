@@ -1,4 +1,4 @@
-// #57, #10, #58, #13, #59, #11, #64, #77, #67, #79, #89, #83, #88: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
+// #57, #10, #58, #13, #59, #11, #64, #77, #67, #79, #89, #83, #88, #99: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -543,6 +543,35 @@ void main() {
           makefile,
           contains('flutter test integration_test -d macos'),
         ); // make test-ui
+      });
+
+      test('#99/AK3 the smoke test also runs on an iOS simulator', () {
+        final mac = job(workflow, 'macos');
+        final ios = mac.indexOf('run: make test-ios\n');
+        expect(ios, isNot(-1));
+        expect(
+          ios,
+          greaterThan(mac.indexOf('flutter build ios --simulator --debug')),
+        );
+        expect(mac, contains("WP_AUDIO_BACKEND: 'null'")); // #99/AK2
+        final target = makefile.substring(makefile.indexOf('\ntest-ios:'));
+        expect(
+          target.substring(0, target.indexOf('\n\n')),
+          contains('tools/ios_sim_test.sh'),
+        );
+        final script = read('../tools/ios_sim_test.sh');
+        expect(script, contains('xcrun simctl boot'));
+        expect(script, contains('xcrun simctl shutdown'));
+        expect(script, contains('SIMCTL_CHILD_WP_AUDIO_BACKEND='));
+        expect(
+          script,
+          contains('flutter test integration_test/app_smoke_test.dart -d'),
+        );
+        // #99/AK4: the recording check is part of that file
+        expect(
+          read('integration_test/app_smoke_test.dart'),
+          contains("testWidgets('#99/AK4, #4/AK6"),
+        );
       });
 
       test('mutation tests on the diff run as a nightly job (#11)', () {

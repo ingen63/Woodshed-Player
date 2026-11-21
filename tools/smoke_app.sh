@@ -4,7 +4,7 @@
 # network) until the position has moved, pauses and quits. Passed when the app ends with exit code 0
 # and prints «smoke: ok»; nothing needs a click. Flow in app/lib/app/smoke.dart.
 # Without an audio device (GitHub's macOS runners) set WP_AUDIO_BACKEND=null: the core then plays to
-# miniaudio's silent null device at real-time pace.
+# its silent null device at real-time pace.
 # Usage: tools/smoke_app.sh [path to the .app], default the release build of `flutter build macos`.
 set -u
 cd "$(dirname "$0")/.."

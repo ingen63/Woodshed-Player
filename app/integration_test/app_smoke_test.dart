@@ -2,11 +2,17 @@
 // generated audio file (dropped onto the window), play/pause, set a loop, change the tempo; then
 // play/pause in every size (desktop, tablet, phone). Rules in ui_helpers.dart (#13/AK2): waits for
 // states, no fixed waiting time.
-// Run: cd app && flutter test integration_test -d macos
-// Without an audio device (CI): WP_AUDIO_BACKEND=null (core plays to miniaudio's null device).
+// #99: the same file also runs on an iOS simulator (FFI, start, controls), plus the check that the
+// recording button is missing there (#4/AK6).
+// Run: cd app && flutter test integration_test -d macos; iOS simulator: make test-ios
+// Without an audio device (CI): WP_AUDIO_BACKEND=null (core plays to its null device).
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:woodshed_player/app/platform_native.dart';
+import 'package:wp_core/wp_core.dart';
 
 import 'ui_helpers.dart';
 
@@ -102,6 +108,9 @@ void main() {
 
       p.seek(0);
       await pumpUntil(tester, () => p.position == 0, '$name: at 0');
+      // #99: on iOS the controls are taller; at 1100 px the button sits just below the window
+      await tester.ensureVisible(find.byKey(const Key('playPause')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('playPause')));
       await pumpUntil(
         tester,
@@ -111,6 +120,34 @@ void main() {
       await tester.tap(find.byKey(const Key('playPause')));
       await pumpUntil(tester, () => !p.isPlaying, '$name: paused');
       expect(p.position, greaterThan(0.2), reason: name);
+    }
+  });
+
+  testWidgets('#99/AK4, #4/AK6 recording button only where the core records', (
+    tester,
+  ) async {
+    final t = testFolder(seconds: 1);
+    final c = await startApp(
+      tester,
+      t.dir,
+      recordingButton: recordingButtonFor,
+    );
+    // iPhone/iPad: the core has no recorder (recorder_stub.cpp) and the app shows no button;
+    // macOS: both are there (desktop and tablet layout carry the button).
+    expect(WpRecorder.available, !Platform.isIOS);
+    expect(c.player.hasTrack, isFalse);
+    for (final (name, size) in [
+      ('desktop', desktopSize),
+      ('tablet', tabletSize),
+    ]) {
+      setSize(tester, size);
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('layout:$name')), findsOneWidget, reason: name);
+      expect(
+        find.byKey(const Key('recordingButton')),
+        Platform.isIOS ? findsNothing : findsOneWidget,
+        reason: name,
+      );
     }
   });
 }

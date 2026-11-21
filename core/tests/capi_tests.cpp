@@ -3,7 +3,7 @@
 // handle, and the calls are checked to reach the player core: load, seek, rate, loop, waveform,
 // metronome. wp_create opens the real audio device; without a device (e.g. a headless runner) the
 // load reports WP_ERR_DEVICE_UNAVAILABLE and the checks that need a loaded title are skipped.
-// With --null-backend (#13, second ctest case) the tests run on miniaudio's null device
+// With --null-backend (#13, second ctest case) the tests run on the core's null device
 // (WP_AUDIO_BACKEND=null), which every machine has: then the load must succeed and nothing is
 // skipped. Volumes are 0, so nothing is audible. Test audio: core/tests/audio/sine440.flac (440 Hz,
 // 1 s).

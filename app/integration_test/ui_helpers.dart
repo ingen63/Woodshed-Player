@@ -48,7 +48,7 @@ const desktopSize = Size(1280, 800),
 }
 
 /// Starts the app with the real core and its library in [dir], silent, at [size] and in [locale]
-/// (or with the texts of [l10n]).
+/// (or with the texts of [l10n]); [recordingButton] as in the app (`recordingButtonFor`) or none.
 Future<AppController> startApp(
   WidgetTester tester,
   Directory dir, {
@@ -56,6 +56,7 @@ Future<AppController> startApp(
   Locale locale = const Locale('en'),
   LocalizationsDelegate<AppLocalizations> l10n = AppLocalizations.delegate,
   TapTempo? tapTempo,
+  Widget? Function(AppController controller)? recordingButton,
 }) async {
   final controller = await createAppController(
     baseDir: Directory('${dir.path}/app'),
@@ -70,6 +71,7 @@ Future<AppController> startApp(
       controller: controller,
       locale: locale,
       localizationsDelegate: l10n,
+      recordingButton: recordingButton,
     ),
   );
   await tester.pumpAndSettle();
@@ -79,6 +81,10 @@ Future<AppController> startApp(
 void setSize(WidgetTester tester, Size size) {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
+  // #99: no safe area of the real device (an iOS simulator reports its notch in physical pixels,
+  // which at ratio 1 would cut off the layout); macOS has none anyway.
+  tester.view.padding = FakeViewPadding.zero;
+  tester.view.viewPadding = FakeViewPadding.zero;
   addTearDown(tester.view.reset);
 }
 

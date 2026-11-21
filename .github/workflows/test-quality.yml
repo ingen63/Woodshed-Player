@@ -11,7 +11,8 @@
 #   fuzz regressions and start corpus (#67); when core/ changes.
 # - network-free: the network check (make network-free, #58); every push, whatever it changes.
 # Nightly (02:17 UTC), only if main has a new commit since the last successful nightly run:
-# - macos: macOS and iOS build, UI tests (integration_test) and smoke test of the built app (#13).
+# - macos: macOS and iOS build, UI tests (integration_test) on macOS and the iOS simulator (#99) and
+#   smoke test of the built app (#13).
 # - sanitize-thread: ThreadSanitizer (#57). fuzz: libFuzzer on decoder and C API (#10), then every
 #   input of the night (regressions, start corpus, grown corpus) against the WASM core (#67).
 # - property: Dart random tests with many cases and a new seed (#10).
@@ -339,17 +340,18 @@ jobs:
           fi
 
   macos:
-    name: macOS and iOS build, UI tests, app smoke test (#13)
+    name: macOS and iOS build, UI tests, app smoke test (#13, #99)
     needs: nightly-gate
     # nightly after the gate, and by hand with nightly=true (then the gate is skipped)
     if: >-
       !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.nightly)
       || (github.event_name == 'schedule' && needs.nightly-gate.outputs.run == 'true'))
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     env:
-      # GitHub's macOS runners have no audio device: the core plays to miniaudio's silent null
-      # device at real-time pace (core/src/player.cpp). Locally the tests use the real device.
+      # GitHub's macOS runners have no audio device: the core plays to its silent null device at
+      # real-time pace (core/src/player.cpp), on macOS and in the iOS simulator. Locally the tests use
+      # the real device.
       WP_AUDIO_BACKEND: 'null'
     steps:
       - uses: actions/checkout@v4
@@ -368,6 +370,10 @@ jobs:
       - name: UI tests (#13/AK1, AK2, AK7)
         working-directory: app
         run: flutter test integration_test -d macos --reporter expanded
+      - name: UI smoke test on the iOS simulator (#99/AK1, AK3, AK4)
+        # the real core on an iOS simulator (booted by the script, null device as above), including the
+        # check that recording is missing on iPhone/iPad (#4/AK6)
+        run: make test-ios
       - name: Smoke test of the built app (#13/AK5)
         run: |
           (cd app && flutter build macos --release)

@@ -2,11 +2,14 @@
 // Laden). Das Gerät läuft ab wp_create mit seiner eigenen Samplerate; Titel werden beim Laden auf
 // diese Rate gewandelt. Der Audio-Callback sperrt nicht und reserviert nichts; Befehle erreichen
 // ihn über eine Lock-free-Queue (#14).
+#include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <mutex>
 #include <new>
+#include <thread>
 
 #include "miniaudio_impl.hpp"
 #include "player_core.hpp"
@@ -20,6 +23,9 @@ struct wp_player {
       device{}; // NOLINT(bugprone-invalid-enum-default-initialization): zeroed miniaudio struct
   bool contextReady = false;
   bool deviceReady = false;
+  // #99: clock of the null device (pacedWrite), only touched by the device's worker thread
+  std::chrono::steady_clock::time_point nullStart{};
+  ma_uint64 nullFrames = 0;
 };
 
 namespace {
@@ -54,13 +60,94 @@ void notificationCallback(const ma_device_notification *n) {
   }
 }
 
-// #13: WP_AUDIO_BACKEND=null selects miniaudio's null device (silent, consumes audio at real-time
+// #13: WP_AUDIO_BACKEND=null selects the null device below (silent, consumes audio at real-time
 // pace) for test runners without an audio device, e.g. the UI tests and the app smoke test on
-// GitHub's macOS runners. Unset, the platform's real device is used.
+// GitHub's macOS runners and the iOS simulator. Unset, the platform's real device is used.
 bool nullBackendRequested() {
   // NOLINTNEXTLINE(concurrency-mt-unsafe): read on a control thread, nobody sets it at run time
   const char *v = std::getenv("WP_AUDIO_BACKEND");
   return v != nullptr && std::strcmp(v, "null") == 0;
+}
+
+// #99: the null device, a custom miniaudio backend paced by std::chrono::steady_clock. miniaudio's
+// own null device measures time with a clock that advanced in whole seconds on the iOS simulator:
+// it consumed audio in one-second bursts, and playback only began a second after play. This one
+// consumes one period (10 ms) after the other at real-time pace, on every platform alike.
+constexpr ma_uint32 kNullRate = 48000;
+constexpr const char *kNullName = "Null Playback Device";
+
+ma_result nullEnumerate(ma_context *context, ma_enum_devices_callback_proc callback,
+                        void *userData) {
+  ma_device_info info{};
+  std::snprintf(info.name, sizeof info.name, "%s", kNullName);
+  info.isDefault = MA_TRUE;
+  callback(context, ma_device_type_playback, &info, userData);
+  return MA_SUCCESS;
+}
+
+ma_result nullDeviceInfo(ma_context *, ma_device_type type, const ma_device_id *,
+                         ma_device_info *info) {
+  if (type != ma_device_type_playback)
+    return MA_NO_DEVICE;
+  *info = ma_device_info{};
+  std::snprintf(info->name, sizeof info->name, "%s", kNullName);
+  info->isDefault = MA_TRUE;
+  info->nativeDataFormatCount = 1;
+  info->nativeDataFormats[0].format = ma_format_f32;
+  info->nativeDataFormats[0].channels = wp::Player::kChannels;
+  info->nativeDataFormats[0].sampleRate = kNullRate;
+  return MA_SUCCESS;
+}
+
+ma_result nullDeviceInit(ma_device *, const ma_device_config *config,
+                         ma_device_descriptor *playback, ma_device_descriptor *) {
+  if (config->deviceType != ma_device_type_playback)
+    return MA_DEVICE_TYPE_NOT_SUPPORTED;
+  playback->format = ma_format_f32;
+  if (playback->channels == 0)
+    playback->channels = wp::Player::kChannels;
+  if (playback->sampleRate == 0)
+    playback->sampleRate = kNullRate;
+  playback->periodSizeInFrames = playback->sampleRate / 100;
+  playback->periodCount = 2;
+  return MA_SUCCESS;
+}
+
+ma_result nullDeviceStart(ma_device *device) {
+  auto *p = static_cast<wp_player *>(device->pUserData);
+  p->nullStart = std::chrono::steady_clock::now();
+  p->nullFrames = 0;
+  return MA_SUCCESS;
+}
+
+ma_result nullNothing(ma_device *) { return MA_SUCCESS; }
+ma_result nullContextUninit(ma_context *) { return MA_SUCCESS; }
+
+// Takes the rendered period and returns when it would have finished playing.
+ma_result nullDeviceWrite(ma_device *device, const void *, ma_uint32 frameCount,
+                          ma_uint32 *framesWritten) {
+  auto *p = static_cast<wp_player *>(device->pUserData);
+  p->nullFrames += frameCount;
+  const std::chrono::duration<double> played(static_cast<double>(p->nullFrames) /
+                                             device->playback.internalSampleRate);
+  std::this_thread::sleep_until(
+      p->nullStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(played));
+  if (framesWritten)
+    *framesWritten = frameCount;
+  return MA_SUCCESS;
+}
+
+ma_result nullContextInit(ma_context *, const ma_context_config *,
+                          ma_backend_callbacks *callbacks) {
+  callbacks->onContextUninit = nullContextUninit;
+  callbacks->onContextEnumerateDevices = nullEnumerate;
+  callbacks->onContextGetDeviceInfo = nullDeviceInfo;
+  callbacks->onDeviceInit = nullDeviceInit;
+  callbacks->onDeviceUninit = nullNothing;
+  callbacks->onDeviceStart = nullDeviceStart;
+  callbacks->onDeviceStop = nullNothing;
+  callbacks->onDeviceWrite = nullDeviceWrite;
+  return MA_SUCCESS;
 }
 
 // Kontext und Gerät anlegen, falls noch nicht geschehen. sampleRate 0 = Samplerate des Geräts.
@@ -69,7 +156,8 @@ bool initDevice(wp_player *p, ma_uint32 sampleRate) {
     ma_context_config cc = ma_context_config_init();
     // iPhone/iPad: Wiedergabe auch bei eingeschaltetem Stummschalter.
     cc.coreaudio.sessionCategory = ma_ios_session_category_playback;
-    const ma_backend nullBackend[] = {ma_backend_null};
+    cc.custom.onContextInit = nullContextInit; // used only with ma_backend_custom
+    const ma_backend nullBackend[] = {ma_backend_custom};
     const bool useNull = nullBackendRequested();
     if (ma_context_init(useNull ? nullBackend : nullptr, useNull ? 1 : 0, &cc, &p->context) !=
         MA_SUCCESS)

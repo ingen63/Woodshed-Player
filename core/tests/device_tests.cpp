@@ -2,9 +2,10 @@
 // player.cpp into its own translation unit (instead of linking the shared library wp_core), so it
 // can reach the miniaudio device of a player and the notification callback: stop and restart the
 // device, send the notifications miniaudio sends (rerouted, interruption, stopped, started) and
-// read the state of the player core behind the C API. It runs on miniaudio's null device
+// read the state of the player core behind the C API. It runs on the core's null device
 // (WP_AUDIO_BACKEND=null), which every machine has. Volumes are 0, so nothing is audible.
 // The C-API tests through the shared library stay in capi_tests.cpp.
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -163,6 +164,37 @@ void metronomeSettersReachTheCore() {
 
 } // namespace
 
+// #99: the null device is the core's own (custom backend) and consumes audio in 10 ms periods at
+// real-time pace. miniaudio's null device moved in one-second bursts on the iOS simulator.
+void nullDevicePacesInSmallSteps() {
+  wp_player *p = wp_create();
+  CHECK(p != nullptr);
+  if (!p)
+    return;
+  CHECK(p->context.backend == ma_backend_custom);
+  CHECK(p->device.playback.internalPeriodSizeInFrames == p->device.sampleRate / 100);
+  wp_set_volume(p, 0.0f);
+  CHECK(wp_load(p, kSine.c_str()) == WP_OK); // 1 s
+  wp_play(p);
+  CHECK(eventually([p] { return wp_position(p) > 0.0; }));
+  const auto start = std::chrono::steady_clock::now();
+  const double from = wp_position(p);
+  double last = from;
+  double largestStep = 0;
+  while (std::chrono::steady_clock::now() - start < std::chrono::milliseconds(400)) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    const double now = wp_position(p);
+    largestStep = std::max(largestStep, now - last);
+    last = now;
+  }
+  const double elapsed =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+  CHECK(largestStep < 0.2);           // no bursts (a loaded machine may delay a single sleep)
+  CHECK(last - from > 0.5 * elapsed); // real-time pace, not stuck
+  CHECK(last - from < elapsed + 0.1); // and not faster
+  wp_destroy(p);
+}
+
 int main() {
   nullBackendOnlyForNull(); // ends with WP_AUDIO_BACKEND=null for the tests below
   std::printf("WP_AUDIO_BACKEND=null\n");
@@ -172,6 +204,7 @@ int main() {
       {"playAndLoadRestartTheDevice", playAndLoadRestartTheDevice},
       {"playMarksRunningDeviceAvailable", playMarksRunningDeviceAvailable},
       {"metronomeSettersReachTheCore", metronomeSettersReachTheCore},
+      {"nullDevicePacesInSmallSteps", nullDevicePacesInSmallSteps},
   };
   for (auto &[name, fn] : tests) {
     const int before = failures;

@@ -4,7 +4,7 @@
 .PHONY: help test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools format format-check lint lint-dart \
         lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
         mutants-diff fuzz fuzz-wasm fuzz-wasm-build fuzz-wasm-findings report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
-        test-ui test-web test-web-start smoke-app pseudo-l10n bench
+        test-ui test-ios test-web test-web-start smoke-app pseudo-l10n bench
 
 SHELL := /bin/bash
 # A failing build must not be hidden by `| tail` (GNU Make 3.81 on macOS has no .SHELLFLAGS).
@@ -49,6 +49,7 @@ help:
 	@echo "make coverage-diff  coverage of the lines changed since BASE (default origin/main), a hint"
 	@echo "make network-free   no network code outside the provider modules, blocked packages, core, CSP"
 	@echo "make test-ui        UI tests with the real core on macOS (integration_test)"
+	@echo "make test-ios       smoke test with the real core on an iOS simulator (WP_IOS_DEVICE, boots it if needed)"
 	@echo "make test-web       web tests in Chrome: OPFS and the WASM core (needs Emscripten)"
 	@echo "make test-web-start the built web app starts without failed requests or console errors"
 	@echo "make smoke-app      builds the macOS app (release) and runs its smoke test"
@@ -286,9 +287,15 @@ network-free:
 
 # ---- UI tests, web tests and the app smoke test (#13), docs/TESTS.md ----
 # UI tests with the real core: start, import, play/pause, loop, tempo, shortcuts, pseudo language.
-# Without an audio device: make test-ui WP_AUDIO_BACKEND=null (miniaudio's null device).
+# Without an audio device: make test-ui WP_AUDIO_BACKEND=null (the core's null device).
 test-ui:
 	cd app && $(if $(WP_AUDIO_BACKEND),WP_AUDIO_BACKEND=$(WP_AUDIO_BACKEND) )flutter test integration_test -d macos
+
+# #99/AK2: the smoke test with the real core on an iOS simulator (tools/ios_sim_test.sh). WP_IOS_DEVICE
+# picks the simulator (name or UDID, default a booted or the first iPhone); one it boots is shut down
+# again. Without an audio device: make test-ios WP_AUDIO_BACKEND=null, as on macOS.
+test-ios:
+	$(if $(WP_AUDIO_BACKEND),WP_AUDIO_BACKEND=$(WP_AUDIO_BACKEND) )$(if $(WP_IOS_DEVICE),WP_IOS_DEVICE="$(WP_IOS_DEVICE)" )tools/ios_sim_test.sh
 
 # Web code in a real browser (#13/AK4): the WASM core next to the test page (test/web/wp_core/, not
 # checked in), Chrome with autoplay allowed (the AudioContext needs no click then).

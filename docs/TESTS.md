@@ -171,6 +171,8 @@ zugeordnet.
 | Workflow `test-quality.yml`: Sanitizer-Läufe des Kerns auf Linux | vorhanden: `test-quality.yml` (Jobs `sanitize`, `sanitize-thread`), `test_quality_workflow_test.dart` (#57) | – |
 | Workflow `test-quality.yml`: Fuzzing und Zufallstests nächtlich | vorhanden: Jobs `fuzz` (mit `make fuzz-wasm`, #67, nach einem Fund `make fuzz-wasm-findings`, #88) und `property`, `test_quality_workflow_test.dart` (#10); beobachtbar erst nach dem Push | – |
 | Workflow `test-quality.yml`: Format, Lint, Tests, Abdeckung auf Linux je Push; macOS/iOS-Build, Oberflächentests und Rauchtest der gebauten App nächtlich | vorhanden: Jobs `checks`, `web`, `macos`, `test_quality_workflow_test.dart`, `smoke_test.dart` (#13); beobachtbar erst nach dem Push | – |
+| Rauchtest mit echtem Kern auf dem iOS-Simulator: Start, FFI, Import, Play/Pause, Loop, Tempo, alle Grössen; keine Aufnahme auf iPhone/iPad (#4/AK6) | vorhanden: `app_smoke_test.dart` über `make test-ios` (`tools/ios_sim_test.sh`), nächtlich im Job `macos`, `test_quality_workflow_test.dart` (#99); im Workflow beobachtbar erst nach dem Push | – |
+| iPhone/iPad, nur am Gerät: Stummschalter, Anruf und andere Unterbrechungen, Rückkehr aus dem Hintergrund, Bildschirm bleibt an, Kopfhörer ab/an, Lautsprecher des Geräts | von Hand am Gerät (#3/AK21, #3/AK22); der Simulator hat keinen Stummschalter, keine Anrufe und nimmt den Ton des Macs | – |
 | Rauchtest der gebauten App auf Windows und Linux | Lücke | #60 |
 | Windows und Linux: Build, Tests, Windows-Pfade | Lücke | #60 |
 
@@ -209,6 +211,7 @@ make format         # dart format (app/) und clang-format (core/, ohne third_par
 make format-check   # schlägt fehl, wenn eine Datei nicht formatiert ist
 make lint           # flutter analyze (streng), C++ mit -Werror, clang-tidy
 make test-ui        # Oberflächentests mit echtem Kern auf macOS; ohne Audiogerät WP_AUDIO_BACKEND=null
+make test-ios       # Rauchtest mit echtem Kern auf einem iOS-Simulator (WP_IOS_DEVICE, startet ihn bei Bedarf, #99)
 make test-web       # Web-Tests in Chrome: OPFS und WASM-Kern (braucht Emscripten), danach test-web-start
 make test-web-start # gebaute Web-App startet in Chrome ohne gescheiterte Anfrage und Konsolenfehler, auch mit CJK- und Emoji-Titeln (#72, #82)
 make smoke-app      # macOS-App bauen (Release) und ihren Rauchtest ausführen
@@ -706,7 +709,7 @@ Workflow lässt sich erst nach dem Push beobachten.
 
 | Datei | Prüft |
 |---|---|
-| `app_smoke_test.dart` | Start, Import einer erzeugten Audiodatei (wie Ziehen ins Fenster, Kanal `woodshed/files`), Play/Pause, Loop mit den Knöpfen «hier», Tempo (Schalter und 0,75×); danach Play/Pause je Grösse (#13/AK1, #17/AK7, #30/AK13) |
+| `app_smoke_test.dart` | Start, Import einer erzeugten Audiodatei (wie Ziehen ins Fenster, Kanal `woodshed/files`), Play/Pause, Loop mit den Knöpfen «hier», Tempo (Schalter und 0,75×); danach Play/Pause je Grösse (#13/AK1, #17/AK7, #30/AK13); Aufnahme-Knopf nur auf macOS (#99/AK4, #4/AK6). Läuft auch auf dem iOS-Simulator (#99) |
 | `shortcuts_test.dart` | Leertaste, S, E, ←/→, M, T, ↑/↓ (mit Shift ±10) gegen den Zustand von Player und Metronom (#13/AK1) |
 | `pseudo_locale_test.dart` | Pseudo-Sprache in allen drei Grössen: kein Überlauf, kein abgeschnittener Text (#13/AK7) |
 
@@ -720,9 +723,21 @@ Regeln (#13/AK2, aus VivaPlan), geprüft in `app/test/ui_test_rules_test.dart`:
   (`createAppController(tapTempo: …)`).
 - **Die Sprache ist fest:** Englisch über `startApp`, im Pseudo-Test die Pseudo-Sprache. Testaudio wird erzeugt
   (`sineWav` in `app/lib/app/smoke.dart`), jeder Test arbeitet in einem eigenen temporären Ordner.
-- **Ohne Audiogerät** (GitHubs macOS-Runner) läuft der Kern mit `WP_AUDIO_BACKEND=null` auf dem stummen Null-Gerät von
-  miniaudio, im Echtzeittakt (`core/src/player.cpp`). Dieselben C-API-Fälle laufen in `ctest` auch so
-  (`capi_null_backend_tests`), dort wird nichts übersprungen. Lokal nehmen die Tests das echte Gerät.
+- **Ohne Audiogerät** (GitHubs macOS-Runner) läuft der Kern mit `WP_AUDIO_BACKEND=null` auf seinem stummen
+  Null-Gerät, im Echtzeittakt (`core/src/player.cpp`). Seit #99 ist das ein eigenes Gerät (miniaudio-Backend
+  `custom`, Takt über `std::chrono::steady_clock`, Perioden zu 10 ms), weil das Null-Gerät von miniaudio auf dem
+  iOS-Simulator nur in ganzen Sekunden weiterlief (Gefundene Fehler 38). Dieselben C-API-Fälle laufen in `ctest`
+  auch so (`capi_null_backend_tests`), dort wird nichts übersprungen; `device_tests` prüft den Takt. Lokal nehmen
+  die Tests das echte Gerät.
+
+**Auf dem iOS-Simulator** (#99, `make test-ios`, `tools/ios_sim_test.sh`): `app_smoke_test.dart` läuft unverändert auf
+einem Simulator, mit dem Kern über FFI wie auf dem Gerät. `WP_IOS_DEVICE` wählt ihn (Name oder UDID); ohne Angabe ein
+laufendes oder das erste verfügbare iPhone. Einen Simulator, den das Skript gestartet hat, fährt es danach wieder
+herunter. `WP_AUDIO_BACKEND` gelangt als `SIMCTL_CHILD_WP_AUDIO_BACKEND` in die App (simctl gibt solche Variablen
+ohne Vorsatz weiter). `setSize` setzt die Sicherheitsabstände des Geräts (Notch) auf null, sonst schnitten sie bei
+Pixelverhältnis 1 das Layout ab. Nicht auf dem Simulator prüfbar und deshalb Gerätetests von Hand: Stummschalter,
+Anrufe und andere Unterbrechungen, Rückkehr aus dem Hintergrund (#3/AK21, #3/AK22), Kopfhörerwechsel und der
+Lautsprecher des Geräts; der Simulator spielt über das Audiogerät des Macs.
 
 **Pseudo-Sprache** (#13/AK7): `app/integration_test/pseudo.dart` setzt jeden Text zwischen `⟦ ⟧`, ersetzt Buchstaben
 durch Akzentbuchstaben und verlängert um 40 %. Die Test-Lokalisierung `pseudo_localizations.dart` erzeugt
@@ -753,7 +768,7 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
 | `sanitize` | Linux, Push mit Änderung am Kern, von Hand | ASan/UBSan (#57) |
 | `contract` | Linux, Push mit Änderung am Kern, von Hand | Vertrag nativ ↔ WASM (#77, #9/AK7): zuerst `make reference-native` (native Referenzfälle schreiben ihre Samples), danach `make test-wasm-compare` (WASM-Kern unter Node.js vergleicht, Toleranz 1e-6, gestreckte Tempo-Fälle 5e-2, jede Funktion der C-API) |
 | `network-free` | Linux, jeder Push, von Hand | Netzwerkfreiheit (#58) |
-| `macos` | macOS, nächtlich nach neuem Commit, von Hand mit `nightly=true` | macOS- und iOS-Build, Oberflächentests, Rauchtest der gebauten App |
+| `macos` | macOS, nächtlich nach neuem Commit, von Hand mit `nightly=true` | macOS- und iOS-Build, Oberflächentests, Rauchtest auf dem iOS-Simulator (`make test-ios`, #99), Rauchtest der gebauten App |
 | `sanitize-thread`, `fuzz`, `property` | Linux, nächtlich nach neuem Commit, von Hand mit `nightly=true` | TSan (#57), Fuzzing und Zufallstests (#10) |
 
 - **Nächtlich** (02:17 UTC) entscheidet `nightly-gate`: Läufe nur, wenn `main` seit dem letzten erfolgreichen
@@ -784,15 +799,15 @@ deutlich länger angesetzt.
 
 | Job | Minuten je Lauf | Läufe im Monat | Minuten im Monat |
 |---|---|---|---|
-| `macos` (Flutter einrichten 2, macOS-Build 4, iOS-Build 4, Oberflächentests 4, Release-Build und Rauchtest 4) | ≈ 18 | 22 | ≈ 400 **macOS** |
+| `macos` (Flutter einrichten 2, macOS-Build 4, iOS-Build 4, Oberflächentests 4, iOS-Simulator 6 (#99), Release-Build und Rauchtest 4) | ≈ 24 | 22 | ≈ 530 **macOS** |
 | `checks` | ≈ 15 | 60 | ≈ 900 Linux |
 | `web` | ≈ 10 | 20 | ≈ 200 Linux |
 | `sanitize`, `network-free` | ≈ 8 und 3 | 30 und 80 | ≈ 480 Linux |
 | `contract` (emsdk 3, aus dem Zwischenspeicher unter 1, #89; nativ 2, WASM 5) | ≈ 10 | 30 | ≈ 300 Linux |
 | `sanitize-thread`, `fuzz` (2 × 20 min, dazu emsdk 3, aus dem Zwischenspeicher unter 1, und WASM 2, #67, #89), `property` | ≈ 10, 50, 10 | 22 | ≈ 1540 Linux |
 
-Das sind rund **400 macOS-Minuten** und rund **3400 Linux-Minuten** im Monat. Bei einem privaten Repository zählt
-GitHub macOS-Minuten zehnfach: 400 × 10 = 4000 von 2000 Gratis-Minuten (GitHub Free), also über dem Kontingent; dann
+Das sind rund **530 macOS-Minuten** und rund **3400 Linux-Minuten** im Monat. Bei einem privaten Repository zählt
+GitHub macOS-Minuten zehnfach: 530 × 10 = 5300 von 2000 Gratis-Minuten (GitHub Free), also über dem Kontingent; dann
 müssten die macOS-Läufe seltener werden (z. B. nur wöchentlich). Das Repository ist öffentlich (GitHub Pages), dort
 sind Standard-Runner kostenlos; die Grenze entfällt, die Schätzung bleibt als Richtwert.
 
@@ -1379,3 +1394,12 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     der Zeile. Hätte gefangen werden müssen von «#78/AK2 …» in `ui_test_rules_test.dart`. Regressionstest: «#95/AK3 a
     fixed real-time pause under test/ is justified» in `ui_test_rules_test.dart`, mit den alten Pausen als Gegenprobe;
     drei volle Läufe von `flutter test` unter Last grün.
+38. 21.11.2026, #99: Auf dem iOS-Simulator lief das Null-Gerät von miniaudio (`WP_AUDIO_BACKEND=null`) in Sprüngen
+    von einer Sekunde: Die Perioden stimmten (10 ms), aber die Rückrufe kamen gebündelt einmal pro Sekunde, und die
+    Position sprang von 1,0 auf 2,0 s. Normale Pausen von 10 ms klappten im selben Prozess; die Zeitmessung des
+    Null-Geräts löste dort nur ganze Sekunden auf. Folge: Nach Play meldete der Kern erst nach bis zu einer Sekunde
+    «spielt», die App fiel nach ihrer Kulanzzeit auf «pausiert» zurück, und der Rauchtest hing. Auf macOS lief es
+    fliessend. Das Null-Gerät ist jetzt ein eigenes miniaudio-Backend mit `std::chrono::steady_clock` als Takt
+    (`core/src/player.cpp`), auf allen Plattformen gleich. Hätte gefangen werden müssen von einem Kerntest auf das
+    Tempo des Null-Geräts. Regressionstest: `nullDevicePacesInSmallSteps` in `core/tests/device_tests.cpp`, dazu der
+    Lauf von `app_smoke_test.dart` auf dem iOS-Simulator (`make test-ios`).
