@@ -323,6 +323,7 @@ class CloudSync extends SyncService {
           ifVersion: remote?.version,
           ifAbsent: remote == null,
         );
+        await library.markSynced(); // #104
         return;
       } on VersionConflict {
         continue; // someone else wrote in between: read, merge, try again
@@ -461,6 +462,7 @@ class CloudSync extends SyncService {
           encodeState(library.state, (last?.$2 ?? 0) + 1),
           ifVersion: remote.version,
         );
+        await library.markSynced(); // #104
       } on VersionConflict {
         continue; // someone else wrote in between: look again
       }

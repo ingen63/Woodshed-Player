@@ -238,4 +238,76 @@ void main() {
       },
     );
   });
+
+  group('#104 the purge horizon only after the first sync', () {
+    Hlc at(DateTime t, String device) =>
+        Hlc(t.millisecondsSinceEpoch, 0, device);
+    final purgedOn = DateTime.utc(2026, 4, 3);
+    final x = StampedRecord.create({'title': 'X'}, at(DateTime.utc(2026), 'a'));
+    // cloud: X deleted on 2026-01-02 and purged, horizon 2026-01-02
+    final cloud = SharedState(
+      tracks: {'x': x.delete(at(DateTime.utc(2026, 1, 2), 'a'))},
+    ).purge(purgedOn);
+    // b, never synced: Y and folder G last changed on 2025-12-01, before the horizon
+    final old = at(DateTime.utc(2025, 12), 'b');
+    final y = StampedRecord.create({'title': 'Y'}, old);
+    final b = SharedState(tracks: {'y': y}, folders: {'g': y});
+    final now = at(purgedOn, 'b');
+
+    test(
+      '#104/AK2 #104/AK3 own tracks and folders survive the first merge',
+      () {
+        expect(b.merge(cloud).tracks['y']!.alive, isFalse); // #98 alone
+        final first = b.beforeFirstSync(cloud, now);
+        for (final m in [first.merge(cloud), cloud.merge(first)]) {
+          expect(m.tracks['y']!.alive, isTrue);
+          expect(m.folders['g']!.alive, isTrue);
+          expect(m.tracks['y']!.values, y.values);
+          expect(m.tracks['x'], isNull);
+          expect(m.purged, cloud.purged);
+        }
+      },
+    );
+
+    test('#104 only records the other side does not know are stamped anew', () {
+      final later = StampedRecord.create({'title': 'L'}, at(purgedOn, 'b'));
+      final known = StampedRecord.create({'title': 'K'}, old);
+      final gone = y.delete(at(DateTime.utc(2025, 12, 2), 'b'));
+      final mine = SharedState(
+        tracks: {'y': y, 'later': later, 'known': known, 'gone': gone},
+      );
+      final theirs = cloud.copyWith(
+        tracks: {'known': known.delete(at(DateTime.utc(2026, 1, 5), 'a'))},
+      );
+      final first = mine.beforeFirstSync(theirs, now);
+      expect(first.tracks['y']!.stamps.values, everyElement(now));
+      expect(identical(first.tracks['later'], later), isTrue);
+      expect(identical(first.tracks['gone'], gone), isTrue);
+      // deleted elsewhere while still known there: the deletion wins as before (#36)
+      expect(identical(first.tracks['known'], known), isTrue);
+      expect(first.merge(theirs).tracks['known']!.alive, isFalse);
+      // without a horizon nothing changes
+      expect(
+        mine.beforeFirstSync(SharedState.empty, now).toJson(),
+        mine.toJson(),
+      );
+    });
+
+    test('#104 the own horizon of a device syncing for the first time kills nothing on the others', () {
+      // b deleted and purged W on its own; the cloud has an older track V b never saw
+      final w = StampedRecord.create({'title': 'W'}, old);
+      final own = SharedState(
+        tracks: {'w': w.delete(at(DateTime.utc(2025, 12, 5), 'b'))},
+      ).purge(DateTime.utc(2026, 3, 10));
+      expect(own.purged, isNotNull);
+      final v = StampedRecord.create({'title': 'V'}, old);
+      final c = SharedState(
+        tracks: {'v': v.restamp(at(DateTime.utc(2025, 11), 'a'))},
+      );
+      expect(own.merge(c).tracks['v']!.alive, isFalse); // #98 alone
+      final first = own.beforeFirstSync(c, now);
+      expect(first.purged, isNull);
+      expect(first.merge(c).tracks['v']!.alive, isTrue);
+    });
+  });
 }

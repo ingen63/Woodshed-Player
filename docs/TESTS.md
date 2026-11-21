@@ -143,6 +143,7 @@ zugeordnet.
 | «Nicht hochladen» und «Synchronisieren» im Kontextmenü | vorhanden: `sync_test.dart` (#37/AK5), `sync_app_test.dart` (#37/AK5) | – |
 | Zufallsfolgen auf 2–4 Geräten: gleicher Stand, zweiter Abgleich ändert nichts, kein Verlust | vorhanden: `property/sync_property_test.dart` (#10/AK6) | – |
 | Gerät länger als 90 Tage offline: gelöschte Titel und Ordner kommen nach dem Bereinigen der Grabsteine nicht zurück, erneuter Import belebt | vorhanden: `stamps_test.dart` (#98/AK2–AK4), `property/sync_property_test.dart` (#98/AK2–AK5) | – |
+| Gerät gleicht zum ersten Mal ab, die Cloud hat schon einen Bereinigungs-Horizont: eigene Titel und Ordner bleiben mit Audiodatei erhalten, Geräte mit früherem Abgleich verlieren Gelöschtes weiter | vorhanden: `sync_test.dart` (#104/AK2–AK4), `stamps_test.dart` (#104), `property/sync_property_test.dart` (#104/AK5) | – |
 | Verfälschte Sync-Dateien aus der Cloud ohne Absturz und ohne Datenverlust, mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7) | – |
 | Beschädigte `state.json` wiederherstellen: Sicherung aus `backup/` oder Stand des Geräts, ohne lokalen Verlust | vorhanden: `cloud_repair_test.dart` (#65/AK1–AK3), `property/sync_property_test.dart` (#65/AK4) | – |
 | Zusammenführen von 10'000 Titeln ≤ 2 s | vorhanden, nächtlich: `app/bench/library_bench_test.dart` (#59/AK3), `make bench` | – |
@@ -468,7 +469,7 @@ Lauf **zuerst**, vor den Zufallsfällen. Nächtlich läuft `make property PROPER
 | Speichern und Laden | `library_property_test.dart` | geladener Stand = gespeicherter Stand; erneutes Speichern schreibt dieselbe Datei |
 | Loop-Grenzen | `player_property_test.dart` | nach Laden (gespeicherte Grenzen, auch ausserhalb der Datei) und jeder Änderung: 0 ≤ Anfang, Ende ≤ Dauer; ab 1 s Dauer Ende ≥ Anfang + 1 s; der Kern hat genau den aktiven Loop |
 | Zeitformat | `player_property_test.dart` | `parseTime(formatTime(x)) == x` (ganze Sekunden bis 100 h), dasselbe mit Zehnteln und im Zeitfeld; beliebiges x ergibt ⌊x⌋ |
-| Abgleich | `sync_property_test.dart` | 2–4 Geräte, 10–40 Schritte (Import aus gemeinsamem Vorrat, Löschen, Titel, Ordner, Verschieben, Loops, Abgleich, teils offline, Zeitsprünge von 85–104 Tagen, also Geräte länger offline als die Grabsteine, #98/AK5): Zusammenführen in jeder Reihenfolge gleich; nach Runden Abgleich, bis eine Runde nichts mehr ändert (mindestens zwei, höchstens fünf), alle Geräte gleich; ein weiterer Abgleich schreibt nichts; kein gelöschter Titel oder Ordner kommt zurück, ausser nach einer jüngeren Änderung; jeder nie gelöschte Titel ist auf allen Geräten, mit Audiodatei dort und in der Cloud, ausser er wurde zuletzt vor dem Bereinigungs-Horizont geändert (Entscheid in #98); der gespeicherte Stand lädt wieder gleich |
+| Abgleich | `sync_property_test.dart` | 2–4 Geräte, 10–40 Schritte (Import aus gemeinsamem Vorrat, Löschen, Titel, Ordner, Verschieben, Loops, Abgleich, teils offline, Zeitsprünge von 85–104 Tagen, also Geräte länger offline als die Grabsteine, #98/AK5): Zusammenführen in jeder Reihenfolge gleich; nach Runden Abgleich, bis eine Runde nichts mehr ändert (mindestens zwei, höchstens fünf), alle Geräte gleich; ein weiterer Abgleich schreibt nichts; kein gelöschter Titel oder Ordner kommt zurück, ausser nach einer jüngeren Änderung; jeder nie gelöschte Titel ist auf allen Geräten, mit Audiodatei dort und in der Cloud, ausser er wurde zuletzt vor dem Bereinigungs-Horizont geändert (Entscheid in #98); manche Geräte gleichen erst spät zum ersten Mal ab, oft nach einem Zeitsprung, und verlieren dabei keinen eigenen Titel und keine Audiodatei (#104/AK5); der gespeicherte Stand lädt wieder gleich |
 
 **Robustheit (AK3, AK7, AK8).** `app/test/property/corrupt.dart` verfälscht eine Datei zufällig: Typwechsel,
 fehlendes Feld, falscher Verweis (Ordner, Loop, ID, Dateiname), Extremwerte (`1e400`, 30-stellige Zahlen, 2⁵³ + 1,
@@ -1424,3 +1425,13 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     Bericht mit Stack aus statt der letzten 40 Zeilen. Hätte gefangen werden müssen von einem C-API-Test mit einem
     solchen Pfad. Regressionsfall `regressions/capi/path_ending_in_dot` (nativ und im WASM-Kern), Test
     `pathEndingInDot` in `core/tests/capi_tests.cpp` (unter `make sanitize` auch auf dem Mac ohne Behebung rot).
+40. 21.11.2026, #104 (gefunden bei #98): Ein Gerät, das zum ersten Mal abglich, verlor eigene Titel und Ordner, die es
+    vor dem Bereinigungs-Horizont der Cloud zuletzt geändert hatte, samt Audiodatei. `SharedState.merge` setzte jeden
+    Eintrag, den nur eine Seite kannte, gegen den Horizont der anderen Seite, auch Einträge, die nie geteilt waren;
+    umgekehrt tötete der eigene Horizont eines neuen Geräts ältere Einträge der Cloud. Jetzt gilt der Horizont erst ab
+    dem ersten Abgleich: `device.json` merkt sich `synced`, und vor dem ersten Zusammenführen stempelt
+    `SharedState.beforeFirstSync` solche eigenen Einträge neu und lässt den eigenen Horizont fallen
+    (`docs/PLAN-WEB-UND-SYNC.md`, Umsetzung W4). Regressionstests: `sync_test.dart` (#104/AK2–AK4, ohne Behebung rot),
+    `stamps_test.dart` (#104) und `property/sync_property_test.dart` (#104/AK5, ohne Behebung rot). Hätte gefangen
+    werden müssen von `sync_property_test.dart` (#98/AK5), dessen Invariante Titel vor dem Horizont ausnahm, ohne zu
+    unterscheiden, ob das Gerät schon abgeglichen hatte, und dessen Geräte alle früh abglichen.

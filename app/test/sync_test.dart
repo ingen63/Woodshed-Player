@@ -796,4 +796,120 @@ void main() {
       expect(a.sync.status, SyncStatus.idle);
     });
   });
+
+  group('#104 the purge horizon applies only after the first sync', () {
+    // Example of the issue: A imports X and folder F, syncs, deletes both and purges them 91 days later
+    // (state.json then has a horizon). B has its own library with Y and folder G, last changed before the
+    // horizon, and syncs for the first time after it.
+    Future<(Device, Device, InMemoryProvider, Track, Track)> purgedCloud({
+      bool bSyncsEarly = false,
+    }) async {
+      final cloud = InMemoryProvider();
+      final a = await device(cloud, 1);
+      final b = await device(cloud, 2);
+      final x = await a.add('x.mp3');
+      final f = a.library.createFolder('F');
+      await a.sync.sync();
+      if (bSyncsEarly) await b.sync.sync();
+      tick();
+      final g = b.library.createFolder('G');
+      final y = await b.add('y.mp3', folderId: g.id);
+      tick();
+      a.library.delete({x.id});
+      a.library.deleteFolder(f.id);
+      await a.sync.sync();
+      clock = clock.add(const Duration(days: 91));
+      await a.sync.sync();
+      expect(cloudState(cloud).purged, isNotNull);
+      expect(cloudState(cloud).tracks[x.id], isNull);
+      // without #104 the horizon would kill Y and G on b's first sync
+      final horizon = cloudState(cloud).purged!;
+      expect(b.library.state.tracks[y.id]!.latest! < horizon, isTrue);
+      expect(b.library.state.folders[g.id]!.latest! < horizon, isTrue);
+      return (a, b, cloud, x, y);
+    }
+
+    test('#104/AK2 a track of a device syncing for the first time stays on both devices, with its audio', () async {
+      final (a, b, cloud, _, y) = await purgedCloud();
+      expect(b.library.device.synced, isFalse);
+      await b.sync.sync();
+      await a.sync.sync();
+      expect(b.library.device.synced, isTrue);
+      for (final d in [a, b]) {
+        expect(d.library.track(y.id), isNotNull);
+        expect(d.library.hasFile(y.id), isTrue);
+      }
+      expect(await b.library.readAudio(b.t(y.id)), sources['y.mp3']);
+      expect(b.store.files.keys, contains('Tracks/${y.id}.mp3'));
+      expect(cloud.files.keys, contains('audio/${y.id}.mp3'));
+      expect(cloudState(cloud).tracks[y.id]!.alive, isTrue);
+    });
+
+    test('#104/AK3 a folder of a device syncing for the first time stays on both devices, with its tracks', () async {
+      final (a, b, _, _, y) = await purgedCloud();
+      final g = b.t(y.id).folderId!;
+      await b.sync.sync();
+      await a.sync.sync();
+      for (final d in [a, b]) {
+        expect(d.library.folders.map((f) => f.id), contains(g));
+        expect(d.t(y.id).folderId, g);
+      }
+    });
+
+    test('#104/AK4 a device that has synced before still loses what was deleted and purged', () async {
+      final (a, b, _, x, y) = await purgedCloud(bSyncsEarly: true);
+      expect(b.library.device.synced, isTrue);
+      // offline since before the deletion
+      expect(b.library.track(x.id), isNotNull);
+      await b.sync.sync();
+      await a.sync.sync();
+      for (final d in [a, b]) {
+        expect(d.library.track(x.id), isNull);
+        expect(d.library.folders.map((f) => f.name), isNot(contains('F')));
+      }
+    });
+
+    test('#104 the flag is kept in device.json and read again', () async {
+      final (_, b, _, _, _) = await purgedCloud();
+      Map<String, Object?> deviceJson() => (jsonDecode(
+        utf8.decode(b.store.files[DeviceSettings.fileName]!),
+      ) as Map).cast();
+      expect(deviceJson().containsKey('synced'), isFalse);
+      await b.sync.sync();
+      expect(deviceJson()['synced'], isTrue);
+      expect((await DeviceSettings.load(b.store)).synced, isTrue);
+    });
+
+    test('#104 the first device to sync (empty cloud) counts as synced after its upload', () async {
+      final cloud = InMemoryProvider();
+      final a = await device(cloud, 1);
+      await a.add('a.mp3');
+      await a.sync.sync();
+      expect(a.library.device.synced, isTrue);
+    });
+
+    test('#104 a device.json without the flag: a state with foreign stamps counts as synced', () async {
+      final cloud = InMemoryProvider();
+      final a = await device(cloud, 1);
+      final b = await device(cloud, 2);
+      await a.add('a.mp3');
+      await a.sync.sync();
+      await b.sync.sync();
+      b.store.files[DeviceSettings.fileName] = bytes(
+        jsonEncode({'deviceId': b.library.device.deviceId}),
+      );
+      final again = Library(
+        b.store,
+        probe: (_) => 2.5,
+        readSource: (s) async => sources[s],
+        now: () => clock,
+        saveDelay: Duration.zero,
+      );
+      await again.load();
+      expect(again.device.synced, isTrue);
+      final fresh = await device(InMemoryProvider(), 3);
+      await fresh.add('b.mp3');
+      expect(fresh.library.device.synced, isFalse);
+    });
+  });
 }

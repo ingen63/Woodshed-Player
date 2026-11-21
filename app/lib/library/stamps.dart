@@ -180,6 +180,10 @@ class StampedRecord {
     );
   }
 
+  /// Every field stamped anew with [stamp], values and deletion unchanged (#104).
+  StampedRecord restamp(Hlc stamp) =>
+      StampedRecord(values, {for (final k in stamps.keys) k: stamp}, deleted);
+
   /// Marks the record deleted; its values stay so that a newer change elsewhere can revive it.
   StampedRecord delete(Hlc stamp) => StampedRecord(values, stamps, stamp);
 
@@ -314,6 +318,46 @@ class SharedState {
       purged: Hlc.maxOf([purged, o.purged]),
     );
   }
+
+  /// #104: prepares the state of a device that has never synced for its first merge with [remote]; the
+  /// purge horizon applies only between devices that have synced before. This device's own horizon only
+  /// concerns records it never shared, so it is dropped. Its alive records that [remote] does not know and
+  /// whose horizon would kill are stamped anew with [stamp], which must be higher than every stamp and the
+  /// horizon of [remote]. Records [remote] knows, even as tombstones, are left as they are. [merge] itself
+  /// stays unchanged (commutative, associative, idempotent).
+  SharedState beforeFirstSync(SharedState remote, Hlc stamp) {
+    final h = remote.purged;
+    Map<String, StampedRecord> keep(
+      Map<String, StampedRecord> mine,
+      Map<String, StampedRecord> theirs,
+    ) => {
+      for (final e in mine.entries)
+        e.key: switch (e.value.latest) {
+          final l?
+              when h != null &&
+                  e.value.alive &&
+                  !theirs.containsKey(e.key) &&
+                  !(l > h) =>
+            e.value.restamp(stamp),
+          _ => e.value,
+        },
+    };
+    return SharedState(
+      tracks: keep(tracks, remote.tracks),
+      folders: keep(folders, remote.folders),
+      settings: settings,
+    );
+  }
+
+  /// Some stamp, deletion or the horizon comes from a device other than [device]: this state has been
+  /// merged with another one (#104, for `device.json` files written before the flag existed).
+  bool stampedByOthers(String device) => [
+    purged,
+    for (final r in [...tracks.values, ...folders.values, settings]) ...[
+      ...r.stamps.values,
+      r.deleted,
+    ],
+  ].any((h) => h != null && h.device != device);
 
   /// Removes tombstones whose deletion is older than [tombstoneLifetime] and moves the purge horizon up to
   /// the newest deletion removed (#98).

@@ -6,6 +6,8 @@
 // - #98/AK5: the clock sometimes jumps by more than the 90 days of a tombstone, so devices stay offline that
 //   long; no deleted track or folder comes back, and only tracks last changed before the purge horizon may be
 //   lost (decision in #98).
+// - #104/AK5: some devices sync for the first time only late, often after such a jump; their first sync
+//   loses none of their own tracks (with audio), the purge horizon applies only once a device has synced.
 // - AK7: a damaged `state.json` in the cloud (foreign version number, missing stamps, changed types,
 //   extreme values, truncated) never crashes the sync and never loses local data; the user gets an
 //   understandable message (in every language) when it cannot be used.
@@ -105,7 +107,13 @@ void main() {
       // #98/AK5: newest change of each track seen on any device
       final lastChange = <String, Hlc>{};
       final log = <String>[];
-      for (var step = 0, n = 10 + r.nextInt(30); step < n; step++) {
+      final steps = 10 + r.nextInt(30);
+      // #104/AK5: step from which a device syncs; before that it works on its own library only
+      final joinAt = {
+        for (final d in devices)
+          d: d == devices.first || r.nextBool() ? 0 : r.nextInt(steps),
+      };
+      for (var step = 0; step < steps; step++) {
         final d = pick(r, devices);
         final lib = d.library;
         final ids = lib.tracks.map((t) => t.id).toList();
@@ -161,10 +169,27 @@ void main() {
               log.add('${d.name} settings');
             }
           default:
+            if (step < joinAt[d]!) {
+              log.add('${d.name} not yet');
+              break;
+            }
+            final first = !lib.device.synced;
+            final own = {for (final t in lib.tracks) t.id};
             cloud.offline = r.nextInt(5) == 0;
             await d.sync.sync();
             cloud.offline = false;
             log.add('${d.name} sync');
+            if (first && lib.device.synced) {
+              // #104/AK5: nothing of its own lost on the first sync, unless deleted elsewhere
+              for (final id in own.difference(deleted)) {
+                expect(
+                  lib.track(id),
+                  isNotNull,
+                  reason: '$id lost on the first sync: ${log.join(', ')}',
+                );
+                expect(lib.hasFile(id), isTrue, reason: log.join(', '));
+              }
+            }
         }
         for (final e in devices.expand((d) => d.library.state.tracks.entries)) {
           final l = Hlc.maxOf([lastChange[e.key], e.value.latest]);

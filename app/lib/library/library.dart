@@ -251,6 +251,10 @@ class Library extends ChangeNotifier {
       if (version == SharedState.formatVersion) {
         _state = SharedState.fromJson((json as Map).cast());
         _clock.observe(_state.latest);
+        // #104: a `device.json` from before the flag; foreign stamps show that this device has synced
+        if (!_device.synced && _state.stampedByOthers(_device.deviceId)) {
+          await markSynced();
+        }
         _state = _state.purge(_now());
         _materialize();
       } else {
@@ -449,6 +453,11 @@ class Library extends ChangeNotifier {
     _pendingSave = null;
     _commit();
     _clock.observe(remote.latest);
+    _clock.observe(remote.purged);
+    if (!_device.synced) {
+      // #104: the purge horizon applies only between devices that have synced before
+      _state = _state.beforeFirstSync(remote, _clock.tick());
+    }
     final before = {for (final t in _tracks) t.id: t};
     _state = _state.merge(remote).purge(_now());
     _materialize();
@@ -471,10 +480,23 @@ class Library extends ChangeNotifier {
     }
     try {
       await _write();
+      await markSynced();
     } catch (e) {
       lastError = LibrarySaveFailed('$e');
     }
     notifyListeners();
+  }
+
+  /// This device has shared its state (#104): from now on the purge horizon applies to its records. Called
+  /// after a merge is saved and by the sync engine after it wrote `state.json`.
+  Future<void> markSynced() async {
+    if (_device.synced) return;
+    _device = _device.copyWith(synced: true);
+    try {
+      await _device.save(store);
+    } catch (_) {
+      // only this run knows it; after a restart foreign stamps in the state show it ([load])
+    }
   }
 
   /// Shows [m] to the user, e.g. a problem of the sync (#10/AK7).
