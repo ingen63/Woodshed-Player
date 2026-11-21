@@ -237,14 +237,13 @@ jobs:
           git clone --quiet --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
           "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION" >/dev/null
           "$RUNNER_TEMP/emsdk/emsdk" activate "$EMSDK_VERSION" >/dev/null
-      - name: make test-web (WASM core, OPFS, binding in Chrome)
+      # make test-web ends with make test-web-start, which builds the web app in release mode once
+      # and starts it in Chrome (#72); no build step of its own (#83)
+      - name: make test-web (WASM core, OPFS, binding in Chrome, release build and start)
         run: |
           . "$RUNNER_TEMP/emsdk/emsdk_env.sh" >/dev/null
           cd app && flutter pub get >/dev/null && cd ..
           make test-web
-      - name: flutter build web
-        working-directory: app
-        run: flutter build web --release --no-wasm-dry-run
 
   sanitize:
     name: ASan and UBSan (core)

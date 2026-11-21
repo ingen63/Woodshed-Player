@@ -1,4 +1,4 @@
-// #57, #10, #58, #13, #59, #11, #64, #77, #67, #79, #89: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
+// #57, #10, #58, #13, #59, #11, #64, #77, #67, #79, #89, #83: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -668,7 +668,6 @@ void main() {
       expect(web, contains("needs.changes.outputs.web == 'true'"));
       expect(web, contains("github.event_name == 'workflow_dispatch'"));
       expect(web, contains('make test-web'));
-      expect(web, contains('flutter build web'));
     });
 
     test('make test-web runs test/web in Chrome with the WASM core', () {
@@ -679,6 +678,33 @@ void main() {
       expect(body, contains('tools/chrome_autoplay.sh'));
       expect(body, contains('--platform chrome'));
       expect(body, contains('test/web/'));
+    });
+  });
+
+  group('#83 the job web builds the web app only once', () {
+    String target(String name) {
+      final rest = makefile.substring(makefile.indexOf('\n$name:\n'));
+      return rest.substring(0, rest.indexOf('\n\n'));
+    }
+
+    final build = RegExp(r'flutter build web\b[^\n]*');
+
+    test('#83/AK1 flutter build web exactly once: in make test-web-start', () {
+      final web = job(workflow, 'web');
+      expect(build.allMatches(web), isEmpty);
+      expect(
+        RegExp(r'^\s+make test-web$', multiLine: true).allMatches(web),
+        hasLength(1),
+      );
+      expect(build.allMatches(target('test-web')), isEmpty);
+      expect(target('test-web'), contains('test-web-start'));
+      expect(build.allMatches(target('test-web-start')), hasLength(1));
+    });
+
+    test('#83/AK2 still a release build that is started in Chrome', () {
+      final start = target('test-web-start');
+      expect(build.firstMatch(start)!.group(0), contains('--release'));
+      expect(start, contains('dart tool/web_start_check.dart build/web'));
     });
   });
 

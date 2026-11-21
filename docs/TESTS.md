@@ -128,7 +128,7 @@ zugeordnet.
 | Auslieferung auf GitHub Pages, Service Worker für COOP/COEP | vorhanden: `web_hosting_test.dart` (#41) | – |
 | Im echten Browser: Position, Pegel, Tempo, Loop, Metronom, Laden ohne Aussetzer, OPFS | automatisch: `app/test/web/web_core_test.dart`, `web_storage_test.dart` (#13/AK4, Laden, Play/Pause, Tempo, Loop, Metronom, OPFS); Pegel und Aussetzer weiter von Hand: `app/tool/web_core_check.sh`, `app/tool/web_store_check.sh` (#34, #35, #42) | – |
 | Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6, gestreckte Tempo-Fälle 5e-2, #94), jede Funktion der C-API in einem Referenzfall | vorhanden: `reference_tests` (nativ `--dump`, WASM `--compare`), `reference_api_coverage` (#9/AK7), `core_build_flags_test.dart` (ohne FMA) | – |
-| `flutter build web` und `flutter test --platform chrome` bei jedem Push mit Web-Änderung | vorhanden: Job `web` in `test-quality.yml`, `make test-web` (#13/AK4) | – |
+| `flutter build web` und `flutter test --platform chrome` bei jedem Push mit Web-Änderung | vorhanden: Job `web` in `test-quality.yml`, `make test-web` (#13/AK4); die Web-App wird dort nur einmal gebaut, im Release-Modus in `make test-web-start` (#83) | – |
 | Content-Security-Policy mit erlaubten Hosts | vorhanden: `app/web/index.html`, `app/tool/network_free_test.dart` (#58/AK4), im Browser von Hand geprüft | – |
 | Gebaute Web-App startet ohne gescheiterte Anfrage, ohne fremde Hosts und ohne Konsolenfehler (fremde Hosts im Test nicht erreichbar, also wie offline) | vorhanden: `make test-web-start` (auch am Ende von `make test-web`), `app/tool/web_start_check.dart`, Tests `web_start_check_test.dart` (#72) | – |
 | Web-Audio auf iPhone und Android | vorhanden unter Node.js: `core/web/w0_test.mjs`; Lücke: auf echten Geräten nur von Hand | #32 |
@@ -667,7 +667,7 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
 | Job | Läuft | Inhalt |
 |---|---|---|
 | `checks` | Linux, jeder Push mit Code-Änderung (`core/`, `app/`, `tools/`, `Makefile`, Workflows), von Hand | `make format-check`, `make lint` (mit actionlint, #64), `make coverage-run`, Prüfung gegen `tools/coverage-min`, `coverage-diff`, Zusammenfassung |
-| `web` | Linux, jeder Push mit Web-Änderung (`app/web/`, `*_web.dart`, Kern, Web-Build), von Hand | WASM-Kern, `make test-web` in Chrome, `flutter build web` |
+| `web` | Linux, jeder Push mit Web-Änderung (`app/web/`, `*_web.dart`, Kern, Web-Build), von Hand | WASM-Kern, `make test-web` in Chrome, am Ende `make test-web-start`: einziger `flutter build web` des Jobs (Release, #83) und Start ohne gescheiterte Anfrage (#72) |
 | `sanitize` | Linux, Push mit Änderung am Kern, von Hand | ASan/UBSan (#57) |
 | `contract` | Linux, Push mit Änderung am Kern, von Hand | Vertrag nativ ↔ WASM (#77, #9/AK7): zuerst `make reference-native` (native Referenzfälle schreiben ihre Samples), danach `make test-wasm-compare` (WASM-Kern unter Node.js vergleicht, Toleranz 1e-6, gestreckte Tempo-Fälle 5e-2, jede Funktion der C-API) |
 | `network-free` | Linux, jeder Push, von Hand | Netzwerkfreiheit (#58) |
