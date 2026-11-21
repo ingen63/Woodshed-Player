@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "command_queue.hpp"
+#include "sample_rate.hpp"
 
 namespace wp {
 
@@ -34,7 +35,8 @@ public:
   Engine();
   ~Engine();
 
-  // Kanäle und Samplerate festlegen, Puffer anlegen. Nur aufrufen, während render() nicht läuft.
+  // Set channels and sample rate, allocate buffers. The time stretch is configured with at least
+  // kMinSampleRate (#81); positions keep the given rate. Only call while render() is not running.
   void configure(int channels, int sampleRate);
 
   // Für Tests und Werkzeuge: configure() und Titel sofort einsetzen. Nur, während render() nicht

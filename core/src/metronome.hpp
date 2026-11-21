@@ -6,6 +6,8 @@
 #include <atomic>
 #include <vector>
 
+#include "sample_rate.hpp"
+
 namespace wp {
 
 class Metronome {
@@ -28,7 +30,8 @@ public:
 
   explicit Metronome(int sampleRate = 48000);
 
-  void setSampleRate(int sampleRate); // nur bei gestopptem Audio-Thread
+  // Rates below kMinSampleRate are raised to it (#81). Only while the audio thread is stopped.
+  void setSampleRate(int sampleRate);
   int sampleRate() const { return sampleRate_; }
 
   void start();

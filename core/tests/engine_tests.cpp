@@ -14,6 +14,7 @@
 #include "command_queue.hpp"
 #include "engine.hpp"
 #include "metronome.hpp"
+#include "sample_rate.hpp"
 #include "test_timing.hpp"
 
 // Zählt Speicherreservierungen und -freigaben im markierten Thread (#14/AK1).
@@ -1029,6 +1030,37 @@ void playWithoutTitleStaysSilent() {
   CHECK(e.position() == 0.0);
 }
 
+// Renders 0.3 s of a 440 Hz tone at tempo 0.5 with the engine configured at `rate`.
+std::vector<float> stretchedAtRate(int rate) {
+  wp::Engine e;
+  e.setSource(sine(440, 1.0, wp::kMinSampleRate), 2, rate);
+  e.setRate(0.5);
+  e.play();
+  return renderFrames(e, wp::kMinSampleRate * 3 / 10);
+}
+
+bool allFinite(const std::vector<float> &v) {
+  for (const float x : v)
+    if (!std::isfinite(x))
+      return false;
+  return true;
+}
+
+void stretchRateHasALowerLimit() { // #81/AK1 #81/AK3 #81/AK4
+  CHECK(wp::kMinSampleRate == 8000);
+  const auto atLimit = stretchedAtRate(wp::kMinSampleRate); // unchanged
+  CHECK(allFinite(atLimit));
+  CHECK(rms(atLimit, wp::kMinSampleRate / 10, wp::kMinSampleRate / 10) > 0.1);
+  for (const int rate : {wp::kMinSampleRate - 1, 1, 0, -1}) { // protected
+    const auto out = stretchedAtRate(rate);
+    CHECK(allFinite(out));
+    CHECK(out == atLimit); // the stretch runs at the limit, not below it
+  }
+  wp::Engine e; // positions keep the given rate
+  e.configure(2, 1);
+  CHECK(e.sampleRate() == 1);
+}
+
 int main(int argc, char **argv) {
   const std::string filter = argc > 1 ? argv[1] : ""; // optional: nur Tests, deren Name das enthält
   const std::vector<std::pair<std::string, std::function<void()>>> tests = {
@@ -1073,6 +1105,7 @@ int main(int argc, char **argv) {
       {"volumeScalesStretchedOutput", volumeScalesStretchedOutput},
       {"defaultEngineTakesATitleThroughTheQueue", defaultEngineTakesATitleThroughTheQueue},
       {"concurrentSendsSucceedWhileThereIsRoom", concurrentSendsSucceedWhileThereIsRoom},
+      {"stretchRateHasALowerLimit", stretchRateHasALowerLimit},
   };
   for (auto &[name, fn] : tests) {
     if (name.find(filter) == std::string::npos)

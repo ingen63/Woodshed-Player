@@ -1155,7 +1155,10 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     Dekodieren und Wandeln in einen Track) meldet `WP_ERR_UNSUPPORTED_SAMPLE_RATE`, die App zeigt dazu
     `loadUnsupportedSampleRate`. Regressionstest: Referenzfall «#76/AK1 #76/AK2 sample rate lower limit»
     (`core/tests/reference_tests.cpp`, `sampleRateLowerLimit`, 8000 Hz, 7999 Hz, 1 Hz, 0 und −1), nativ (`make test`)
-    und im WASM-Kern (`make test-wasm`).
+    und im WASM-Kern (`make test-wasm`). Mit #81 schützen sich auch Engine und Metronom selbst: Die Engine
+    konfiguriert den Time-Stretch mit mindestens `wp::kMinSampleRate` (`core/src/sample_rate.hpp`, einzige Stelle
+    der Untergrenze), das Metronom hebt die Rate darauf an. Tests `stretchRateHasALowerLimit` (`engine_tests.cpp`)
+    und `sampleRateHasALowerLimit` (`metronome_tests.cpp`), je 8000 Hz, 7999 Hz, 1 Hz, 0 und −1.
 22. 20.11.2026, #11, Mutationstests: Mehrere Regeln waren ausgeführt, aber nicht geprüft und sind jetzt getestet
     (Kanaltrennung und Lautstärke im gedehnten Pfad, Seek genau aufs Loop-Ende, Loop ab 0 s und knapp unter 1 s,
     mehrere Loop-Durchgänge in einem Block, Wellenform je Block, Klangform und Stopp des Metronoms, Neubeginn der

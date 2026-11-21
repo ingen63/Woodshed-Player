@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "metronome.hpp"
+#include "sample_rate.hpp"
 
 namespace {
 
@@ -748,6 +749,28 @@ void meterChangeWithNextBeatOutside() {
 
 } // namespace
 
+void sampleRateHasALowerLimit() { // #81/AK2 #81/AK3 #81/AK4
+  const int limit = wp::kMinSampleRate;
+  for (const int rate : {limit, limit - 1, 1, 0, -1}) {
+    Metronome m(rate);
+    CHECK(m.sampleRate() == limit);
+    m.start();
+    const auto out = render(m, limit); // one second at 120 bpm
+    bool finite = true;
+    for (const float x : out)
+      finite = finite && std::isfinite(x);
+    CHECK(finite);
+    const auto t = run(m, limit); // the next second: two beats, half a second apart
+    CHECK(t.size() == 2);
+    CHECK(t.size() == 2 && t[1].frame - t[0].frame == limit / 2);
+  }
+  Metronome m(48000);
+  m.setSampleRate(1);
+  CHECK(m.sampleRate() == limit);
+  m.setSampleRate(limit + 1);
+  CHECK(m.sampleRate() == limit + 1);
+}
+
 int main() {
   const std::vector<std::pair<std::string, std::function<void()>>> tests = {
       {"defaults", defaults},
@@ -781,6 +804,7 @@ int main() {
       {"subdivisionChangeLateInTheBeat", subdivisionChangeLateInTheBeat},
       {"meterChangeWithNextBeatOutside", meterChangeWithNextBeatOutside},
       {"stopEndsTheClicks", stopEndsTheClicks},
+      {"sampleRateHasALowerLimit", sampleRateHasALowerLimit},
   };
   for (auto &[name, fn] : tests) {
     const int before = failures;

@@ -25,7 +25,7 @@ bool validMeter(int m) { return m == 2 || m == 3 || m == 4 || m == 6; }
 Metronome::Metronome(int sampleRate) { setSampleRate(sampleRate); }
 
 void Metronome::setSampleRate(int sampleRate) {
-  sampleRate_ = std::max(1, sampleRate);
+  sampleRate_ = std::max(kMinSampleRate, sampleRate); // never below the shared limit (#81)
   gainCoef_ = static_cast<float>(1.0 - std::exp(-1.0 / (kGainSmoothSeconds * sampleRate_)));
 }
 

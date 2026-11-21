@@ -11,6 +11,7 @@
 
 #include "engine.hpp"
 #include "metronome.hpp"
+#include "sample_rate.hpp"
 #include "waveform.hpp"
 
 namespace wp {
@@ -28,10 +29,6 @@ enum ErrorCode {
   kErrBusy = -8,
   kErrUnsupportedSampleRate = -9,
 };
-
-// Lowest sample rate the core accepts, as WP_MIN_SAMPLE_RATE in wp_core.h (#76). Below it the
-// time stretch divides by zero (block size 0).
-constexpr int kMinSampleRate = 8000;
 
 // Deutscher Text zu einem Fehlercode (statisch, nie nullptr).
 const char *errorMessage(int code);

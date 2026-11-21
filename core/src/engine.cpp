@@ -37,7 +37,8 @@ void Engine::configure(int channels, int sampleRate) {
   channels_ = std::clamp(channels, 1, 16);
   sampleRate_ = std::max(1, sampleRate);
   auto &st = *stretch_;
-  st.s.presetDefault(channels_, static_cast<float>(sampleRate_));
+  // The time stretch never runs below the shared limit (#81): below it the block size is 0.
+  st.s.presetDefault(channels_, static_cast<float>(std::max(kMinSampleRate, sampleRate_)));
   // Puffer einmal anlegen, damit der Audio-Thread nichts reserviert.
   const int maxIn = static_cast<int>(std::ceil(kChunk * kMaxRate)) + 2;
   const int seekLen = st.s.outputSeekLength(static_cast<float>(kMaxRate)) + 2;
