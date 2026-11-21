@@ -8,18 +8,46 @@
 @TestOn('browser')
 library;
 
+import 'dart:js_interop';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:web/web.dart' as web;
 import 'package:woodshed_player/app/file_platform_web.dart';
 import 'package:woodshed_player/app/file_store_web.dart';
 import 'package:woodshed_player/app/platform_web.dart';
 import 'package:woodshed_player/app/smoke.dart';
 import 'package:woodshed_player/player/audio_core_web.dart';
+import 'package:wp_core/wp_types.dart';
 
 const hangGuard = Duration(seconds: 30);
 
 void main() {
   setUp(() => OpfsFileStore.clear(libraryDir));
   tearDown(() => OpfsFileStore.clear(libraryDir));
+
+  test('#97/AK6 an AudioContext faster than the core is replaced by one at its limit', () async {
+    // Stands in for an output at 384 kHz: Chrome opens contexts up to 768 kHz.
+    final fast = web.AudioContext(web.AudioContextOptions(sampleRate: 384000));
+    final ctx = await WebAudioCore.supportedContext(fast);
+    addTearDown(() => ctx.close().toDart);
+    expect(ctx.sampleRate, WpSampleRate.max);
+    expect(fast.state, 'closed');
+
+    final usual = web.AudioContext(web.AudioContextOptions(sampleRate: 48000));
+    addTearDown(() => usual.close().toDart);
+    expect(
+      identical(await WebAudioCore.supportedContext(usual), usual),
+      isTrue,
+    );
+    final atLimit = web.AudioContext(
+      web.AudioContextOptions(sampleRate: WpSampleRate.max),
+    );
+    addTearDown(() => atLimit.close().toDart);
+    expect(
+      identical(await WebAudioCore.supportedContext(atLimit), atLimit),
+      isTrue,
+    );
+  });
 
   test(
     '#13/AK4 WASM core: load, play, pause, tempo, loop, metronome',

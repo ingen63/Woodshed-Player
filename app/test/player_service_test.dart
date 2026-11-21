@@ -365,6 +365,26 @@ void main() {
         contains('Unbekannter Fehler'),
       );
     });
+
+    test('#97/AK7 the sample rate message names the range 8–192 kHz', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      for (final l in [de, en]) {
+        final t = loadErrorMessage(
+          l,
+          const LoadError(WpCode.unsupportedSampleRate, 'x.mp3'),
+        );
+        expect(t, contains('8'));
+        expect(t, contains('192 kHz'));
+      }
+      expect(
+        loadErrorMessage(
+          en,
+          const LoadError(WpCode.unsupportedSampleRate, 'x.mp3'),
+        ),
+        'The audio output runs at an unsupported sample rate. '
+        'Supported are 8 to 192 kHz.',
+      );
+    });
   });
 
   group('#29 Steigerung nach Loop-Durchgängen im PlayerService', () {

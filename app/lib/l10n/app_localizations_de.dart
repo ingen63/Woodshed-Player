@@ -545,8 +545,18 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Audio-Kern ist gerade ausgelastet. Bitte erneut versuchen.';
 
   @override
-  String get loadUnsupportedSampleRate =>
-      'Die Audio-Ausgabe läuft mit zu niedriger Samplerate. Nötig sind mindestens 8 kHz.';
+  String loadUnsupportedSampleRate(int min, int max) {
+    final intl.NumberFormat minNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String minString = minNumberFormat.format(min);
+    final intl.NumberFormat maxNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String maxString = maxNumberFormat.format(max);
+
+    return 'Die Audio-Ausgabe läuft mit einer nicht unterstützten Samplerate. Unterstützt werden $minString bis $maxString kHz.';
+  }
 
   @override
   String get loadInvalid => 'Ungültige Datei-Angabe.';

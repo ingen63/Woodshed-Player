@@ -817,12 +817,28 @@ void metronomeRunsAtThePlayerRate() {
   CHECK(low.metronome().sampleRate() == wp::kMinSampleRate);
 }
 
-// #76, #61: a player with an unsupported sample rate renders silence into the whole buffer.
+// #76, #61, #97/AK2: a player with an unsupported sample rate (below or above the limits) renders
+// silence into the whole buffer.
 void unsupportedRateRendersSilence() {
-  wp::Player p(wp::kMinSampleRate - 1);
-  std::vector<float> out(256 * 2, 0.5f);
-  p.render(out.data(), 256);
-  CHECK(std::all_of(out.begin(), out.end(), [](float v) { return v == 0.0f; }));
+  for (const int rate : {wp::kMinSampleRate - 1, wp::kMaxSampleRate + 1}) {
+    wp::Player p(rate);
+    CHECK(!p.sampleRateSupported());
+    std::vector<float> out(256 * 2, 0.5f);
+    p.render(out.data(), 256);
+    CHECK(std::all_of(out.begin(), out.end(), [](float v) { return v == 0.0f; }));
+  }
+  CHECK(wp::Player(wp::kMaxSampleRate).sampleRateSupported());
+}
+
+// #97/AK6: an output device runs at its own rate up to the limit; a faster one (352.8 kHz, 384 kHz,
+// 768 kHz) is opened at the limit and the platform converts, so the player never stays silent.
+void outputRateIsCappedAtTheLimit() {
+  CHECK(wp::kMaxSampleRate == 192000);
+  for (const int rate : {wp::kMinSampleRate, 44100, 48000, 96000, wp::kMaxSampleRate})
+    CHECK(wp::outputRate(rate) == rate);
+  for (const int rate : {wp::kMaxSampleRate + 1, 352800, 384000, 768000})
+    CHECK(wp::outputRate(rate) == wp::kMaxSampleRate);
+  static_assert(wp::outputRate(768000) == wp::kMaxSampleRate, "usable at compile time");
 }
 
 // Fremd dekodiertes PCM (AAC/M4A aus dem Browser) wird auf Stereo und die Rate des Kerns gewandelt
@@ -1081,6 +1097,7 @@ int main() {
       {"progressIsCompleteAfterLoad", progressIsCompleteAfterLoad},
       {"loadThreadWithoutMemory", loadThreadWithoutMemory},
       {"unsupportedRateRendersSilence", unsupportedRateRendersSilence},
+      {"outputRateIsCappedAtTheLimit", outputRateIsCappedAtTheLimit},
       {"metronomeRunsAtThePlayerRate", metronomeRunsAtThePlayerRate},
       {"unreadableFileIsReported", unreadableFileIsReported},
       {"emptyAudioIsUnsupported", emptyAudioIsUnsupported},

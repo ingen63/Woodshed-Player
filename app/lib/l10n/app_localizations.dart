@@ -950,11 +950,11 @@ abstract class AppLocalizations {
   /// **'The audio core is busy right now. Please try again.'**
   String get loadBusy;
 
-  /// No description provided for @loadUnsupportedSampleRate.
+  /// #97: the core accepts sample rates from WP_MIN_SAMPLE_RATE to WP_MAX_SAMPLE_RATE, given in kHz.
   ///
   /// In en, this message translates to:
-  /// **'The audio output runs at too low a sample rate. At least 8 kHz is needed.'**
-  String get loadUnsupportedSampleRate;
+  /// **'The audio output runs at an unsupported sample rate. Supported are {min} to {max} kHz.'**
+  String loadUnsupportedSampleRate(int min, int max);
 
   /// No description provided for @loadInvalid.
   ///

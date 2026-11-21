@@ -31,6 +31,17 @@ class WebAudioCore implements AudioCore {
     _loader.onmessage = ((web.MessageEvent e) => _onLoaderMessage(e.data)).toJS;
   }
 
+  /// #97/AK6: [ctx] if it runs at a rate the core accepts, otherwise (an output faster than
+  /// WpSampleRate.max, e.g. 384 kHz) [ctx] is closed and a new context at WpSampleRate.max is
+  /// returned; the browser converts to the output's rate.
+  static Future<web.AudioContext> supportedContext(web.AudioContext ctx) async {
+    final own = ctx.sampleRate.round();
+    final rate = WpSampleRate.output(own);
+    if (rate == own) return ctx;
+    await ctx.close().toDart;
+    return web.AudioContext(web.AudioContextOptions(sampleRate: rate));
+  }
+
   /// Ordner mit wp_core_web.wasm, wp_core_web.mjs und wp_worklet.js, relativ zur Seite.
   static const assetDir = 'wp_core/';
 
@@ -54,7 +65,7 @@ class WebAudioCore implements AudioCore {
     }
     final module = await _wasmCompile(await response.arrayBuffer().toDart)
         .toDart;
-    final ctx = web.AudioContext();
+    final ctx = await supportedContext(web.AudioContext());
     await ctx.audioWorklet.addModule('${base}wp_worklet.js').toDart;
     final options = JSObject()
       ..['module'] = module

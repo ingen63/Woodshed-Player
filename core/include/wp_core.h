@@ -33,7 +33,7 @@ typedef struct wp_player wp_player;
 /* Range of sample rates the core accepts, both limits included (#76, #97). A player configured
  * outside it renders silence and answers every load with WP_ERR_UNSUPPORTED_SAMPLE_RATE. */
 #define WP_MIN_SAMPLE_RATE 8000
-#define WP_MAX_SAMPLE_RATE 96000
+#define WP_MAX_SAMPLE_RATE 192000
 
 /* English text for an error code, static, never NULL. For logs only: the UI shows its own
  * localized text per code (ARB files in the app). */

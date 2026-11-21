@@ -201,7 +201,17 @@ wp_player *wp_create(void) {
   // Erst das Gerät (für seine Samplerate), dann der Kern; der Callback läuft erst nach
   // ma_device_start.
   std::lock_guard<std::mutex> lock(p->deviceMutex);
-  const bool ready = initDevice(p, 0);
+  bool ready = initDevice(p, 0);
+  // A device faster than the core's limit (e.g. an interface at 352.8 kHz) gets a new one at the
+  // limit; miniaudio converts to the hardware rate (#97/AK6).
+  if (ready) {
+    const int own = static_cast<int>(p->device.sampleRate);
+    if (wp::outputRate(own) != own) {
+      ma_device_uninit(&p->device);
+      p->deviceReady = false;
+      ready = initDevice(p, static_cast<ma_uint32>(wp::outputRate(own)));
+    }
+  }
   p->core = std::make_unique<wp::Player>(ready ? static_cast<int>(p->device.sampleRate) : 48000);
   // Ohne Gerät gibt es trotzdem einen Player; wp_load meldet dann WP_ERR_DEVICE_UNAVAILABLE.
   p->core->setDeviceAvailable(ready && ma_device_start(&p->device) == MA_SUCCESS);

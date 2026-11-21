@@ -195,6 +195,20 @@ void nullDevicePacesInSmallSteps() {
   wp_destroy(p);
 }
 
+// #97/AK6: wp_create runs the core at the device's rate, never above WP_MAX_SAMPLE_RATE, so the
+// player is supported and loads.
+void createdPlayerRateIsSupported() {
+  wp_player *p = wp_create();
+  CHECK(p != nullptr);
+  if (!p)
+    return;
+  const int rate = p->core->sampleRate();
+  CHECK(rate >= WP_MIN_SAMPLE_RATE && rate <= WP_MAX_SAMPLE_RATE);
+  CHECK(rate == static_cast<int>(p->device.sampleRate));
+  CHECK(p->core->sampleRateSupported());
+  wp_destroy(p);
+}
+
 int main() {
   nullBackendOnlyForNull(); // ends with WP_AUDIO_BACKEND=null for the tests below
   std::printf("WP_AUDIO_BACKEND=null\n");
@@ -205,6 +219,7 @@ int main() {
       {"playMarksRunningDeviceAvailable", playMarksRunningDeviceAvailable},
       {"metronomeSettersReachTheCore", metronomeSettersReachTheCore},
       {"nullDevicePacesInSmallSteps", nullDevicePacesInSmallSteps},
+      {"createdPlayerRateIsSupported", createdPlayerRateIsSupported},
   };
   for (auto &[name, fn] : tests) {
     const int before = failures;

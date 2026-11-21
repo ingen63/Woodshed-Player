@@ -539,8 +539,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loadBusy => 'The audio core is busy right now. Please try again.';
 
   @override
-  String get loadUnsupportedSampleRate =>
-      'The audio output runs at too low a sample rate. At least 8 kHz is needed.';
+  String loadUnsupportedSampleRate(int min, int max) {
+    final intl.NumberFormat minNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String minString = minNumberFormat.format(min);
+    final intl.NumberFormat maxNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String maxString = maxNumberFormat.format(max);
+
+    return 'The audio output runs at an unsupported sample rate. Supported are $minString to $maxString kHz.';
+  }
 
   @override
   String get loadInvalid => 'Invalid file reference.';

@@ -22,6 +22,17 @@ abstract final class WpCode {
   static const loadReady = 2;
 }
 
+/// Range of sample rates the core accepts, as `WP_MIN_SAMPLE_RATE` and `WP_MAX_SAMPLE_RATE` in
+/// wp_core.h (#76, #97); app/test/ffi_coverage_test.dart compares them.
+abstract final class WpSampleRate {
+  static const min = 8000;
+  static const max = 192000;
+
+  /// Rate to run an output at whose own rate is [deviceRate]: its own rate up to [max], [max] above
+  /// it; the platform converts to the hardware rate (#97/AK6, as `wp::outputRate` in the core).
+  static int output(int deviceRate) => deviceRate > max ? max : deviceRate;
+}
+
 /// Error codes of `wp_rec_start` as in wp_core.h (`WP_REC_ERR_*`, #44).
 abstract final class WpRecCode {
   static const invalidPath = -1;

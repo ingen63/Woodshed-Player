@@ -103,7 +103,9 @@ int anyRate(wp::fuzz::Reader &in) {
   if (kind < 216)
     return -static_cast<int>(in.u32() % 2147483648u) + static_cast<int>(kind % 2) * 7999;
   if (kind < 240)
-    return 96001 + static_cast<int>(in.u32() % static_cast<uint32_t>(kWebAudioMaxRate - 96000));
+    return WP_MAX_SAMPLE_RATE + 1 +
+           static_cast<int>(in.u32() %
+                            static_cast<uint32_t>(kWebAudioMaxRate - WP_MAX_SAMPLE_RATE));
   return in.i32();
 }
 

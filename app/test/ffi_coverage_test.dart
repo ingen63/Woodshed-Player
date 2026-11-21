@@ -197,6 +197,8 @@ void main() {
       WpCode.unsupportedSampleRate,
       define('WP_ERR_UNSUPPORTED_SAMPLE_RATE'),
     );
+    expect(WpSampleRate.min, define('WP_MIN_SAMPLE_RATE'));
+    expect(WpSampleRate.max, define('WP_MAX_SAMPLE_RATE'));
     expect(WpCode.loadIdle, define('WP_LOAD_IDLE'));
     expect(WpCode.loadRunning, define('WP_LOAD_RUNNING'));
     expect(WpCode.loadReady, define('WP_LOAD_READY'));
@@ -206,6 +208,15 @@ void main() {
       9,
       reason: 'new WP_ERR_* in wp_core.h: update WpCode and loadErrorMessage',
     );
+  });
+
+  test('#97/AK6: an output runs at most at WpSampleRate.max', () {
+    for (final rate in [WpSampleRate.min, 44100, 48000, 96000, 192000]) {
+      expect(WpSampleRate.output(rate), rate);
+    }
+    for (final rate in [192001, 352800, 384000, 768000]) {
+      expect(WpSampleRate.output(rate), WpSampleRate.max);
+    }
   });
 
   test('#44/AK1: recording error codes as in wp_core.h', () {

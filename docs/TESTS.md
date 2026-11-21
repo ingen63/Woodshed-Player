@@ -572,7 +572,7 @@ Die Abdeckung blieb gleich oder stieg (cov 2367–2400 vorher, 2406–2462 nachh
 Unit- und Referenztests erreichten. Die neuen Befehle stehen hinten in der Befehlsliste (`Op` in `fuzz_capi.cpp`),
 damit die eingecheckten Programme ihre Bedeutung behalten; nur in `regressions/capi/nonfinite_arguments` wurden 9
 Befehlsbytes auf ihren bisherigen Wert modulo 20 umgeschrieben (gleiche Befehle, gleiche Argumente). Argumente kommen
-aus `anyRate` (übliche Rate; unter `WP_MIN_SAMPLE_RATE` bis `INT_MIN`; über `WP_MAX_SAMPLE_RATE` (96 kHz, #97) bis
+aus `anyRate` (übliche Rate; unter `WP_MIN_SAMPLE_RATE` bis `INT_MIN`; über `WP_MAX_SAMPLE_RATE` (192 kHz, #97) bis
 768 kHz, dem Höchstwert eines Web-Audio-`AudioContext`; jeder `int` bis `INT_MAX`), `anyCount` (plausibel, negativ bis −2³¹ + 1, jeder `int`) und
 Samples mit NaN, ±unendlich und 3·10³⁸. Fehlercodes gelten als dokumentiert, wenn sie zwischen `WP_OK` und
 `WP_ERR_UNSUPPORTED_SAMPLE_RATE` liegen. Unter ASan/UBSan (`make fuzz`, `make sanitize`) ist zudem jeder
@@ -1368,12 +1368,20 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
 35. 21.11.2026, #97 (aus #85), Fuzzing der übrigen Web-API: Der Kern nahm jede Abtastrate ab `WP_MIN_SAMPLE_RATE` bis
     `INT_MAX` an. `wp_web_track_decode` mit einer kurzen WAV-Datei und `INT_MAX` Hz reservierte Speicher für Milliarden
     Frames (unter `make fuzz` ein Speicherfund über 2 GB); `fuzz_capi` umging das bis dahin mit einer Hilfsbegrenzung.
-    Jetzt gilt die Obergrenze `WP_MAX_SAMPLE_RATE` (96 000 Hz), wie die Untergrenze nur in `core/src/sample_rate.hpp`
+    Jetzt gilt die Obergrenze `WP_MAX_SAMPLE_RATE` (192 000 Hz), wie die Untergrenze nur in `core/src/sample_rate.hpp`
     festgelegt (`wp::kMaxSampleRate`, `wp::sampleRateSupported`). Darüber bleibt der Player stumm, und Laden,
-    Dekodieren und Wandeln (Ziel- und Quellrate) melden `WP_ERR_UNSUPPORTED_SAMPLE_RATE`; genau 96 000 Hz wird
-    angenommen. Regressionstest: Referenzfall «#97/AK1 #97/AK2 #97/AK3 sample rate upper limit»
-    (`core/tests/reference_tests.cpp`, `sampleRateUpperLimit`, 96 000 Hz, 96 001 Hz und `INT_MAX`), nativ und im
-    WASM-Kern; `fuzz_capi` ruft Dekodieren und Wandeln ohne die Hilfsbegrenzung auf. Hätte gefangen werden müssen von
+    Dekodieren und Wandeln (Ziel- und Quellrate) melden `WP_ERR_UNSUPPORTED_SAMPLE_RATE`; genau 192 000 Hz wird
+    angenommen. Damit ein schnelleres Ausgabegerät (z. B. 384 kHz) den Player nicht stumm macht, legt `wp_create`
+    das Gerät dann mit 192 kHz an (`wp::outputRate`, miniaudio wandelt), und die Web-App ersetzt einen solchen
+    `AudioContext` durch einen mit 192 kHz (`WebAudioCore.supportedContext`, der Browser wandelt). Der Text
+    `loadUnsupportedSampleRate` nennt den Bereich 8–192 kHz (aus `WpSampleRate`, statt «zu niedrig»).
+    Regressionstests: Referenzfall «#97/AK1 #97/AK2 #97/AK3 sample rate upper limit» (`core/tests/reference_tests.cpp`,
+    `sampleRateUpperLimit`, 192 000 Hz, 192 001 Hz und `INT_MAX`), nativ und im WASM-Kern;
+    `unsupportedRateRendersSilence` und `outputRateIsCappedAtTheLimit` (`player_tests.cpp`),
+    `createdPlayerRateIsSupported` (`device_tests.cpp`), «#97/AK6 an AudioContext faster than the core …»
+    (`app/test/web/web_core_test.dart`, Chrome mit 384 kHz), `ffi_coverage_test.dart` (Grenzen wie in `wp_core.h`,
+    `WpSampleRate.output`) und «#97/AK7 …» (`player_service_test.dart`). `fuzz_capi` ruft Dekodieren und Wandeln ohne
+    die Hilfsbegrenzung auf. Hätte gefangen werden müssen von
     `fuzz_capi` mit beliebigen Raten; bis #85 rief es Dekodieren und Wandeln in eine Spur nicht auf.
 36. 21.11.2026, #96 (aus #91): `readMetadata` (`app/lib/library/metadata.dart`) warf bei einem beschädigten
     ID3v2-Tag am Dateianfang (erweiterter Kopf über das Tag hinaus, v2.4-Frame mit Längenangabe, aber kürzer als

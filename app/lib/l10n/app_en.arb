@@ -352,7 +352,20 @@
   },
   "loadCancelled": "Loading was cancelled.",
   "loadBusy": "The audio core is busy right now. Please try again.",
-  "loadUnsupportedSampleRate": "The audio output runs at too low a sample rate. At least 8 kHz is needed.",
+  "loadUnsupportedSampleRate": "The audio output runs at an unsupported sample rate. Supported are {min} to {max} kHz.",
+  "@loadUnsupportedSampleRate": {
+    "description": "#97: the core accepts sample rates from WP_MIN_SAMPLE_RATE to WP_MAX_SAMPLE_RATE, given in kHz.",
+    "placeholders": {
+      "min": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "max": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
   "loadInvalid": "Invalid file reference.",
   "loadUnknown": "Unknown error while loading (code {code}).",
   "@loadUnknown": {

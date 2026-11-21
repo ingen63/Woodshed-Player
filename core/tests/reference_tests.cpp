@@ -998,12 +998,12 @@ void sampleRateLowerLimit() {
 }
 
 void sampleRateUpperLimit() {
-  // #97/AK1 #97/AK2 #97/AK3: WP_MAX_SAMPLE_RATE (96 000 Hz) is the highest rate the core accepts.
-  // At the limit a player loads and plays, decoding and converting work; above it (96 001 Hz and
+  // #97/AK1 #97/AK2 #97/AK3: WP_MAX_SAMPLE_RATE (192 000 Hz) is the highest rate the core accepts.
+  // At the limit a player loads and plays, decoding and converting work; above it (192 001 Hz and
   // INT_MAX, where decoding a short file reserved gigabytes, docs/TESTS.md «Gefundene Fehler»)
   // the player stays silent and every way of loading, decoding and converting (target and source
   // rate) reports WP_ERR_UNSUPPORTED_SAMPLE_RATE.
-  CHECK(WP_MAX_SAMPLE_RATE == 96000);
+  CHECK(WP_MAX_SAMPLE_RATE == 192000);
   const auto wav = wavInMemory(8000, 800);
   const float pcm[4] = {0.25f, -0.25f, 0.25f, -0.25f};
   int err = -999;
@@ -1011,7 +1011,7 @@ void sampleRateUpperLimit() {
   wp_web_track *t = wp_web_track_decode(wav.data(), wav.size(), WP_MAX_SAMPLE_RATE, &err);
   CHECK(t != nullptr && err == WP_OK);
   if (t)
-    CHECK(wp_web_track_frames(t) == 9600); // 0.1 s at 96 kHz
+    CHECK(wp_web_track_frames(t) == 19200); // 0.1 s at 192 kHz
   wp_web_track_free(t);
   t = wp_web_track_convert(pcm, 2, 2, WP_MAX_SAMPLE_RATE, WP_MAX_SAMPLE_RATE, &err);
   CHECK(t != nullptr && err == WP_OK);

@@ -310,8 +310,8 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get loadBusy => pseudo(super.loadBusy);
   @override
-  String get loadUnsupportedSampleRate =>
-      pseudo(super.loadUnsupportedSampleRate);
+  String loadUnsupportedSampleRate(int min, int max) =>
+      pseudo(super.loadUnsupportedSampleRate(min, max));
   @override
   String get loadInvalid => pseudo(super.loadInvalid);
   @override

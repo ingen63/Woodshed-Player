@@ -76,7 +76,10 @@ String loadErrorMessage(AppLocalizations l, LoadError e) => switch (e.code) {
   WpCode.outOfMemory => l.loadOutOfMemory(e.file),
   WpCode.cancelled => l.loadCancelled,
   WpCode.busy => l.loadBusy,
-  WpCode.unsupportedSampleRate => l.loadUnsupportedSampleRate,
+  WpCode.unsupportedSampleRate => l.loadUnsupportedSampleRate(
+    WpSampleRate.min ~/ 1000,
+    WpSampleRate.max ~/ 1000,
+  ),
   WpCode.invalidArgument => l.loadInvalid,
   _ => l.loadUnknown(e.code),
 };
