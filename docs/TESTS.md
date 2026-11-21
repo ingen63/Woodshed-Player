@@ -1329,3 +1329,10 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     lädt TSan seine Laufzeit dynamisch, deshalb lief `make sanitize-thread` dort. Die Ersetzung entfällt jetzt unter
     TSan (`core/tests/replace_new.hpp`, auch in `engine_tests` und `realtime_tests`), die davon abhängigen Prüfungen
     werden dort übersprungen. Hätte gefangen werden müssen vom TSan-Job, der vorher nie lief.
+33. 21.11.2026, #102 (aus #59): Der Selbsttest `bench_memory_limit` (#59/AK4) scheiterte im ersten nächtlichen Lauf
+    unter Linux mit `FAILED raw == nullptr`. Nicht das Limit war falsch, sondern der Test: clang -O2 entfernt das
+    ungenutzte Paar `std::malloc(2048 MiB)`/`std::free` und faltet den Vergleich zu «nicht null». Belegt mit
+    `clang++ --target=x86_64-linux-gnu -O2 -S` eines Minimalbeispiels: kein Aufruf von `malloc`, `failures` wird
+    ohne Bedingung erhöht. Der Test schlug also mit und ohne Limit fehl. Jetzt läuft `malloc` über einen
+    `volatile`-Funktionszeiger; der Aufruf bleibt im erzeugten Code, ohne Limit liefert er einen Zeiger und der Test
+    scheitert (Gegenprobe unter macOS). Hätte gefangen werden müssen vom Bench-Job, der vorher nie unter Linux lief.

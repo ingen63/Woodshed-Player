@@ -453,8 +453,11 @@ void memoryLimitHolds() {
   std::vector<float> small(kMiB); // 4 MiB within the limit
   CHECK(small.size() == kMiB);
 #if defined(__linux__) && !defined(WP_SANITIZED)
-  // the address space limit (+1 GiB) also stops malloc outside operator new
-  void *raw = std::malloc(2048 * kMiB);
+  // the address space limit (+1 GiB) also stops malloc outside operator new. #102: called through a
+  // volatile pointer, since clang -O2 removes an unused malloc/free pair and folds the check to
+  // "not null", so the test failed with and without the limit.
+  void *(*volatile allocate)(std::size_t) = std::malloc;
+  void *raw = allocate(2048 * kMiB);
   CHECK(raw == nullptr);
   std::free(raw);
 #endif
