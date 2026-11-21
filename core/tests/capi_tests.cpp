@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -95,6 +96,39 @@ void errorMessagesAndFileDuration() {
   CHECK_NEAR(wp_file_duration(kSine.c_str()), 1.0, 1e-6);
   CHECK(wp_file_duration((kAudio / "missing.flac").string().c_str()) == WP_ERR_FILE_NOT_FOUND);
   CHECK(wp_file_duration("") == WP_ERR_INVALID_ARGUMENT);
+}
+
+// #105/AK2: a path that ends in '.' (the folder ".", a file "song.") made miniaudio read past the
+// end of the path (stack-buffer-overflow found by fuzz_capi). Such a file decodes like any other,
+// a folder is a documented error.
+void pathEndingInDot() {
+  const fs::path dir = fs::temp_directory_path() / "wp_capi_tests_105";
+  std::error_code ec;
+  fs::create_directories(dir, ec);
+  const fs::path dotted = dir / "sine440.";
+  fs::copy_file(kSine, dotted, fs::copy_options::overwrite_existing, ec);
+  CHECK(!ec);
+  CHECK_NEAR(wp_file_duration(dotted.string().c_str()), 1.0, 1e-6);
+  for (const std::string &folder : {std::string("."), (dir / ".").string()}) {
+    const double d = wp_file_duration(folder.c_str());
+    CHECK(d == WP_ERR_UNSUPPORTED_FORMAT || d == WP_ERR_FILE_UNREADABLE);
+  }
+  CHECK(wp_file_duration((dir / "missing.").string().c_str()) == WP_ERR_FILE_NOT_FOUND);
+
+  wp_player *p = wp_create();
+  CHECK(p != nullptr);
+  if (!p)
+    return;
+  wp_set_volume(p, 0.0f);
+  const int r = wp_load(p, dotted.string().c_str());
+  CHECK(r == WP_OK || (!nullBackend && r == WP_ERR_DEVICE_UNAVAILABLE));
+  if (r == WP_OK) {
+    CHECK_NEAR(wp_duration(p), 1.0, 1e-3);
+    const int folder = wp_load(p, ".");
+    CHECK(folder == WP_ERR_UNSUPPORTED_FORMAT || folder == WP_ERR_FILE_UNREADABLE);
+  }
+  wp_destroy(p);
+  fs::remove_all(dir, ec);
 }
 
 void loadAndTransport() {
@@ -209,6 +243,7 @@ int main(int argc, char **argv) {
   const std::vector<std::pair<std::string, std::function<void()>>> tests = {
       {"nullHandleIsSafe", nullHandleIsSafe},
       {"errorMessagesAndFileDuration", errorMessagesAndFileDuration},
+      {"pathEndingInDot", pathEndingInDot},
       {"loadAndTransport", loadAndTransport},
       {"metronomeThroughCApi", metronomeThroughCApi},
       {"recorderStartsIdle", recorderStartsIdle},

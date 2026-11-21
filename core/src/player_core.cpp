@@ -100,6 +100,35 @@ int checkReadable(const std::string &path, size_t *size = nullptr) {
   return kOk;
 }
 
+// #105 (found by fuzz_capi): miniaudio's extension check (ma_path_extension, called by
+// ma_decoder_init_file and ma_decoder_init_vfs) reads past the end of a path that ends in '.',
+// such as the folder "." or a file "song.". Such a path has no extension to pick a decoder by
+// anyway, so the file is read into memory and decoded from there; every other path is opened as a
+// file. Declare the DecoderFile before the decoder: the bytes must outlive ma_decoder_uninit.
+class DecoderFile {
+public:
+  DecoderFile() = default;
+  DecoderFile(const DecoderFile &) = delete;
+  DecoderFile &operator=(const DecoderFile &) = delete;
+  ~DecoderFile() { ma_free(bytes_, nullptr); }
+
+  ma_result init(const std::string &path, const ma_decoder_config &cfg, ma_decoder &dec) {
+    if (path.empty() || path.back() != '.')
+      return ma_decoder_init_file(path.c_str(), &cfg, &dec);
+    ma_default_vfs vfs;
+    if (ma_result r = ma_default_vfs_init(&vfs, nullptr); r != MA_SUCCESS)
+      return r;
+    size_t size = 0;
+    if (ma_result r = ma_vfs_open_and_read_file(&vfs, path.c_str(), &bytes_, &size, nullptr);
+        r != MA_SUCCESS)
+      return r;
+    return ma_decoder_init_memory(bytes_, size, &cfg, &dec);
+  }
+
+private:
+  void *bytes_ = nullptr;
+};
+
 // #75: fewest bytes per second of audio a supported file plausibly has (MP3 at 8 kbit/s has 1000).
 // A header claiming more audio than its file can hold this way is not trusted for the reservation.
 constexpr double kMinBytesPerSecond = 500;
@@ -198,8 +227,9 @@ int decodeFile(const std::string &path, int sampleRate, const std::atomic<bool> 
     return err;
 
   ma_decoder_config cfg = decoderConfig(sampleRate);
+  DecoderFile file;
   ma_decoder dec;
-  if (ma_result r = ma_decoder_init_file(path.c_str(), &cfg, &dec); r != MA_SUCCESS) {
+  if (ma_result r = file.init(path, cfg, dec); r != MA_SUCCESS) {
     return r == MA_DOES_NOT_EXIST || r == MA_ACCESS_DENIED ? mapOpenError(r)
                                                            : kErrUnsupportedFormat;
   }
@@ -213,9 +243,10 @@ double fileDuration(const std::string &path) {
     return kErrInvalidArgument;
   if (int err = checkReadable(path); err != kOk)
     return err;
-  ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 0, 0); // ohne Umwandlung
+  ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 0, 0); // without conversion
+  DecoderFile file;
   ma_decoder dec;
-  if (ma_result r = ma_decoder_init_file(path.c_str(), &cfg, &dec); r != MA_SUCCESS) {
+  if (ma_result r = file.init(path, cfg, dec); r != MA_SUCCESS) {
     return r == MA_DOES_NOT_EXIST || r == MA_ACCESS_DENIED ? mapOpenError(r)
                                                            : kErrUnsupportedFormat;
   }

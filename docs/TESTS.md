@@ -518,7 +518,8 @@ eigenen Testaudios und Befehlsprogramme; keine fremden Audiodateien. Gefundene E
 LeakSanitizer) mit Homebrew-Clang und lässt jedes Ziel `FUZZ_SECONDS` lang laufen (Vorgabe 60, nächtlich 1200), mit
 Zeitgrenze 10 s je Eingabe und 2 GB Speicher. Neue Korpusdateien bleiben in `core/build-fuzz/corpus/` (nicht
 eingecheckt; im Workflow über den Cache von Nacht zu Nacht). Ein Fund (Absturz, Sanitizer, verletzte Invariante,
-Zeitüberschreitung, Speicher) beendet den Lauf mit Fehler und legt die Eingabe unter
+Zeitüberschreitung, Speicher) beendet den Lauf mit Fehler, gibt den ganzen Bericht ab seiner ersten Zeile aus
+(Sanitizer mit Stack, verletzte Invariante, Zeitgrenze; höchstens 300 Zeilen, #105) und legt die Eingabe unter
 `core/build-fuzz/artifacts/<ziel>/` ab; der Job `fuzz` lädt sie als Artefakt hoch. Nach der Behebung kommt die
 Eingabe nach `core/tests/fuzz/regressions/<ziel>/`. Stand 19.11.2026, je 60 s auf dem Mac: `fuzz_decoder` rund
 35 000–90 000 Eingaben, `fuzz_capi` rund 700–1100, ohne Fund.
@@ -1411,3 +1412,15 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     (`core/src/player.cpp`), auf allen Plattformen gleich. Hätte gefangen werden müssen von einem Kerntest auf das
     Tempo des Null-Geräts. Regressionstest: `nullDevicePacesInSmallSteps` in `core/tests/device_tests.cpp`, dazu der
     Lauf von `app_smoke_test.dart` auf dem iOS-Simulator (`make test-ios`).
+39. 21.11.2026, #105, `fuzz_capi` (nächtlicher Lauf, Linux): AddressSanitizer meldete einen Stack-Pufferüberlauf in
+    `ma_path_extension` (miniaudio), aufgerufen von `ma_decoder_init_file` aus `wp::fileDuration`
+    (`core/src/player_core.cpp`) für `wp_file_duration(".")`. Die Endungsprüfung von miniaudio liest bei jedem Pfad,
+    der auf einen Punkt endet (der Ordner `.`, aber auch eine Datei `lied.`), über das Ende der Zeichenkette hinaus;
+    `ma_decoder_init_vfs` ebenso. Unter Linux lag der kurze Pfad im 16-Byte-Puffer der `std::string` auf dem Stack,
+    auf dem Mac (libc++, 22 Byte) blieb der Lesezugriff im Objekt und ASan sah nichts; im WASM-Kern gibt es keinen
+    Sanitizer. Behoben in `player_core.cpp` (`DecoderFile`): Ein Pfad, der auf einen Punkt endet, hat keine Endung
+    für die Wahl des Decoders, die Datei wird in den Speicher gelesen und mit `ma_decoder_init_memory` dekodiert;
+    gilt für `wp_load`, `wp_load_async` und `wp_file_duration`. Seither gibt `make fuzz` bei einem Fund den ganzen
+    Bericht mit Stack aus statt der letzten 40 Zeilen. Hätte gefangen werden müssen von einem C-API-Test mit einem
+    solchen Pfad. Regressionsfall `regressions/capi/path_ending_in_dot` (nativ und im WASM-Kern), Test
+    `pathEndingInDot` in `core/tests/capi_tests.cpp` (unter `make sanitize` auch auf dem Mac ohne Behebung rot).

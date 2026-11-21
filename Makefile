@@ -201,6 +201,12 @@ FUZZ_ENV = UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1:suppressions='$(CUR
            ASAN_OPTIONS="halt_on_error=1:allocator_may_return_null=1$(if $(filter Darwin,$(shell uname -s)),,:detect_leaks=1)" \
            LSAN_OPTIONS="suppressions='$(CURDIR)/core/tests/sanitizer/lsan.supp'"
 
+# #105/AK3: on a finding, print the whole report (sanitizer report with stack, UBSan runtime error,
+# broken invariant, libFuzzer timeout or out of memory) from its first line on, at most 300 lines;
+# without such a line the last 40 lines of the log.
+FUZZ_REPORT = awk 'f || /==ERROR:|ERROR: libFuzzer|runtime error:|FUZZ INVARIANT FAILED/ { f = 1; \
+  if (++n <= 300) print } END { exit !f }' "$(1)" || tail -40 "$(1)"
+
 fuzz-build:
 	cmake -S core -B $(FUZZ_DIR) -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWP_SANITIZE=address,undefined \
 	  -DWP_FUZZ=ON -DCMAKE_C_COMPILER="$(FUZZ_CC)" -DCMAKE_CXX_COMPILER="$(FUZZ_CXX)" >/dev/null
@@ -216,7 +222,7 @@ fuzz: fuzz-build
 	    > $(FUZZ_DIR)/fuzz_$$t.log 2>&1; rc=$$?; \
 	  grep -E '^(stat::number_of_executed_units|stat::new_units_added|INFO: seed corpus)' \
 	    $(FUZZ_DIR)/fuzz_$$t.log; \
-	  if [ $$rc -ne 0 ]; then tail -40 $(FUZZ_DIR)/fuzz_$$t.log; \
+	  if [ $$rc -ne 0 ]; then $(call FUZZ_REPORT,$(FUZZ_DIR)/fuzz_$$t.log); \
 	    echo "fuzz_$$t: finding, input in $(FUZZ_DIR)/artifacts/$$t/"; exit 1; fi; \
 	done
 
