@@ -280,6 +280,13 @@ if(WP_MULL_PLUGIN)
     COMPILE_OPTIONS "-fpass-plugin=${WP_MULL_PLUGIN};-g;-grecord-command-line"
     OBJECT_DEPENDS "${WP_MULL_CONFIG}")
   wp_strict_warnings(mutants_selftest)
+  # #103: clang 18 (the Mull package of the workflow job) reports NULL + 0 in C as pointer-overflow;
+  # miniaudio does that when a converter needs no heap (ma_offset_ptr(NULL, 0)). Newer clang no longer
+  # reports it (C2y makes it defined), so make sanitize and the local mutation runs stay silent. Only
+  # this third-party translation unit skips the check; our own code keeps every UBSan check.
+  if(WP_SANITIZE MATCHES "undefined")
+    target_compile_options(wp_miniaudio PRIVATE -fno-sanitize=pointer-overflow)
+  endif()
 endif()
 
 # #57: in a sanitizer build every test runs with these options; a finding ends the test with a

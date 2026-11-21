@@ -385,7 +385,7 @@ braucht darüber einen Kommentar mit Meldung, Grund und Issue und steht in der f
 
 | Sanitizer | Eintrag | Grund | Issue |
 |---|---|---|---|
-| – | keine | Stand 19.11.2026: ASan, UBSan und TSan melden in allen Kerntests nichts (macOS) | – |
+| UBSan, nur Mutationsbau | `-fno-sanitize=pointer-overflow` für `wp_miniaudio` (`core/CMakeLists.txt`), keine Datei in `*.supp` | miniaudio rechnet `ma_offset_ptr(NULL, 0)`, wenn ein Wandler keinen Heap braucht (`miniaudio.h:56323`). In C17 ist `NULL + 0` undefiniert, ab C2y definiert; clang-18 meldet es, neueres clang (Apple clang 21, clang 23, das Standard-clang von Ubuntu 26.04) nicht mehr. Die Prüfung entfällt nur für diese fremde Übersetzungseinheit; der eigene Code bleibt voll geprüft. Eine Unterdrückungsdatei wirkt nicht, weil alle Prüfungen mit `-fno-sanitize-recover=all` abbrechen. | #103 |
 
 **Grenzen.** LeakSanitizer gibt es mit ASan auf macOS nicht; Lecks prüft nur der Linux-Lauf. `capi_tests` öffnet ein
 echtes Audiogerät; ohne Gerät (Linux-Runner) überspringt er die Ladefälle, der Callback des Geräts läuft dann nicht
@@ -1435,3 +1435,11 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     `stamps_test.dart` (#104) und `property/sync_property_test.dart` (#104/AK5, ohne Behebung rot). Hätte gefangen
     werden müssen von `sync_property_test.dart` (#98/AK5), dessen Invariante Titel vor dem Horizont ausnahm, ohne zu
     unterscheiden, ob das Gerät schon abgeglichen hatte, und dessen Geräte alle früh abglichen.
+41. 21.11.2026, #103 (Mutationsjob, nächtlicher Lauf unter Linux): Der Mull-Vorlauf von `player_tests` scheiterte nach
+    160 ms. Mull zeigt die Testausgabe nicht (`--no-output`); seit #103 startet das Werkzeug das Programm dann selbst
+    noch einmal. Ursache: UBSan `pointer-overflow` in miniaudio (`applying zero offset to null pointer`,
+    `ma_offset_ptr(NULL, 0)`), gemeldet nur von clang-18 (Job auf Ubuntu 24.04 wegen des Mull-Pakets). Der Job `sanitize`
+    läuft auf `ubuntu-latest` (Ubuntu 26.04) mit neuerem clang, das `NULL + 0` in C nicht mehr meldet, und lokal
+    (clang 23) blieb es ebenso still. Kein Fehler im eigenen Code: Im Mutationsbau prüft UBSan `pointer-overflow` in
+    `wp_miniaudio` nicht mehr (Abschnitt «Unterdrückungen»). Hätte früher gefangen werden müssen von einem Sanitizer-Lauf
+    mit derselben clang-Version wie der Mutationsjob.
