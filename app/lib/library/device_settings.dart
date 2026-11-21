@@ -19,6 +19,7 @@ class DeviceSettings {
     this.keepOffline = const {},
     this.evicted = const {},
     this.lastUsed = const {},
+    this.libraryId,
   });
 
   static const fileName = 'device.json';
@@ -45,12 +46,17 @@ class DeviceSettings {
   /// Track ID → milliseconds since the epoch when the track was last used on this device.
   final Map<String, int> lastUsed;
 
+  /// ID of the library this device syncs with (#53, `format.json`); null until the first sync. A storage
+  /// holding another library ID is not merged.
+  final String? libraryId;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
     Set<String>? keepOffline,
     Set<String>? evicted,
     Map<String, int>? lastUsed,
+    String? libraryId,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -58,6 +64,7 @@ class DeviceSettings {
     keepOffline: keepOffline ?? this.keepOffline,
     evicted: evicted ?? this.evicted,
     lastUsed: lastUsed ?? this.lastUsed,
+    libraryId: libraryId ?? this.libraryId,
   );
 
   Map<String, Object?> toJson() => {
@@ -67,6 +74,7 @@ class DeviceSettings {
     if (keepOffline.isNotEmpty) 'keepOffline': [...keepOffline]..sort(),
     if (evicted.isNotEmpty) 'evicted': [...evicted]..sort(),
     if (lastUsed.isNotEmpty) 'lastUsed': lastUsed,
+    if (libraryId != null) 'libraryId': libraryId,
   };
 
   static String newDeviceId([Random? random]) {
@@ -100,6 +108,10 @@ class DeviceSettings {
                 for (final e in m.entries)
                   if (e.key is String && e.value is int)
                     e.key as String: e.value as int,
+            },
+            libraryId: switch (j['libraryId']) {
+              final String v when v.isNotEmpty => v,
+              _ => null,
             },
           );
         }

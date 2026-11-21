@@ -500,6 +500,10 @@ class Library extends ChangeNotifier {
     }
   }
 
+  /// Remembers the library ID of the storage this device syncs with (#53, `format.json`).
+  Future<void> setLibraryId(String id) =>
+      _updateDevice(_device.copyWith(libraryId: id));
+
   /// Shows [m] to the user, e.g. a problem of the sync (#10/AK7).
   void report(LibraryMessage m) {
     lastError = m;

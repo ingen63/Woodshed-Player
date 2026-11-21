@@ -161,7 +161,10 @@ void main() {
         );
         await withSync.library.load();
         await withSync.controller.start();
-        expect(cloud.files.keys, contains(CloudSync.stateName));
+        expect(
+          cloud.files.keys,
+          contains(CloudSync.deviceName(withSync.library.device.deviceId)),
+        );
         final src = File('${dir.path}/a.mp3')..writeAsStringSync('audio a');
         await withSync.library.importFiles([src.path]);
         // #95/AK1: wait for the upload (a state, not a time)

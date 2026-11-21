@@ -20,8 +20,8 @@ enum SyncStatus {
   /// The cloud holds a newer format than this app writes; nothing is written.
   tooNew,
 
-  /// `state.json` in the cloud is damaged; syncing waits for the user's choice ([SyncService.repairCloudState]).
-  damaged,
+  /// A source holds another library (`format.json`, #53/AK9); it is neither merged nor written.
+  foreignLibrary,
 }
 
 /// How to repair a damaged `state.json` (#65).
@@ -66,7 +66,7 @@ abstract class SyncService extends ChangeNotifier {
   /// Syncs now, also retrying files that gave up (button «Sync now», #40).
   Future<void> syncNow();
 
-  /// Repairs a damaged `state.json` in the cloud ([SyncStatus.damaged], #65). Data on this device are
+  /// Repairs a damaged `state.json` in the cloud (#65; since #53 there is none, see CloudSync). Data on this device are
   /// never lost: the backup is merged with them, never put in their place.
   Future<CloudRepairResult> repairCloudState(CloudStateRepair how);
 

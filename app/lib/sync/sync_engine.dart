@@ -1,13 +1,25 @@
-// Sync engine (#37, plan W5): merges the library with `state.json` in the cloud and moves the audio files.
-// Pure Dart on top of a CloudProvider, the same on desktop and in the browser.
+// Sync engine (#37, #53, plan W5): merges the library with the state of every other device and moves the
+// audio files. Pure Dart on top of one or more CloudProviders, the same on desktop and in the browser.
 //
-// One sync: (1) read `state.json`, merge it into the library (stamps per field, stamps.dart), write the
-// result conditionally on the version read; on a conflict read, merge and try again. Before each write
-// the previous contents go to `backup/state-<n>.json` (5 slots in turn). (2) List `audio/` and plan the
-// tasks: upload what is missing, delete what was deleted or excluded, download (desktop) what is missing
-// here. Tasks that fail are retried with growing delays and given up after a few attempts; without a
-// connection the whole sync waits and is retried later. The queue is derived again from the library on
-// every sync, so changes made offline are sent as soon as a sync gets through.
+// Layout at every source (docs/KONZEPT-SYNC.md):
+//   format.json                         format version and library ID
+//   devices/<device-id>.json            state of that device; only that device writes the file
+//   backup/<device-id>/state-<n>.json   the last 5 own states
+//   audio/<hash>.<ext>                  audio files, named after the SHA-256 of their contents
+//
+// One sync: (1) at every source check `format.json`, read every `devices/*.json` (conflict copies too)
+// and merge all of them into the library (stamps per field, stamps.dart; the merge is commutative and
+// idempotent, so the order of files and sources does not matter). (2) Write the merged state to the own
+// device file at every source; the previous contents go to a backup slot first. No write is conditional:
+// no device writes the file of another one. Conflict copies and files of devices gone for
+// [CloudSync.staleAfter] are deleted once their contents are in the own file. (3) Per source, list `audio/`
+// and plan the tasks: upload what is missing, delete what was deleted or excluded, download (desktop)
+// what is missing here. Tasks that fail are retried with growing delays and given up after a few
+// attempts; a source without connection waits and is retried later.
+//
+// Several sources make a bridge (#53/AK4): a device syncing with the cloud and with a paired device
+// carries the changes of each to the other, because its own file holds everything it merged. Google
+// Drive (#54), OneDrive (#55) and a paired device (#56) are just further CloudProviders.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -18,18 +30,13 @@ import '../library/stamps.dart' show isFiniteJson, sameJson;
 import 'cloud_provider.dart';
 import 'sync_service.dart';
 
-/// The cloud holds `state.json` in a newer format.
+/// A source holds the library in a newer format.
 class SyncTooNew implements Exception {
   const SyncTooNew(this.version);
   final int version;
 }
 
-/// `state.json` in the cloud is damaged: the sync waits for the user's choice (#65).
-class _StateDamaged implements Exception {
-  const _StateDamaged();
-}
-
-/// A task of the queue: `state`, `up:<hash>`, `down:<hash>` or `rm:<hash>`.
+/// A task of the queue of one source: `state`, `up:<hash>`, `down:<hash>` or `rm:<hash>`.
 class SyncTask {
   SyncTask(this.key);
   final String key;
@@ -41,28 +48,113 @@ class SyncTask {
   Object? lastError;
 }
 
+/// A device file as read from a source.
+class DeviceFile {
+  const DeviceFile({
+    required this.name,
+    required this.deviceId,
+    required this.copy,
+    required this.bytes,
+    required this.state,
+    required this.generation,
+    this.written,
+  });
+
+  final String name;
+  final String deviceId;
+
+  /// A conflict copy made by the storage, not the file the device writes.
+  final bool copy;
+  final Uint8List bytes;
+  final SharedState state;
+
+  /// Counts the writes of the device; picks the backup slot.
+  final int generation;
+
+  /// When the device wrote the file (its clock); null if unknown.
+  final DateTime? written;
+}
+
+/// Contents of `format.json`; both null if it is missing or damaged.
+class _Format {
+  const _Format({this.version, this.id});
+
+  factory _Format.parse(Uint8List bytes) {
+    try {
+      final j = jsonDecode(utf8.decode(bytes));
+      if (j is Map) {
+        return _Format(
+          version: j['formatVersion'] is int ? j['formatVersion'] as int : null,
+          id: switch (j['libraryId']) {
+            final String v when v.isNotEmpty => v,
+            _ => null,
+          },
+        );
+      }
+    } on FormatException {
+      // damaged: written again with the library ID of this device
+    }
+    return const _Format();
+  }
+
+  final int? version;
+  final String? id;
+}
+
+/// What one sync read from one source.
+class _Read {
+  final files = <DeviceFile>[];
+  DeviceFile? own;
+  Uint8List? ownBytes;
+}
+
+/// One storage the device syncs with, with its own queue.
+class _Source {
+  _Source(this.provider);
+  final CloudProvider provider;
+  final queue = <String, SyncTask>{};
+  Set<String> audio = {};
+
+  /// The last sync could not reach it.
+  bool offline = false;
+
+  /// It holds another library (`format.json`): nothing is merged or written.
+  bool foreign = false;
+}
+
 class CloudSync extends SyncService {
   CloudSync(
-    this.provider,
+    CloudProvider provider,
     this.library, {
+    List<CloudProvider> more = const [],
     this.eagerDownload = true,
     this.changeDelay = const Duration(seconds: 5),
     this.backoffBase = const Duration(seconds: 2),
     this.backoffMax = const Duration(minutes: 5),
     this.maxAttempts = 5,
-    this.maxConflicts = 5,
     this.maxOfflineRetries = 8,
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+    Random? random,
+  }) : _now = now ?? DateTime.now,
+       _random = random ?? Random.secure() {
+    for (final p in [provider, ...more]) {
+      _sources.add(_Source(p));
+    }
+  }
 
-  static const stateName = 'state.json';
+  static const formatName = 'format.json';
+  static const devicesPrefix = 'devices/';
+  static String deviceName(String deviceId) => '$devicesPrefix$deviceId.json';
   static const backupCount = 5;
-  static String backupName(int n) => 'backup/state-$n.json';
+  static String backupName(String deviceId, int n) =>
+      'backup/$deviceId/state-$n.json';
 
-  /// Where a repair keeps the damaged `state.json` before replacing it (#65).
-  static const damagedName = 'backup/state-damaged.json';
+  /// #53/AK8: a device file not written for so long is merged and removed.
+  static const staleAfter = Duration(days: 180);
 
-  final CloudProvider provider;
+  /// The own file is written again after this time even without changes, so it never looks stale.
+  static const refreshAfter = Duration(days: 30);
+
   final Library library;
 
   /// Download missing audio files right away (desktop); otherwise only when played ([fetchAudio]).
@@ -74,16 +166,13 @@ class CloudSync extends SyncService {
   /// Attempts per file before it is given up (protection against endless loops).
   final int maxAttempts;
 
-  /// Conditional writes of `state.json` per sync before the sync counts as failed.
-  final int maxConflicts;
-
   /// Automatic retries without a connection; after that only start, foreground and changes trigger one.
   final int maxOfflineRetries;
   final DateTime Function() _now;
+  final Random _random;
 
+  final _sources = <_Source>[];
   SyncStatus _status = SyncStatus.idle;
-  final _queue = <String, SyncTask>{};
-  Set<String> _cloudAudio = {};
   Future<void>? _running;
   bool _again = false;
   int _offline = 0;
@@ -91,18 +180,38 @@ class CloudSync extends SyncService {
   Timer? _retryTimer;
   bool _disposed = false;
 
+  /// Format version already reported as too new: one message per version.
+  int? _reportedTooNew;
+
   /// Time of the last sync that got through.
   DateTime? lastSync;
+
+  /// The sources in sync order; the first one is the cloud if there is one.
+  List<CloudProvider> get sources => [for (final s in _sources) s.provider];
+
+  /// The first source.
+  CloudProvider get provider => _sources.first.provider;
+
+  /// Adds a source, e.g. a paired device that connected (#56). It takes part from the next sync on.
+  void addSource(CloudProvider p) {
+    if (_sources.any((s) => identical(s.provider, p))) return;
+    _sources.add(_Source(p));
+  }
+
+  /// Removes a source with its queue (e.g. a paired device that went away).
+  void removeSource(CloudProvider p) =>
+      _sources.removeWhere((s) => identical(s.provider, p));
 
   @override
   SyncStatus get status => _status;
 
-  /// Tasks still waiting or given up (for tests and the status in #40).
-  List<SyncTask> get pending => List.unmodifiable(_queue.values);
+  /// Tasks still waiting or given up, of every source (for tests and the status in #40).
+  List<SyncTask> get pending =>
+      List.unmodifiable([for (final s in _sources) ...s.queue.values]);
 
   /// Tasks given up after [maxAttempts].
   List<SyncTask> get failed => [
-    for (final t in _queue.values)
+    for (final t in pending)
       if (t.parked) t,
   ];
 
@@ -110,7 +219,8 @@ class CloudSync extends SyncService {
   Duration? nextRetry;
 
   @override
-  bool inCloud(String trackId) => _cloudAudio.contains(trackId);
+  bool inCloud(String trackId) =>
+      _sources.any((s) => s.audio.contains(trackId));
 
   @override
   Future<void> start() => sync();
@@ -121,14 +231,16 @@ class CloudSync extends SyncService {
   @override
   void localChanged() {
     // A new change gives the state another chance even if it gave up before.
-    if (_queue['state'] case final t? when t.parked) _queue.remove('state');
+    for (final s in _sources) {
+      if (s.queue['state'] case final t? when t.parked) s.queue.remove('state');
+    }
     _changeTimer?.cancel();
     _changeTimer = Timer(changeDelay, sync);
   }
 
   @override
   Future<void> syncNow() {
-    for (final t in _queue.values) {
+    for (final t in pending) {
       t.parked = false;
       t.attempts = 0;
       t.notBefore = null;
@@ -155,7 +267,7 @@ class CloudSync extends SyncService {
     } while (_again &&
         _status != SyncStatus.offline &&
         _status != SyncStatus.tooNew &&
-        _status != SyncStatus.damaged);
+        _status != SyncStatus.foreignLibrary);
   }
 
   Future<void> _once() async {
@@ -169,26 +281,128 @@ class CloudSync extends SyncService {
     _setStatus(SyncStatus.syncing);
     try {
       library.flush();
-      _queue.putIfAbsent('state', () => SyncTask('state'));
-      await _runTasks(only: 'state');
-      if (!_queue.containsKey('state')) {
-        _plan(await provider.list('audio/'));
-        await _runTasks();
+      final active = [..._sources];
+      for (final s in active) {
+        s.offline = false;
+        s.queue.putIfAbsent('state', () => SyncTask('state'));
+      }
+      // (0) format.json everywhere first: a library ID found at any source is taken over before a new
+      // one is made for a source that has none yet
+      final formats = <_Source, _Format>{};
+      for (final s in active) {
+        if (!_due(s.queue['state']!)) continue;
+        await _guard(s, s.queue['state']!, () async {
+          formats[s] = await _readFormat(s);
+        });
+      }
+      if (library.device.libraryId == null) {
+        final found = formats.values.map((f) => f.id).nonNulls.firstOrNull;
+        if (found != null) await library.setLibraryId(found);
+      }
+      // (1) read every source, then merge everything at once
+      final reads = <_Source, _Read>{};
+      for (final e in formats.entries) {
+        final s = e.key;
+        await _guard(s, s.queue['state']!, () async {
+          final r = await _read(s, e.value);
+          if (r != null) reads[s] = r;
+        });
+      }
+      final merged = [
+        for (final r in reads.values)
+          for (final f in r.files) f.state,
+      ];
+      if (merged.isNotEmpty) {
+        await library.mergeRemote(merged.reduce((a, b) => a.merge(b)));
+      }
+      // (2) write the own file at every source that was read
+      for (final e in reads.entries) {
+        final s = e.key;
+        if (await _guard(s, s.queue['state']!, () => _write(s, e.value))) {
+          s.queue.remove('state');
+        }
+      }
+      // (3) audio at every source whose state got through: first download from all of them, then
+      // upload and delete, so a file that arrived from one source goes on to the others at once (AK4)
+      final ready = [
+        for (final s in active)
+          if (!s.offline && !s.foreign && !s.queue.containsKey('state')) s,
+      ];
+      for (final downloads in [true, false]) {
+        for (final s in ready) {
+          if (s.offline) continue;
+          try {
+            if (downloads) {
+              _plan(s, {
+                for (final e in await s.provider.list('audio/'))
+                  _hashOf(e.name),
+              });
+            } else {
+              _plan(s, s.audio);
+            }
+            await _runTasks(s, downloads: downloads);
+          } on CloudOffline {
+            s.offline = true;
+          }
+        }
       }
       await _trimCache();
-      _offline = 0;
+      final reached = active.where((s) => !s.offline).length;
+      if (active.isNotEmpty && reached == 0) throw const CloudOffline();
+      if (reached < active.length) {
+        _offline++;
+        if (_offline <= maxOfflineRetries) _retryIn(_backoff(_offline));
+      } else {
+        _offline = 0;
+        _scheduleRetry();
+      }
       lastSync = _now();
-      _scheduleRetry();
-      _setStatus(failed.isEmpty ? SyncStatus.idle : SyncStatus.failed);
+      _setStatus(
+        active.any((s) => s.foreign)
+            ? SyncStatus.foreignLibrary
+            : failed.isEmpty
+            ? SyncStatus.idle
+            : SyncStatus.failed,
+      );
     } on CloudOffline {
       _offline++;
       if (_offline <= maxOfflineRetries) _retryIn(_backoff(_offline));
       _setStatus(SyncStatus.offline);
     } on SyncTooNew {
       _setStatus(SyncStatus.tooNew);
-    } on _StateDamaged {
-      // #65: no automatic retry; the user chooses how to repair (start, foreground and changes still look).
-      _setStatus(SyncStatus.damaged);
+    }
+  }
+
+  bool _due(SyncTask t) =>
+      !t.parked && !(t.notBefore?.isAfter(_now()) ?? false);
+
+  /// Runs [step] for source [s]; a failure counts against [task]. False if it did not get through.
+  /// [CloudOffline] marks the source as offline; [SyncTooNew] stops the whole sync.
+  Future<bool> _guard(
+    _Source s,
+    SyncTask task,
+    Future<void> Function() step,
+  ) async {
+    try {
+      await step();
+      return true;
+    } on CloudOffline {
+      s.offline = true;
+    } on SyncTooNew {
+      rethrow;
+    } catch (e) {
+      _fail(task, e);
+    }
+    return false;
+  }
+
+  void _fail(SyncTask task, Object e) {
+    task.lastError = e;
+    task.attempts++;
+    if (task.attempts >= maxAttempts) {
+      task.parked = true;
+    } else {
+      task.notBefore = _now().add(_backoff(task.attempts));
     }
   }
 
@@ -197,180 +411,155 @@ class CloudSync extends SyncService {
     if (!_disposed) notifyListeners();
   }
 
-  /// Hash from `audio/<hash>.<ext>`.
-  static String _hashOf(String name) {
-    final base = name.substring(name.lastIndexOf('/') + 1);
-    final dot = base.indexOf('.');
-    return dot < 0 ? base : base.substring(0, dot);
-  }
+  // ---- State: format.json and device files (#53) ----
 
-  void _plan(List<CloudEntry> listing) {
-    _cloudAudio = {for (final e in listing) _hashOf(e.name)};
-    void add(String key) => _queue.putIfAbsent(key, () => SyncTask(key));
-    final tracks = {for (final t in library.tracks) t.id: t};
-    for (final t in tracks.values) {
-      final here = library.hasFile(t.id);
-      final there = _cloudAudio.contains(t.id);
-      if (here && !there && library.uploadable(t)) add('up:${t.id}');
-      if (!here && there && eagerDownload) add('down:${t.id}');
-    }
-    // Only hashes the state knows: a file of a track this device has not seen yet stays.
-    for (final h in _cloudAudio) {
-      final rec = library.state.tracks[h];
-      if (rec == null) continue;
-      final t = tracks[h];
-      if (!rec.alive || (t != null && !library.uploadable(t))) add('rm:$h');
-    }
-    notifyListeners();
-  }
-
-  /// Runs the due tasks ([only] one key). [CloudOffline] stops all of them.
-  Future<void> _runTasks({String? only}) async {
-    final now = _now();
-    for (final task in _queue.values.toList()) {
-      if (only != null && task.key != only) continue;
-      if (task.parked) continue;
-      if (task.notBefore case final t? when t.isAfter(now)) continue;
+  /// Settles `format.json` and reads every device file of [s]. Null if [s] holds another library.
+  Future<_Read?> _read(_Source s, _Format format) async {
+    if (!await _settleFormat(s, format)) return null;
+    final me = library.device.deviceId;
+    final read = _Read();
+    for (final e in await s.provider.list(devicesPrefix)) {
+      final kind = parseDeviceName(e.name);
+      if (kind == null) continue; // not a device file: left alone
+      final f = await s.provider.get(e.name);
+      if (f == null) continue; // gone in the meantime
+      final DeviceFile file;
       try {
-        await _execute(task.key);
-        _queue.remove(task.key);
-      } on CloudOffline {
+        file = decodeDevice(e.name, f.bytes);
+      } on SyncTooNew catch (t) {
+        _reportTooNew(t.version);
         rethrow;
-      } on SyncTooNew {
-        rethrow;
-      } on _StateDamaged {
-        rethrow;
-      } catch (e) {
-        task.lastError = e;
-        task.attempts++;
-        if (task.attempts >= maxAttempts) {
-          task.parked = true;
-        } else {
-          task.notBefore = _now().add(_backoff(task.attempts));
-        }
+      } on FormatException {
+        // #53/AK5: no error; the file stays and is tried again on the next sync
+        if (e.name == deviceName(me)) read.ownBytes = f.bytes;
+        continue;
+      }
+      read.files.add(file);
+      if (e.name == deviceName(me)) {
+        read.own = file;
+        read.ownBytes = f.bytes;
       }
     }
+    return read;
   }
 
-  Future<void> _execute(String key) async {
-    if (key == 'state') return _syncState();
-    final hash = key.substring(key.indexOf(':') + 1);
-    final t = library.track(hash);
-    switch (key.substring(0, key.indexOf(':'))) {
-      case 'up':
-        if (t == null || !library.uploadable(t) || !library.hasFile(hash)) {
-          return;
-        }
-        final bytes = await library.readAudio(t);
-        if (bytes == null) return;
-        // Content-addressed: writing the same file again changes nothing, so this is idempotent.
-        await provider.put(Library.cloudAudioName(t), bytes);
-        _cloudAudio.add(hash);
-      case 'down':
-        if (t == null || library.hasFile(hash)) return;
-        if (!await _download(t)) throw CloudError('download of $hash failed');
-      case 'rm':
-        final rec = library.state.tracks[hash];
-        if (rec == null) return;
-        if (rec.alive && t != null && library.uploadable(t)) return;
-        for (final e in await provider.list('audio/$hash')) {
-          await provider.delete(e.name);
-        }
-        _cloudAudio.remove(hash);
+  /// Reads `format.json` of [s] (#53/AK9): a newer format stops the sync without writing.
+  Future<_Format> _readFormat(_Source s) async {
+    s.foreign = false;
+    final f = await s.provider.get(formatName);
+    final format = f == null ? const _Format() : _Format.parse(f.bytes);
+    if (format.version case final v? when v > SharedState.formatVersion) {
+      _reportTooNew(v);
+      throw SyncTooNew(v);
     }
+    return format;
   }
 
-  Future<bool> _download(Track t) async {
-    final f = await provider.get(Library.cloudAudioName(t));
-    if (f == null) return false;
-    return library.addAudio(t.id, f.bytes);
-  }
-
-  @override
-  Future<bool> fetchAudio(Track track) async {
-    if (library.hasFile(track.id)) return true;
-    try {
-      if (!await _download(track)) return false;
-    } catch (_) {
+  /// #53/AK9: another library ID is not merged. Writes `format.json` if it is missing, damaged or older,
+  /// with the library ID of this device (a new one if it has none yet).
+  Future<bool> _settleFormat(_Source s, _Format format) async {
+    final mine = library.device.libraryId;
+    final id = format.id;
+    if (mine != null && id != null && id != mine) {
+      s.foreign = true;
       return false;
     }
-    await _trimCache(
-      keep: {track.id},
-    ); // the file just loaded is about to be played
+    if (id != null && format.version == SharedState.formatVersion) return true;
+    final useId = id ?? mine ?? _newLibraryId();
+    await s.provider.put(formatName, encodeFormat(useId));
+    // two devices may create it at the same moment: the one stored wins, before anything is merged
+    final stored = await s.provider.get(formatName);
+    final adopt =
+        (stored == null ? null : _Format.parse(stored.bytes).id) ?? useId;
+    if (mine != null && adopt != mine) {
+      s.foreign = true;
+      return false;
+    }
+    if (mine == null) await library.setLibraryId(adopt);
     return true;
   }
 
-  /// #39/AK3: without eager downloads (browser) the device is a cache of the cloud: above its limit the
-  /// files used longest ago go, as far as they are in the cloud. Desktop keeps every file.
-  Future<void> _trimCache({Set<String> keep = const {}}) async {
-    if (eagerDownload) return;
-    try {
-      await library.trimCache(inCloud: inCloud, keep: keep);
-    } catch (_) {} // a failed delete leaves the file; the next sync tries again
+  String _newLibraryId() => List.generate(
+    16,
+    (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ).join();
+
+  void _reportTooNew(int version) {
+    if (_reportedTooNew != version) library.report(CloudStateTooNew(version));
+    _reportedTooNew = version;
   }
 
-  /// Merges `state.json` into the library and writes the result back conditionally (#37/AK1, AK6).
-  Future<void> _syncState() async {
-    for (var i = 0; i < maxConflicts; i++) {
-      final remote = await provider.get(stateName);
-      SharedState? theirs;
-      var generation = 0;
-      if (remote != null) {
-        final (state, gen) = _readState(remote);
-        theirs = state;
-        generation = gen;
-        await library.mergeRemote(theirs);
-      }
-      final mine = library.state;
-      if (theirs != null && sameJson(mine.toJson(), theirs.toJson())) return;
-      if (remote != null) {
-        // #37/AK6: the previous contents first; the slot follows the generation, so the last 5 remain.
-        await provider.put(
-          backupName(generation % backupCount + 1),
-          remote.bytes,
+  /// Writes the merged state to the own device file of [s] if it differs (#53/AK1), after keeping the
+  /// previous contents as a backup (#53/AK7). Then removes conflict copies and stale files whose contents
+  /// are in it (#53/AK6, AK8).
+  Future<void> _write(_Source s, _Read read) async {
+    final me = library.device.deviceId;
+    final mine = library.state;
+    final own = read.own;
+    final now = _now();
+    final fresh =
+        own != null &&
+        own.written != null &&
+        now.difference(own.written!) < refreshAfter;
+    if (own == null || !fresh || !sameJson(own.state.toJson(), mine.toJson())) {
+      final generation = own?.generation ?? 0;
+      if (read.ownBytes case final previous?) {
+        // the slot follows the generation, so the last 5 remain
+        await s.provider.put(
+          backupName(me, generation % backupCount + 1),
+          previous,
         );
       }
-      try {
-        await provider.put(
-          stateName,
-          encodeState(mine, generation + 1),
-          ifVersion: remote?.version,
-          ifAbsent: remote == null,
-        );
-        await library.markSynced(); // #104
-        return;
-      } on VersionConflict {
-        continue; // someone else wrote in between: read, merge, try again
-      }
+      await s.provider.put(
+        deviceName(me),
+        encodeDevice(mine, me, generation + 1, now),
+      );
     }
-    throw CloudError('state.json: $maxConflicts conflicts in a row');
-  }
-
-  /// Reads `state.json` and checks it before anything is merged (#10/AK7): a damaged file leaves the
-  /// library untouched. The user gets one message per damaged version and the sync waits for a repair
-  /// ([repairCloudState], #65). A newer format version stops the sync ([SyncTooNew]).
-  (SharedState, int) _readState(CloudFile remote) {
-    try {
-      return _decodeState(remote.bytes);
-    } on SyncTooNew catch (e) {
-      if (_reported != remote.version) {
-        library.report(CloudStateTooNew(e.version));
+    await library.markSynced(); // #104
+    for (final f in read.files) {
+      final stale =
+          f.deviceId != me &&
+          !f.copy &&
+          f.written != null &&
+          now.difference(f.written!) >= staleAfter;
+      if (!f.copy && !stale) continue;
+      // merged above and written into the own file; delete only what was read (no data loss)
+      final again = await s.provider.get(f.name);
+      if (again != null && _same(again.bytes, f.bytes)) {
+        await s.provider.delete(f.name);
       }
-      _reported = remote.version;
-      rethrow;
-    } on FormatException {
-      if (_reported != remote.version) {
-        library.report(const CloudStateUnreadable());
-      }
-      _reported = remote.version;
-      throw const _StateDamaged();
     }
   }
 
-  /// Decodes and checks a `state.json` (or a backup of it): not JSON, other types, missing stamps, numbers
-  /// beyond a double, stamps out of range or records the app cannot show give a [FormatException]; a newer
+  static bool _same(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  /// The device ID of a file under `devices/` and whether it is a conflict copy; null for other files.
+  ///
+  /// Storages keep both versions of a file written twice at once under a new name (#53/AK6): Google Drive
+  /// for desktop `<id> (1).json`, the OneDrive API (`conflictBehavior=rename`) `<id> 1.json`, the OneDrive
+  /// client `<id>-<device name>.json`, iCloud `<id> 2.json`, others
+  /// `<id> (<name>'s conflicted copy <date>).json`, Syncthing `<id>.sync-conflict-<date>-<time>-<id>.json`.
+  /// Device IDs are 16 hex digits, so whatever follows them up to `.json` (starting with another
+  /// character) marks a copy.
+  static ({String deviceId, bool copy})? parseDeviceName(String name) {
+    final m = RegExp(r'^devices/([0-9a-f]{16})([^0-9a-f/][^/]*)?\.json$')
+        .firstMatch(name);
+    if (m == null) return null;
+    return (deviceId: m.group(1)!, copy: m.group(2) != null);
+  }
+
+  /// Decodes and checks a device file: not JSON, other types, missing stamps, numbers beyond a double,
+  /// stamps out of range or records the app cannot show give a [FormatException] (#10/AK7); a newer
   /// format version gives [SyncTooNew].
-  static (SharedState, int) _decodeState(Uint8List bytes) {
+  static DeviceFile decodeDevice(String name, Uint8List bytes) {
+    final kind = parseDeviceName(name);
+    if (kind == null) throw FormatException('not a device file: $name');
     try {
       final j = jsonDecode(utf8.decode(bytes));
       if (j is! Map) throw const FormatException('not an object');
@@ -389,115 +578,174 @@ class CloudSync extends SyncService {
       }
       TrackSortOrder.parse(state.settings.values['sortOrder'] as String?);
       final g = j['generation'];
-      return (state, g is int && g >= 0 && g <= Hlc.maxCounter ? g : 0);
+      final w = j['written'];
+      return DeviceFile(
+        name: name,
+        deviceId: kind.deviceId,
+        copy: kind.copy,
+        bytes: bytes,
+        state: state,
+        generation: g is int && g >= 0 && g <= Hlc.maxCounter ? g : 0,
+        written: w is int && w >= 0
+            ? DateTime.fromMillisecondsSinceEpoch(w, isUtc: true)
+            : null,
+      );
     } on SyncTooNew {
       rethrow;
     } on FormatException {
       rethrow;
     } catch (e) {
-      throw FormatException('state.json unreadable: $e');
+      throw FormatException('$name unreadable: $e');
     }
+  }
+
+  /// A device file: the shared state, the writing device, a generation counter for the backup slots and
+  /// the time of writing (for [staleAfter]).
+  static Uint8List encodeDevice(
+    SharedState s,
+    String deviceId,
+    int generation,
+    DateTime written,
+  ) => Uint8List.fromList(
+    utf8.encode(
+      const JsonEncoder.withIndent('  ').convert({
+        ...s.toJson(),
+        'deviceId': deviceId,
+        'generation': generation,
+        'written': written.millisecondsSinceEpoch,
+      }),
+    ),
+  );
+
+  static Uint8List encodeFormat(String libraryId) => Uint8List.fromList(
+    utf8.encode(
+      const JsonEncoder.withIndent('  ').convert({
+        'formatVersion': SharedState.formatVersion,
+        'libraryId': libraryId,
+      }),
+    ),
+  );
+
+  // ---- Audio ----
+
+  /// Hash from `audio/<hash>.<ext>`.
+  static String _hashOf(String name) {
+    final base = name.substring(name.lastIndexOf('/') + 1);
+    final dot = base.indexOf('.');
+    return dot < 0 ? base : base.substring(0, dot);
+  }
+
+  void _plan(_Source s, Set<String> hashes) {
+    s.audio = {...hashes};
+    void add(String key) => s.queue.putIfAbsent(key, () => SyncTask(key));
+    final tracks = {for (final t in library.tracks) t.id: t};
+    for (final t in tracks.values) {
+      final here = library.hasFile(t.id);
+      final there = s.audio.contains(t.id);
+      if (here && !there && library.uploadable(t)) add('up:${t.id}');
+      if (!here && there && eagerDownload) add('down:${t.id}');
+    }
+    // Only hashes the state knows: a file of a track this device has not seen yet stays.
+    for (final h in s.audio) {
+      final rec = library.state.tracks[h];
+      if (rec == null) continue;
+      final t = tracks[h];
+      if (!rec.alive || (t != null && !library.uploadable(t))) add('rm:$h');
+    }
+    notifyListeners();
+  }
+
+  /// Runs the due downloads of [s], or its other audio tasks. [CloudOffline] stops all of them.
+  Future<void> _runTasks(_Source s, {required bool downloads}) async {
+    for (final task in s.queue.values.toList()) {
+      if (task.key == 'state' || !_due(task)) continue;
+      if (task.key.startsWith('down:') != downloads) continue;
+      try {
+        await _execute(s, task.key);
+        s.queue.remove(task.key);
+      } on CloudOffline {
+        rethrow;
+      } catch (e) {
+        _fail(task, e);
+      }
+    }
+  }
+
+  Future<void> _execute(_Source s, String key) async {
+    final hash = key.substring(key.indexOf(':') + 1);
+    final t = library.track(hash);
+    switch (key.substring(0, key.indexOf(':'))) {
+      case 'up':
+        if (t == null || !library.uploadable(t) || !library.hasFile(hash)) {
+          return;
+        }
+        final bytes = await library.readAudio(t);
+        if (bytes == null) return;
+        // Content-addressed: writing the same file again changes nothing, so this is idempotent.
+        await s.provider.put(Library.cloudAudioName(t), bytes);
+        s.audio.add(hash);
+      case 'down':
+        if (t == null || library.hasFile(hash)) return;
+        // #53/AK5: a file with the wrong hash is not stored; the task is tried again later
+        if (!await _download(s.provider, t)) {
+          throw CloudError('download of $hash failed');
+        }
+      case 'rm':
+        final rec = library.state.tracks[hash];
+        if (rec == null) return;
+        if (rec.alive && t != null && library.uploadable(t)) return;
+        for (final e in await s.provider.list('audio/$hash')) {
+          await s.provider.delete(e.name);
+        }
+        s.audio.remove(hash);
+    }
+  }
+
+  Future<bool> _download(CloudProvider p, Track t) async {
+    final f = await p.get(Library.cloudAudioName(t));
+    if (f == null) return false;
+    return library.addAudio(t.id, f.bytes);
   }
 
   @override
+  Future<bool> fetchAudio(Track track) async {
+    if (library.hasFile(track.id)) return true;
+    var ok = false;
+    for (final s in [..._sources]) {
+      try {
+        if (await _download(s.provider, track)) {
+          ok = true;
+          break;
+        }
+      } catch (_) {
+        // try the next source
+      }
+    }
+    if (!ok) return false;
+    await _trimCache(
+      keep: {track.id},
+    ); // the file just loaded is about to be played
+    return true;
+  }
+
+  /// #39/AK3: without eager downloads (browser) the device is a cache of the cloud: above its limit the
+  /// files used longest ago go, as far as they are in the cloud. Desktop keeps every file.
+  Future<void> _trimCache({Set<String> keep = const {}}) async {
+    if (eagerDownload) return;
+    try {
+      await library.trimCache(inCloud: inCloud, keep: keep);
+    } catch (_) {} // a failed delete leaves the file; the next sync tries again
+  }
+
+  /// #65 repaired a damaged shared `state.json`. Since #53 every device writes only its own file: a
+  /// damaged file of another device is skipped and read again later, the own file is written again from
+  /// this device. So nothing is ever damaged as a whole; this just syncs.
+  @override
   Future<CloudRepairResult> repairCloudState(CloudStateRepair how) async {
     if (_disposed || library.readOnly) return CloudRepairResult.failed;
-    // one thing at a time: wait for a running sync, keep new ones waiting (they follow below)
-    for (var r = _running; r != null; r = _running) {
-      try {
-        await r;
-      } catch (_) {
-        // that sync's own problem; the repair looks for itself
-      }
-    }
-    final done = Completer<void>();
-    _running = done.future;
-    _changeTimer?.cancel();
-    var result = CloudRepairResult.failed;
-    try {
-      result = await _repair(how);
-    } catch (_) {
-      // offline, server error: nothing was replaced, this device keeps everything
-    } finally {
-      _running = null;
-      done.complete();
-    }
-    final repaired =
-        result != CloudRepairResult.failed &&
-        result != CloudRepairResult.noBackup;
-    if (repaired) {
-      _queue.remove('state');
-      _offline = 0;
-    }
-    if (repaired || _again) {
-      _again = false;
-      await sync();
-    }
-    return result;
+    await sync();
+    return CloudRepairResult.notDamaged;
   }
-
-  /// #65: replaces a damaged `state.json`, conditionally on the damaged version. The damaged file is kept
-  /// under [damagedName]. Data on this device are never lost: way 1 merges the last valid backup into the
-  /// library (stamps per field, as any sync), way 2 writes the library as it is.
-  Future<CloudRepairResult> _repair(CloudStateRepair how) async {
-    for (var i = 0; i < maxConflicts; i++) {
-      final remote = await provider.get(stateName);
-      if (remote == null) return CloudRepairResult.notDamaged;
-      try {
-        _decodeState(remote.bytes);
-        // repaired elsewhere in the meantime
-        return CloudRepairResult.notDamaged;
-      } on SyncTooNew {
-        return CloudRepairResult.notDamaged; // the normal sync reports it
-      } on FormatException {
-        // damaged: repair below
-      }
-      // the last valid state: the backup with the highest generation the app can read
-      (SharedState, int)? last;
-      for (var n = 1; n <= backupCount; n++) {
-        final f = await provider.get(backupName(n));
-        if (f == null) continue;
-        try {
-          final b = _decodeState(f.bytes);
-          if (last == null || b.$2 > last.$2) last = b;
-        } on Object {
-          continue; // a damaged or newer backup is skipped
-        }
-      }
-      if (how == CloudStateRepair.restoreBackup) {
-        if (last == null) return CloudRepairResult.noBackup;
-        await library.mergeRemote(last.$1);
-      }
-      library.flush();
-      await provider.put(damagedName, remote.bytes);
-      try {
-        await provider.put(
-          stateName,
-          encodeState(library.state, (last?.$2 ?? 0) + 1),
-          ifVersion: remote.version,
-        );
-        await library.markSynced(); // #104
-      } on VersionConflict {
-        continue; // someone else wrote in between: look again
-      }
-      return how == CloudStateRepair.restoreBackup
-          ? CloudRepairResult.restored
-          : CloudRepairResult.overwritten;
-    }
-    return CloudRepairResult.failed;
-  }
-
-  /// Version of `state.json` already reported as damaged or too new: one message per version.
-  String? _reported;
-
-  /// `state.json`: the shared state plus a generation counter for the backup slots.
-  static Uint8List encodeState(SharedState s, int generation) =>
-      Uint8List.fromList(
-        utf8.encode(
-          const JsonEncoder.withIndent('  ')
-              .convert({...s.toJson(), 'generation': generation}),
-        ),
-      );
 
   Duration _backoff(int attempt) {
     final ms = backoffBase.inMilliseconds * pow(2, attempt - 1);
@@ -507,7 +755,7 @@ class CloudSync extends SyncService {
   /// Plans a retry when the earliest waiting task is due.
   void _scheduleRetry() {
     DateTime? next;
-    for (final t in _queue.values) {
+    for (final t in pending) {
       if (t.parked) continue;
       final at = t.notBefore ?? _now();
       if (next == null || at.isBefore(next)) next = at;

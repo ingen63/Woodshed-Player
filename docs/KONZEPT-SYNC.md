@@ -56,6 +56,12 @@ WoodshedPlayer/
 ```
 
 - **Eine Datei je Gerät** statt einer gemeinsamen `state.json`: Kein Gerät überschreibt ein anderes, bedingtes Schreiben (ETag) ist nicht nötig. Das Zusammenführen aus #36 ist reihenfolgeunabhängig; jedes Gerät liest alle `devices/*.json` und schreibt seinen zusammengeführten Stand.
+- **Umgesetzt in #53 (M1):** `CloudSync` in `app/lib/sync/sync_engine.dart`. Ablauf je Abgleich: (0) `format.json` aller Quellen lesen; eine Bibliotheks-ID, die irgendwo steht, übernimmt das Gerät, bevor es für eine leere Quelle eine neue anlegt (zufällig, 32 Hex-Zeichen, in `device.json` als `libraryId`). (1) Alle `devices/*.json` aller Quellen lesen und gemeinsam zusammenführen. (2) Die eigene Datei schreiben, wenn sie fehlt, sich unterscheidet oder älter als 30 Tage ist; vorher kommt der bisherige Inhalt nach `backup/<geraet-id>/state-<n>.json` (Platz = Generation mod 5 + 1). Danach Konfliktkopien und Dateien von Geräten, die 180 Tage nicht geschrieben haben, löschen, sofern sie seit dem Lesen unverändert sind. (3) Audio: zuerst aus allen Quellen laden, dann hochladen und löschen.
+- **Gerätedatei:** der geteilte Stand (`formatVersion`, Titel, Ordner, Einstellungen, Bereinigungshorizont) plus `deviceId`, `generation` und `written` (Millisekunden, Uhr des Geräts).
+- **Kein bedingtes Schreiben:** Die Engine nutzt weder ETag noch `rev`. Der Test-Speicher `InMemoryProvider(conditional: false)` lehnt bedingtes Schreiben ab.
+- **Konfliktkopien** erkennt die Engine an der Gerät-ID (16 Hex-Zeichen) mit beliebigem Zusatz vor `.json`, der nicht mit einer Hex-Ziffer beginnt: Google Drive für Desktop `<id> (1).json`, OneDrive-Schnittstelle mit `conflictBehavior=rename` `<id> 1.json`, OneDrive-Client `<id>-<Gerätename>.json`, iCloud `<id> 2.json`, `<id> (<Name>'s conflicted copy <Datum>).json`, Syncthing `<id>.sync-conflict-<Datum>-<Zeit>-<Kennung>.json`. Legt die Google-Drive-Schnittstelle zwei Dateien mit gleichem Namen an, muss der Provider (#54) die zweite unter einem solchen Namen zeigen.
+- **Unlesbare Gerätedatei** (beschädigt, unbekannte Felder): wird übersprungen, ohne Meldung, und beim nächsten Abgleich erneut gelesen; sie wird nie gelöscht. Eine Gerätedatei mit neuerem Format stoppt den Abgleich wie `format.json` mit neuerer Version (Meldung «App aktualisieren», `SyncStatus.tooNew`). Fremde Bibliotheks-ID: diese Quelle wird weder gelesen noch geschrieben (`SyncStatus.foreignLibrary`), andere Quellen laufen weiter.
+- **Bekannte Grenze:** Legen zwei Geräte `format.json` im selben Augenblick an, gewinnt die zuletzt gespeicherte; das Gerät liest sie nach dem Schreiben zurück und übernimmt sie. Fällt das Zurücklesen genau zwischen die beiden Schreibvorgänge, sieht ein Gerät danach eine fremde Bibliotheks-ID. Die Oberfläche (M5) muss dann «dieser Bibliothek beitreten» anbieten.
 - **Dasselbe Layout** für Google, OneDrive und die direkte Verbindung. Bei der direkten Verbindung beantwortet die Gegenstelle `list`/`get`/`put` aus ihrer lokalen Kopie.
 - Audio unveränderlich, nach Hash benannt, nach dem Laden geprüft; «nicht hochladen» je Titel und «synchronisieren» je Ordner wie in #37.
 
@@ -65,7 +71,7 @@ Ein Gerät kann mehrere Quellen haben: die Cloud und gekoppelte Geräte. Die Eng
 
 Beispiel: Rechner mit Google-Konto, Linux-Laptop ohne Konto, gekoppelt. Der Laptop gleicht direkt mit dem Rechner ab, der Rechner trägt alles in Google Drive weiter. Das iPhone mit Google-Konto sieht die Änderungen des Laptops zeitversetzt.
 
-Die Brücke ist kein eigener Mechanismus, sondern ergibt sich aus mehreren `CloudProvider` je Gerät.
+Die Brücke ist kein eigener Mechanismus, sondern ergibt sich aus mehreren `CloudProvider` je Gerät: `CloudSync(provider, library, more: [...])`, zur Laufzeit `addSource`/`removeSource` (z. B. wenn ein gekoppeltes Gerät sich verbindet). Ist eine Quelle nicht erreichbar, gleichen die übrigen trotzdem ab, und ein neuer Versuch wird geplant; offline ist der Abgleich erst, wenn keine Quelle erreichbar ist. Für die direkte Verbindung (#56) beantwortet B die Anfragen von C aus einem eigenen Speicher, den B selbst als Quelle führt; im Test aus #53 ist das ein `InMemoryProvider`.
 
 ## Ablauf aus Deiner Sicht
 
@@ -78,7 +84,7 @@ Die Brücke ist kein eigener Mechanismus, sondern ergibt sich aus mehreren `Clou
 ## Architektur
 
 ```
-Sync-Engine (#37) + PerDeviceLayout
+Sync-Engine (#37) mit einer Datei je Gerät und mehreren Quellen (#53)
   ├── GoogleDriveProvider   (drive.file, Desktop und Web)
   ├── OneDriveProvider      (approot, Desktop und Web)
   └── PeerProvider          (WebRTC, je gekoppeltes Gerät)
@@ -111,7 +117,7 @@ Sync-Engine (#37) + PerDeviceLayout
 | # | Inhalt | Aufwand |
 |---|---|---|
 | M0 | Machbarkeitstest: P1–P4 mit Testkonten und K0 (#52) | 3–4 Tage · **Go/No-Go** je Weg |
-| M1 | `PerDeviceLayout` und mehrere Quellen je Gerät in der Engine (#53); Tests mit `InMemoryProvider` (zwei, drei Geräte, Brücke, Reihenfolge vertauscht, Abbrüche) | 3–4 Tage |
+| M1 | Eine Datei je Gerät und mehrere Quellen je Gerät in der Engine (#53, umgesetzt); Tests mit `InMemoryProvider` (zwei, drei Geräte, Brücke, Reihenfolge vertauscht, Abbrüche) | 3–4 Tage |
 | M2 | `OneDriveProvider` (#55): App-Ordner, Upload-Sitzungen, Anmeldung Desktop und Web | 3–4 Tage |
 | M3 | `GoogleDriveProvider` (#54): `drive.file`, Ordner anlegen und finden, Pfade auf IDs, Anmeldung Desktop und Web | 3–4 Tage |
 | M4 | Direkte Verbindung (#56): Kopplung, Relays, `PeerProvider` (K2/K3 im Konzept ohne Registrierung) | 7–10 Tage |

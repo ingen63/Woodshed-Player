@@ -144,8 +144,9 @@ zugeordnet.
 | Zufallsfolgen auf 2–4 Geräten: gleicher Stand, zweiter Abgleich ändert nichts, kein Verlust | vorhanden: `property/sync_property_test.dart` (#10/AK6) | – |
 | Gerät länger als 90 Tage offline: gelöschte Titel und Ordner kommen nach dem Bereinigen der Grabsteine nicht zurück, erneuter Import belebt | vorhanden: `stamps_test.dart` (#98/AK2–AK4), `property/sync_property_test.dart` (#98/AK2–AK5) | – |
 | Gerät gleicht zum ersten Mal ab, die Cloud hat schon einen Bereinigungs-Horizont: eigene Titel und Ordner bleiben mit Audiodatei erhalten, Geräte mit früherem Abgleich verlieren Gelöschtes weiter | vorhanden: `sync_test.dart` (#104/AK2–AK4), `stamps_test.dart` (#104), `property/sync_property_test.dart` (#104/AK5) | – |
-| Verfälschte Sync-Dateien aus der Cloud ohne Absturz und ohne Datenverlust, mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7) | – |
-| Beschädigte `state.json` wiederherstellen: Sicherung aus `backup/` oder Stand des Geräts, ohne lokalen Verlust | vorhanden: `cloud_repair_test.dart` (#65/AK1–AK3), `property/sync_property_test.dart` (#65/AK4) | – |
+| Verfälschte Gerätedateien aus der Cloud ohne Absturz und ohne Datenverlust, übersprungen und später erneut gelesen; neueres Format mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7, #53/AK5) | – |
+| Dialog zur beschädigten `state.json` (seit #53 von der Engine nicht mehr ausgelöst) | vorhanden: `cloud_repair_test.dart` (#65/AK1, #65/AK3) | – |
+| Eine Datei je Gerät, mehrere Quellen, Brücke, Speicher ohne bedingtes Schreiben, Konfliktkopien, Sicherungen je Gerät, verwaiste Gerätedateien, `format.json` | vorhanden: `sync_devices_test.dart` (#53/AK1–AK10), `sync_test.dart` (#53/AK7) | – |
 | Zusammenführen von 10'000 Titeln ≤ 2 s | vorhanden, nächtlich: `app/bench/library_bench_test.dart` (#59/AK3), `make bench` | – |
 | Nur die Anbietermodule (`app/lib/sync/providers/`) öffnen Verbindungen, keine Analyse- oder Werbepakete, kein Netzwerk im Kern | vorhanden: `make network-free`, `app/tool/network_free_test.dart` (#58) | – |
 | Anbieter Google Drive, OneDrive, direkte Verbindung | Lücke (noch nicht umgesetzt) | #54, #55, #56 |

@@ -1,6 +1,6 @@
-// Interface to a cloud storage (#37, plan W5): the sync engine knows no provider, only these five calls.
+// Interface to a storage (#37, #53, plan W5): the sync engine knows no provider, only these five calls.
 // Google Drive (#54) and OneDrive (#55) follow; tests use the InMemoryProvider. All names are relative
-// to the app's own folder at the provider and separated by «/» («state.json», «audio/<hash>.mp3»).
+// to the app's own folder at the provider and separated by «/» («devices/<id>.json», «audio/<hash>.mp3»).
 import 'dart:typed_data';
 
 /// One stored file: name, version tag (ETag / rev) and size in bytes.
@@ -58,7 +58,9 @@ abstract class CloudProvider {
 
   /// Writes the whole file and returns its new version. With [ifVersion] only if the stored version is
   /// still that one, with [ifAbsent] only if there is no such file yet; otherwise throws
-  /// [VersionConflict]. An aborted upload leaves the previous contents (or nothing).
+  /// [VersionConflict]. An aborted upload leaves the previous contents (or nothing). Since #53 the sync
+  /// engine never writes conditionally (one file per device), so a storage without versions may refuse
+  /// both conditions.
   Future<String> put(
     String name,
     Uint8List bytes, {

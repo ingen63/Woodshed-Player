@@ -1,4 +1,4 @@
-// #61: rules of the sync engine (sync_engine.dart, #37 and #65), one per test; found by mutation testing
+// #61: rules of the sync engine (sync_engine.dart, #37, #53 and #65), one per test; found by mutation testing
 // (make mutants). Every test runs against the InMemoryProvider and libraries in memory, never a real
 // account or the real library. Tests about timers run on the fake clock of testWidgets: a timer fires
 // exactly when the test moves the clock, never because the machine is slow.
@@ -8,25 +8,37 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/library/library.dart';
-import 'package:woodshed_player/sync/cloud_provider.dart';
 import 'package:woodshed_player/sync/in_memory_provider.dart';
 import 'package:woodshed_player/sync/sync_engine.dart';
 import 'package:woodshed_player/sync/sync_service.dart';
 
 import 'fakes.dart';
-import 'sync_test.dart' show Device, bytes, cloudGeneration, device, tick;
+import 'sync_test.dart'
+    show Device, bytes, cloudGeneration, device, ownJson, ownName, tick;
 
-final _damaged = bytes('{"formatVersion": 2, "tracks": 7');
+/// How often the device files were listed (once per sync that reads the state).
+int _stateReads(InMemoryProvider c) =>
+    c.countOf('list ${CloudSync.devicesPrefix}');
 
-int _stateReads(InMemoryProvider c) => c.countOf('get ${CloudSync.stateName}');
-
-/// state.json of [d] with this generation counter.
+/// The device file of [d] with this generation counter.
 Uint8List _withGeneration(Device d, Object? generation) {
   final j = (jsonDecode(
-    utf8.decode(CloudSync.encodeState(d.library.state, 1)),
+    utf8.decode(
+      CloudSync.encodeDevice(
+        d.library.state,
+        d.library.device.deviceId,
+        1,
+        DateTime.utc(2026),
+      ),
+    ),
   ) as Map)..['generation'] = generation;
   return bytes(jsonEncode(j));
 }
+
+/// The device file of a library outside a [Device].
+Map<String, Object?> _fileOf(InMemoryProvider c, Library l) => (jsonDecode(
+  utf8.decode(c.files[CloudSync.deviceName(l.device.deviceId)]!),
+) as Map).cast();
 
 /// A device whose engine the test disposes itself (no tear-down of [device]).
 Future<Device> _ownDevice(InMemoryProvider cloud, int seed) async {
@@ -107,19 +119,19 @@ void main() {
       // testWidgets fails if a timer is still pending at the end
     });
 
-    testWidgets('a repair ends a waiting change, also when it fails', (
+    testWidgets('a repair syncs at once and ends a waiting change', (
       tester,
     ) async {
-      final cloud = InMemoryProvider()
-        ..putDirect(CloudSync.stateName, _damaged);
+      final cloud = InMemoryProvider();
       final a = await _ownDevice(cloud, 1);
       a.sync.localChanged();
-      // no backup: nothing is replaced, the sync keeps waiting for the user (#65)
+      // #53: nothing is damaged as a whole any more; the repair just syncs
       expect(
         await a.sync.repairCloudState(CloudStateRepair.restoreBackup),
-        CloudRepairResult.noBackup,
+        CloudRepairResult.notDamaged,
       );
       final reads = _stateReads(cloud);
+      expect(reads, 1);
       await tester.pump(const Duration(milliseconds: 100));
       expect(_stateReads(cloud), reads);
       a.sync.dispose();
@@ -149,9 +161,14 @@ void main() {
       final a = await device(cloud, 1);
       final t = await a.add('a.mp3');
       final gate = Completer<void>();
-      cloud.beforePut = (_) => gate.future;
+      // the first sync waits while writing its device file, after it read the state
+      cloud.beforePut = (name) =>
+          name.startsWith('devices/') ? gate.future : Future.value();
       final first = a.sync.sync();
-      await Future<void>.delayed(Duration.zero);
+      await eventually(
+        () => cloud.requests.any((r) => r.startsWith('put devices/')),
+        'the first sync writes its device file',
+      );
       tick();
       a.library.editMetadata(t.id, title: 'Später', artist: null);
       final second = a.sync.sync();
@@ -159,10 +176,9 @@ void main() {
       gate.complete();
       await first;
       await second;
-      final state =
-          jsonDecode(utf8.decode(cloud.files[CloudSync.stateName]!)) as Map;
+      final state = ownJson(cloud, a);
       expect(
-        (((state['tracks'] as Map)[t.id] as Map)['values'] as Map)['title'],
+        (((state['tracks']! as Map)[t.id] as Map)['values'] as Map)['title'],
         'Später',
       );
       expect(a.sync.status, SyncStatus.idle);
@@ -230,10 +246,9 @@ void main() {
       library.sortOrder = TrackSortOrder.alphabetical;
       library.metronomePreset = {'bpm': 99};
       await s.sync();
-      final state =
-          jsonDecode(utf8.decode(cloud.files[CloudSync.stateName]!)) as Map;
+      final state = _fileOf(cloud, library);
       expect(
-        ((state['settings'] as Map)['values'] as Map)['metronome.bpm'],
+        ((state['settings']! as Map)['values'] as Map)['metronome.bpm'],
         99,
       );
     });
@@ -302,96 +317,89 @@ void main() {
     });
   });
 
-  group('#37/AK1 conflicts on state.json', () {
-    /// Every write of state.json meets a newer version written by «another device».
-    void alwaysConflict(InMemoryProvider c, Device other) {
-      c.beforePut = (name) async {
-        if (name == CloudSync.stateName) {
-          c.putDirect(name, CloudSync.encodeState(other.library.state, 1));
-        }
-      };
-    }
-
-    test('a sync gives up after maxConflicts writes', () async {
+  group('#10/AK7, #53/AK5 contents of a device file', () {
+    test('a track or folder the app cannot show makes the file unreadable: skipped, the rest is merged', () async {
       final cloud = InMemoryProvider();
-      final other = await device(cloud, 2);
-      final d = Device(cloud, 1);
-      await d.library.load();
-      await d.add('a.mp3');
-      final s = CloudSync(cloud, d.library, maxConflicts: 3);
-      addTearDown(s.dispose);
-      alwaysConflict(cloud, other);
-      await s.sync();
-      expect(cloud.countOf('put ${CloudSync.stateName}'), 3);
-      expect(s.pending.single.key, 'state');
-      expect(s.pending.single.lastError, isA<CloudError>());
+      final a = await device(cloud, 1);
+      final t = await a.add('a.mp3');
+      final f = a.library.createFolder('F');
+      await a.sync.sync();
+      final good = cloud.files[ownName(a)]!;
+      for (final (kind, id, field) in [
+        ('tracks', t.id, 'fileName'),
+        ('folders', f.id, 'name'),
+      ]) {
+        final j = jsonDecode(utf8.decode(good)) as Map;
+        (((j[kind] as Map)[id] as Map)['values'] as Map)[field] = 7;
+        cloud.putDirect(ownName(a), bytes(jsonEncode(j)));
+        final b = await device(cloud, 2);
+        final own = await b.add('b.mp3');
+        await b.sync.sync();
+        expect(b.sync.status, SyncStatus.idle, reason: kind);
+        expect(b.library.tracks.map((x) => x.id), [own.id], reason: kind);
+        expect(b.library.lastError, isNull, reason: kind);
+      }
     });
-
-    test('a repair gives up after maxConflicts writes', () async {
-      final cloud = InMemoryProvider();
-      final other = await device(cloud, 2);
-      final d = Device(cloud, 1);
-      await d.library.load();
-      final s = CloudSync(cloud, d.library, maxConflicts: 3);
-      addTearDown(s.dispose);
-      cloud.putDirect(CloudSync.stateName, _damaged);
-      cloud.beforePut = (name) async {
-        if (name == CloudSync.stateName) {
-          cloud.putDirect(name, _damaged); // damaged again, a new version
-        }
-      };
-      final r = await s.repairCloudState(CloudStateRepair.overwriteWithLocal);
-      expect(r, CloudRepairResult.failed);
-      expect(cloud.countOf('put ${CloudSync.stateName}'), 3);
-      expect(other, isNotNull);
-    });
-  });
-
-  group('#10/AK7 contents of state.json', () {
-    test(
-      'a track or folder the app cannot show makes state.json damaged',
-      () async {
-        final cloud = InMemoryProvider();
-        final a = await device(cloud, 1);
-        final t = await a.add('a.mp3');
-        final f = a.library.createFolder('F');
-        await a.sync.sync();
-        final good = cloud.files[CloudSync.stateName]!;
-        for (final (kind, id, field) in [
-          ('tracks', t.id, 'fileName'),
-          ('folders', f.id, 'name'),
-        ]) {
-          final j = jsonDecode(utf8.decode(good)) as Map;
-          (((j[kind] as Map)[id] as Map)['values'] as Map)[field] = 7;
-          cloud.putDirect(CloudSync.stateName, bytes(jsonEncode(j)));
-          final b = await device(cloud, 2);
-          await b.sync.sync();
-          expect(b.sync.status, SyncStatus.damaged, reason: kind);
-          expect(b.library.tracks, isEmpty, reason: kind);
-        }
-      },
-    );
 
     test('a generation that is not a counter counts as 0', () async {
       for (final g in ['x', -5]) {
         final cloud = InMemoryProvider();
         final a = await device(cloud, 1);
         await a.add('a.mp3');
-        cloud.putDirect(CloudSync.stateName, _withGeneration(a, g));
-        final b = await device(cloud, 2);
-        await b.add('b.mp3');
-        await b.sync.sync();
-        expect(b.sync.status, SyncStatus.idle, reason: '$g');
-        expect(cloudGeneration(cloud), 1, reason: '$g');
-        expect(cloud.files.keys, contains(CloudSync.backupName(1)));
+        cloud.putDirect(ownName(a), _withGeneration(a, g));
+        tick();
+        await a.add('b.mp3');
+        await a.sync.sync();
+        expect(a.sync.status, SyncStatus.idle, reason: '$g');
+        expect(cloudGeneration(cloud, a), 1, reason: '$g');
+        expect(
+          cloud.files.keys,
+          contains(CloudSync.backupName(a.library.device.deviceId, 1)),
+        );
       }
+    });
+
+    test('a time of writing that is not a time counts as unknown', () async {
+      for (final w in ['x', -5]) {
+        final j = (jsonDecode(
+          utf8.decode(
+            CloudSync.encodeDevice(
+              SharedState.empty,
+              '00000000000000aa',
+              1,
+              DateTime.utc(2026),
+            ),
+          ),
+        ) as Map)..['written'] = w;
+        final f = CloudSync.decodeDevice(
+          'devices/00000000000000aa.json',
+          bytes(jsonEncode(j)),
+        );
+        expect(f.written, isNull, reason: '$w');
+      }
+      final f = CloudSync.decodeDevice(
+        'devices/00000000000000aa.json',
+        CloudSync.encodeDevice(
+          SharedState.empty,
+          '00000000000000aa',
+          4,
+          DateTime.utc(2026, 3, 4),
+        ),
+      );
+      expect(f.written, DateTime.utc(2026, 3, 4));
+      expect(f.generation, 4);
+      expect(f.deviceId, '00000000000000aa');
+      expect(f.copy, isFalse);
+      expect(
+        () => CloudSync.decodeDevice('format.json', f.bytes),
+        throwsFormatException,
+      );
     });
   });
 
-  group('#65 repairing a damaged state.json', () {
+  group('#65 repairing since #53', () {
     test('a disposed engine or a read-only library does not repair', () async {
-      final cloud = InMemoryProvider()
-        ..putDirect(CloudSync.stateName, _damaged);
+      final cloud = InMemoryProvider();
       final d = Device(cloud, 1);
       await d.library.load();
       d.sync.dispose();
@@ -419,121 +427,29 @@ void main() {
       expect(cloud.requests, isEmpty);
     });
 
-    test('a repair without a backup starts no sync of its own', () async {
-      final cloud = InMemoryProvider()
-        ..putDirect(CloudSync.stateName, _damaged);
-      final d = await device(cloud, 1);
-      final r = await d.sync.repairCloudState(CloudStateRepair.restoreBackup);
-      expect(r, CloudRepairResult.noBackup);
-      expect(d.sync.status, SyncStatus.idle); // no sync ran
-      // after a repair that synced, a later one without backup again starts none
-      expect(
-        await d.sync.repairCloudState(CloudStateRepair.overwriteWithLocal),
-        CloudRepairResult.overwritten,
-      );
-      cloud.putDirect(CloudSync.stateName, _damaged);
-      for (var n = 1; n <= CloudSync.backupCount; n++) {
-        await cloud.delete(CloudSync.backupName(n));
-      }
-      final reads = _stateReads(cloud);
-      expect(
-        await d.sync.repairCloudState(CloudStateRepair.restoreBackup),
-        CloudRepairResult.noBackup,
-      );
-      expect(_stateReads(cloud), reads + 1); // only the repair looked
-    });
-
-    test('a sync requested during a repair completes after it', () async {
-      final cloud = InMemoryProvider()
-        ..putDirect(CloudSync.stateName, _damaged);
-      final d = await device(cloud, 1);
-      final repair = d.sync.repairCloudState(
-        CloudStateRepair.overwriteWithLocal,
-      );
-      final sync = d.sync.sync(); // the repair runs: this one waits for it
-      expect(await repair, CloudRepairResult.overwritten);
-      await sync.timeout(const Duration(seconds: 10));
-      expect(d.sync.status, SyncStatus.idle);
-    });
-
-    test('the backup in the last slot counts too', () async {
+    test('a repair writes the latest local state, also a change still waiting to be saved', () async {
       final cloud = InMemoryProvider();
-      final a = await device(cloud, 1);
-      await a.add('a.mp3');
-      cloud.putDirect(
-        CloudSync.backupName(CloudSync.backupCount),
-        CloudSync.encodeState(a.library.state, 3),
+      final library = Library(
+        MemoryFileStore(),
+        probe: (_) => 2.5,
+        readSource: (_) async => null,
+        saveDelay: const Duration(hours: 1),
       );
-      cloud.putDirect(CloudSync.stateName, _damaged);
-      final b = await device(cloud, 2);
+      await library.load();
+      final s = CloudSync(cloud, library);
+      addTearDown(s.dispose);
+      addTearDown(library.dispose);
+      library.metronomePreset = {'bpm': 66};
       expect(
-        await b.sync.repairCloudState(CloudStateRepair.restoreBackup),
-        CloudRepairResult.restored,
+        await s.repairCloudState(CloudStateRepair.overwriteWithLocal),
+        CloudRepairResult.notDamaged,
       );
-      expect(b.library.tracks, hasLength(1));
+      expect(
+        ((_fileOf(cloud, library)['settings']! as Map)['values']
+            as Map)['metronome.bpm'],
+        66,
+      );
     });
-
-    test(
-      'the repaired state.json counts on from the backup, with local changes',
-      () async {
-        final cloud = InMemoryProvider();
-        final a = await device(cloud, 1);
-        await a.add('a.mp3');
-        cloud.putDirect(
-          CloudSync.backupName(2),
-          CloudSync.encodeState(a.library.state, 6),
-        );
-        cloud.putDirect(CloudSync.stateName, _damaged);
-        final d = Device(cloud, 2);
-        await d.library.load();
-        addTearDown(d.sync.dispose);
-        final b = d.library;
-        // a change still waiting to be saved goes into the repaired state
-        b.metronomePreset = {'bpm': 77};
-        final r = await d.sync.repairCloudState(CloudStateRepair.restoreBackup);
-        expect(r, CloudRepairResult.restored);
-        expect(cloudGeneration(cloud), greaterThanOrEqualTo(7));
-        final state =
-            jsonDecode(utf8.decode(cloud.files[CloudSync.stateName]!)) as Map;
-        expect(
-          ((state['settings'] as Map)['values'] as Map)['metronome.bpm'],
-          77,
-        );
-      },
-    );
-  });
-
-  group('#65 a repair writes the latest local state', () {
-    test(
-      'a change still waiting to be saved goes into the repaired file',
-      () async {
-        final cloud = InMemoryProvider()
-          ..putDirect(CloudSync.stateName, _damaged);
-        final library = Library(
-          MemoryFileStore(),
-          probe: (_) => 2.5,
-          readSource: (_) async => null,
-          saveDelay: const Duration(hours: 1),
-        );
-        await library.load();
-        final s = CloudSync(cloud, library);
-        addTearDown(s.dispose);
-        addTearDown(library.dispose);
-        library.metronomePreset = {'bpm': 66};
-        expect(
-          await s.repairCloudState(CloudStateRepair.overwriteWithLocal),
-          CloudRepairResult.overwritten,
-        );
-        final state =
-            jsonDecode(utf8.decode(cloud.files[CloudSync.stateName]!)) as Map;
-        expect(
-          ((state['settings'] as Map)['values'] as Map)['metronome.bpm'],
-          66,
-        );
-        // written by the repair itself: the sync after it had nothing left to send
-        expect(cloudGeneration(cloud), 1);
-      },
-    );
   });
 
   group('#37 dispose', () {

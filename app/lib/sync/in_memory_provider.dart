@@ -1,10 +1,15 @@
-// Cloud storage in memory for tests (#37/AK7): never a real account. It can go offline, abort uploads and
+// Cloud storage in memory for tests (#37/AK7, #53): never a real account. It can go offline, abort uploads and
 // let «another device» write between reading and writing, and it counts every request.
 import 'dart:typed_data';
 
 import 'cloud_provider.dart';
 
 class InMemoryProvider implements CloudProvider {
+  /// With [conditional] false the storage knows no versions (#53/AK3): every version is empty and a
+  /// conditional put throws [UnsupportedError].
+  InMemoryProvider({this.conditional = true});
+
+  final bool conditional;
   final _files = <String, CloudFile>{};
   int _version = 0;
 
@@ -26,6 +31,8 @@ class InMemoryProvider implements CloudProvider {
   };
 
   String? versionOf(String name) => _files[name]?.version;
+
+  String _next() => conditional ? 'v${++_version}' : '';
 
   int countOf(String request) => requests.where((r) => r == request).length;
 
@@ -58,6 +65,9 @@ class InMemoryProvider implements CloudProvider {
     bool ifAbsent = false,
   }) async {
     _call('put $name');
+    if (!conditional && (ifVersion != null || ifAbsent)) {
+      throw UnsupportedError('no conditional writes');
+    }
     await beforePut?.call(name);
     if (abortPut?.call(name) ?? false) {
       throw CloudError('upload of $name aborted');
@@ -67,14 +77,14 @@ class InMemoryProvider implements CloudProvider {
         (ifVersion != null && current?.version != ifVersion)) {
       throw VersionConflict(name);
     }
-    final v = 'v${++_version}';
+    final v = _next();
     _files[name] = CloudFile(Uint8List.fromList(bytes), v);
     return v;
   }
 
   /// Writes as another device would, without counting it as a request.
   void putDirect(String name, Uint8List bytes) =>
-      _files[name] = CloudFile(Uint8List.fromList(bytes), 'v${++_version}');
+      _files[name] = CloudFile(Uint8List.fromList(bytes), _next());
 
   @override
   Future<void> delete(String name) async {

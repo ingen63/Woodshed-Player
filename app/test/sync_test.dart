@@ -1,4 +1,4 @@
-// #37: sync engine with merging. Every test runs against the InMemoryProvider (#37/AK7) and libraries in
+// #37, #53: sync engine with merging. Every test runs against the InMemoryProvider (#37/AK7) and libraries in
 // in-memory stores, never a real account or the real library.
 import 'dart:async';
 import 'dart:convert';
@@ -67,15 +67,26 @@ Future<Device> device(
   return d;
 }
 
-/// Shared state in the cloud (without the generation counter).
-SharedState cloudState(InMemoryProvider c) => SharedState.fromJson(
-  (jsonDecode(utf8.decode(c.files[CloudSync.stateName]!)) as Map).cast(),
-);
+/// Shared state in the cloud: every device file merged, as a new device would see it.
+SharedState cloudState(InMemoryProvider c) => [
+  for (final e in c.files.entries)
+    if (CloudSync.parseDeviceName(e.key) != null)
+      CloudSync.decodeDevice(e.key, e.value).state,
+].fold(SharedState.empty, (a, b) => a.merge(b)).purge(clock);
 
-int cloudGeneration(InMemoryProvider c) =>
-    (jsonDecode(utf8.decode(c.files[CloudSync.stateName]!))
-            as Map)['generation']
-        as int;
+/// Name of the device file of [d].
+String ownName(Device d) => CloudSync.deviceName(d.library.device.deviceId);
+
+/// The device file of [d] as JSON.
+Map<String, Object?> ownJson(InMemoryProvider c, Device d) =>
+    (jsonDecode(utf8.decode(c.files[ownName(d)]!)) as Map).cast();
+
+int cloudGeneration(InMemoryProvider c, Device d) =>
+    ownJson(c, d)['generation']! as int;
+
+/// Writes of device files (with every device on this storage).
+int deviceWrites(InMemoryProvider c) =>
+    c.requests.where((r) => r.startsWith('put devices/')).length;
 
 void tick([int ms = 1000]) => clock = clock.add(Duration(milliseconds: ms));
 
@@ -115,7 +126,7 @@ void main() {
 
   group('#37/AK1 merging is independent of order and idempotent', () {
     test(
-      'first sync writes state.json; a second sync writes nothing',
+      'first sync writes the own device file; a second sync writes nothing',
       () async {
         final cloud = InMemoryProvider();
         final a = await device(cloud, 1);
@@ -240,15 +251,11 @@ void main() {
           );
         }
         // Idempotent: another round writes nothing.
-        final version = cloud.versionOf(CloudSync.stateName);
+        final writes = deviceWrites(cloud);
         for (final d in devices) {
           await d.sync.sync();
         }
-        expect(
-          cloud.versionOf(CloudSync.stateName),
-          version,
-          reason: 'seed $seed',
-        );
+        expect(deviceWrites(cloud), writes, reason: 'seed $seed');
       }
       // the random inputs do reach the interesting cases
       expect(stats.every((n) => n > 5), isTrue, reason: '$stats');
@@ -300,18 +307,19 @@ void main() {
     });
 
     test(
-      'state.json from a newer app is neither merged nor overwritten',
+      'a device file from a newer app is neither merged nor overwritten',
       () async {
         final cloud = InMemoryProvider();
         cloud.putDirect(
-          CloudSync.stateName,
+          'devices/00000000000000aa.json',
           bytes(jsonEncode({'formatVersion': 3})),
         );
         final a = await device(cloud, 1);
         await a.add('a.mp3');
         await a.sync.sync();
         expect(a.sync.status, SyncStatus.tooNew);
-        expect(cloud.countOf('put ${CloudSync.stateName}'), 0);
+        expect(deviceWrites(cloud), 0);
+        expect(a.library.lastError, isA<CloudStateTooNew>());
       },
     );
   });
@@ -409,38 +417,34 @@ void main() {
       expect(a.sync.status, SyncStatus.idle);
     });
 
-    test('conflict on state.json: read again, merge, write again', () async {
-      final cloud = InMemoryProvider();
-      final a = await device(cloud, 1);
-      final b = await device(cloud, 2);
-      final t = await a.add('a.mp3');
-      await a.sync.sync();
-      await b.sync.sync();
-      tick();
-      b.library.editMetadata(t.id, title: 'von B', artist: null);
-      tick();
-      a.library.editMetadata(t.id, title: 'a', artist: 'von A');
-      var once = true;
-      cloud.beforePut = (name) async {
-        if (name == CloudSync.stateName && once) {
-          once = false;
-          // B writes in between, as another device would.
-          cloud.putDirect(
-            name,
-            CloudSync.encodeState(b.library.state, cloudGeneration(cloud) + 1),
-          );
-        }
-      };
-      await a.sync.sync();
-      expect(
-        cloud.countOf('put ${CloudSync.stateName}'),
-        greaterThanOrEqualTo(2),
-      );
-      final s = cloudState(cloud).tracks[t.id]!.values;
-      expect(s['title'], 'von B');
-      expect(s['artist'], 'von A');
-      expect(a.t(t.id).title, 'von B');
-    });
+    test(
+      'another device writes between reading and writing: nothing is lost',
+      () async {
+        final cloud = InMemoryProvider();
+        final a = await device(cloud, 1);
+        final b = await device(cloud, 2);
+        final t = await a.add('a.mp3');
+        await a.sync.sync();
+        await b.sync.sync();
+        tick();
+        b.library.editMetadata(t.id, title: 'von B', artist: null);
+        tick();
+        a.library.editMetadata(t.id, title: 'a', artist: 'von A');
+        var once = true;
+        cloud.beforePut = (name) async {
+          if (name == ownName(a) && once) {
+            once = false;
+            await b.sync.sync(); // B writes its own file in between
+          }
+        };
+        await a.sync.sync();
+        await a.sync.sync();
+        final s = cloudState(cloud).tracks[t.id]!.values;
+        expect(s['title'], 'von B');
+        expect(s['artist'], 'von A');
+        expect(a.t(t.id).title, 'von B');
+      },
+    );
 
     test('audio is stored as audio/<hash>.<ext>; the same file twice is uploaded once', () async {
       final cloud = InMemoryProvider();
@@ -642,7 +646,7 @@ void main() {
       },
     );
 
-    test('deleted track: tombstone in state.json, file gone from the cloud and from other devices', () async {
+    test('deleted track: tombstone in the device files, file gone from the cloud and from other devices', () async {
       final cloud = InMemoryProvider();
       final a = await device(cloud, 1);
       final b = await device(cloud, 2);
@@ -678,52 +682,65 @@ void main() {
     );
   });
 
-  group('#37/AK6 the last 5 states remain under backup/', () {
-    test('before every write the previous state.json goes to backup/state-<n>.json', () async {
-      final cloud = InMemoryProvider();
-      final a = await device(cloud, 1);
-      final t = await a.add('a.mp3');
-      final previous = <Uint8List>[];
-      for (var i = 0; i < 8; i++) {
-        tick();
-        a.library.editMetadata(t.id, title: 'Stand $i', artist: null);
-        final before = cloud.files[CloudSync.stateName];
-        if (before != null) previous.add(before);
-        await a.sync.sync();
-      }
-      final backups = {
-        for (final e in cloud.files.entries)
-          if (e.key.startsWith('backup/')) e.key: e.value,
-      };
-      expect(backups.keys.toSet(), {
-        for (var n = 1; n <= 5; n++) CloudSync.backupName(n),
-      });
-      final kept = backups.values.map(utf8.decode).toSet();
-      expect(kept, previous.reversed.take(5).map(utf8.decode).toSet());
-      // the backup is written before state.json each time
-      final puts = cloud.requests
-          .where(
-            (r) =>
-                r.startsWith('put backup/') ||
-                r == 'put ${CloudSync.stateName}',
-          )
-          .toList();
-      for (var i = 0; i < puts.length; i++) {
-        if (puts[i].startsWith('put backup/')) {
-          expect(puts[i + 1], 'put ${CloudSync.stateName}');
+  group(
+    '#37/AK6, #53/AK7 the last 5 own states remain under backup/<device-id>/',
+    () {
+      test('#53/AK7 before every write the previous own file goes to backup/<device-id>/state-<n>.json', () async {
+        final cloud = InMemoryProvider();
+        final a = await device(cloud, 1);
+        final b = await device(cloud, 2);
+        final t = await a.add('a.mp3');
+        final previous = <Uint8List>[];
+        for (var i = 0; i < 8; i++) {
+          tick();
+          a.library.editMetadata(t.id, title: 'Stand $i', artist: null);
+          final before = cloud.files[ownName(a)];
+          if (before != null) previous.add(before);
+          await a.sync.sync();
+          await b.sync.sync();
         }
-      }
-    });
+        final id = a.library.device.deviceId;
+        final backups = {
+          for (final e in cloud.files.entries)
+            if (e.key.startsWith('backup/$id/')) e.key: e.value,
+        };
+        expect(backups.keys.toSet(), {
+          for (var n = 1; n <= 5; n++) CloudSync.backupName(id, n),
+        });
+        expect(CloudSync.backupName(id, 3), 'backup/$id/state-3.json');
+        final kept = backups.values.map(utf8.decode).toSet();
+        expect(kept, previous.reversed.take(5).map(utf8.decode).toSet());
+        // only own states: b's backups are under its own ID
+        expect(
+          cloud.files.keys.where(
+            (k) => k.startsWith('backup/') && !k.startsWith('backup/$id/'),
+          ),
+          everyElement(startsWith('backup/${b.library.device.deviceId}/')),
+        );
+        // the backup is written before the own file each time
+        final puts = cloud.requests
+            .where(
+              (r) =>
+                  r.startsWith('put backup/$id/') || r == 'put ${ownName(a)}',
+            )
+            .toList();
+        for (var i = 0; i < puts.length; i++) {
+          if (puts[i].startsWith('put backup/')) {
+            expect(puts[i + 1], 'put ${ownName(a)}');
+          }
+        }
+      });
 
-    test('no backup when nothing changes', () async {
-      final cloud = InMemoryProvider();
-      final a = await device(cloud, 1);
-      await a.add('a.mp3');
-      await a.sync.sync();
-      await a.sync.sync();
-      expect(cloud.files.keys.where((k) => k.startsWith('backup/')), isEmpty);
-    });
-  });
+      test('no backup when nothing changes', () async {
+        final cloud = InMemoryProvider();
+        final a = await device(cloud, 1);
+        await a.add('a.mp3');
+        await a.sync.sync();
+        await a.sync.sync();
+        expect(cloud.files.keys.where((k) => k.startsWith('backup/')), isEmpty);
+      });
+    },
+  );
 
   group('#37 triggers: start, change (delayed, combined), foreground', () {
     test(
@@ -735,40 +752,37 @@ void main() {
         a.library.onLocalChange = a.sync.localChanged;
         await a.sync.start();
         expect(cloudState(cloud).tracks.keys, [t.id]);
-        final writes = cloud.countOf('put ${CloudSync.stateName}');
+        final writes = deviceWrites(cloud);
         for (var i = 0; i < 5; i++) {
           tick();
           a.library.editMetadata(t.id, title: 'T$i', artist: null);
         }
-        expect(
-          cloud.countOf('put ${CloudSync.stateName}'),
-          writes,
-          reason: 'delayed',
-        );
+        expect(deviceWrites(cloud), writes, reason: 'delayed');
         // #92/AK1: wait for the delayed sync to finish, not for a fixed time
         await eventually(
           () =>
-              cloud.countOf('put ${CloudSync.stateName}') > writes &&
-              a.sync.status == SyncStatus.idle,
+              deviceWrites(cloud) > writes && a.sync.status == SyncStatus.idle,
           'delayed sync after the last change',
         );
         expect(
-          cloud.countOf('put ${CloudSync.stateName}'),
+          deviceWrites(cloud),
           writes + 1,
           reason: 'five changes are sent together once',
         );
         expect(cloudState(cloud).tracks[t.id]!.values['title'], 'T4');
         // another device changed something; coming back to the foreground fetches it
         cloud.putDirect(
-          CloudSync.stateName,
-          CloudSync.encodeState(
+          CloudSync.deviceName('ffffffffffffffff'),
+          CloudSync.encodeDevice(
             cloudState(cloud).copyWith(
               settings: cloudState(cloud).settings.update(
                 {'sortOrder': 'alphabetical'},
                 Hlc(clock.millisecondsSinceEpoch + 5000, 0, 'ffffffffffffffff'),
               ),
             ),
-            cloudGeneration(cloud) + 1,
+            'ffffffffffffffff',
+            1,
+            clock,
           ),
         );
         a.sync.resumed();
@@ -799,7 +813,7 @@ void main() {
 
   group('#104 the purge horizon applies only after the first sync', () {
     // Example of the issue: A imports X and folder F, syncs, deletes both and purges them 91 days later
-    // (state.json then has a horizon). B has its own library with Y and folder G, last changed before the
+    // (the device files then have a horizon). B has its own library with Y and folder G, last changed before the
     // horizon, and syncs for the first time after it.
     Future<(Device, Device, InMemoryProvider, Track, Track)> purgedCloud({
       bool bSyncsEarly = false,
