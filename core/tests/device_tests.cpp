@@ -209,6 +209,74 @@ void createdPlayerRateIsSupported() {
   wp_destroy(p);
 }
 
+// #108/AK1: wp_create keeps the own rate of a device up to the limit (the null device: 48 kHz) and
+// runs a faster device (352.8 kHz, an interface rate) at exactly the limit (#97/AK6).
+void createdPlayerKeepsOrCapsTheDeviceRate() {
+  wp_player *p = wp_create();
+  CHECK(p != nullptr);
+  if (p) {
+    CHECK(p->core->sampleRate() == static_cast<int>(kNullRate));
+    CHECK(p->device.sampleRate == kNullRate);
+    wp_destroy(p);
+  }
+  for (const ma_uint32 own : {static_cast<ma_uint32>(WP_MAX_SAMPLE_RATE), ma_uint32{352800}}) {
+    nullRate = own;
+    p = wp_create();
+    nullRate = kNullRate;
+    CHECK(p != nullptr);
+    if (!p)
+      continue;
+    CHECK(p->core->sampleRate() == WP_MAX_SAMPLE_RATE);
+    CHECK(p->device.sampleRate == static_cast<ma_uint32>(WP_MAX_SAMPLE_RATE));
+    CHECK(p->core->deviceAvailable());
+    wp_destroy(p);
+  }
+}
+
+// #108/AK1: the null device describes itself as a playback device (f32, stereo, its own rate) and
+// has no capture device.
+void nullDeviceInfoOnlyForPlayback() {
+  wp_player *p = wp_create();
+  CHECK(p != nullptr);
+  if (!p)
+    return;
+  ma_device_info info{};
+  CHECK(ma_context_get_device_info(&p->context, ma_device_type_playback, nullptr, &info) ==
+        MA_SUCCESS);
+  CHECK(std::strcmp(info.name, kNullName) == 0);
+  CHECK(info.nativeDataFormatCount == 1);
+  CHECK(info.nativeDataFormats[0].format == ma_format_f32);
+  CHECK(info.nativeDataFormats[0].channels == static_cast<ma_uint32>(wp::Player::kChannels));
+  CHECK(info.nativeDataFormats[0].sampleRate == kNullRate);
+  ma_device_info capture{};
+  CHECK(ma_context_get_device_info(&p->context, ma_device_type_capture, nullptr, &capture) !=
+        MA_SUCCESS);
+  wp_destroy(p);
+}
+
+// #108/AK1: a device opened on the null backend without a channel count gets the core's stereo;
+// one that asks for a count keeps it.
+void nullDeviceFillsInTheChannelCount() {
+  wp_player *p = wp_create();
+  CHECK(p != nullptr);
+  if (!p)
+    return;
+  for (const ma_uint32 asked : {ma_uint32{0}, ma_uint32{1}}) {
+    ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
+    cfg.playback.format = ma_format_f32;
+    cfg.playback.channels = asked;
+    cfg.dataCallback = [](ma_device *, void *, const void *, ma_uint32) {};
+    // NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization): zeroed miniaudio struct
+    ma_device dev{};
+    CHECK(ma_device_init(&p->context, &cfg, &dev) == MA_SUCCESS);
+    const ma_uint32 expected = asked == 0 ? static_cast<ma_uint32>(wp::Player::kChannels) : asked;
+    CHECK(dev.playback.internalChannels == expected);
+    CHECK(dev.playback.channels == expected);
+    ma_device_uninit(&dev); // never started: the null device's start needs a wp_player
+  }
+  wp_destroy(p);
+}
+
 int main() {
   nullBackendOnlyForNull(); // ends with WP_AUDIO_BACKEND=null for the tests below
   std::printf("WP_AUDIO_BACKEND=null\n");
@@ -220,6 +288,9 @@ int main() {
       {"metronomeSettersReachTheCore", metronomeSettersReachTheCore},
       {"nullDevicePacesInSmallSteps", nullDevicePacesInSmallSteps},
       {"createdPlayerRateIsSupported", createdPlayerRateIsSupported},
+      {"createdPlayerKeepsOrCapsTheDeviceRate", createdPlayerKeepsOrCapsTheDeviceRate},
+      {"nullDeviceInfoOnlyForPlayback", nullDeviceInfoOnlyForPlayback},
+      {"nullDeviceFillsInTheChannelCount", nullDeviceFillsInTheChannelCount},
   };
   for (auto &[name, fn] : tests) {
     const int before = failures;

@@ -911,5 +911,37 @@ void main() {
       await fresh.add('b.mp3');
       expect(fresh.library.device.synced, isFalse);
     });
+
+    test('#108/AK1 a library with only its own stamps does not count as synced after a restart', () async {
+      final fresh = await device(InMemoryProvider(), 3);
+      final b = await fresh.add('b.mp3');
+      final again = Library(
+        fresh.store,
+        probe: (_) => 2.5,
+        readSource: (s) async => sources[s],
+        now: () => clock,
+        saveDelay: Duration.zero,
+      );
+      await again.load();
+      expect(again.track(b.id), isNotNull);
+      expect(again.device.synced, isFalse);
+    });
+
+    test('#108/AK1 a horizon ahead of the own clock does not kill own tracks on the first merge', () async {
+      // the other device's clock runs a day ahead: its horizon lies after everything stamped here
+      final b = await device(InMemoryProvider(), 2);
+      final y = await b.add('y.mp3');
+      final horizon = Hlc(
+        clock.add(const Duration(days: 1)).millisecondsSinceEpoch,
+        0,
+        'a',
+      );
+      final remote = SharedState.empty.copyWith(purged: horizon);
+      expect(remote.latest, isNull); // only the horizon tells the clock
+      await b.library.mergeRemote(remote);
+      expect(b.library.track(y.id), isNotNull);
+      expect(b.library.state.tracks[y.id]!.latest! > horizon, isTrue);
+      expect(b.library.device.synced, isTrue);
+    });
   });
 }

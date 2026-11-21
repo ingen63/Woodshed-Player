@@ -277,6 +277,14 @@ core/web/wp_core_web.cpp | cxx_remove_void_call | p->core->engine().collectGarba
 # Speicherfreigabe: Gibt Speicher frei, den der Browser-Teil mit wp_web_alloc geholt hat.
 core/web/wp_core_web.cpp | cxx_remove_void_call | void wp_web_free(void *ptr) { std::free(ptr); }
 
+# ---- core (#108) ----
+# gleichwertig: Nur bei genau kMaxSampleRate gibt «>=» die Grenze statt der eigenen Rate zurück,
+# und beide sind dann derselbe Wert.
+core/src/sample_rate.hpp | cxx_gt_to_ge | return deviceRate > kMaxSampleRate ? kMaxSampleRate : deviceRate;
+# Speicherfreigabe: Gibt nur den eingelesenen Inhalt einer Datei mit Punkt am Ende frei (#105), ein
+# Leck, Lecks zählen im Mutationslauf nicht; der Decoder ist zu dem Zeitpunkt schon freigegeben.
+core/src/player_core.cpp | cxx_remove_void_call | ~DecoderFile() { ma_free(bytes_, nullptr); }
+
 # ---- app/lib/library/stamps.dart (#61) ----
 # gleichwertig: b ist immer mindestens a + 1 (indexOf ab a + 1). Die Grenzfälle a == 0 («-2-d») und
 # b == a + 1 («1--d») lassen ein leeres Zahlfeld übrig; int.parse wirft dafür dieselbe

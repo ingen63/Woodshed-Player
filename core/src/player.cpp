@@ -74,6 +74,10 @@ bool nullBackendRequested() {
 // it consumed audio in one-second bursts, and playback only began a second after play. This one
 // consumes one period (10 ms) after the other at real-time pace, on every platform alike.
 constexpr ma_uint32 kNullRate = 48000;
+// Own rate of the null device: kNullRate, other values only from device_tests (#108), which
+// includes this file and sets it before wp_create to stand in for a device above the core's limit.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): test seam, see above
+ma_uint32 nullRate = kNullRate;
 constexpr const char *kNullName = "Null Playback Device";
 
 ma_result nullEnumerate(ma_context *context, ma_enum_devices_callback_proc callback,
@@ -95,7 +99,7 @@ ma_result nullDeviceInfo(ma_context *, ma_device_type type, const ma_device_id *
   info->nativeDataFormatCount = 1;
   info->nativeDataFormats[0].format = ma_format_f32;
   info->nativeDataFormats[0].channels = wp::Player::kChannels;
-  info->nativeDataFormats[0].sampleRate = kNullRate;
+  info->nativeDataFormats[0].sampleRate = nullRate;
   return MA_SUCCESS;
 }
 
@@ -107,7 +111,7 @@ ma_result nullDeviceInit(ma_device *, const ma_device_config *config,
   if (playback->channels == 0)
     playback->channels = wp::Player::kChannels;
   if (playback->sampleRate == 0)
-    playback->sampleRate = kNullRate;
+    playback->sampleRate = nullRate;
   playback->periodSizeInFrames = playback->sampleRate / 100;
   playback->periodCount = 2;
   return MA_SUCCESS;
