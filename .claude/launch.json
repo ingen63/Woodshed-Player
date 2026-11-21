@@ -82,6 +82,20 @@
         "app/build/pages"
       ],
       "port": 8737
+    },
+    {
+      "name": "pwa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8738",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "app/build/pwa"
+      ],
+      "port": 8738
     }
   ]
 }

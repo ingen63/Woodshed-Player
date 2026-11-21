@@ -1,6 +1,10 @@
 // App services in the browser: WASM core in the AudioWorklet (#34), library in the Origin Private File
-// System (#35), import through the file picker. No recording. Desktop and mobile: platform_native.dart.
+// System (#35), import through the file picker. No recording. Media Session for the lock screen and
+// headphone buttons (#39/AK2). Desktop and mobile: platform_native.dart.
+import 'dart:js_interop';
+
 import 'package:material_ui/material_ui.dart';
+import 'package:web/web.dart' as web;
 
 import '../library/library.dart';
 import '../metronome/metronome_controller.dart';
@@ -10,7 +14,10 @@ import '../player/player_service.dart';
 import 'app_controller.dart';
 import 'file_platform_web.dart';
 import 'file_store_web.dart';
+import 'install_hint.dart';
 import 'library_settings_store.dart';
+import 'media_session.dart';
+import 'media_session_web.dart';
 
 /// Library folder in the page's OPFS.
 const libraryDir = 'WoodshedPlayer';
@@ -41,12 +48,27 @@ Future<AppController> createAppController({
     metronome: metronome,
     files: files,
   );
+  if (WebMediaSession.create() case final api?) {
+    MediaSessionLink(api, controller); // lives as long as the page
+  }
   await controller.start();
   return controller;
 }
 
-/// Aufnahme gibt es im Browser nicht.
+/// #39/AK5: there is no recording in the browser, so never a recording button.
 Widget? recordingButtonFor(AppController controller) => null;
+
+@JS('navigator.standalone')
+external bool? get _iosStandalone;
+
+/// #39/AK6: iPhone or iPad in the browser, not started from the home screen.
+bool get installHintWanted => wantsInstallHint(
+  userAgent: web.window.navigator.userAgent,
+  maxTouchPoints: web.window.navigator.maxTouchPoints,
+  standalone:
+      (_iosStandalone ?? false) ||
+      web.window.matchMedia('(display-mode: standalone)').matches,
+);
 
 /// The smoke test of the built app (#13/AK5) exists only on desktop.
 bool get smokeRequested => false;

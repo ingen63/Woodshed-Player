@@ -18,6 +18,7 @@ class LibraryView extends StatefulWidget {
     required this.controller,
     this.onSelected,
     bool? touch,
+    this.cacheControls = kIsWeb,
   }) : touch =
            touch ??
            (kIsWeb
@@ -31,6 +32,10 @@ class LibraryView extends StatefulWidget {
 
   /// Touch: Ziehen nach langem Drücken; sonst sofort mit der Maus.
   final bool touch;
+
+  /// #39/AK3: the device is a cache of the cloud (browser): the storage line opens the cache limit and
+  /// tracks can be kept offline. Desktop and mobile keep every file.
+  final bool cacheControls;
 
   @override
   State<LibraryView> createState() => _LibraryViewState();
@@ -50,7 +55,7 @@ class _LibraryViewState extends State<LibraryView> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([lib, c.player, c.sync]),
+      listenable: Listenable.merge([c, lib, c.player, c.sync]),
       builder: (context, _) {
         final folders = lib.sortedFolders;
         final loose = lib.sortedTracksIn(null);
@@ -85,7 +90,18 @@ class _LibraryViewState extends State<LibraryView> {
                     ),
             ),
             if (lib.storage case final s?)
-              _StorageLine(storageLabel(context.l10n, s)),
+              _StorageLine(
+                [
+                  storageLabel(context.l10n, s),
+                  if (widget.cacheControls)
+                    context.l10n.storageCacheLimit(
+                      formatBytes(lib.cacheLimit, context.l10n.localeName),
+                    ),
+                ].join(' · '),
+                onTap: widget.cacheControls
+                    ? () => showCacheLimitDialog(context, lib)
+                    : null,
+              ),
           ],
         );
       },
@@ -162,6 +178,8 @@ class _LibraryViewState extends State<LibraryView> {
       artwork: lib.artworkPath(t),
       selected: c.player.trackId == t.id,
       onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
+      onlyInCloud: !lib.hasFile(t.id) && c.sync.inCloud(t.id),
+      fetching: c.fetching == t.id,
       indent: indent,
       touch: widget.touch,
       onTap: () => _select(t),
@@ -210,6 +228,13 @@ class _LibraryViewState extends State<LibraryView> {
           onChanged: (v) => lib.setNoUpload({t.id}, v ?? false),
           child: Text(l.dontUpload),
         ),
+        if (widget.cacheControls)
+          CheckboxMenuButton(
+            key: const Key('keepOffline'),
+            value: lib.keptOffline(t.id),
+            onChanged: (v) => lib.setKeepOffline({t.id}, v ?? false),
+            child: Text(l.keepOffline),
+          ),
         MenuItemButton(
           leadingIcon: const Icon(WsIcons.trash, size: 16),
           onPressed: () => confirmDeleteTrack(context, c, t),
@@ -580,29 +605,99 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// Storage usage in the library footer (#35/AK5), e.g. «1.2 GB used».
+/// Storage usage in the library footer (#35/AK5), e.g. «1.2 GB used». With [onTap] it opens the cache
+/// limit (#39/AK3).
 class _StorageLine extends StatelessWidget {
-  const _StorageLine(this.text);
+  const _StorageLine(this.text, {this.onTap});
   final String text;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('storageLine'),
-    width: double.infinity,
-    padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-    decoration: BoxDecoration(
-      border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
-    ),
-    child: Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        fontSize: 11,
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Container(
+      key: const Key('storageLine'),
+      width: double.infinity,
+      constraints: BoxConstraints(
+        minHeight: onTap == null ? 0 : WsLayout.of(context).target,
+      ),
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+      ),
+      child: Text(
+        text,
+        maxLines: onTap == null ? 1 : 2, // phone: the limit must stay readable
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          fontSize: 11,
+        ),
       ),
     ),
   );
+}
+
+/// Limits offered for the audio cache (#39/AK3), in bytes.
+const cacheLimitChoices = [
+  500000000,
+  1000000000,
+  2000000000,
+  5000000000,
+  10000000000,
+  20000000000,
+];
+
+/// #39/AK3: chooses the device-local limit of the audio cache.
+Future<void> showCacheLimitDialog(BuildContext context, Library lib) async {
+  final l = context.l10n;
+  final used = await lib.cacheSize();
+  if (!context.mounted) return;
+  final choices = {...cacheLimitChoices, lib.cacheLimit}.toList()..sort();
+  final chosen = await showDialog<int>(
+    context: context,
+    builder: (context) => AlertDialog(
+      key: const Key('cacheLimitDialog'),
+      title: Text(l.cacheLimitTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l.cacheLimitHint),
+            const SizedBox(height: 8),
+            Text(
+              l.cacheLimitUsed(formatBytes(used, l.localeName)),
+              key: const Key('cacheUsed'),
+            ),
+            RadioGroup<int>(
+              groupValue: lib.cacheLimit,
+              onChanged: (v) => Navigator.pop(context, v),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final c in choices)
+                    RadioListTile<int>(
+                      key: Key('cacheLimit:$c'),
+                      value: c,
+                      title: Text(formatBytes(c, l.localeName)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
+      ],
+    ),
+  );
+  if (chosen != null) await lib.setCacheLimit(chosen);
 }
 
 class _Placeholder extends StatelessWidget {
@@ -636,6 +731,8 @@ class _TrackRow extends StatelessWidget {
     required this.artwork,
     required this.selected,
     this.onlyElsewhere = false,
+    this.onlyInCloud = false,
+    this.fetching = false,
     required this.indent,
     required this.touch,
     required this.onTap,
@@ -649,6 +746,9 @@ class _TrackRow extends StatelessWidget {
 
   /// The audio file is on another device only (#37/AK5).
   final bool onlyElsewhere;
+
+  /// The audio file is in the cloud only and loads when played (#39/AK4); [fetching] while it does.
+  final bool onlyInCloud, fetching;
   final VoidCallback onTap;
   final void Function(String trackId) onDrop;
   final List<Widget> Function(BuildContext context) menu;
@@ -724,6 +824,34 @@ class _TrackRow extends StatelessWidget {
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: ws.amber,
                         ),
+                      ),
+                    if (onlyInCloud)
+                      Row(
+                        key: Key('onlyInCloud:${track.title}'),
+                        spacing: WsSpace.s,
+                        children: [
+                          if (fetching)
+                            const SizedBox.square(
+                              dimension: 10,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                              ),
+                            )
+                          else
+                            Icon(WsIcons.cloud, size: 12, color: ws.muted),
+                          Flexible(
+                            child: Text(
+                              fetching
+                                  ? context.l10n.loadingFromCloud
+                                  : context.l10n.onlyInCloud,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: ws.muted,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     if (track.artist != null)
                       Text(

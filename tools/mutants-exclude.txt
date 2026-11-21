@@ -366,3 +366,9 @@ app/lib/player/player_service.dart | dart_ge_to_gt | (_playing && corePlaying &&
 # danach enger als 1 s, hat sich der Anfang oder das Ende geändert, und die Zweige davor greifen.
 app/lib/player/player_service.dart | dart_and_to_or | } else if (next.loopEnabled && !old.loopEnabled) {
 app/lib/player/player_service.dart | dart_remove_negation | } else if (next.loopEnabled && !old.loopEnabled) {
+
+# ---- app/lib/library/library.dart (#39) ----
+# gleichwertig: Die frühe Rückkehr in trimCache() ist nur eine Abkürzung. Bei total == cacheLimit
+# bricht die Schleife darunter mit derselben Bedingung «total <= cacheLimit» sofort ab, nichts wird
+# entfernt und removed ist leer; das Ergebnis ist dasselbe.
+app/lib/library/library.dart | dart_le_to_lt | if (total <= cacheLimit) return const [];

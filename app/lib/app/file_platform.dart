@@ -45,6 +45,9 @@ abstract class FileStore {
   /// Used (and, in the browser, available) storage.
   Future<StorageInfo> storageInfo();
 
+  /// Size of the file in bytes, or null if it is missing (#39/AK3: size of the audio cache).
+  Future<int?> size(String name) async => (await read(name))?.length;
+
   /// Requests persistent storage (browser only, `navigator.storage.persist()`); null elsewhere.
   Future<bool?> requestPersistence() async => null;
 }

@@ -27,7 +27,11 @@ Future<void> main() async {
   }
   final controller = await createAppController();
   runApp(
-    WoodshedApp(controller: controller, recordingButton: recordingButtonFor),
+    WoodshedApp(
+      controller: controller,
+      recordingButton: recordingButtonFor,
+      installHint: installHintWanted,
+    ),
   );
 }
 
@@ -36,6 +40,7 @@ class WoodshedApp extends StatelessWidget {
     super.key,
     required this.controller,
     this.recordingButton,
+    this.installHint = false,
     this.locale,
     this.localizationsDelegate = AppLocalizations.delegate,
   });
@@ -49,6 +54,9 @@ class WoodshedApp extends StatelessWidget {
 
   /// Aufnahme-Knopf, wo es Aufnahme gibt (nur macOS); null sonst.
   final Widget? Function(AppController controller)? recordingButton;
+
+  /// Shows the hint «Add to Home Screen» (iPhone/iPad in the browser, #39/AK6).
+  final bool installHint;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +84,7 @@ class WoodshedApp extends StatelessWidget {
       home: HomePage(
         controller: controller,
         recordingButton: recordingButton?.call(controller),
+        installHint: installHint,
       ),
     );
   }

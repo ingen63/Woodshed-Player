@@ -60,6 +60,12 @@ class IoFileStore extends FileStore {
   }
 
   @override
+  Future<int?> size(String name) async {
+    final f = _file(name);
+    return f.existsSync() ? f.lengthSync() : null;
+  }
+
+  @override
   String locate(String name) => _file(name).path;
 
   @override

@@ -1,5 +1,7 @@
 // Verbindet Bibliothek, Player und Metronom (#17): Titel wählen, importieren, löschen.
 // Ohne Widgets, damit es sich in Tests prüfen lässt.
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../library/library.dart';
@@ -72,6 +74,9 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Track whose file is being loaded from the cloud (#39/AK4); null otherwise.
+  String? fetching;
+
   /// Der geladene Titel aus der Bibliothek (für Cover und Künstler).
   Track? get currentTrack {
     final id = player.trackId;
@@ -89,10 +94,21 @@ class AppController extends ChangeNotifier {
   /// Titel in den Player laden (ohne abzuspielen, wie in der Swift-App). A track without a known
   /// duration (imported in the browser) gets the one the core found (#42/AK5).
   Future<bool> select(Track t) async {
-    // #37: a file synced from another device is loaded from the cloud when played.
-    if (!library.hasFile(t.id) && !await sync.fetchAudio(t)) {
-      _show(TrackNotOnDevice(t.title));
-      return false;
+    // #39/AK3: the loaded track is the newest in the cache and never removed while loaded.
+    library.inUse = t.id;
+    unawaited(library.markUsed(t.id));
+    // #37, #39/AK4: a file only in the cloud is loaded from there when played.
+    if (!library.hasFile(t.id)) {
+      fetching = t.id;
+      notifyListeners();
+      final ok = await sync.fetchAudio(t);
+      fetching = null;
+      notifyListeners();
+      if (!ok) {
+        library.inUse = player.trackId;
+        _show(TrackNotOnDevice(t.title));
+        return false;
+      }
     }
     final ok = await player.load(
       library.filePath(t),
@@ -123,7 +139,10 @@ class AppController extends ChangeNotifier {
   }
 
   void deleteTracks(Set<String> ids) {
-    if (ids.contains(player.trackId)) player.unload();
+    if (ids.contains(player.trackId)) {
+      player.unload();
+      library.inUse = null;
+    }
     library.delete(ids);
   }
 

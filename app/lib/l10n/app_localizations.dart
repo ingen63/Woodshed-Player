@@ -1129,6 +1129,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Built on {date}'**
   String aboutBuildDate(DateTime date);
+
+  /// #39/AK4: track row, the audio file is not on this device but in the cloud; it loads when played
+  ///
+  /// In en, this message translates to:
+  /// **'Only in the cloud'**
+  String get onlyInCloud;
+
+  /// #39/AK4: track row while its file is downloaded
+  ///
+  /// In en, this message translates to:
+  /// **'Loading from the cloud …'**
+  String get loadingFromCloud;
+
+  /// #39/AK3: track menu, the file stays on this device whatever the cache limit
+  ///
+  /// In en, this message translates to:
+  /// **'Keep offline'**
+  String get keepOffline;
+
+  /// #39/AK3: part of the storage line in the library footer
+  ///
+  /// In en, this message translates to:
+  /// **'limit {size}'**
+  String storageCacheLimit(String size);
+
+  /// #39/AK3: dialog opened from the storage line
+  ///
+  /// In en, this message translates to:
+  /// **'Offline storage for audio'**
+  String get cacheLimitTitle;
+
+  /// No description provided for @cacheLimitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio files on this device up to this limit. Above it, the tracks played longest ago are removed from this device; they stay in the library and in the cloud and load again when played. Tracks marked «Keep offline» always stay. The setting applies to this device only.'**
+  String get cacheLimitHint;
+
+  /// No description provided for @cacheLimitUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} of audio on this device'**
+  String cacheLimitUsed(String size);
+
+  /// #39/AK6: banner on iPhone/iPad in the browser while the app is not installed
+  ///
+  /// In en, this message translates to:
+  /// **'Install the app: tap Share, then «Add to Home Screen».'**
+  String get installHint;
+
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
 }
 
 class _AppLocalizationsDelegate

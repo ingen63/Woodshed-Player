@@ -666,4 +666,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
     return 'Built on $dateString';
   }
+
+  @override
+  String get onlyInCloud => 'Only in the cloud';
+
+  @override
+  String get loadingFromCloud => 'Loading from the cloud …';
+
+  @override
+  String get keepOffline => 'Keep offline';
+
+  @override
+  String storageCacheLimit(String size) {
+    return 'limit $size';
+  }
+
+  @override
+  String get cacheLimitTitle => 'Offline storage for audio';
+
+  @override
+  String get cacheLimitHint =>
+      'Audio files on this device up to this limit. Above it, the tracks played longest ago are removed from this device; they stay in the library and in the cloud and load again when played. Tracks marked «Keep offline» always stay. The setting applies to this device only.';
+
+  @override
+  String cacheLimitUsed(String size) {
+    return '$size of audio on this device';
+  }
+
+  @override
+  String get installHint =>
+      'Install the app: tap Share, then «Add to Home Screen».';
+
+  @override
+  String get close => 'Close';
 }

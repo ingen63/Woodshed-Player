@@ -278,9 +278,10 @@ class Library extends ChangeNotifier {
     for (final t in _tracks) {
       if (await store.exists(trackName(t.fileName))) {
         present.add(t);
-      } else if (_state.tracks[t.id]?.stamps['fileName']?.device !=
-          _device.deviceId) {
-        // Imported on another device (#37): stays visible without a file here.
+      } else if (_device.evicted.contains(t.id) ||
+          _state.tracks[t.id]?.stamps['fileName']?.device != _device.deviceId) {
+        // Imported on another device (#37) or removed from the cache (#39/AK3): stays visible without a
+        // file here.
         present.add(t);
         _absent.add(t.id);
       }
@@ -535,6 +536,11 @@ class Library extends ChangeNotifier {
         : _sha256Hex(bytes);
     if (hash != id) return false;
     await store.write(trackName(t.fileName), bytes);
+    if (_device.evicted.contains(id)) {
+      await _updateDevice(
+        _device.copyWith(evicted: {..._device.evicted}..remove(id)),
+      );
+    }
     if (t.hasArtwork) {
       final art = readMetadata(bytes).artwork;
       if (art != null && art.isNotEmpty) {
@@ -545,6 +551,123 @@ class Library extends ChangeNotifier {
     notifyListeners();
     await refreshStorage();
     return true;
+  }
+
+  // ---- Audio cache of this device (#39/AK3) ----
+
+  /// Track loaded in the player (set by the app); [trimCache] never removes its file.
+  String? inUse;
+
+  /// Bytes of audio files this device keeps; above it [trimCache] removes the oldest.
+  int get cacheLimit => _device.cacheLimit;
+
+  /// Sets the limit (device-local, never synced); values below 1 are ignored.
+  Future<void> setCacheLimit(int bytes) async {
+    if (bytes < 1 || bytes == _device.cacheLimit) return;
+    final saving = _updateDevice(_device.copyWith(cacheLimit: bytes));
+    notifyListeners();
+    await saving;
+  }
+
+  /// The file of track [id] is never removed to keep the limit («Keep offline»).
+  bool keptOffline(String id) => _device.keepOffline.contains(id);
+
+  /// Switches «Keep offline» for these tracks (device-local).
+  Future<void> setKeepOffline(Set<String> ids, bool on) async {
+    final next = {..._device.keepOffline};
+    on ? next.addAll(ids) : next.removeAll(ids);
+    if (next.length == _device.keepOffline.length &&
+        next.containsAll(_device.keepOffline)) {
+      return;
+    }
+    final saving = _updateDevice(_device.copyWith(keepOffline: next));
+    notifyListeners();
+    await saving;
+  }
+
+  /// Track [id] was played on this device now: it is the last one [trimCache] removes.
+  Future<void> markUsed(String id) => _updateDevice(
+    _device.copyWith(
+      lastUsed: {..._device.lastUsed, id: _now().millisecondsSinceEpoch},
+    ),
+  );
+
+  /// Sum of the audio files on this device (bytes).
+  Future<int> cacheSize() async {
+    var total = 0;
+    for (final t in _tracks) {
+      if (hasFile(t.id)) total += await store.size(trackName(t.fileName)) ?? 0;
+    }
+    return total;
+  }
+
+  /// Keeps the audio files on this device at or below [cacheLimit]: removes the files of the tracks used
+  /// longest ago (last played here, else added) until the rest fits. Only files that are in the cloud
+  /// ([inCloud]) are removed; never a track kept offline, the loaded track ([inUse]) or one in [keep]. The track
+  /// stays in the library and is loaded again when played. Returns the IDs whose file was removed.
+  Future<List<String>> trimCache({
+    required bool Function(String id) inCloud,
+    Set<String> keep = const {},
+  }) async {
+    final sizes = <Track, int>{
+      for (final t in _tracks)
+        if (hasFile(t.id)) t: await store.size(trackName(t.fileName)) ?? 0,
+    };
+    var total = sizes.values.fold(0, (a, b) => a + b);
+    if (total <= cacheLimit) return const [];
+    int age(Track t) =>
+        _device.lastUsed[t.id] ?? t.dateAdded.millisecondsSinceEpoch;
+    final candidates = [
+      for (final t in sizes.keys)
+        if (inCloud(t.id) &&
+            !keptOffline(t.id) &&
+            t.id != inUse &&
+            !keep.contains(t.id))
+          t,
+    ]..sort((a, b) => age(a).compareTo(age(b)));
+    final removed = <String>[];
+    for (final t in candidates) {
+      if (total <= cacheLimit) break;
+      await store.delete(trackName(t.fileName)).catchError((_) {});
+      _absent.add(t.id);
+      removed.add(t.id);
+      total -= sizes[t]!;
+    }
+    if (removed.isEmpty) return removed;
+    await _updateDevice(
+      _device.copyWith(evicted: {..._device.evicted, ...removed}),
+    );
+    notifyListeners();
+    await refreshStorage();
+    return removed;
+  }
+
+  /// Removes deleted tracks from the device-local cache lists.
+  void _forgetOnDevice(Set<String> ids) {
+    final d = _device;
+    if (!ids.any(
+      (id) =>
+          d.keepOffline.contains(id) ||
+          d.evicted.contains(id) ||
+          d.lastUsed.containsKey(id),
+    )) {
+      return;
+    }
+    _updateDevice(
+      d.copyWith(
+        keepOffline: {...d.keepOffline}..removeAll(ids),
+        evicted: {...d.evicted}..removeAll(ids),
+        lastUsed: {...d.lastUsed}..removeWhere((k, _) => ids.contains(k)),
+      ),
+    );
+  }
+
+  /// A failed write keeps the settings for this run; the next change writes them again.
+  Future<void> _updateDevice(DeviceSettings d) async {
+    _device = d;
+    try {
+      await d.save(store);
+    } catch (_) {}
   }
 
   /// Switches «don't upload» for these tracks (#37/AK5).
@@ -752,6 +875,7 @@ class Library extends ChangeNotifier {
     }
     _tracks.removeWhere((t) => ids.contains(t.id));
     _absent.removeAll(ids);
+    _forgetOnDevice(ids);
     save();
     notifyListeners();
     refreshStorage();

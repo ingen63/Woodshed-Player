@@ -117,6 +117,8 @@ jobs:
         run: |
           flutter build web --release --no-wasm-dry-run --base-href "$BASE_HREF" \
             --dart-define=WP_GIT_TAG="$TAG" --dart-define=WP_BUILD_DATE="$(date -u +%Y-%m-%d)"
+          # offline start: version and file list into sw.js (#39/AK1); tags before #39 have no such tool
+          if [ -f tool/stamp_sw.dart ]; then dart run tool/stamp_sw.dart build/web; fi
 
       - name: Build site (#50)
         env:

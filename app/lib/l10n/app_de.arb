@@ -171,5 +171,14 @@
   "sourceCode": "Quelltext",
   "aboutTag": "Tag {tag}",
   "aboutNoTag": "Ohne Tag",
-  "aboutBuildDate": "Gebaut am {date}"
+  "aboutBuildDate": "Gebaut am {date}",
+  "onlyInCloud": "Nur in der Cloud",
+  "loadingFromCloud": "Wird aus der Cloud geladen …",
+  "keepOffline": "Offline halten",
+  "storageCacheLimit": "Grenze {size}",
+  "cacheLimitTitle": "Offline-Speicher für Audio",
+  "cacheLimitHint": "Audiodateien auf diesem Gerät bis zu dieser Grenze. Darüber werden die am längsten nicht gespielten Titel von diesem Gerät entfernt; sie bleiben in der Bibliothek und in der Cloud und werden beim Abspielen wieder geladen. Titel mit «Offline halten» bleiben immer. Die Einstellung gilt nur für dieses Gerät.",
+  "cacheLimitUsed": "{size} Audio auf diesem Gerät",
+  "installHint": "App installieren: Teilen antippen, dann «Zum Home-Bildschirm».",
+  "close": "Schliessen"
 }

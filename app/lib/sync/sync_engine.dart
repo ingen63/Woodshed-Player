@@ -175,6 +175,7 @@ class CloudSync extends SyncService {
         _plan(await provider.list('audio/'));
         await _runTasks();
       }
+      await _trimCache();
       _offline = 0;
       lastSync = _now();
       _scheduleRetry();
@@ -289,10 +290,23 @@ class CloudSync extends SyncService {
   Future<bool> fetchAudio(Track track) async {
     if (library.hasFile(track.id)) return true;
     try {
-      return await _download(track);
+      if (!await _download(track)) return false;
     } catch (_) {
       return false;
     }
+    await _trimCache(
+      keep: {track.id},
+    ); // the file just loaded is about to be played
+    return true;
+  }
+
+  /// #39/AK3: without eager downloads (browser) the device is a cache of the cloud: above its limit the
+  /// files used longest ago go, as far as they are in the cloud. Desktop keeps every file.
+  Future<void> _trimCache({Set<String> keep = const {}}) async {
+    if (eagerDownload) return;
+    try {
+      await library.trimCache(inCloud: inCloud, keep: keep);
+    } catch (_) {} // a failed delete leaves the file; the next sync tries again
   }
 
   /// Merges `state.json` into the library and writes the result back conditionally (#37/AK1, AK6).

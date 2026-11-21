@@ -18,8 +18,16 @@ import 'player_view.dart';
 import 'style.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, required this.controller, this.recordingButton});
+  const HomePage({
+    super.key,
+    required this.controller,
+    this.recordingButton,
+    this.installHint = false,
+  });
   final AppController controller;
+
+  /// #39/AK6: hint «Add to Home Screen» on top until it is closed (iPhone/iPad in the browser).
+  final bool installHint;
 
   /// Aufnahme-Knopf (#4); sichtbar nur auf macOS, Windows und Linux (#30/AK10).
   final Widget? recordingButton;
@@ -30,6 +38,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool _phonePlayer = false; // Phone: Übe-Seite statt Bibliothek
+  bool _hintClosed = false;
   Timer? _metronomeTicker;
   final _scaffold = GlobalKey<ScaffoldState>();
 
@@ -176,13 +185,29 @@ class _HomePageState extends State<HomePage> {
         child: LayoutBuilder(
           builder: (context, box) {
             final metrics = WsMetrics(WsSize.forWidth(box.maxWidth), platform);
+            final layout = switch (metrics.size) {
+              WsSize.desktop => _desktop(),
+              WsSize.tablet => _tablet(),
+              WsSize.phone => _phone(),
+            };
             return WsLayout(
               metrics: metrics,
-              child: switch (metrics.size) {
-                WsSize.desktop => _desktop(),
-                WsSize.tablet => _tablet(),
-                WsSize.phone => _phone(),
-              },
+              child: widget.installHint && !_hintClosed
+                  ? Column(
+                      children: [
+                        _InstallHint(
+                          onClose: () => setState(() => _hintClosed = true),
+                        ),
+                        Expanded(
+                          child: MediaQuery.removePadding(
+                            context: context,
+                            removeTop: true,
+                            child: layout,
+                          ),
+                        ),
+                      ],
+                    )
+                  : layout,
             );
           },
         ),
@@ -401,6 +426,43 @@ class _NowPlayingBar extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// #39/AK6: how to install the app on iPhone and iPad (Share → Add to Home Screen); can be closed.
+class _InstallHint extends StatelessWidget {
+  const _InstallHint({required this.onClose});
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    return Material(
+      key: const Key('installHint'),
+      color: ws.panel2,
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: ws.border)),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
+          child: Row(
+            spacing: WsSpace.s,
+            children: [
+              Icon(WsIcons.share, size: 18, color: ws.amber),
+              Expanded(child: Text(context.l10n.installHint)),
+              IconButton(
+                key: const Key('installHintClose'),
+                tooltip: context.l10n.close,
+                icon: const Icon(WsIcons.close, size: 16),
+                onPressed: onClose,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

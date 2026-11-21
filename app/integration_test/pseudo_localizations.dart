@@ -372,6 +372,25 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get aboutNoTag => pseudo(super.aboutNoTag);
   @override
   String aboutBuildDate(DateTime date) => pseudo(super.aboutBuildDate(date));
+  @override
+  String get onlyInCloud => pseudo(super.onlyInCloud);
+  @override
+  String get loadingFromCloud => pseudo(super.loadingFromCloud);
+  @override
+  String get keepOffline => pseudo(super.keepOffline);
+  @override
+  String storageCacheLimit(String size) =>
+      pseudo(super.storageCacheLimit(size));
+  @override
+  String get cacheLimitTitle => pseudo(super.cacheLimitTitle);
+  @override
+  String get cacheLimitHint => pseudo(super.cacheLimitHint);
+  @override
+  String cacheLimitUsed(String size) => pseudo(super.cacheLimitUsed(size));
+  @override
+  String get installHint => pseudo(super.installHint);
+  @override
+  String get close => pseudo(super.close);
 }
 
 /// Loads [PseudoLocalizations] for any locale.

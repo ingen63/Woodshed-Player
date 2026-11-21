@@ -135,6 +135,14 @@ class OpfsFileStore extends FileStore {
     return bytes == null ? null : crypto.sha256.convert(bytes).toString();
   }
 
+  /// Size without reading the contents (#39/AK3).
+  @override
+  Future<int?> size(String name) => _serial(() async {
+    final h = await _handle(name);
+    if (h == null) return null;
+    return (await h.getFile().toDart).size;
+  });
+
   @override
   String locate(String name) => name;
 

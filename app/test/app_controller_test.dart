@@ -1,4 +1,5 @@
 // #17: Zusammenspiel von Bibliothek, Player und Metronom ohne Oberfläche; #22 Drag & Drop über den Kanal.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -8,6 +9,8 @@ import 'package:woodshed_player/app/file_platform.dart';
 import 'package:woodshed_player/app/file_store_io.dart';
 import 'package:woodshed_player/metronome/metronome_controller.dart';
 import 'package:woodshed_player/library/library.dart';
+import 'package:woodshed_player/sync/in_memory_provider.dart';
+import 'package:woodshed_player/sync/sync_engine.dart';
 import 'package:wp_core/wp_core.dart';
 
 import 'fakes.dart';
@@ -155,5 +158,40 @@ void main() {
     expect((a.controller.message! as ImportFailed).files, ['fehlt.mp3']);
     a.controller.clearMessage();
     expect(a.controller.message, isNull);
+  });
+
+  test('#39/AK3, AK4: playing marks the track as used and shows the download while it runs', () async {
+    final dir = Directory.systemTemp.createTempSync('wp_only_cloud');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final cloud = InMemoryProvider();
+    late CloudSync sync;
+    final app = TestApp(
+      Directory('${dir.path}/lib'),
+      sync: (l) => sync = CloudSync(
+        cloud,
+        l,
+        eagerDownload: false,
+        changeDelay: const Duration(days: 1),
+      ),
+    );
+    addTearDown(sync.dispose);
+    await app.library.load();
+    await app.library.setCacheLimit(10);
+    final src = File('${dir.path}/Etude.mp3')..writeAsStringSync('audio etude');
+    final a = (await app.library.importFiles([src.path])).imported.single;
+    app.library.inUse = null;
+    await sync.syncNow();
+    expect(app.library.hasFile(a.id), isFalse);
+
+    final seen = <String?>[];
+    app.controller.addListener(() => seen.add(app.controller.fetching));
+    cloud.offline = true; // the download fails
+    expect(await app.controller.select(a), isFalse);
+    expect(seen.first, a.id, reason: 'the row shows the download');
+    expect(seen.last, isNull, reason: 'and stops showing it');
+    final device = jsonDecode(
+      File('${dir.path}/lib/device.json').readAsStringSync(),
+    ) as Map;
+    expect((device['lastUsed'] as Map).keys, contains(a.id));
   });
 }

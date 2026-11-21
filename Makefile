@@ -318,6 +318,7 @@ test-web:
 # The only web build of the CI job web (#83), so it stays a release build.
 test-web-start:
 	cd app && $(PIPEFAIL) flutter build web --release --no-wasm-dry-run 2>&1 | tail -1
+	cd app && dart run tool/stamp_sw.dart build/web
 	cd app && dart tool/web_start_check.dart build/web
 
 # #13/AK5: smoke test of the built app (release): start, play a generated file, exit code 0.

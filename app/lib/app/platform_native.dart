@@ -58,6 +58,9 @@ Future<AppController> createAppController({
 Widget? recordingButtonFor(AppController controller) =>
     WpRecorder.available ? RecordingButton(controller: controller) : null;
 
+/// The hint «Add to Home Screen» is for the browser only (#39/AK6).
+bool get installHintWanted => false;
+
 /// Verbindet den MetronomeController mit dem Audio-Kern.
 class _PlayerMetronome implements MetronomeBackend {
   _PlayerMetronome(this._p);

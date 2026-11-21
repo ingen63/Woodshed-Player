@@ -500,5 +500,46 @@
         "format": "yMd"
       }
     }
-  }
+  },
+  "onlyInCloud": "Only in the cloud",
+  "@onlyInCloud": {
+    "description": "#39/AK4: track row, the audio file is not on this device but in the cloud; it loads when played"
+  },
+  "loadingFromCloud": "Loading from the cloud …",
+  "@loadingFromCloud": {
+    "description": "#39/AK4: track row while its file is downloaded"
+  },
+  "keepOffline": "Keep offline",
+  "@keepOffline": {
+    "description": "#39/AK3: track menu, the file stays on this device whatever the cache limit"
+  },
+  "storageCacheLimit": "limit {size}",
+  "@storageCacheLimit": {
+    "description": "#39/AK3: part of the storage line in the library footer",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheLimitTitle": "Offline storage for audio",
+  "@cacheLimitTitle": {
+    "description": "#39/AK3: dialog opened from the storage line"
+  },
+  "cacheLimitHint": "Audio files on this device up to this limit. Above it, the tracks played longest ago are removed from this device; they stay in the library and in the cloud and load again when played. Tracks marked «Keep offline» always stay. The setting applies to this device only.",
+  "@cacheLimitHint": {},
+  "cacheLimitUsed": "{size} of audio on this device",
+  "@cacheLimitUsed": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "installHint": "Install the app: tap Share, then «Add to Home Screen».",
+  "@installHint": {
+    "description": "#39/AK6: banner on iPhone/iPad in the browser while the app is not installed"
+  },
+  "close": "Close",
+  "@close": {}
 }

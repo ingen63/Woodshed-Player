@@ -221,6 +221,13 @@ Abgelöst durch `docs/KONZEPT-SYNC.md` (Mischform): Google Drive #54, OneDrive #
 - Cache-Verwaltung: Obergrenze, Entfernen der ältesten Titel, «Offline halten», Anzeige «nur in der Cloud».
 - Aufnahme-Knopf bleibt unsichtbar; Datei-Import über Auswahl.
 
+#### Umsetzung W7 (#39)
+- **Offline-Start:** derselbe Service Worker `app/web/sw.js` wie für COOP/COEP (#41), kein zweiter. `app/tool/stamp_sw.dart` schreibt nach dem Bau Version (Hash über alle Dateien) und Dateiliste hinein; beim Installieren landen die Dateien im Cache `wp-shell-<version>`, beim Aktivieren werden ältere Caches gelöscht. Dateien kommen zuerst aus dem Cache, die Seite selbst zuerst aus dem Netz. Nicht vorab geladen werden die CanvasKit-Varianten (der Browser wählt eine), sie kommen beim ersten Laden in den Cache und werden bei einem neuen Stand mitgenommen.
+- **Media Session** (`app/lib/app/media_session.dart`, Browser-Teil `media_session_web.dart`): Titel, Artist, Zustand, Position und Tempo; Aktionen *play*, *pause*, *stop*, *seekto*, ±15 s. Abspielen über den Sperrbildschirm stoppt das Metronom wie in der App.
+- **Audio-Cache:** Obergrenze, «Offline halten», verdrängte Titel und letzte Nutzung je Titel stehen gerätelokal in `device.json`. Entfernt wird nur, was in der Cloud liegt, die am längsten nicht gespielten Titel zuerst, nie der geladene Titel; nur ohne sofortiges Herunterladen (Browser), der Desktop behält alle Dateien. Eingestellt über die Speicherzeile im Fuss der Bibliothek. Abweichung von `docs/KONZEPT-SYNC.md`: keine; «Nur in der Cloud» gilt für jede Quelle, die `inCloud` meldet, also später auch gekoppelte Geräte (#56).
+- **Hinweis «Zum Home-Bildschirm»:** iPhone und iPad (iPadOS meldet sich als Mac mit Touch) im Browser, solange `navigator.standalone` bzw. der Anzeigemodus `standalone` fehlt; schliessbar, er kommt beim nächsten Start wieder.
+- Offen für den Test auf echten Geräten: Sperrbildschirm und Kopfhörertasten auf iPhone und Android, Stummschalter, Wake Lock beim Üben (bleibt beim Metronom wie bisher).
+
 ### W8 – Einstellungen, Oberfläche, Desktop (3–4 Tage)
 Abgelöst durch M5 in `docs/KONZEPT-SYNC.md`: die Oberfläche wächst in #54, #55 und #56 mit (#40 geschlossen).
 - Bereich «Abgleich» in den Einstellungen: Weg wählen (Google Drive, OneDrive, direkte Verbindung), anmelden bzw. koppeln, abmelden bzw. entkoppeln, Status je Gerät, letzter Abgleich, Fehler.
