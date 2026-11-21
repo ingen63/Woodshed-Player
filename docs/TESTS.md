@@ -184,6 +184,7 @@ zugeordnet.
 | Hook nach dem Commit mit eigenen Tests | vorhanden: `app/tool/after_commit_hook_test.dart` (#7/AK7) | – |
 | Abdeckung je Teil mit Untergrenze, `coverage-diff`, `pre-push` mit eigenen Tests | vorhanden: `tools/coverage-min`, `tools/git-hooks/pre-push`, `app/tool/coverage_test.dart`, `app/tool/pre_push_hook_test.dart` (#8) | – |
 | C-API (`player.cpp`) über die geteilte Bibliothek: Nullzeiger, Laden, Seek, Tempo, Loop, Wellenform, Metronom, Aufnahme im Ruhezustand | vorhanden: `core/tests/capi_tests.cpp` (#8) | – |
+| Dart-Anbindung (`wp_core.dart`) gegen `wp_core.h`: jede Funktion gebunden, Rückgabe- und Parametertypen gleich (`int`→`Int32`, `long long`→`Int64`, `float`→`Float`, …), unbekannte Typen scheitern mit Funktionsnamen, ohne gebauten Kern | vorhanden: `app/test/ffi_coverage_test.dart` (#15/AK3, #100) | – |
 | Gerätehülle (`player.cpp`) von innen auf dem Null-Gerät: Meldungen von miniaudio, Neustart des Geräts, Metronom über die C-API | vorhanden: `core/tests/device_tests.cpp` (#61) | – |
 | Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug, `make mutants`, `make mutants-diff`, Job `mutants-diff` | vorhanden: `app/tool/mutants*.dart`, `core/tests/mutants/`, `tools/mutants-exclude.txt` (#11); kein offener Mutant mehr (#61, Abschnitt «Mutationstests (#11)») | – |
 | Übersichtsseite Testqualität: vier Schichten mit Status, Zuordnung `#nn/AKn`, Verlauf, «keine Daten» | vorhanden: `make report`, `app/tool/report/` mit `report_test.dart`, Artefakt `test-quality-report` im Job `checks` (#12) | – |

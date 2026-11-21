@@ -4,6 +4,168 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wp_core/wp_core.dart';
 
+/// One deviation between a `WP_API` declaration and its `lookupFunction` binding.
+typedef SignatureFinding = ({String function, String detail});
+
+const _scalarTypes = {
+  'void': 'Void',
+  'int': 'Int32',
+  'long long': 'Int64',
+  'float': 'Float',
+  'double': 'Double',
+};
+
+/// Native type of a pointer's target; `char` is bound as `Utf8` (C strings).
+const _pointeeTypes = {
+  'char': 'Utf8',
+  'float': 'Float',
+  'wp_player': '_Player',
+};
+
+/// Maps a C type from wp_core.h to the native type of the Dart binding, or `null` if unknown.
+String? nativeTypeFor(String cType) {
+  final t = cType
+      .replaceAll(RegExp(r'\bconst\b'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAll(' *', '*')
+      .trim();
+  if (t.endsWith('*')) {
+    final target = t.substring(0, t.length - 1).trim();
+    if (target.contains('*')) return null;
+    final native = _pointeeTypes[target];
+    return native == null ? null : 'Pointer<$native>';
+  }
+  return _scalarTypes[t];
+}
+
+/// C types of every `WP_API` function: return type first, then the parameters.
+Map<String, List<String>> headerSignatures(String header) {
+  final result = <String, List<String>>{};
+  for (final m in RegExp(
+    r'^WP_API\s+([^;(]*?)\s*\b(wp_\w+)\s*\(([^)]*)\)\s*;',
+    multiLine: true,
+  ).allMatches(header)) {
+    final params = m.group(3)!.trim();
+    result[m.group(2)!] = [
+      m.group(1)!,
+      if (params != 'void')
+        for (final p in params.split(','))
+          RegExp(r'^(.*[\s*])\w+$').firstMatch(p.trim())?.group(1) ?? p.trim(),
+    ];
+  }
+  return result;
+}
+
+/// Index of the `>` closing the `<` at [open].
+int _closingAngle(String s, int open) {
+  var depth = 0;
+  for (var i = open; i < s.length; i++) {
+    if (s[i] == '<') depth++;
+    if (s[i] == '>' && --depth == 0) return i;
+  }
+  throw StateError('unbalanced <> at $open');
+}
+
+/// Splits [s] at commas outside of `<>` and `()`, dropping empty parts.
+List<String> _splitTopLevel(String s) {
+  final parts = <String>[];
+  var depth = 0;
+  var start = 0;
+  for (var i = 0; i < s.length; i++) {
+    final c = s[i];
+    if (c == '<' || c == '(') depth++;
+    if (c == '>' || c == ')') depth--;
+    if (c == ',' && depth == 0) {
+      parts.add(s.substring(start, i));
+      start = i + 1;
+    }
+  }
+  parts.add(s.substring(start));
+  return [
+    for (final p in parts)
+      if (p.trim().isNotEmpty) p.replaceAll(RegExp(r'\s+'), ''),
+  ];
+}
+
+/// Native types in `lookupFunction<Native, Dart>('wp_…')`: return type first, then the parameters.
+Map<String, List<String>> bindingSignatures(String binding) {
+  final result = <String, List<String>>{};
+  const marker = 'lookupFunction<';
+  for (
+    var at = binding.indexOf(marker);
+    at >= 0;
+    at = binding.indexOf(marker, at + 1)
+  ) {
+    final open = at + marker.length - 1;
+    final close = _closingAngle(binding, open);
+    final name = RegExp(r"^\s*\(\s*'(wp_\w+)'")
+        .firstMatch(binding.substring(close + 1))
+        ?.group(1);
+    if (name == null) continue;
+    final native = _splitTopLevel(binding.substring(open + 1, close)).first;
+    final fn = native.indexOf('Function(');
+    result[name] = [
+      native.substring(0, fn),
+      ..._splitTopLevel(
+        native.substring(fn + 'Function('.length, native.length - 1),
+      ),
+    ];
+  }
+  return result;
+}
+
+/// Compares every `WP_API` declaration with the native signature of its binding.
+List<SignatureFinding> compareSignatures(String header, String binding) {
+  final findings = <SignatureFinding>[];
+  final declared = headerSignatures(header);
+  final declarations = RegExp(
+    r'^WP_API\s',
+    multiLine: true,
+  ).allMatches(header).length;
+  if (declared.length != declarations) {
+    findings.add((
+      function: '*',
+      detail: 'parsed ${declared.length} of $declarations WP_API declarations',
+    ));
+  }
+  final bound = bindingSignatures(binding);
+  for (final MapEntry(key: function, value: cTypes) in declared.entries) {
+    final expected = <String>[];
+    for (final cType in cTypes) {
+      final native = nativeTypeFor(cType);
+      if (native == null) {
+        findings.add((
+          function: function,
+          detail: 'unknown C type "${cType.trim()}"',
+        ));
+      }
+      expected.add(native ?? '?');
+    }
+    final found = bound[function];
+    if (found == null) {
+      findings.add((function: function, detail: 'no lookupFunction binding'));
+      continue;
+    }
+    if (found.length != expected.length) {
+      findings.add((
+        function: function,
+        detail:
+            'expected ${expected.length - 1} parameters, found ${found.length - 1}',
+      ));
+      continue;
+    }
+    for (var i = 0; i < expected.length; i++) {
+      if (expected[i] == '?' || expected[i] == found[i]) continue;
+      final where = i == 0 ? 'return type' : 'parameter $i';
+      findings.add((
+        function: function,
+        detail: '$where: expected ${expected[i]}, found ${found[i]}',
+      ));
+    }
+  }
+  return findings;
+}
+
 void main() {
   final header = File('../core/include/wp_core.h').readAsStringSync();
   final binding = File('packages/wp_core/lib/wp_core.dart').readAsStringSync();
@@ -59,5 +221,82 @@ void main() {
       reason: 'new WP_REC_ERR_* in wp_core.h: update WpRecCode and recordingErrorMessage',
     );
     expect(WpRecCode.all.toSet().length, WpRecCode.all.length);
+  });
+
+  group('#100 #15/AK3: native types of the binding match wp_core.h', () {
+    test('#100/AK1: every WP_API function has the same types', () {
+      expect(headerSignatures(header).length, greaterThan(30));
+      expect(compareSignatures(header, binding), isEmpty);
+    });
+
+    test('#100/AK1: mapping of C types to native types', () {
+      expect(nativeTypeFor('void'), 'Void');
+      expect(nativeTypeFor('int'), 'Int32');
+      expect(nativeTypeFor('long long'), 'Int64');
+      expect(nativeTypeFor('float'), 'Float');
+      expect(nativeTypeFor('double'), 'Double');
+      expect(nativeTypeFor('const char *'), 'Pointer<Utf8>');
+      expect(nativeTypeFor('float *'), 'Pointer<Float>');
+      expect(nativeTypeFor('wp_player *'), 'Pointer<_Player>');
+      expect(nativeTypeFor('char **'), isNull);
+    });
+
+    test('#100/AK2: Double instead of Float in wp_set_volume is reported', () {
+      final start = binding.indexOf('final _setVolume');
+      final end = binding.indexOf("('wp_set_volume')", start);
+      expect(start, isNonNegative);
+      expect(end, greaterThan(start));
+      final broken =
+          binding.substring(0, start) +
+          binding.substring(start, end).replaceFirst('Float', 'Double') +
+          binding.substring(end);
+      expect(compareSignatures(header, broken), [
+        (
+          function: 'wp_set_volume',
+          detail: 'parameter 2: expected Float, found Double',
+        ),
+      ]);
+    });
+
+    test('#100/AK2: Int32 instead of Int64 in wp_loop_passes is reported', () {
+      final broken = binding.replaceFirst(
+        'Int64 Function(Pointer<_Player>)',
+        'Int32 Function(Pointer<_Player>)',
+      );
+      expect(compareSignatures(header, broken), [
+        (
+          function: 'wp_loop_passes',
+          detail: 'return type: expected Int64, found Int32',
+        ),
+      ]);
+    });
+
+    test('#100/AK3: an unknown C type fails with the function name', () {
+      final extended = header.replaceFirst(
+        'WP_API void wp_play(wp_player *p);',
+        'WP_API void wp_play(wp_player *p);\n'
+            'WP_API unsigned short wp_new_call(wp_player *p, size_t n);',
+      );
+      final findings = compareSignatures(extended, binding);
+      expect(
+        findings,
+        contains((
+          function: 'wp_new_call',
+          detail: 'unknown C type "unsigned short"',
+        )),
+      );
+      expect(
+        findings,
+        contains((function: 'wp_new_call', detail: 'unknown C type "size_t"')),
+      );
+    });
+
+    test('#100/AK3: a declaration the parser misses is reported', () {
+      final extended = '$header\nWP_API int wp_odd(int (*callback)(void));\n';
+      expect(
+        compareSignatures(extended, binding).map((f) => f.function),
+        contains('*'),
+      );
+    });
   });
 }
