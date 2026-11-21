@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "player_core.hpp"
+#include "replace_new.hpp"
 #include "wp_core.h"
 
 namespace fs = std::filesystem;
@@ -41,11 +42,16 @@ static_assert(WP_LOAD_IDLE == wp::kLoadIdle && WP_LOAD_RUNNING == wp::kLoadRunni
 
 // #61: every operator new of this program goes through here. A thread can make its allocations fail
 // (tFailAlloc) and the largest single allocation is recorded (gLargestAlloc), to check how much the
-// loading reserves at once.
+// loading reserves at once. Not under ThreadSanitizer (#101, replace_new.hpp): there the tests that
+// need it are skipped (kReplacesNew).
 namespace {
+constexpr bool kReplacesNew = WP_REPLACE_NEW;
 thread_local bool tFailAlloc = false;
 std::atomic<std::size_t> gLargestAlloc{0};
+} // namespace
 
+#if WP_REPLACE_NEW
+namespace {
 void *testNew(std::size_t n) {
   if (tFailAlloc)
     throw std::bad_alloc();
@@ -94,6 +100,7 @@ void operator delete(void *p, std::align_val_t) noexcept { std::free(p); }
 void operator delete[](void *p, std::align_val_t) noexcept { std::free(p); }
 void operator delete(void *p, std::size_t, std::align_val_t) noexcept { std::free(p); }
 void operator delete[](void *p, std::size_t, std::align_val_t) noexcept { std::free(p); }
+#endif
 
 namespace {
 
@@ -731,6 +738,10 @@ void longTitleWithWrongHeaderLength() {
 // so a long title reserves its length once there too: no single allocation is larger than the
 // samples plus one decode block (growing step by step would allocate about twice 5 minutes).
 void longTitleFromFileReservesOnce() {
+  if (!kReplacesNew) {
+    std::printf("  skipped: no operator new of its own under ThreadSanitizer (#101)\n");
+    return;
+  }
   const fs::path file = writeIndexWav("long6min-file.wav", kLongFrames, kLongSr);
   gLargestAlloc.store(0);
   wp::Player p(kLongSr);
@@ -780,6 +791,10 @@ void progressIsCompleteAfterLoad() {
 // WP_ERR_OUT_OF_MEMORY, and the load state says so too.
 // #93/AK2: runs in the WASM tests too; they are built with -fwasm-exceptions like the browser core.
 void loadThreadWithoutMemory() {
+  if (!kReplacesNew) {
+    std::printf("  skipped: no operator new of its own under ThreadSanitizer (#101)\n");
+    return;
+  }
   const std::string file = writeIndexWav("no-thread.wav", 1000).string();
   wp::Player p(kSr);
   tFailAlloc = true;

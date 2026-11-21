@@ -48,6 +48,7 @@
 
 #include "engine.hpp"
 #include "player_core.hpp"
+#include "replace_new.hpp"
 #include "test_timing.hpp"
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -61,12 +62,14 @@ namespace {
 // Sizes come from the allocator itself (malloc_size, malloc_usable_size) rather than a header in
 // front of the block: libc++ may free memory it allocated before main with this operator delete.
 // The counter is signed, so such a block cannot wrap it around.
-constexpr std::size_t kMinAlign = alignof(std::max_align_t);
 std::atomic<long long> gLive{0};
 std::atomic<long long> gPeak{0};
 std::atomic<long long> gLimit{LLONG_MAX};
 // #75/AK1: the first allocation of at least this many bytes fails once (reserve-fallback)
 std::atomic<long long> gFailOnceFrom{LLONG_MAX};
+
+#if WP_REPLACE_NEW
+constexpr std::size_t kMinAlign = alignof(std::max_align_t);
 
 std::size_t blockSize(void *p) {
 #if defined(__APPLE__)
@@ -110,9 +113,13 @@ void *nothrowNew(std::size_t n, std::size_t align) noexcept {
     return nullptr;
   }
 }
+#endif
 
 } // namespace
 
+// Not under ThreadSanitizer, whose runtime brings its own operators (#101, replace_new.hpp):
+// without them there is no memory limit, so main refuses to run there.
+#if WP_REPLACE_NEW
 void *operator new(std::size_t n) { return countedNew(n, kMinAlign); }
 void *operator new[](std::size_t n) { return countedNew(n, kMinAlign); }
 void *operator new(std::size_t n, const std::nothrow_t &) noexcept {
@@ -135,6 +142,7 @@ void operator delete(void *p, std::align_val_t) noexcept { countedDelete(p); }
 void operator delete[](void *p, std::align_val_t) noexcept { countedDelete(p); }
 void operator delete(void *p, std::size_t, std::align_val_t) noexcept { countedDelete(p); }
 void operator delete[](void *p, std::size_t, std::align_val_t) noexcept { countedDelete(p); }
+#endif
 
 namespace {
 
@@ -455,6 +463,10 @@ void memoryLimitHolds() {
 } // namespace
 
 int main(int argc, char **argv) {
+  if (!WP_REPLACE_NEW) {
+    std::printf("skipped: no memory limit under ThreadSanitizer (#101)\n");
+    return 0;
+  }
   const std::string mode = argc > 1 ? argv[1] : "";
   if (mode == "stretch") {
     stretchPerBuffer();

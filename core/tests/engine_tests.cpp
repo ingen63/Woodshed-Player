@@ -14,6 +14,7 @@
 #include "command_queue.hpp"
 #include "engine.hpp"
 #include "metronome.hpp"
+#include "replace_new.hpp"
 #include "sample_rate.hpp"
 #include "test_timing.hpp"
 
@@ -21,6 +22,7 @@
 namespace {
 thread_local bool tCountAllocs = false;
 std::atomic<long> gAllocs{0};
+#if WP_REPLACE_NEW
 void *countedAlloc(std::size_t n) {
   if (tCountAllocs)
     ++gAllocs;
@@ -33,14 +35,19 @@ void countedFree(void *p) noexcept {
     ++gAllocs;
   std::free(p);
 }
+#endif
 } // namespace
 
+// Not under ThreadSanitizer, whose runtime brings its own operators (#101, replace_new.hpp); there
+// nothing is counted and the check of #14/AK1 runs in the other builds only.
+#if WP_REPLACE_NEW
 void *operator new(std::size_t n) { return countedAlloc(n); }
 void *operator new[](std::size_t n) { return countedAlloc(n); }
 void operator delete(void *p) noexcept { countedFree(p); }
 void operator delete[](void *p) noexcept { countedFree(p); }
 void operator delete(void *p, std::size_t) noexcept { countedFree(p); }
 void operator delete[](void *p, std::size_t) noexcept { countedFree(p); }
+#endif
 
 namespace {
 

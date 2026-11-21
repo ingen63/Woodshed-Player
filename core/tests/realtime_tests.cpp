@@ -4,7 +4,8 @@
 // blocking lock.
 //
 // Counted in the render thread only:
-// - every replaceable operator new/delete (all platforms, all builds);
+// - every replaceable operator new/delete (all platforms, all builds except ThreadSanitizer,
+//   whose runtime brings its own: #101, replace_new.hpp);
 // - on Linux with glibc and without sanitizers also malloc, calloc, realloc, free, posix_memalign,
 //   aligned_alloc and pthread_mutex_lock (the sanitizers bring their own malloc and lock hooks).
 // On macOS malloc and locks cannot be interposed from the test program; there the operator new
@@ -19,6 +20,7 @@
 #include <vector>
 
 #include "player_core.hpp"
+#include "replace_new.hpp"
 
 #if defined(__linux__) && defined(__GLIBC__) && !defined(WP_SANITIZED)
 #define WP_COUNT_LIBC 1
@@ -33,6 +35,7 @@ thread_local bool tCount = false;
 std::atomic<long> gAllocs{0};
 std::atomic<long> gLocks{0};
 
+#if WP_REPLACE_NEW
 void *countedNew(std::size_t n) {
   if (tCount)
     gAllocs.fetch_add(1, std::memory_order_relaxed);
@@ -54,8 +57,10 @@ void countedDelete(void *p) noexcept {
     gAllocs.fetch_add(1, std::memory_order_relaxed);
   std::free(p);
 }
+#endif
 } // namespace
 
+#if WP_REPLACE_NEW
 void *operator new(std::size_t n) { return countedNew(n); }
 void *operator new[](std::size_t n) { return countedNew(n); }
 void *operator new(std::size_t n, const std::nothrow_t &) noexcept {
@@ -82,6 +87,7 @@ void operator delete(void *p, std::align_val_t) noexcept { countedDelete(p); }
 void operator delete[](void *p, std::align_val_t) noexcept { countedDelete(p); }
 void operator delete(void *p, std::size_t, std::align_val_t) noexcept { countedDelete(p); }
 void operator delete[](void *p, std::size_t, std::align_val_t) noexcept { countedDelete(p); }
+#endif
 
 #if WP_COUNT_LIBC
 // glibc declares these functions noexcept (__THROW) and exports its allocator as __libc_*; the
@@ -252,6 +258,10 @@ void renderPathIsRealtimeSafe() {
 // The counter itself works: an allocation in the counted thread is seen (also through malloc on
 // Linux), so 0 above is not an artefact of a broken hook.
 void counterSeesAllocations() {
+  if (!WP_REPLACE_NEW) {
+    std::printf("  skipped: no operator new of its own under ThreadSanitizer (#101)\n");
+    return;
+  }
   gAllocs = 0;
   tCount = true;
   auto *v = new std::vector<int>(100);

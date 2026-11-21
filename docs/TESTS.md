@@ -383,7 +383,11 @@ braucht darüber einen Kommentar mit Meldung, Grund und Issue und steht in der f
 
 **Grenzen.** LeakSanitizer gibt es mit ASan auf macOS nicht; Lecks prüft nur der Linux-Lauf. `capi_tests` öffnet ein
 echtes Audiogerät; ohne Gerät (Linux-Runner) überspringt er die Ladefälle, der Callback des Geräts läuft dann nicht
-unter den Sanitizern.
+unter den Sanitizern. Unter TSan ersetzen die Testprogramme `operator new`/`delete` nicht (#101,
+`core/tests/replace_new.hpp`): Die TSan-Laufzeit bringt eigene mit, unter Linux statisch gelinkt. Dort entfallen die
+Prüfungen, die eigene Operatoren brauchen: Zählen der Reservierungen im Audio-Thread (`engine_tests`,
+`realtime_tests`), fehlschlagende und grösste Reservierung (`player_tests`), die Bench-Fälle mit Speicherlimit
+(`bench_tests` bricht unter TSan mit Hinweis ab). Sie laufen im normalen Build und unter ASan/UBSan.
 
 ## Audio-Referenzfälle (#9)
 
@@ -1314,3 +1318,9 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     von einem Starttest mit solchen Titeln; `make test-web-start` startete nur mit leerer Bibliothek. Regressionstest:
     zweiter Start in `make test-web-start` mit CJK- und Emoji-Titel im OPFS (`app/tool/web_start_check.dart`), Tests
     «#82/AK…» in `web_start_check_test.dart`.
+32. 21.11.2026, #101 (aus #57/#61): Der erste nächtliche TSan-Lauf unter Linux scheiterte am Linker. `player_tests`
+    und `bench_tests` ersetzen `operator new`/`delete`, die statisch gelinkte TSan-Laufzeit
+    (`libclang_rt.tsan_cxx`) definiert dieselben Funktionen: «multiple definition of `operator delete`». Unter macOS
+    lädt TSan seine Laufzeit dynamisch, deshalb lief `make sanitize-thread` dort. Die Ersetzung entfällt jetzt unter
+    TSan (`core/tests/replace_new.hpp`, auch in `engine_tests` und `realtime_tests`), die davon abhängigen Prüfungen
+    werden dort übersprungen. Hätte gefangen werden müssen vom TSan-Job, der vorher nie lief.
