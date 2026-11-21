@@ -3,6 +3,11 @@
 // an error. Foreign hosts are unreachable for this Chrome (host resolver rules), so the start runs
 // as if offline; a font or script fetched from a CDN shows up as a failed request.
 //
+// #82: a second start opens a library with titles Inter cannot draw (CJK, emoji), written into the
+// page's OPFS beforehand. The web engine then asks for Noto fallback fonts; the bootstrap answers
+// those without a request (web/flutter_bootstrap.js). The second start must be as clean as the first
+// and must show that the engine did ask (its console warning names `fonts/fallback/`).
+//
 // Usage: dart tool/web_start_check.dart [<build directory>]   (default build/web, from app/)
 // WP_CHROME names the Chrome binary; otherwise the usual places on macOS and Linux are tried.
 // Uses dart:io only (no packages): a static file server on 127.0.0.1 and the DevTools protocol.
@@ -61,6 +66,49 @@ List<String> problems(List<StartEvent> events, String origin) {
   return out;
 }
 
+/// Whether the web engine looked for a fallback font during the start (#82): it warns on the console
+/// with the URL under `fonts/fallback/` when the bootstrap tells it the font is not bundled.
+bool fallbackFontRequested(List<StartEvent> events) => events.any(
+  (e) =>
+      e.method == 'Runtime.consoleAPICalled' &&
+      (e.params['args'] as List? ?? const []).any(
+        (a) => '${(a as Map)['value']}'.contains('fonts/fallback/'),
+      ),
+);
+
+/// Folder of the library in the page's OPFS (lib/app/platform_web.dart).
+const libraryDir = 'WoodshedPlayer';
+
+/// Invented titles with characters Inter lacks (#82/AK1): CJK and emoji.
+const fallbackTitles = ['練習曲 第一番', 'Etude 🎸🎷'];
+
+/// `library.json` (format 2) with one track per [fallbackTitles]. The tracks count as imported on
+/// another device, so they are listed without an audio file on this one.
+String seedLibrary() {
+  const stamp = '1767225600000-0-c0ffee0000000000';
+  var n = 0;
+  return jsonEncode({
+    'formatVersion': 2,
+    'settings': {'values': <String, Object?>{}, 'stamps': <String, String>{}},
+    'folders': <String, Object?>{},
+    'tracks': {
+      for (final title in fallbackTitles)
+        '${++n}'.padLeft(64, '0'): {
+          'values': {
+            'fileName': '${'$n'.padLeft(64, '0')}.wav',
+            'title': title,
+            'duration': 1.0,
+            'dateAdded': '2026-01-01T00:00:00.000Z',
+          },
+          'stamps': {
+            for (final k in ['fileName', 'title', 'duration', 'dateAdded'])
+              k: stamp,
+          },
+        },
+    },
+  });
+}
+
 /// Own origin, or a URL that never reaches the network (data:, blob:).
 bool _isOwn(String url, String origin) =>
     url.startsWith('$origin/') ||
@@ -84,10 +132,20 @@ const _types = <String, String>{
   'frag': 'text/plain',
 };
 
+/// Page of the check server (not in the build) used to write the library before the second start.
+const seedPath = '/__seed__.html';
+
 Future<HttpServer> _serve(Directory dir) async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   server.listen((request) async {
     var path = Uri.decodeComponent(request.uri.path);
+    if (path == seedPath) {
+      // An empty page of the own origin, so the check can write into its OPFS before the start.
+      request.response.headers.set('Content-Type', _types['html']!);
+      request.response.write('<!doctype html><title>seed</title>');
+      await request.response.close();
+      return;
+    }
     if (path.endsWith('/')) path += 'index.html';
     final file = File('${dir.path}$path');
     final response = request.response;
@@ -143,6 +201,8 @@ Future<void> main(List<String> args) async {
     '--user-data-dir=${profile.path}',
     '--no-first-run',
     '--no-default-browser-check',
+    // Wide enough that the library is shown next to the player (#82: its titles must be drawn).
+    '--window-size=1400,900',
     // Every host except the own server is unreachable: the start must not depend on the internet.
     '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
     'about:blank',
@@ -161,12 +221,33 @@ Future<void> main(List<String> args) async {
         .firstWhere((u) => u != null)
         .timeout(const Duration(seconds: 30));
     final debugPort = Uri.parse(wsUrl!).port;
-    final page = await _pageSocket(debugPort);
-    final events = await _recordStart(page, origin);
-    final found = problems(events, origin);
+    final page = _DevTools(await _pageSocket(debugPort));
+    for (final domain in ['Network', 'Runtime', 'Log', 'Page']) {
+      await page.send('$domain.enable');
+    }
+    final found = problems(await _recordStart(page, origin), origin);
+    // #82: second start with titles Inter cannot draw.
+    await page.send('Page.navigate', {'url': '$origin$seedPath'});
+    await _waitFor(page, "document.title === 'seed'");
+    final seeded = await page.send('Runtime.evaluate', {
+      'expression': _seedScript(seedLibrary()),
+      'awaitPromise': true,
+      'returnByValue': true,
+    });
+    if ((seeded['result'] as Map?)?['value'] != true) {
+      found.add('#82: library with fallback titles not written: $seeded');
+    }
+    final fallbackEvents = await _recordStart(page, origin);
+    found.addAll(problems(fallbackEvents, origin).map((p) => '#82: $p'));
+    if (!fallbackFontRequested(fallbackEvents)) {
+      found.add(
+        '#82: the engine never looked for a fallback font (titles not drawn?)',
+      );
+    }
     if (found.isEmpty) {
       stdout.writeln(
-        'web_start_check: start without failed requests and console errors',
+        'web_start_check: start without failed requests and console errors, '
+        'also with CJK and emoji titles',
       );
       exitCode = 0;
     } else {
@@ -206,59 +287,91 @@ Future<WebSocket> _pageSocket(int debugPort) async {
   }
 }
 
-/// Opens [origin] and records events until the Flutter view is there and a quiet period has passed.
-Future<List<StartEvent>> _recordStart(WebSocket page, String origin) async {
-  final events = <StartEvent>[];
-  final replies = <int, Completer<Map<String, dynamic>>>{};
-  var nextId = 0;
-  page.listen((data) {
-    final message = jsonDecode(data as String) as Map<String, dynamic>;
-    final id = message['id'];
-    if (id is int) {
-      replies
-          .remove(id)
-          ?.complete((message['result'] as Map<String, dynamic>?) ?? {});
-    } else if (message['method'] is String) {
-      events.add(
-        StartEvent(
-          message['method'] as String,
-          (message['params'] as Map<String, dynamic>?) ?? {},
-        ),
-      );
-    }
-  });
+/// Writes [json] as `library.json` into the library folder of the page's OPFS; resolves to true.
+String _seedScript(String json) =>
+    """(async () => {
+  const root = await navigator.storage.getDirectory();
+  const dir = await root.getDirectoryHandle('$libraryDir', {create: true});
+  const file = await dir.getFileHandle('library.json', {create: true});
+  const out = await file.createWritable();
+  await out.write(${jsonEncode(json)});
+  await out.close();
+  return true;
+})()""";
+
+/// One DevTools connection to the page: commands with replies, events collected in [events].
+class _DevTools {
+  _DevTools(this._socket) {
+    _socket.listen((data) {
+      final message = jsonDecode(data as String) as Map<String, dynamic>;
+      final id = message['id'];
+      if (id is int) {
+        _replies
+            .remove(id)
+            ?.complete((message['result'] as Map<String, dynamic>?) ?? {});
+      } else if (message['method'] is String) {
+        events.add(
+          StartEvent(
+            message['method'] as String,
+            (message['params'] as Map<String, dynamic>?) ?? {},
+          ),
+        );
+      }
+    });
+  }
+
+  final WebSocket _socket;
+  final _replies = <int, Completer<Map<String, dynamic>>>{};
+  var _nextId = 0;
+  List<StartEvent> events = [];
+
   Future<Map<String, dynamic>> send(
     String method, [
     Map<String, dynamic>? params,
   ]) {
-    final id = ++nextId;
-    final reply = replies[id] = Completer();
-    page.add(jsonEncode({'id': id, 'method': method, 'params': params ?? {}}));
+    final id = ++_nextId;
+    final reply = _replies[id] = Completer();
+    _socket.add(
+      jsonEncode({'id': id, 'method': method, 'params': params ?? {}}),
+    );
     return reply.future.timeout(const Duration(seconds: 30));
   }
 
-  for (final domain in ['Network', 'Runtime', 'Log', 'Page']) {
-    await send('$domain.enable');
-  }
-  await send('Page.navigate', {'url': '$origin/'});
-  final deadline = DateTime.now().add(const Duration(seconds: 60));
+  Future<void> close() => _socket.close();
+}
+
+/// Polls [expression] until it is true; false after [timeout].
+Future<bool> _waitFor(
+  _DevTools page,
+  String expression, {
+  Duration timeout = const Duration(seconds: 60),
+}) async {
+  final deadline = DateTime.now().add(timeout);
   while (true) {
-    final result = await send('Runtime.evaluate', {
-      'expression': "document.querySelector('flutter-view') !== null",
+    final result = await page.send('Runtime.evaluate', {
+      'expression': expression,
       'returnByValue': true,
     });
-    if ((result['result'] as Map?)?['value'] == true) break;
-    if (DateTime.now().isAfter(deadline)) {
-      events.add(
-        StartEvent('Runtime.exceptionThrown', {
-          'exceptionDetails': {
-            'text': 'Flutter view did not appear within 60 s',
-          },
-        }),
-      );
-      return events;
-    }
+    if ((result['result'] as Map?)?['value'] == true) return true;
+    if (DateTime.now().isAfter(deadline)) return false;
     await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+}
+
+/// Opens [origin] and records events until the Flutter view is there and a quiet period has passed.
+Future<List<StartEvent>> _recordStart(_DevTools page, String origin) async {
+  final events = page.events = [];
+  await page.send('Page.navigate', {'url': '$origin/'});
+  if (!await _waitFor(
+    page,
+    "document.querySelector('flutter-view') !== null",
+  )) {
+    events.add(
+      StartEvent('Runtime.exceptionThrown', {
+        'exceptionDetails': {'text': 'Flutter view did not appear within 60 s'},
+      }),
+    );
+    return events;
   }
   // Fonts and the first frame load after the view appears.
   await Future<void>.delayed(const Duration(seconds: 5));

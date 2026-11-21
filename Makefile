@@ -300,7 +300,8 @@ test-web:
 	$(MAKE) --no-print-directory test-web-start
 
 # #72/AK3: the built web app starts in headless Chrome without failed requests, foreign hosts or
-# console errors (app/tool/web_start_check.dart). Needs the WASM core in app/web/wp_core/.
+# console errors (app/tool/web_start_check.dart). #82: a second start with CJK and emoji titles in the
+# library, whose fallback fonts are answered without a request. Needs the WASM core in app/web/wp_core/.
 # The only web build of the CI job web (#83), so it stays a release build.
 test-web-start:
 	cd app && $(PIPEFAIL) flutter build web --release --no-wasm-dry-run 2>&1 | tail -1

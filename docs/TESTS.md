@@ -130,7 +130,7 @@ zugeordnet.
 | Vertrag nativ ↔ Web: gleiche Samples (Toleranz 1e-6, gestreckte Tempo-Fälle 5e-2, #94), jede Funktion der C-API in einem Referenzfall | vorhanden: `reference_tests` (nativ `--dump`, WASM `--compare`), `reference_api_coverage` (#9/AK7), `core_build_flags_test.dart` (ohne FMA) | – |
 | `flutter build web` und `flutter test --platform chrome` bei jedem Push mit Web-Änderung | vorhanden: Job `web` in `test-quality.yml`, `make test-web` (#13/AK4); die Web-App wird dort nur einmal gebaut, im Release-Modus in `make test-web-start` (#83) | – |
 | Content-Security-Policy mit erlaubten Hosts | vorhanden: `app/web/index.html`, `app/tool/network_free_test.dart` (#58/AK4), im Browser von Hand geprüft | – |
-| Gebaute Web-App startet ohne gescheiterte Anfrage, ohne fremde Hosts und ohne Konsolenfehler (fremde Hosts im Test nicht erreichbar, also wie offline) | vorhanden: `make test-web-start` (auch am Ende von `make test-web`), `app/tool/web_start_check.dart`, Tests `web_start_check_test.dart` (#72) | – |
+| Gebaute Web-App startet ohne gescheiterte Anfrage, ohne fremde Hosts und ohne Konsolenfehler (fremde Hosts im Test nicht erreichbar, also wie offline), auch mit CJK- und Emoji-Titeln in der Bibliothek | vorhanden: `make test-web-start` (auch am Ende von `make test-web`), `app/tool/web_start_check.dart`, Tests `web_start_check_test.dart` (#72, #82) | – |
 | Web-Audio auf iPhone und Android | vorhanden unter Node.js: `core/web/w0_test.mjs`; Lücke: auf echten Geräten nur von Hand | #32 |
 
 ### Abgleich/Sync
@@ -208,7 +208,7 @@ make format-check   # schlägt fehl, wenn eine Datei nicht formatiert ist
 make lint           # flutter analyze (streng), C++ mit -Werror, clang-tidy
 make test-ui        # Oberflächentests mit echtem Kern auf macOS; ohne Audiogerät WP_AUDIO_BACKEND=null
 make test-web       # Web-Tests in Chrome: OPFS und WASM-Kern (braucht Emscripten), danach test-web-start
-make test-web-start # gebaute Web-App startet in Chrome ohne gescheiterte Anfrage und Konsolenfehler (#72)
+make test-web-start # gebaute Web-App startet in Chrome ohne gescheiterte Anfrage und Konsolenfehler, auch mit CJK- und Emoji-Titeln (#72, #82)
 make smoke-app      # macOS-App bauen (Release) und ihren Rauchtest ausführen
 make pseudo-l10n    # Pseudo-Sprache der Oberflächentests nach einer Änderung an den ARB-Dateien
 make bench          # Leistungs- und Lasttests von Kern und Bibliothek (nächtlich, nicht in make test, #59)
@@ -1306,3 +1306,11 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     Tags nur auf «keine Ausnahme». Ein beschädigter `id3 `-Chunk wird jetzt übergangen, ein beschädigter FLAC-Block
     beendet das Lesen; die bis dahin gelesenen Felder bleiben. Die beiden Ausschlüsse sind neu begründet. Test:
     Gruppe «#91 damaged block at the end keeps the fields read so far» (`#91/AK1`, `#91/AK2`) in `metadata_test.dart`.
+31. 21.11.2026, #82 (aus #72): Titel mit Zeichen, die Inter nicht enthält (CJK, Emoji), liessen Flutters Web-Engine
+    Noto-Ersatzschriften unter `fonts/fallback/` anfordern; dort liegt nichts, also 404 mit Fehler in der Konsole.
+    Entscheid: keine Ersatzschrift mitliefern und keine nachladen. `app/web/flutter_bootstrap.js` beantwortet
+    Anfragen unter `fonts/fallback/` selbst mit 410, bevor die Engine lädt; es entsteht keine Anfrage. Die Engine
+    gibt die Schrift mit einer Warnung (keinem Fehler) auf und zeichnet Ersatzzeichen. Hätte gefangen werden müssen
+    von einem Starttest mit solchen Titeln; `make test-web-start` startete nur mit leerer Bibliothek. Regressionstest:
+    zweiter Start in `make test-web-start` mit CJK- und Emoji-Titel im OPFS (`app/tool/web_start_check.dart`), Tests
+    «#82/AK…» in `web_start_check_test.dart`.
