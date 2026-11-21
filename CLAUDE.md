@@ -33,7 +33,7 @@ Jede Änderung hat ein Issue mit **Abnahmekriterien als Häkchen-Liste**; jedes 
 2. **Direkt auf `main`**, keine Feature-Branches, keine Pull Requests. Ein Branch nur für grosse oder riskante Arbeiten und nur mit Deiner Zustimmung.
 3. **Umsetzen**, klein und gezielt, nur was im Issue steht. Nebenbaustellen als neues Issue vorschlagen.
 4. **Testen**, jedes Abnahmekriterium prüfen und im Bericht nennen, was geprüft ist und was nicht.
-   Bei Änderungen an `core/src`, `core/web` oder der Dart-Logik (`app/lib`) läuft vor der Abnahme `make mutants-diff` (Basis `origin/main`). Jeder nicht erkannte Mutant wird durch einen Test erkannt oder mit Begründung in `tools/mutants-exclude.txt` ausgeschlossen; sonst wird das Issue nicht geschlossen.
+   Bei Änderungen an `core/src`, `core/web` oder der Dart-Logik (`app/lib`) läuft vor der Abnahme `make mutants-diff` (Basis `origin/main`, auf die geänderten Dateien beschränkt, siehe «Testumfang»). Jeder nicht erkannte Mutant wird durch einen Test erkannt oder mit Begründung in `tools/mutants-exclude.txt` ausgeschlossen; sonst wird das Issue nicht geschlossen.
 5. **Commit** im Imperativ oder als Substantiv, ohne Punkt, mit Issue am Ende: `Ziehbare Loop-Marker (#22)`. Kein `Fixes #22`.
    Nach dem Commit, der die Anforderung vollständig umsetzt: `gh issue edit <Nr> --add-label implemented` und Kommentar «Umgesetzt in <Commit>. Abnahme ausstehend.». Teilschritte bekommen das Label nicht. Wird das Issue wieder geöffnet, kommt das Label weg, bis die Nacharbeit committet ist.
 6. **Abnahme** machst Du. Claude hakt nichts ab und schliesst nichts.
@@ -60,6 +60,20 @@ xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination
 tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitTimePitch
 ```
 
+- **Testumfang:** Die Läufe sind lang. Darum läuft nur, was die Änderung betrifft, und jeder volle Lauf einmal je Stand.
+  - Während der Arbeit nur die betroffenen Tests (`ctest --test-dir core/build -R <name>`, `cd app && flutter test <datei>`).
+  - Vor dem Umsetzungs-Commit einmal `make format-check`, `make lint` und `make test`, dazu je nach geänderten Pfaden:
+
+    | Geändert | Zusätzlich |
+    |---|---|
+    | `core/` | `make sanitize`, `make test-wasm`; bei Dekodieren, C-API oder Web-API auch `make fuzz` (60 s je Ziel) |
+    | `core/src`, `core/web`, `app/lib` ausser `app/lib/ui` | `make mutants-diff MUTANTS_ARGS="--file '<regex der geänderten Dateien>'"` (Zwischenspeicher bleibt an, kein `--fresh`) |
+    | `app/lib/ui`, `app/integration_test` | `make test-ui`, bei Bezug zu iPhone/iPad auch `make test-ios` |
+    | `app/web`, `*_web.dart`, `core/web` | `make test-web` |
+    | nur `docs/`, `README.md`, `.github/` | nur `make format-check` und `make lint` (actionlint) |
+
+  - **«Prüfe #Nr»** übernimmt die Ergebnisse des Laufs vor dem Commit, wenn seither nichts geändert ist (derselbe Commit, sauberer Arbeitsbaum), und nennt sie im Kommentar. Neu laufen nur Tests zu Nachbesserungen und Kriterien, die der Lauf nicht abdeckt.
+  - Kriterien, die nur auf GitHub prüfbar sind, bleiben offen bis zum nächsten Push mit Lauf; kein Push nur dafür.
 - **Hook nach dem Commit** baut und testet die betroffenen Teile selbst. Nur bei Fehlern oder geänderter Logik ohne Tests meldet er sich; dann Fehler beheben bzw. den `test-agent` (Schnellmodus) starten. Testdetails stehen im Agenten.
 - Flutter-App und Kern werden mit `flutter test` und `ctest` geprüft; `xcodebuild` nur noch für das Swift-Altprojekt.
 - Neuer Code ist formatiert (`make format`) und ohne Warnungen (`make lint`); Ausnahmen nur mit Begründung (`core/.clang-tidy`, `NOLINT(<Prüfung>)`).
