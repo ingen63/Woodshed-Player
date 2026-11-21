@@ -415,8 +415,11 @@ jobs:
           key: fuzz-corpus-${{ github.run_id }}
           restore-keys: fuzz-corpus-
       - name: make fuzz (#10/AK4, AK9), 20 min per target
+        id: native
         run: make fuzz FUZZ_SECONDS=1200
+      # #88: the WASM steps also run after a native finding; the failed native step keeps the job red
       - name: Emscripten from the cache (#89)
+        if: ${{ !cancelled() }}
         id: emsdk
         uses: actions/cache@v4
         with:
@@ -424,16 +427,23 @@ jobs:
           # a new EMSDK_VERSION gives a new key, so the next run installs it afresh
           key: emsdk-${{ runner.os }}-${{ env.EMSDK_VERSION }}
       - name: Install Emscripten (fixed version)
-        if: steps.emsdk.outputs.cache-hit != 'true'
+        if: ${{ !cancelled() && steps.emsdk.outputs.cache-hit != 'true' }}
         run: |
           git clone --quiet --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
           "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION" >/dev/null
           "$RUNNER_TEMP/emsdk/emsdk" activate "$EMSDK_VERSION" >/dev/null
       - name: The same inputs against the WASM core under Node.js (#67/AK1-AK3)
         # regressions, start corpus and the corpus grown by make fuzz (this night and earlier ones)
+        if: steps.native.outcome == 'success'
         run: |
           . "$RUNNER_TEMP/emsdk/emsdk_env.sh" >/dev/null
           make fuzz-wasm
+      - name: Inputs of the native finding against the WASM core (#88/AK1, AK2)
+        # one line per input of core/build-fuzz/artifacts/: finding under WASM yes or no
+        if: ${{ !cancelled() && steps.native.outcome == 'failure' }}
+        run: |
+          . "$RUNNER_TEMP/emsdk/emsdk_env.sh" >/dev/null
+          make fuzz-wasm-findings
       - name: Inputs of the finding
         if: failure()
         uses: actions/upload-artifact@v4
@@ -443,6 +453,8 @@ jobs:
             core/build-fuzz/artifacts/
             core/build-fuzz/fuzz_*.log
             core/build-wasm/fuzz_*_replay.log
+            core/build-wasm/fuzz_findings_wasm.txt
+            core/build-wasm/fuzz_*_finding_*.log
           if-no-files-found: ignore
 
   property:

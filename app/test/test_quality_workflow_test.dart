@@ -1,4 +1,4 @@
-// #57, #10, #58, #13, #59, #11, #64, #77, #67, #79, #89, #83: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
+// #57, #10, #58, #13, #59, #11, #64, #77, #67, #79, #89, #83, #88: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -213,7 +213,11 @@ void main() {
       '#67/AK2, AK3 make fuzz-wasm runs every input of make fuzz under Node.js',
       () {
         final target = recipe('fuzz-wasm');
-        expect(target, contains('emcmake cmake -S core -B \$(FUZZ_WASM_DIR)'));
+        expect(target, startsWith('\nfuzz-wasm: fuzz-wasm-build\n'));
+        expect(
+          recipe('fuzz-wasm-build'),
+          contains('emcmake cmake -S core -B \$(FUZZ_WASM_DIR)'),
+        );
         expect(target, contains('core/tests/fuzz/regressions/\$\$t'));
         expect(target, contains('core/tests/fuzz/corpus/\$\$t'));
         // the corpus grown by make fuzz, if there is one
@@ -238,6 +242,107 @@ void main() {
         expect(fuzz, contains('core/build-wasm/fuzz_*_replay.log'));
       },
     );
+  });
+
+  group('#88 native fuzz findings against the WASM core', () {
+    String recipe(String name) {
+      final target = makefile.substring(makefile.indexOf('\n$name:'));
+      return target.substring(0, target.indexOf('\n\n'));
+    }
+
+    /// One step of a job: from `      - name: <prefix>` up to the next step.
+    String step(String job, String prefix) {
+      final start = job.indexOf('      - name: $prefix');
+      expect(start, isNot(-1), reason: 'step $prefix missing');
+      final next = job.indexOf('\n      - ', start + 1);
+      return next == -1 ? job.substring(start) : job.substring(start, next);
+    }
+
+    // late: read inside the tests, expect() is not allowed while declaring the group
+    late final fuzz = job(workflow, 'fuzz');
+
+    test('#88/AK1 make fuzz-wasm-findings replays every input of '
+        'core/build-fuzz/artifacts/<target>/ on its own under Node.js', () {
+      final target = recipe('fuzz-wasm-findings');
+      expect(target, startsWith('\nfuzz-wasm-findings: fuzz-wasm-build\n'));
+      expect(target, contains(r'for t in $(FUZZ_TARGETS); do'));
+      expect(target, contains(r'for f in $(FUZZ_DIR)/artifacts/$$t/*; do'));
+      expect(target, contains(r'node "fuzz_$${t}_replay.js" "$(CURDIR)/$$f"'));
+    });
+
+    test('#88/AK1 after a native finding the WASM steps still run', () {
+      final native = step(fuzz, 'make fuzz ');
+      expect(native, contains('id: native'));
+      expect(native, contains('run: make fuzz FUZZ_SECONDS='));
+      // cache and install of emsdk run after a failed step as well
+      expect(
+        step(fuzz, 'Emscripten from the cache'),
+        contains(r'if: ${{ !cancelled() }}'),
+      );
+      expect(
+        step(fuzz, 'Install Emscripten'),
+        contains(
+          r"if: ${{ !cancelled() && steps.emsdk.outputs.cache-hit != 'true' }}",
+        ),
+      );
+      final findings = step(fuzz, 'Inputs of the native finding');
+      expect(
+        findings,
+        contains(
+          r"if: ${{ !cancelled() && steps.native.outcome == 'failure' }}",
+        ),
+      );
+      expect(findings, contains('emsdk_env.sh'));
+      expect(findings, contains('\n          make fuzz-wasm-findings'));
+      expect(
+        fuzz.indexOf('make fuzz-wasm-findings'),
+        greaterThan(fuzz.indexOf('run: make fuzz FUZZ_SECONDS=')),
+      );
+      // the full replay of #67 stays for nights without a finding
+      expect(
+        step(fuzz, 'The same inputs against the WASM core'),
+        contains("if: steps.native.outcome == 'success'"),
+      );
+    });
+
+    test('#88/AK2 one result per input in the log and in the artifact', () {
+      final target = recipe('fuzz-wasm-findings');
+      expect(
+        makefile,
+        contains(
+          r'FUZZ_FINDINGS_REPORT  = $(FUZZ_WASM_DIR)/fuzz_findings_wasm.txt',
+        ),
+      );
+      expect(
+        target,
+        contains(
+          r'echo "fuzz_$$t: $$name: finding under WASM: $$result" '
+          r'| tee -a "$(FUZZ_FINDINGS_REPORT)"',
+        ),
+      );
+      expect(target, contains(r'result="no"'));
+      expect(target, contains(r'result="yes (exit $$rc)"'));
+      expect(target, contains('result="yes (timeout after'));
+      // an empty artifacts folder is reported, not silently skipped
+      expect(target, contains(r'no inputs in $(FUZZ_DIR)/artifacts/'));
+      final upload = step(fuzz, 'Inputs of the finding');
+      expect(upload, contains('if: failure()'));
+      expect(upload, contains('core/build-wasm/fuzz_findings_wasm.txt'));
+      expect(upload, contains('core/build-wasm/fuzz_*_finding_*.log'));
+      expect(upload, contains('core/build-fuzz/artifacts/'));
+    });
+
+    test('#88/AK3 the job stays red while the native finding exists', () {
+      // make fuzz fails the step on a finding, nothing hides that failure
+      expect(recipe('fuzz'), contains('exit 1'));
+      expect(fuzz, isNot(contains('continue-on-error')));
+      // the WASM result only reports: no exit code of its own turns the job green or red
+      final target = recipe('fuzz-wasm-findings');
+      expect(target, isNot(contains('; exit')));
+      expect(target, isNot(contains(r'$(PIPEFAIL)')));
+      expect(fuzz, isNot(contains('success()')));
+      expect(fuzz, isNot(contains('always()')));
+    });
   });
 
   group('#10/AK1, AK6 random tests', () {

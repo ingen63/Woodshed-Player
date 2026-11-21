@@ -64,7 +64,7 @@ zugeordnet.
 | Render-Pfad ohne Speicheranforderung und ohne Sperre, Befehle aus vielen Threads | vorhanden: `engine_tests.cpp` (`renderDoesNotAllocate`, `commandsFromManyThreadsWhileRendering`, Queue-Fälle), `realtime_tests.cpp` (#57/AK4, `Player::render` mit Tempo, Loop, Metronom), `player_tests.cpp` (`controlFromSecondThreadWhileRendering`, #57/AK2) | – |
 | Wellenform (Minimum/Maximum je Abschnitt, Grenzen) | vorhanden: `waveform_tests.cpp`, `wp_waveform_ffi_test.dart`, `web_binding_test.dart` (#34/AK3) | – |
 | Seek auf t beginnt bei Sample round(t × Abtastrate); Pause und Fortsetzen ohne verlorenes Sample | vorhanden: `reference_tests.cpp` (#9/AK3, Rampe, t knapp unter und über einem halben Sample, im Stand und beim Spielen) | – |
-| Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | vorhanden: `player_tests.cpp` (`truncatedAndWrongAudioFiles`, #10/AK3), `core/tests/fuzz/` mit Wiederholung von Korpus und Regressionsfällen in jedem Build (`fuzz_*_replay`), `make fuzz` (#10/AK4), dieselben Eingaben gegen den WASM-Kern (`make test-wasm`, `make fuzz-wasm`, #67) | – |
+| Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | vorhanden: `player_tests.cpp` (`truncatedAndWrongAudioFiles`, #10/AK3), `core/tests/fuzz/` mit Wiederholung von Korpus und Regressionsfällen in jedem Build (`fuzz_*_replay`), `make fuzz` (#10/AK4), dieselben Eingaben gegen den WASM-Kern (`make test-wasm`, `make fuzz-wasm`, #67; Funde mit `make fuzz-wasm-findings`, #88) | – |
 | AddressSanitizer, UBSan, ThreadSanitizer | vorhanden: `make sanitize`, `make sanitize-thread`, Selbsttest `tests/sanitizer/selftest.cpp`, Workflow `test-quality.yml` (#57) | – |
 | Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | vorhanden, nächtlich: `core/tests/bench_tests.cpp` (`bench_long_file`, #59/AK2, Grenze #75/AK2), `make bench` | – |
 | Lange Titel (über 5 min): Länge aus dem Dateikopf einmal reservieren, Rückfall bei `bad_alloc`, falsche Längenangabe | vorhanden: `player_tests.cpp` (`longTitleReservesHeaderLength`, #75/AK1; `longTitleWithWrongHeaderLength`, #75/AK3), nächtlich `bench_tests.cpp` (`bench_reserve_fallback`, #75/AK1) | – |
@@ -168,7 +168,7 @@ zugeordnet.
 | macOS- und iOS-Build bei jeder Änderung an Kern oder Plugin | vorhanden: Hook nach dem Commit (`.claude/hooks/after-commit.sh`), geprüft in `app/tool/after_commit_hook_test.dart` | – |
 | Swift-Altprojekt: Tests und iOS-Build | vorhanden: `WoodshedPlayerTests/` über den Hook (`xcodebuild`) | – |
 | Workflow `test-quality.yml`: Sanitizer-Läufe des Kerns auf Linux | vorhanden: `test-quality.yml` (Jobs `sanitize`, `sanitize-thread`), `test_quality_workflow_test.dart` (#57) | – |
-| Workflow `test-quality.yml`: Fuzzing und Zufallstests nächtlich | vorhanden: Jobs `fuzz` (mit `make fuzz-wasm`, #67) und `property`, `test_quality_workflow_test.dart` (#10); beobachtbar erst nach dem Push | – |
+| Workflow `test-quality.yml`: Fuzzing und Zufallstests nächtlich | vorhanden: Jobs `fuzz` (mit `make fuzz-wasm`, #67, nach einem Fund `make fuzz-wasm-findings`, #88) und `property`, `test_quality_workflow_test.dart` (#10); beobachtbar erst nach dem Push | – |
 | Workflow `test-quality.yml`: Format, Lint, Tests, Abdeckung auf Linux je Push; macOS/iOS-Build, Oberflächentests und Rauchtest der gebauten App nächtlich | vorhanden: Jobs `checks`, `web`, `macos`, `test_quality_workflow_test.dart`, `smoke_test.dart` (#13); beobachtbar erst nach dem Push | – |
 | Rauchtest der gebauten App auf Windows und Linux | Lücke | #60 |
 | Windows und Linux: Build, Tests, Windows-Pfade | Lücke | #60 |
@@ -198,6 +198,7 @@ make sanitize       # Kerntests mit AddressSanitizer und UBSan (core/build-asan)
 make sanitize-thread  # Kerntests mit ThreadSanitizer (core/build-tsan)
 make fuzz           # libFuzzer mit ASan/UBSan auf Decoder und C-API, FUZZ_SECONDS je Ziel (Vorgabe 60)
 make fuzz-wasm      # Regressionen, Startkorpus und gewachsener Korpus von make fuzz gegen den WASM-Kern (#67)
+make fuzz-wasm-findings # die Funde von make fuzz (core/build-fuzz/artifacts/) einzeln gegen den WASM-Kern (#88)
 make property       # Zufallstests der App mit PROPERTY_CASES Fällen und Startwert PROPERTY_SEED
 make coverage       # alle Tests mit Abdeckung, Prüfung je Teil gegen tools/coverage-min
 make coverage-diff  # Abdeckung der seit BASE geänderten Zeilen (Vorgabe origin/main), ein Hinweis
@@ -524,6 +525,14 @@ Exit-Code ungleich 0; die letzte Zeile `replay …` im Protokoll (`core/build-wa
 als Artefakt) nennt die Eingabe. Ohne Sanitizer: unter WebAssembly zählen nur Abstürze und Invarianten. Stand
 20.11.2026 auf dem Mac: 15 und 7 Eingaben im `ctest`, mit dem lokal gewachsenen Korpus 2080 (`decoder`) und 616
 (`capi`) Eingaben in rund 7 s, ohne Fund.
+
+**Ein nativer Fund auch gegen den WASM-Kern (#88).** Hat `make fuzz` im Job `fuzz` einen Fund, laufen Zwischenspeicher
+und Installation von Emscripten trotzdem (`if: !cancelled()`), `make fuzz-wasm` entfällt, und `make fuzz-wasm-findings`
+spielt jede Eingabe aus `core/build-fuzz/artifacts/<ziel>/` einzeln unter Node.js ab. Je Eingabe steht eine Zeile
+`fuzz_<ziel>: <datei>: finding under WASM: no` bzw. `yes (exit N)` oder `yes (timeout after 60 s)` im Protokoll und
+in `core/build-wasm/fuzz_findings_wasm.txt`; diese Datei und die Protokolle `fuzz_<ziel>_finding_<datei>.log` kommen
+ins Artefakt `fuzz-findings`. Das WASM-Ergebnis ändert den Ausgang nicht: Der fehlgeschlagene Schritt `make fuzz`
+hält den Job rot, solange der native Fund besteht. Lokal ohne `timeout` (macOS) gilt kein Zeitlimit.
 
 **Durchsatz von `fuzz_capi` (#66).** Ein Profil zeigte, dass nicht das Rendern die meiste Zeit braucht, sondern das
 Laden: rund 78 % in `wp_web_load_pcm` (Umrechnen langer PCM-Titel auf die Geräterate, Peaks), 10 % im Anlegen des

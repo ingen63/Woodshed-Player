@@ -3,7 +3,7 @@
 # (clang-format, clang-tidy), actionlint. core/third_party/ is never formatted, linted or read.
 .PHONY: help test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools format format-check lint lint-dart \
         lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
-        mutants-diff fuzz fuzz-wasm report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
+        mutants-diff fuzz fuzz-wasm fuzz-wasm-build fuzz-wasm-findings report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
         test-ui test-web test-web-start smoke-app pseudo-l10n bench
 
 SHELL := /bin/bash
@@ -40,6 +40,7 @@ help:
 	@echo "make sanitize-thread core tests with ThreadSanitizer"
 	@echo "make fuzz           libFuzzer with ASan/UBSan, FUZZ_SECONDS per target (default 60)"
 	@echo "make fuzz-wasm      fuzz regressions and corpus (also make fuzz's new files) against the WASM core"
+	@echo "make fuzz-wasm-findings the findings of make fuzz against the WASM core, one result per input"
 	@echo "make property      Dart random tests, PROPERTY_CASES cases, PROPERTY_SEED (printed on failure)"
 	@echo "make format         dart format and clang-format"
 	@echo "make format-check   fails if a file is not formatted"
@@ -223,10 +224,12 @@ fuzz: fuzz-build
 # the fuzz job). make test-wasm already replays regressions and start corpus (ctest
 # fuzz_<target>_replay); a finding (abort, trap) fails and names the input it was running.
 FUZZ_WASM_DIR = core/build-wasm
-fuzz-wasm:
+fuzz-wasm-build:
 	emcmake cmake -S core -B $(FUZZ_WASM_DIR) -DCMAKE_BUILD_TYPE=Release >/dev/null
 	$(PIPEFAIL) cmake --build $(FUZZ_WASM_DIR) -j 8 \
 	  --target $(addsuffix _replay,$(addprefix fuzz_,$(FUZZ_TARGETS))) 2>&1 | tail -20
+
+fuzz-wasm: fuzz-wasm-build
 	@for t in $(FUZZ_TARGETS); do \
 	  set -- "$(CURDIR)/core/tests/fuzz/regressions/$$t" "$(CURDIR)/core/tests/fuzz/corpus/$$t"; \
 	  if [ -d "$(FUZZ_DIR)/corpus/$$t" ]; then set -- "$$@" "$(CURDIR)/$(FUZZ_DIR)/corpus/$$t"; fi; \
@@ -236,6 +239,32 @@ fuzz-wasm:
 	  if [ $$rc -ne 0 ]; then tail -20 "$$log"; \
 	    echo "fuzz_$$t (WASM): finding, the last replayed input above is the cause"; exit 1; fi; \
 	done
+
+# #88: when make fuzz has a finding, replay each input of core/build-fuzz/artifacts/<target>/ on its
+# own against the WASM core, so the nightly fuzz job shows whether the browser core fails as well.
+# One line per input in the log and in FUZZ_FINDINGS_REPORT (job artifact); a replay that runs
+# longer than FUZZ_WASM_TIMEOUT seconds counts as a finding. Only reports, never fails because of a
+# WASM result: the job stays red through the native finding.
+FUZZ_WASM_TIMEOUT    ?= 60
+FUZZ_FINDINGS_REPORT  = $(FUZZ_WASM_DIR)/fuzz_findings_wasm.txt
+FUZZ_TIMEOUT_CMD      = $(shell command -v timeout || command -v gtimeout)
+fuzz-wasm-findings: fuzz-wasm-build
+	@: > "$(FUZZ_FINDINGS_REPORT)"; \
+	for t in $(FUZZ_TARGETS); do \
+	  for f in $(FUZZ_DIR)/artifacts/$$t/*; do \
+	    [ -f "$$f" ] || continue; \
+	    name=$$(basename "$$f"); log="$(FUZZ_WASM_DIR)/fuzz_$${t}_finding_$$name.log"; \
+	    (cd $(FUZZ_WASM_DIR) && $(if $(FUZZ_TIMEOUT_CMD),"$(FUZZ_TIMEOUT_CMD)" $(FUZZ_WASM_TIMEOUT)) \
+	      node "fuzz_$${t}_replay.js" "$(CURDIR)/$$f") > "$$log" 2>&1; rc=$$?; \
+	    if [ $$rc -eq 0 ]; then result="no"; \
+	    elif [ $$rc -eq 124 ]; then result="yes (timeout after $(FUZZ_WASM_TIMEOUT) s)"; \
+	    else result="yes (exit $$rc)"; fi; \
+	    echo "fuzz_$$t: $$name: finding under WASM: $$result" | tee -a "$(FUZZ_FINDINGS_REPORT)"; \
+	    if [ $$rc -ne 0 ]; then tail -5 "$$log"; fi; \
+	  done; \
+	done; \
+	if [ ! -s "$(FUZZ_FINDINGS_REPORT)" ]; then \
+	  echo "no inputs in $(FUZZ_DIR)/artifacts/" | tee "$(FUZZ_FINDINGS_REPORT)"; fi
 
 # ---- Random tests (#10), docs/TESTS.md ----
 # The Dart random tests (app/test/property/) also run in make test with 100 cases and the fixed seed.
