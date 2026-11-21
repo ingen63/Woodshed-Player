@@ -14,11 +14,12 @@ Iterable<File> _dartFiles(String dir) =>
 final _realTimeWait = RegExp(r'Future(<\w+>)?\.delayed|\bsleep\(');
 final _loopStart = RegExp(r'\b(for|while)\s*\(');
 
-/// #78/AK2: lines (1-based) of [lines] that wait in real time inside a `for` or `while` loop whose header has no
-/// `hangGuard`, i.e. a polling loop with a fixed number of rounds. Allowed is only the polling step of a wait for a
-/// state bounded by `hangGuard` (`eventually`, `waitUntil` in fakes.dart).
-List<int> fixedCountWaitLoops(List<String> lines) {
-  final hits = <int>[];
+/// A real-time wait in [lines]: its line (1-based) and whether it sits inside a `for`/`while` loop without and with
+/// `hangGuard` in the loop header.
+typedef _Wait = ({int line, bool unguardedLoop, bool guardedLoop});
+
+List<_Wait> _realTimeWaits(List<String> lines) {
+  final waits = <_Wait>[];
   final loops = <(int, bool)>[]; // (brace depth before the loop, guarded)
   var depth = 0;
   String? header; // loop header until its `{`
@@ -37,12 +38,46 @@ List<int> fixedCountWaitLoops(List<String> lines) {
         header = null; // loop without braces ends here
       }
     }
-    if (_realTimeWait.hasMatch(line) &&
-        (unguardedHeader || loops.any((l) => !l.$2))) {
-      hits.add(i + 1);
+    if (_realTimeWait.hasMatch(line)) {
+      waits.add((
+        line: i + 1,
+        unguardedLoop: unguardedHeader || loops.any((l) => !l.$2),
+        guardedLoop: loops.any((l) => l.$2),
+      ));
     }
     depth += '{'.allMatches(line).length - '}'.allMatches(line).length;
     loops.removeWhere((l) => depth <= l.$1);
+  }
+  return waits;
+}
+
+/// #78/AK2: lines (1-based) of [lines] that wait in real time inside a `for` or `while` loop whose header has no
+/// `hangGuard`, i.e. a polling loop with a fixed number of rounds. Allowed is only the polling step of a wait for a
+/// state bounded by `hangGuard` (`eventually`, `waitUntil` in fakes.dart).
+List<int> fixedCountWaitLoops(List<String> lines) => [
+  for (final w in _realTimeWaits(lines))
+    if (w.unguardedLoop) w.line,
+];
+
+/// The justification a fixed real-time pause needs in its own line (#95/AK2): it watches that something stays out.
+final _absenceReason = RegExp(r'// absence: \S');
+
+/// #95/AK3: lines (1-based) of [lines] with a fixed real-time pause that is neither a single yield
+/// (`Duration.zero`), nor the polling step of a wait bounded by `hangGuard`, nor justified in the same line with
+/// `// absence: <what stays out>`.
+List<int> unjustifiedFixedWaits(List<String> lines) {
+  final hits = <int>[];
+  for (final w in _realTimeWaits(lines)) {
+    final line = lines[w.line - 1];
+    // the statement up to its `;`, which may span lines
+    var statement = line;
+    for (var j = w.line; !statement.contains(';') && j < lines.length; j++) {
+      statement += lines[j];
+    }
+    if (statement.contains('Duration.zero')) continue;
+    if (w.guardedLoop && !w.unguardedLoop) continue;
+    if (_absenceReason.hasMatch(line)) continue;
+    hits.add(w.line);
   }
   return hits;
 }
@@ -126,6 +161,66 @@ void main() {
       final fakes = File('test/fakes.dart').readAsStringSync();
       expect(fakes, contains('Future<void> eventually('));
       expect(fakes, contains('runAsync(() => eventually(done, what'));
+    });
+  });
+
+  group('#95/AK3 a fixed real-time pause under test/ is justified', () {
+    test('every fixed pause under test/ watches that something stays out', () {
+      final all = _dartFiles('test')
+          // this file holds the forbidden pauses as text (cases below)
+          .where((f) => !f.path.endsWith('ui_test_rules_test.dart'))
+          .toList();
+      expect(all.length, greaterThanOrEqualTo(30));
+      for (final f in all) {
+        expect(
+          unjustifiedFixedWaits(f.readAsLinesSync()),
+          isEmpty,
+          reason:
+              '${f.path}: wait for a state with waitUntil/eventually (fakes.dart), '
+              'or justify the pause in its line with «// absence: …»',
+        );
+      }
+    });
+
+    test('the check finds the former pauses and lets the allowed ones pass (counter-check)', () {
+      // the former pauses (#95): sync_app_test.dart, library_rules_test.dart, file_store_test.dart,
+      // appearance_test.dart
+      const old = [
+        'await Future<void>.delayed(const Duration(milliseconds: 100));',
+        'await Future<void>.delayed(const Duration(milliseconds: 10));',
+        'await Future<void>.delayed(const Duration(milliseconds: 60)); // wait',
+        'Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 50));',
+        'await Future<void>.delayed(',
+        '  const Duration(milliseconds: 60),',
+        '); // absence: the comment is not in the line of the pause',
+        'sleep(const Duration(milliseconds: 5));',
+        'await Future<void>.delayed(_quiet); // absence:',
+      ];
+      expect(unjustifiedFixedWaits(old), [1, 2, 3, 4, 5, 8, 9]);
+      const allowed = [
+        'await Future<void>.delayed(Duration.zero);',
+        'Future<void> settle() => Future<void>.delayed(Duration.zero);',
+        'await Future<void>.delayed(_quiet); // absence: no second save',
+        'final watch = Stopwatch()..start();',
+        'while (!done() && watch.elapsed < hangGuard) {',
+        '  await Future<void>.delayed(const Duration(milliseconds: 5));',
+        '}',
+      ];
+      expect(unjustifiedFixedWaits(allowed), isEmpty);
+      // a guarded loop does not excuse a pause in an unguarded loop inside it
+      const nested = [
+        'while (!done() && watch.elapsed < hangGuard) {',
+        '  for (var i = 0; i < 3; i++) {',
+        '    await Future<void>.delayed(const Duration(milliseconds: 5));',
+        '  }',
+        '}',
+      ];
+      expect(unjustifiedFixedWaits(nested), [3]);
+      // the real polling step in fakes.dart passes
+      expect(
+        unjustifiedFixedWaits(File('test/fakes.dart').readAsLinesSync()),
+        isEmpty,
+      );
     });
   });
 

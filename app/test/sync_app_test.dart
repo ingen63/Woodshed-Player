@@ -14,6 +14,9 @@ import 'package:woodshed_player/sync/sync_service.dart';
 import 'fakes.dart';
 import 'home_page_test.dart' show pumpApp;
 
+/// How long a test watches that no request goes out (#95/AK2).
+const _quiet = Duration(milliseconds: 50);
+
 /// Counts what the app asks of the sync.
 class CountingSync extends NoSync {
   final calls = <String>[];
@@ -83,7 +86,7 @@ void main() {
           app.library.editMetadata(t.id, title: 'Neu', artist: null);
           app.library.setNoUpload({t.id}, true);
           app.controller.resumed();
-          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await Future<void>.delayed(_quiet); // absence: no request
         }, createHttpClient: net.createHttpClient);
         expect(net.clients, 0);
       },
@@ -161,7 +164,11 @@ void main() {
         expect(cloud.files.keys, contains(CloudSync.stateName));
         final src = File('${dir.path}/a.mp3')..writeAsStringSync('audio a');
         await withSync.library.importFiles([src.path]);
-        await Future<void>.delayed(const Duration(milliseconds: 100));
+        // #95/AK1: wait for the upload (a state, not a time)
+        await eventually(
+          () => cloud.files.keys.any((k) => k.startsWith('audio/')),
+          'audio file uploaded',
+        );
         expect(
           cloud.files.keys.where((k) => k.startsWith('audio/')),
           hasLength(1),

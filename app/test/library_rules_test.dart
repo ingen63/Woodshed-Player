@@ -10,6 +10,9 @@ import 'package:woodshed_player/library/library.dart';
 
 import 'fakes.dart';
 
+/// How long a test watches that a save stays out (#95/AK2): twice the save delay of 30 ms used here.
+const _quiet = Duration(milliseconds: 60);
+
 final _t0 = DateTime.utc(2026, 11, 1);
 
 /// Import sources: name → contents (generated text, no real audio).
@@ -251,7 +254,7 @@ void main() {
       await a.library.mergeRemote(SharedState.empty);
       expect(a.notified, greaterThan(before));
       expect(store.indexWrites, writes + 1);
-      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await Future<void>.delayed(_quiet); // absence: cancelled save
       expect(store.indexWrites, writes + 1);
     });
   });
@@ -409,13 +412,13 @@ void main() {
       );
       final t = await a.add('a.mp3');
       final writes = store.indexWrites;
+      // #95/AK1: both changes without a pause in between, so they fall within the delay even under load
       a.library.updateSettings(t.id, t.settings.copyWith(speed: 0.5));
-      await Future<void>.delayed(const Duration(milliseconds: 10));
       a.library.updateSettings(t.id, t.settings.copyWith(speed: 0.6));
       expect(store.indexWrites, writes);
       // wait for the save (a state, not a time), then for as long again
       await eventually(() => store.indexWrites != writes, 'delayed save');
-      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await Future<void>.delayed(_quiet); // absence: no second save
       expect(store.indexWrites, writes + 1);
       final tracks = (a.saved['tracks'] as Map)[t.id] as Map;
       expect((tracks['values'] as Map)['speed'], 0.6);
@@ -452,7 +455,7 @@ void main() {
       final writes = store.indexWrites;
       a.library.updateSettings(t.id, t.settings.copyWith(speed: 0.5));
       await a.library.save();
-      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await Future<void>.delayed(_quiet); // absence: pending save
       expect(store.indexWrites, writes + 1);
     });
 

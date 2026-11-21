@@ -381,7 +381,8 @@ void main() {
       expect(storageLabel(de, l.storage!), endsWith('belegt'));
       final used = l.storage!.used;
       l.delete({l.tracks.single.id});
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // #95/AK1: wait for the measurement after the deletion (a state, not a time)
+      await eventually(() => l.storage!.used < used, 'storage after delete');
       expect(l.storage!.used, lessThan(used));
     });
 

@@ -29,8 +29,18 @@ Future<Library> loaded(Directory base) async {
 
 File prefs(Directory base) => File('${base.path}/preferences.json');
 
-/// Waits until the fire-and-forget preferences write has reached the disk.
-Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 50));
+/// Waits until the fire-and-forget save has written [key] = [value] into library.json (#95/AK1: a state, not a
+/// time). A file caught in the middle of a write counts as not yet saved.
+Future<void> saved(String key, String value) => eventually(() {
+  try {
+    final json = jsonDecode(
+      File('${tmp.path}/library.json').readAsStringSync(),
+    );
+    return (((json as Map)['settings'] as Map)['values'] as Map)[key] == value;
+  } on Object {
+    return false;
+  }
+}, 'library.json: $key = $value');
 
 void main() {
   setUp(() => tmp = Directory.systemTemp.createTempSync('wp_appearance'));
@@ -60,7 +70,7 @@ void main() {
         ]) {
           final l = await loaded(tmp);
           l.appearance = a;
-          await settle();
+          await saved('appearance', a.name);
           expect((await loaded(tmp)).appearance, a);
         }
       },
@@ -69,9 +79,9 @@ void main() {
     test('#31/AK4 stored next to the sort order, which stays intact', () async {
       final l = await loaded(tmp);
       l.sortOrder = TrackSortOrder.alphabetical;
-      await settle();
+      await saved('sortOrder', 'alphabetical');
       l.appearance = Appearance.dark;
-      await settle();
+      await saved('appearance', 'dark');
       // #36/AK5: both are shared settings in library.json.
       final shared =
           ((jsonDecode(File('${tmp.path}/library.json').readAsStringSync())

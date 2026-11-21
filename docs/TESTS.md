@@ -1116,7 +1116,9 @@ Text «Alphabetisch» trifft darum den Menüeintrag, nicht den Text.
   Aufnahme in der Bibliothek; das hätte unter Last wirklich scheitern können. Tests ohne `WidgetTester` warten mit
   `eventually(done, what)` aus derselben Datei. Dass kein Test unter `app/test/` mehr in einer Schleife mit fester
   Höchstzahl wartet (`Future.delayed` oder `sleep` in `for`/`while` ohne `hangGuard`), prüft «#78/AK2 …» in
-  `ui_test_rules_test.dart`. Einzelne Pausen ausserhalb einer Schleife erfasst die Prüfung nicht.
+  `ui_test_rules_test.dart`. Eine feste Echtzeit-Pause ausserhalb davon ist nur noch erlaubt, wo der Test prüft,
+  dass etwas ausbleibt, und nur mit der Begründung `// absence: <was ausbleibt>` in derselben Zeile; ausgenommen sind
+  `Duration.zero` und der Abfragetakt von `eventually` (#95/AK3 in `ui_test_rules_test.dart`).
 
 **Kein globales `retry` in `dart_test.yaml`.** Entschieden am 20.11.2026: Ein wackelnder Test ist ein Fehler, dessen
 Ursache behoben wird. Eine Wiederholung würde ihn verstecken und auch echte Fehler mit zeitlicher Ursache (Rennen,
@@ -1366,3 +1368,14 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     müssen von `metadata_test.dart` (#16/AK4, #91), das beschädigte Blöcke nur in FLAC und im `id3 `-Chunk von WAV
     prüfte. Test: Gruppe «#96 damaged ID3v2 tag at the start keeps the other fields» (`#96/AK1`, `#96/AK2`,
     `#96/AK3`) in `metadata_test.dart`.
+37. 21.11.2026, #95 (aus #78): Einzelne feste Echtzeit-Pausen ausserhalb von Schleifen warteten auf Ergebnisse,
+    die Prüfung aus #78 erfasste nur Schleifen. `sync_app_test.dart` wartete 100 ms auf den Upload der Audiodatei,
+    `file_store_test.dart` 50 ms auf die Messung nach dem Löschen, `appearance_test.dart` (`settle`) 50 ms auf das
+    Schreiben von `library.json`. In `library_rules_test.dart`, «several changes within the delay are saved once»,
+    lagen zwischen zwei Änderungen 10 ms bei 30 ms Speicherverzögerung; dauerte die Pause unter Last länger, speicherte
+    die Bibliothek schon dazwischen. Beobachtet wurde kein Fehlschlag. Die Tests warten jetzt mit `eventually` auf den
+    Zustand (Upload, kleinere Belegung, Wert in `library.json`), die beiden Änderungen folgen ohne Pause. Feste Pausen
+    bleiben nur, wo der Test prüft, dass etwas ausbleibt (kein Speichern, keine Verbindung), mit `// absence: …` in
+    der Zeile. Hätte gefangen werden müssen von «#78/AK2 …» in `ui_test_rules_test.dart`. Regressionstest: «#95/AK3 a
+    fixed real-time pause under test/ is justified» in `ui_test_rules_test.dart`, mit den alten Pausen als Gegenprobe;
+    drei volle Läufe von `flutter test` unter Last grün.
