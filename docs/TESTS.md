@@ -1443,3 +1443,13 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     (clang 23) blieb es ebenso still. Kein Fehler im eigenen Code: Im Mutationsbau prüft UBSan `pointer-overflow` in
     `wp_miniaudio` nicht mehr (Abschnitt «Unterdrückungen»). Hätte früher gefangen werden müssen von einem Sanitizer-Lauf
     mit derselben clang-Version wie der Mutationsjob.
+42. 21.11.2026, #106 (Oberflächentest «#30/AK13 play/pause» im nächtlichen Lauf, macOS, Null-Backend): In der Grösse
+    phone war die Position nach Pause 0,12 statt über 0,2. Ursache in `PlayerService._updatePosition` (#73): Nach
+    `seek(0)` und Play meldete der Kern noch die alte Pause-Stelle der vorigen Grösse (über 0,2) und «pausiert», weil
+    der Audio-Thread Seek und Play noch nicht übernommen hatte. Der Service nahm diesen Vorlauf gegenüber dem Seek-Ziel
+    als «Seek übernommen und weitergespielt» an; der Test sah so «spielt, Position > 0,2», bevor der Kern überhaupt
+    spielte, und pausierte nach 0,12 s echter Wiedergabe. In der App zeigte die Anzeige nach Seek und Play kurz die alte
+    Stelle. Behebung: Der Vorlauf zählt nur, wenn der Kern selbst «spielt» meldet. Regressionstest
+    `player_service_test.dart` (#106/AK2, ohne Behebung rot); der Oberflächentest prüft zusätzlich, dass die Position
+    nach Pause nicht kleiner ist als die beim Spielen erreichte. Hätte gefangen werden müssen von den #73-Tests, deren
+    Kern-Attrappe Play sofort übernahm.

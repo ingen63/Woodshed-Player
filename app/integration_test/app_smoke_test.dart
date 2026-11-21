@@ -117,8 +117,11 @@ void main() {
         () => p.isPlaying && p.position > 0.2,
         '$name: playing',
       );
+      final reached = p.position;
       await tester.tap(find.byKey(const Key('playPause')));
       await pumpUntil(tester, () => !p.isPlaying, '$name: paused');
+      // #106/AK2: pause keeps the position reached while playing
+      expect(p.position, greaterThanOrEqualTo(reached), reason: name);
       expect(p.position, greaterThan(0.2), reason: name);
     }
   });

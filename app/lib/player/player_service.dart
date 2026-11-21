@@ -124,7 +124,10 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
       final corePlaying = core.isPlaying;
       if (corePlaying || _playGrace <= 0) _playing = corePlaying;
       if (_playGrace > 0) _playGrace--;
-      _updatePosition(core.position.clamp(0, _duration).toDouble());
+      _updatePosition(
+        core.position.clamp(0, _duration).toDouble(),
+        corePlaying,
+      );
       _countLoopPasses();
     }
     if (!_playing && _pending == null && _seekTarget == null) {
@@ -135,13 +138,15 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
   }
 
   /// Takes the core's position, unless a seek is still on its way to the core (#73).
-  void _updatePosition(double corePosition) {
+  /// A lead over the target only counts while the core itself reports playing: before it has
+  /// applied seek and play, it still reports the old position and "paused" (#106).
+  void _updatePosition(double corePosition, bool corePlaying) {
     final target = _seekTarget;
     if (target != null) {
       final lead = corePosition - target;
       final applied =
           lead.abs() <= seekTolerance ||
-          (_playing && lead >= 0 && lead <= seekPlayingLead);
+          (_playing && corePlaying && lead >= 0 && lead <= seekPlayingLead);
       if (!applied && _seekWait < seekSettleTicks) {
         _seekWait++;
         return;

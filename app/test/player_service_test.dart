@@ -782,5 +782,32 @@ void main() {
       h.fire();
       expect(h.service.position, 61);
     });
+
+    test('#106/AK2: the stale position before seek and play does not count as played on', () async {
+      // Nightly UI test (#106): paused at 0.5, seek(0), play. The audio thread has applied
+      // neither command yet and still reports 0.5 and "paused". That stale position must not
+      // be taken as "seek applied and already played on".
+      final h = Harness();
+      await h.loadReady('/a.mp3', 3);
+      h.core.pos = 0.5;
+      h.core.applySeekImmediately = false;
+      h.core.applyPlayImmediately = false;
+      h.service.seek(0);
+      h.service.play();
+      h.fire(2);
+      expect(h.service.isPlaying, isTrue);
+      expect(h.service.position, 0);
+      // The audio thread applies seek and play together and plays on.
+      h.core.applySeek();
+      h.core.playing = true;
+      h.core.pos = 0.12;
+      h.fire();
+      expect(h.service.position, 0.12);
+      // Pause keeps the position reached.
+      h.service.pause();
+      h.fire();
+      expect(h.service.isPlaying, isFalse);
+      expect(h.service.position, 0.12);
+    });
   });
 }

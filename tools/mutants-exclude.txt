@@ -350,9 +350,9 @@ app/lib/player/waveform_summary.dart | dart_lt_to_le | if (mins[j] < lo) lo = mi
 app/lib/player/waveform_summary.dart | dart_gt_to_ge | if (maxs[j] > hi) hi = maxs[j];
 # Grenzfall: Nur eine Abweichung von genau seekTolerance bzw. seekPlayingLead (gerechnete Positionen).
 app/lib/player/player_service.dart | dart_le_to_lt | lead.abs() <= seekTolerance ||
-app/lib/player/player_service.dart | dart_le_to_lt | (_playing && lead >= 0 && lead <= seekPlayingLead);
+app/lib/player/player_service.dart | dart_le_to_lt | (_playing && corePlaying && lead >= 0 && lead <= seekPlayingLead);
 # gleichwertig: Ist lead genau 0, gilt schon die erste Bedingung (|lead| <= seekTolerance).
-app/lib/player/player_service.dart | dart_ge_to_gt | (_playing && lead >= 0 && lead <= seekPlayingLead);
+app/lib/player/player_service.dart | dart_ge_to_gt | (_playing && corePlaying && lead >= 0 && lead <= seekPlayingLead);
 # gleichwertig: Der Zweig ist nicht erreichbar. Nach dem Laden sind die Grenzen nie enger als 1 s
 # (_normalized, «Ende nicht gesetzt» wird zum Titelende), und jede Änderung hält sie so; sind sie
 # danach enger als 1 s, hat sich der Anfang oder das Ende geändert, und die Zweige davor greifen.
