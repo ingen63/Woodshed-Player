@@ -10,6 +10,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show max;
 
 /// Outcome of one mutant. «timeout» counts as detected (an endless loop), like in VivaPlan.
 enum Outcome { killed, timeout, survived, excluded, unviable }
@@ -669,11 +670,14 @@ List<Mutant> mergeMutants(Iterable<Mutant> all) {
 enum RunEnd { passed, failed, timeout, memory }
 
 class RunResult {
-  RunResult(this.end, this.output, this.elapsed, this.peakMiB);
+  RunResult(this.end, this.output, this.elapsed, this.peakMiB, {this.exitCode});
   final RunEnd end;
   final String output;
   final Duration elapsed;
   final int peakMiB;
+
+  /// Exit code of the process (negative: ended by that signal), null if unknown.
+  final int? exitCode;
 }
 
 /// Resident memory (KiB) per process and the children of each (ps works on macOS and Linux).
@@ -761,7 +765,44 @@ Future<RunResult> runLimited(
     out.toString(),
     watch.elapsed,
     peak,
+    exitCode: code,
   );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Failed original test of a core program (#103)
+// ---------------------------------------------------------------------------------------------
+
+/// Whether mull-runner stopped because the unmutated test program failed (warm-up or baseline
+/// run). Mull runs with --no-output and shows nothing of the test then.
+bool originalTestFailed(String mullOutput) =>
+    mullOutput.contains('Original test failed');
+
+/// What the job shows when the original test failed: the test program run again by itself with
+/// the same arguments and environment, how it ended and the last [lines] lines of its output.
+String originalTestReport(
+  String program,
+  List<String> args,
+  RunResult r, {
+  int lines = 60,
+}) {
+  final how = switch (r.end) {
+    RunEnd.timeout => 'time limit reached',
+    RunEnd.memory => 'memory limit reached (${r.peakMiB} MiB)',
+    _ => switch (r.exitCode) {
+      null => 'exit code unknown',
+      final c when c < 0 => 'ended by signal ${-c}',
+      final c => 'exit code $c',
+    },
+  };
+  final text = r.output.trimRight().split('\n');
+  final shown = text.sublist(max(0, text.length - lines));
+  return [
+    'original test run again without Mull: $program${args.map((a) => ' $a').join()}',
+    '$how after ${r.elapsed.inMilliseconds} ms'
+        '${shown.length < text.length ? ', last ${shown.length} of ${text.length} lines' : ''}:',
+    ...shown,
+  ].join('\n');
 }
 
 final _compileError = RegExp(

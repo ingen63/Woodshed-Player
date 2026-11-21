@@ -586,4 +586,5 @@ jobs:
             local/mutants/diff/summary.txt
             local/mutants/diff/missed.txt
             local/mutants/diff/results.json
+            local/mutants/diff/core/*.log
           if-no-files-found: ignore

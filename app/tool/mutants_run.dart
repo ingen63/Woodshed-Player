@@ -395,6 +395,22 @@ Future<List<Mutant>> runCore(
     if (r.exitCode != 0 || !json.existsSync()) {
       final text = '${r.stdout}${r.stderr}'.split('\n');
       stderr.writeln(text.sublist(max(0, text.length - 15)).join('\n'));
+      if (originalTestFailed('${r.stdout}${r.stderr}')) {
+        // #103: Mull shows nothing of the failed test (--no-output); run it again by itself, in
+        // the same directory and with the same environment as mull-runner
+        final again = await runLimited(
+          '$dir/$name',
+          args,
+          workingDirectory: Directory.current.path,
+          timeout: const Duration(minutes: 5),
+          memoryMiB: 4096,
+          environment: runEnv,
+        );
+        final report = originalTestReport('$dir/$name', args, again);
+        File('${reports.path}/$name.original.log')
+            .writeAsStringSync('$report\n');
+        stderr.writeln(report);
+      }
       stderr.writeln('mutants: mull-runner $name failed');
       exit(2);
     }

@@ -386,6 +386,69 @@ void main() {
     });
   });
 
+  group('#103/AK1: output of a failed original test', () {
+    test('only a failed original test is recognised', () {
+      expect(
+        originalTestFailed(
+          '[error] Original test failed (warmup run)\nstatus: Failed\nstdout: \'\'\n',
+        ),
+        isTrue,
+      );
+      expect(
+        originalTestFailed(
+          '[info] No mutants found. Mutation score: infinitely high',
+        ),
+        isFalse,
+      );
+    });
+
+    test(
+      'the run again shows how it ended and the end of its output',
+      () async {
+        final dir = Directory.systemTemp.createTempSync('mutants_original_');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final r = await runLimited(
+          'sh',
+          [
+            '-c',
+            'for i in 1 2 3 4 5; do echo "line \$i"; done; echo "FAIL last" >&2; exit 7',
+          ],
+          workingDirectory: dir.path,
+          timeout: const Duration(seconds: 10),
+          memoryMiB: 1024,
+        );
+        expect(r.end, RunEnd.failed);
+        expect(r.exitCode, 7);
+        final report = originalTestReport(
+          'build/player_tests',
+          ['--x'],
+          r,
+          lines: 3,
+        );
+        expect(report, contains('build/player_tests --x'));
+        expect(report, contains('exit code 7'));
+        expect(report, contains('last 3 of 6 lines'));
+        expect(report, contains('FAIL last'));
+        expect(report, isNot(contains('line 1')));
+      },
+    );
+
+    test('a signal, the time and the memory limit are named', () {
+      String how(RunEnd end, int? code) => originalTestReport(
+        'p',
+        const [],
+        RunResult(end, 'x', Duration.zero, 2048, exitCode: code),
+      ).split('\n')[1];
+      expect(how(RunEnd.failed, -11), startsWith('ended by signal 11'));
+      expect(how(RunEnd.timeout, -9), startsWith('time limit reached'));
+      expect(
+        how(RunEnd.memory, -9),
+        startsWith('memory limit reached (2048 MiB)'),
+      );
+      expect(how(RunEnd.failed, null), startsWith('exit code unknown'));
+    });
+  });
+
   group('#11/AK5: summary with file and line', () {
     test('counts per part and every not detected mutant', () {
       final ms = [

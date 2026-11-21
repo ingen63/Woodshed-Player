@@ -912,6 +912,11 @@ Plugin). Im Workflow: die Debian-Pakete für Ubuntu 24.04 und LLVM 18 (`clang-18
   Mutanten-Namen (Präfix `cxx_`) aus der beim Start gelesenen Umgebung; welcher Mutant läuft, ändert sich nicht.
 - Ein Mutant, der ausserhalb eines Puffers schreibt, wird von ASan erkannt wie im Workflow-Job `sanitize`. Lecks zählen
   nicht (`detect_leaks=0`, LeakSanitizer läuft auf macOS nicht; so ergeben beide Systeme dieselben Mutanten).
+- **Gescheiterter Vorlauf (#103):** Mull läuft mit `--no-output` und zeigt bei «Original test failed» nichts vom
+  Test. Das Werkzeug startet das Testprogramm dann selbst noch einmal (gleiche Argumente, Umgebung und Ordner wie
+  `mull-runner`) und schreibt, wie es endete (Exit-Code, Signal, Zeit- oder Speichergrenze), mit den letzten 60 Zeilen
+  der Ausgabe ins Log und nach `local/mutants/<Lauf>/core/<Programm>.original.log` (im Job im Artefakt
+  `mutants-diff`).
 
 **Dart-Logik mit eigenem Werkzeug.**
 
