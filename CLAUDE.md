@@ -33,6 +33,7 @@ Jede Änderung hat ein Issue mit **Abnahmekriterien als Häkchen-Liste**; jedes 
 2. **Direkt auf `main`**, keine Feature-Branches, keine Pull Requests. Ein Branch nur für grosse oder riskante Arbeiten und nur mit Deiner Zustimmung.
 3. **Umsetzen**, klein und gezielt, nur was im Issue steht. Nebenbaustellen als neues Issue vorschlagen.
 4. **Testen**, jedes Abnahmekriterium prüfen und im Bericht nennen, was geprüft ist und was nicht.
+   Bei Änderungen an `core/src`, `core/web` oder der Dart-Logik (`app/lib`) läuft vor der Abnahme `make mutants-diff` (Basis `origin/main`). Jeder nicht erkannte Mutant wird durch einen Test erkannt oder mit Begründung in `tools/mutants-exclude.txt` ausgeschlossen; sonst wird das Issue nicht geschlossen.
 5. **Commit** im Imperativ oder als Substantiv, ohne Punkt, mit Issue am Ende: `Ziehbare Loop-Marker (#22)`. Kein `Fixes #22`.
    Nach dem Commit, der die Anforderung vollständig umsetzt: `gh issue edit <Nr> --add-label implemented` und Kommentar «Umgesetzt in <Commit>. Abnahme ausstehend.». Teilschritte bekommen das Label nicht. Wird das Issue wieder geöffnet, kommt das Label weg, bis die Nacharbeit committet ist.
 6. **Abnahme** machst Du. Claude hakt nichts ab und schliesst nichts.
@@ -51,6 +52,7 @@ cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release && cmake --build core/bui
 cd app && flutter analyze --no-pub && flutter test --reporter failures-only
 cd app && flutter build macos --debug && flutter build ios --simulator --debug
 cd app && flutter build web --release --no-wasm-dry-run                          # Web-App
+make mutants-diff          # Mutationstests der seit origin/main geänderten Zeilen (Kern mit Mull, Dart-Logik), vor jeder Abnahme
 make test-wasm             # Kern als WASM (Emscripten) unter Node.js, verglichen mit dem nativen Kern
 make test-web              # Web-Tests in Chrome: OPFS und WASM-Kern (braucht Emscripten)
 xcodebuild -project WoodshedPlayer.xcodeproj -scheme WoodshedPlayer -destination 'platform=macOS' -quiet test        # Swift-Altprojekt
