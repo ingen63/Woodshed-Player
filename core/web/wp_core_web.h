@@ -19,8 +19,8 @@ extern "C" {
 #define WP_WEB_MAX_BLOCK 4096
 
 /* Player with a fixed sample rate (the AudioContext's). NULL only if there is no free memory.
- * Below WP_MIN_SAMPLE_RATE the player stays silent and every load reports
- * WP_ERR_UNSUPPORTED_SAMPLE_RATE (#76). */
+ * Below WP_MIN_SAMPLE_RATE (#76) or above WP_MAX_SAMPLE_RATE (#97) the player stays silent and
+ * every load reports WP_ERR_UNSUPPORTED_SAMPLE_RATE. */
 WP_API wp_player *wp_web_create(int sample_rate);
 WP_API int wp_web_sample_rate(wp_player *p);
 
@@ -46,10 +46,11 @@ typedef struct wp_web_track wp_web_track;
 
 /* Decodes MP3, WAV or FLAC into stereo at sample_rate. NULL on failure, the code goes to *err
  * (WP_ERR_UNSUPPORTED_FORMAT: try decodeAudioData, e.g. AAC/M4A; WP_ERR_UNSUPPORTED_SAMPLE_RATE:
- * sample_rate below WP_MIN_SAMPLE_RATE). */
+ * sample_rate below WP_MIN_SAMPLE_RATE or above WP_MAX_SAMPLE_RATE). */
 WP_API wp_web_track *wp_web_track_decode(const void *data, size_t size, int sample_rate, int *err);
 /* Converts already decoded PCM (interleaved, any channel count and rate) into stereo at dst_rate.
- * Either rate below WP_MIN_SAMPLE_RATE gives WP_ERR_UNSUPPORTED_SAMPLE_RATE. */
+ * Either rate below WP_MIN_SAMPLE_RATE or above WP_MAX_SAMPLE_RATE (#97) gives
+ * WP_ERR_UNSUPPORTED_SAMPLE_RATE. */
 WP_API wp_web_track *wp_web_track_convert(const float *interleaved, int channels, int frames,
                                           int src_rate, int dst_rate, int *err);
 /* Interleaved stereo PCM, frames and duration of the track. */

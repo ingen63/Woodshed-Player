@@ -568,16 +568,16 @@ Die Abdeckung blieb gleich oder stieg (cov 2367–2400 vorher, 2406–2462 nachh
 Unit- und Referenztests erreichten. Die neuen Befehle stehen hinten in der Befehlsliste (`Op` in `fuzz_capi.cpp`),
 damit die eingecheckten Programme ihre Bedeutung behalten; nur in `regressions/capi/nonfinite_arguments` wurden 9
 Befehlsbytes auf ihren bisherigen Wert modulo 20 umgeschrieben (gleiche Befehle, gleiche Argumente). Argumente kommen
-aus `anyRate` (übliche Rate; unter `WP_MIN_SAMPLE_RATE` bis `INT_MIN`; über 96 kHz bis 768 kHz, dem Höchstwert eines
-Web-Audio-`AudioContext`; jeder `int` bis `INT_MAX`), `anyCount` (plausibel, negativ bis −2³¹ + 1, jeder `int`) und
+aus `anyRate` (übliche Rate; unter `WP_MIN_SAMPLE_RATE` bis `INT_MIN`; über `WP_MAX_SAMPLE_RATE` (96 kHz, #97) bis
+768 kHz, dem Höchstwert eines Web-Audio-`AudioContext`; jeder `int` bis `INT_MAX`), `anyCount` (plausibel, negativ bis −2³¹ + 1, jeder `int`) und
 Samples mit NaN, ±unendlich und 3·10³⁸. Fehlercodes gelten als dokumentiert, wenn sie zwischen `WP_OK` und
 `WP_ERR_UNSUPPORTED_SAMPLE_RATE` liegen. Unter ASan/UBSan (`make fuzz`, `make sanitize`) ist zudem jeder
 Speicherfehler und jedes undefinierte Verhalten ein Fund.
 
 | Funktion | Invarianten |
 |---|---|
-| `wp_web_track_decode` | NULL genau dann, wenn `*err` ≠ `WP_OK`; `*err` dokumentiert (auch ohne `err` kein Absturz); Rate unter `WP_MIN_SAMPLE_RATE` ergibt `WP_ERR_UNSUPPORTED_SAMPLE_RATE`; Daten NULL ergibt NULL |
-| `wp_web_track_convert` | wie oben; Rate zu klein: `WP_ERR_UNSUPPORTED_SAMPLE_RATE` (vor allem anderen), sonst ohne Daten, Kanäle < 1 oder Frames < 1 `WP_ERR_INVALID_ARGUMENT`; NaN und unendlich im Eingang kommen endlich heraus |
+| `wp_web_track_decode` | NULL genau dann, wenn `*err` ≠ `WP_OK`; `*err` dokumentiert (auch ohne `err` kein Absturz); Rate unter `WP_MIN_SAMPLE_RATE` oder über `WP_MAX_SAMPLE_RATE` (#97) ergibt `WP_ERR_UNSUPPORTED_SAMPLE_RATE`; Daten NULL ergibt NULL |
+| `wp_web_track_convert` | wie oben; Quell- oder Zielrate ausserhalb der Grenzen: `WP_ERR_UNSUPPORTED_SAMPLE_RATE` (vor allem anderen), sonst ohne Daten, Kanäle < 1 oder Frames < 1 `WP_ERR_INVALID_ARGUMENT`; NaN und unendlich im Eingang kommen endlich heraus |
 | `wp_web_track_frames`, `_duration`, `_data` | für jede Spur: mindestens 1 Frame, Dauer = Frames / Rate (endlich, > 0), Daten nicht NULL, jedes der Frames × 2 Samples endlich und höchstens ±8; für NULL: 0, 0,0 und NULL |
 | `wp_web_track_waveform` | `WP_OK` oder `WP_ERR_INVALID_ARGUMENT` (immer bei NULL); bei `WP_OK` jedes Paar endlich mit Min ≤ Max |
 | `wp_web_track_free` | gibt frei (ASan meldet doppelte Freigabe und Lecks), NULL ist erlaubt |
@@ -598,11 +598,12 @@ Speicherfehler und jedes undefinierte Verhalten ein Fund.
   Dauer und Position 0, ein Render-Block womöglich zugleich noch die alte Position. Bis nach dem Ende des Ladens ein
   Block gerendert ist, entfallen deshalb die Prüfungen, die zwei Abfragen vergleichen (Position ≤ Dauer, Dauer
   unverändert nach einem Fehler, Position 0 nach dem Laden).
-- **Grenzen der Argumente (Speicher):** Damit eine Eingabe unter den 2 GB von `make fuzz` bleibt, wandelt
-  `wp_web_track_convert` höchstens 4 × 96 000 Frames Ausgabe (bei hoher Zielrate kommen weniger Eingangsframes) und
-  bekommt höchstens 2²⁰ Samples, sonst NULL als Daten; `wp_web_track_decode` mit einer Rate über 768 kHz bekommt
-  eine erzeugte WAV-Datei mit 1–4 Frames statt der Eingabebytes, sonst würde eine ganze Datei bei `INT_MAX` Hz
-  Gigabytes. `wp_web_pcm_begin` reserviert höchstens 2²⁴ Frames (128 MiB). `wp_web_pcm_append` bekommt jede Zahl
+- **Grenzen der Argumente (Speicher):** Damit eine Eingabe unter den 2 GB von `make fuzz` bleibt, bekommt
+  `wp_web_track_convert` höchstens 2²⁰ Samples, sonst NULL als Daten. Die Raten brauchen seit #97 keine Begrenzung
+  im Fuzzer mehr: Dekodieren und Wandeln laufen mit jeder Rate bis `INT_MAX` und den Eingabebytes bzw. allen
+  Eingangsframes, denn der Kern weist jede Rate über `WP_MAX_SAMPLE_RATE` ab, bevor er etwas dekodiert (vorher
+  bekam das Dekodieren über 768 kHz eine erzeugte WAV-Datei mit 1–4 Frames, und das Wandeln wurde auf 4 × 96 000
+  Frames Ausgabe gekürzt). `wp_web_pcm_begin` reserviert höchstens 2²⁴ Frames (128 MiB). `wp_web_pcm_append` bekommt jede Zahl
   bis `INT_MAX`, wenn sie über den angekündigten Frames liegt (Abweisung ohne Lesen), sonst höchstens 8192 Frames.
 - **Zählt als Laden (#66):** Dekodieren, Wandeln und `wp_load_async` zählen zu den höchstens 4 Ladebefehlen je
   Eingabe; `wp_file_duration` liest nur den Kopf und zählt nicht.
@@ -1346,3 +1347,13 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     assoziativ (Feldwerte hingen von der Reihenfolge ab). Regressionstests: `stamps_test.dart` (#98/AK2–AK4) und
     `property/sync_property_test.dart` (#98/AK2–AK5). Hätte gefangen werden müssen von `sync_property_test.dart`
     (#10/AK6), dessen Uhr nur um Millisekunden lief.
+35. 21.11.2026, #97 (aus #85), Fuzzing der übrigen Web-API: Der Kern nahm jede Abtastrate ab `WP_MIN_SAMPLE_RATE` bis
+    `INT_MAX` an. `wp_web_track_decode` mit einer kurzen WAV-Datei und `INT_MAX` Hz reservierte Speicher für Milliarden
+    Frames (unter `make fuzz` ein Speicherfund über 2 GB); `fuzz_capi` umging das bis dahin mit einer Hilfsbegrenzung.
+    Jetzt gilt die Obergrenze `WP_MAX_SAMPLE_RATE` (96 000 Hz), wie die Untergrenze nur in `core/src/sample_rate.hpp`
+    festgelegt (`wp::kMaxSampleRate`, `wp::sampleRateSupported`). Darüber bleibt der Player stumm, und Laden,
+    Dekodieren und Wandeln (Ziel- und Quellrate) melden `WP_ERR_UNSUPPORTED_SAMPLE_RATE`; genau 96 000 Hz wird
+    angenommen. Regressionstest: Referenzfall «#97/AK1 #97/AK2 #97/AK3 sample rate upper limit»
+    (`core/tests/reference_tests.cpp`, `sampleRateUpperLimit`, 96 000 Hz, 96 001 Hz und `INT_MAX`), nativ und im
+    WASM-Kern; `fuzz_capi` ruft Dekodieren und Wandeln ohne die Hilfsbegrenzung auf. Hätte gefangen werden müssen von
+    `fuzz_capi` mit beliebigen Raten; bis #85 rief es Dekodieren und Wandeln in eine Spur nicht auf.

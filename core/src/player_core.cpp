@@ -32,7 +32,7 @@ const char *errorMessage(int code) {
   case kErrBusy:
     return "Audio core busy, try again";
   case kErrUnsupportedSampleRate:
-    return "Sample rate too low for the audio core";
+    return "Sample rate outside the range of the audio core";
   default:
     return "Unknown error";
   }
@@ -229,7 +229,7 @@ double fileDuration(const std::string &path) {
 }
 
 int decodeMemory(const void *data, size_t size, int sampleRate, Source &out) {
-  if (sampleRate < kMinSampleRate)
+  if (!wp::sampleRateSupported(sampleRate))
     return kErrUnsupportedSampleRate;
   if (!data)
     return kErrInvalidArgument;
@@ -244,7 +244,7 @@ int decodeMemory(const void *data, size_t size, int sampleRate, Source &out) {
 
 int convertPcm(const float *interleaved, int channels, long long frames, int srcRate, int dstRate,
                Source &out) {
-  if (srcRate < kMinSampleRate || dstRate < kMinSampleRate)
+  if (!wp::sampleRateSupported(srcRate) || !wp::sampleRateSupported(dstRate))
     return kErrUnsupportedSampleRate;
   if (!interleaved || channels < 1 || frames < 1)
     return kErrInvalidArgument;
@@ -298,7 +298,7 @@ int convertPcm(const float *interleaved, int channels, long long frames, int src
 
 Player::Player(int sampleRate) : sampleRate_(sampleRate) {
   // An unsupported rate never reaches the time stretch (#76); the player stays silent instead.
-  const int configured = std::max(kMinSampleRate, sampleRate_);
+  const int configured = sampleRateSupported() ? sampleRate_ : kMinSampleRate;
   engine_.configure(kChannels, configured);
   metronome_.setSampleRate(configured);
 }

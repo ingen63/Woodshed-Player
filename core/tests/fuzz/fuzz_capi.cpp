@@ -79,8 +79,8 @@ enum Op : uint8_t {
 bool documented(int r) { return r <= 0 && r >= WP_ERR_UNSUPPORTED_SAMPLE_RATE; }
 
 // #85: limits that keep one input fast and below the fuzzer's 2 GB; the arguments themselves can
-// still be any value (see anyRate, anyCount and the cases).
-constexpr int kMaxTrackFrames = 4 * 96000;  // longest converted track, in frames at its rate
+// still be any value (see anyRate, anyCount and the cases). The rates need no limit here since
+// the core rejects every rate above WP_MAX_SAMPLE_RATE (#97).
 constexpr int kMaxBeginFrames = 1 << 24;    // largest reservation of wp_web_pcm_begin (128 MiB)
 constexpr int kAppendFrames = 8192;         // largest piece appended from generated samples
 constexpr int kMaxConvertSamples = 1 << 20; // largest generated PCM input of track_convert
@@ -94,9 +94,8 @@ float rawFloat(wp::fuzz::Reader &in) {
 }
 
 // #85: a sample rate as a caller could pass it. Mostly a usual one; also below WP_MIN_SAMPLE_RATE
-// (0, negative, INT_MIN), above the usual ones up to the Web Audio maximum, and any int up to
-// INT_MAX. Decoding and converting at a rate above kWebAudioMaxRate get only a few input frames
-// (see trackDecode, trackConvert), since the output grows with the rate.
+// (0, negative, INT_MIN), above WP_MAX_SAMPLE_RATE up to the Web Audio maximum, and any int up to
+// INT_MAX. Outside the limits the core rejects the rate before decoding anything (#97).
 int anyRate(wp::fuzz::Reader &in) {
   const uint8_t kind = in.byte();
   if (kind < 192)
@@ -146,37 +145,6 @@ const float *rampBuffer() {
     return v;
   }();
   return ramp.data();
-}
-
-// A mono 16-bit WAV of `frames` frames at `rate`, for decoding at an extreme rate.
-std::vector<uint8_t> tinyWav(int frames, uint32_t rate) {
-  const auto u32le = [](std::vector<uint8_t> &v, uint32_t x) {
-    for (int i = 0; i < 4; ++i)
-      v.push_back(static_cast<uint8_t>(x >> (8 * i)));
-  };
-  const auto u16le = [](std::vector<uint8_t> &v, uint16_t x) {
-    v.push_back(static_cast<uint8_t>(x));
-    v.push_back(static_cast<uint8_t>(x >> 8));
-  };
-  const auto tag = [](std::vector<uint8_t> &v, const char *t) { v.insert(v.end(), t, t + 4); };
-  std::vector<uint8_t> w;
-  const auto dataBytes = static_cast<uint32_t>(frames * 2);
-  tag(w, "RIFF");
-  u32le(w, 36 + dataBytes);
-  tag(w, "WAVE");
-  tag(w, "fmt ");
-  u32le(w, 16);
-  u16le(w, 1);
-  u16le(w, 1);
-  u32le(w, rate);
-  u32le(w, rate * 2);
-  u16le(w, 2);
-  u16le(w, 16);
-  tag(w, "data");
-  u32le(w, dataBytes);
-  for (int i = 0; i < frames; ++i)
-    u16le(w, static_cast<uint16_t>(i * 8000));
-  return w;
 }
 
 struct State {
@@ -262,7 +230,7 @@ void takeTrack(State &s, wp_web_track *t, int err, bool withErr, int rate) {
   if (withErr) {
     WP_FUZZ_CHECK(documented(err));
     WP_FUZZ_CHECK((t != nullptr) == (err == WP_OK));
-    if (rate < WP_MIN_SAMPLE_RATE)
+    if (rate < WP_MIN_SAMPLE_RATE || rate > WP_MAX_SAMPLE_RATE)
       WP_FUZZ_CHECK(err == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
   }
   if (!t)
@@ -270,7 +238,8 @@ void takeTrack(State &s, wp_web_track *t, int err, bool withErr, int rate) {
   const int frames = WP_FUZZ_CALL(wp_web_track_frames, t);
   const double duration = WP_FUZZ_CALL(wp_web_track_duration, t);
   const float *data = WP_FUZZ_CALL(wp_web_track_data, t);
-  WP_FUZZ_CHECK(rate >= WP_MIN_SAMPLE_RATE && frames >= 1 && data != nullptr);
+  WP_FUZZ_CHECK(rate >= WP_MIN_SAMPLE_RATE && rate <= WP_MAX_SAMPLE_RATE);
+  WP_FUZZ_CHECK(frames >= 1 && data != nullptr);
   WP_FUZZ_CHECK(std::isfinite(duration) && duration > 0.0);
   WP_FUZZ_CHECK(duration == static_cast<double>(frames) / rate);
   for (size_t i = 0; i < static_cast<size_t>(frames) * 2; ++i)
@@ -284,17 +253,9 @@ void trackDecode(State &s, wp::fuzz::Reader &in) {
   const int rate = anyRate(in);
   const uint8_t flags = in.byte();
   size_t got = 0;
-  const uint8_t *bytes = in.take(in.u16(), got);
+  const uint8_t *const bytes = in.take(in.u16(), got);
   if (++s.loads > kMaxLoads)
     return;
-  // The output grows with the rate: above the Web Audio maximum only a WAV of 1–4 frames, so even
-  // INT_MAX gives about 11 000 frames. (A whole file at such a rate would need gigabytes.)
-  std::vector<uint8_t> wav;
-  if (rate > kWebAudioMaxRate) {
-    wav = tinyWav(1 + flags % 4, static_cast<uint32_t>(kWebAudioMaxRate));
-    bytes = wav.data();
-    got = wav.size();
-  }
   const bool withErr = (flags & 0x80) == 0;
   int err = 1; // not a code: must be overwritten
   wp_web_track *t = WP_FUZZ_CALL(wp_web_track_decode,
@@ -308,18 +269,12 @@ void trackDecode(State &s, wp::fuzz::Reader &in) {
 }
 
 void trackConvert(State &s, wp::fuzz::Reader &in) {
-  int channels = anyCount(in, 8);
-  int frames = anyCount(in, static_cast<uint32_t>(kMaxPcmSeconds * 96000));
+  const int channels = anyCount(in, 8);
+  const int frames = anyCount(in, static_cast<uint32_t>(kMaxPcmSeconds * 96000));
   const int src = anyRate(in), dst = anyRate(in);
   const uint8_t flags = in.byte();
   if (++s.loads > kMaxLoads)
     return;
-  // At most kMaxTrackFrames of output: fewer input frames when the target rate is higher.
-  if (src >= WP_MIN_SAMPLE_RATE && dst >= WP_MIN_SAMPLE_RATE && frames > 0) {
-    const double limit = static_cast<double>(kMaxTrackFrames) * src / dst;
-    if (static_cast<double>(frames) > limit)
-      frames = limit < 1.0 ? 1 : static_cast<int>(limit);
-  }
   // The input must hold channels * frames samples; beyond kMaxConvertSamples it is NULL, which the
   // core rejects (after the rates).
   const long long samples =
@@ -335,7 +290,8 @@ void trackConvert(State &s, wp::fuzz::Reader &in) {
   int err = 1;
   wp_web_track *t = WP_FUZZ_CALL(wp_web_track_convert, null ? nullptr : pcm.data(), channels,
                                  frames, src, dst, withErr ? &err : nullptr);
-  if (withErr && (src < WP_MIN_SAMPLE_RATE || dst < WP_MIN_SAMPLE_RATE))
+  const auto outside = [](int r) { return r < WP_MIN_SAMPLE_RATE || r > WP_MAX_SAMPLE_RATE; };
+  if (withErr && (outside(src) || outside(dst)))
     WP_FUZZ_CHECK(err == WP_ERR_UNSUPPORTED_SAMPLE_RATE);
   else if (withErr && (null || channels < 1 || frames < 1))
     WP_FUZZ_CHECK(err == WP_ERR_INVALID_ARGUMENT);
@@ -425,7 +381,7 @@ void checkLoadState(wp_player *p) {
 void loadAsync(State &s, wp::fuzz::Reader &in) {
   const auto kind = static_cast<PathKind>(in.byte() % 4);
   size_t got = 0;
-  const uint8_t *bytes = in.take(in.u16(), got);
+  const uint8_t *const bytes = in.take(in.u16(), got);
   if (++s.loads > kMaxLoads)
     return;
   const std::string purpose = "async" + std::to_string(s.loads);
@@ -456,7 +412,7 @@ void loadWait(State &s) {
 void fileDuration(wp::fuzz::Reader &in) {
   const auto kind = static_cast<PathKind>(in.byte() % 4);
   size_t got = 0;
-  const uint8_t *bytes = in.take(in.u16(), got);
+  const uint8_t *const bytes = in.take(in.u16(), got);
   const std::string path = pathFor(kind, "duration", bytes, got);
   if (kind == kPathFile && path.empty())
     return;

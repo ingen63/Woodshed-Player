@@ -34,7 +34,8 @@ static_assert(WP_OK == wp::kOk && WP_ERR_INVALID_ARGUMENT == wp::kErrInvalidArgu
                   WP_ERR_FILE_UNREADABLE == wp::kErrFileUnreadable &&
                   WP_ERR_CANCELLED == wp::kErrCancelled && WP_ERR_BUSY == wp::kErrBusy &&
                   WP_ERR_UNSUPPORTED_SAMPLE_RATE == wp::kErrUnsupportedSampleRate &&
-                  WP_MIN_SAMPLE_RATE == wp::kMinSampleRate,
+                  WP_MIN_SAMPLE_RATE == wp::kMinSampleRate &&
+                  WP_MAX_SAMPLE_RATE == wp::kMaxSampleRate,
               "error codes in wp_core.h and player_core.hpp must match");
 static_assert(WP_LOAD_IDLE == wp::kLoadIdle && WP_LOAD_RUNNING == wp::kLoadRunning &&
                   WP_LOAD_READY == wp::kLoadReady,

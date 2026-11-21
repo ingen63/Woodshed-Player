@@ -28,11 +28,12 @@ typedef struct wp_player wp_player;
 #define WP_ERR_FILE_UNREADABLE -6         /* keine Leserechte, Ordner statt Datei, Lesefehler */
 #define WP_ERR_CANCELLED -7               /* durch ein neueres Laden abgebrochen */
 #define WP_ERR_BUSY -8                    /* Befehls-Queue voll */
-#define WP_ERR_UNSUPPORTED_SAMPLE_RATE -9 /* sample rate below WP_MIN_SAMPLE_RATE (#76) */
+#define WP_ERR_UNSUPPORTED_SAMPLE_RATE -9 /* rate outside WP_MIN/MAX_SAMPLE_RATE (#76, #97) */
 
-/* Lowest sample rate the core accepts (#76). A player configured below it renders silence and
- * answers every load with WP_ERR_UNSUPPORTED_SAMPLE_RATE. */
+/* Range of sample rates the core accepts, both limits included (#76, #97). A player configured
+ * outside it renders silence and answers every load with WP_ERR_UNSUPPORTED_SAMPLE_RATE. */
 #define WP_MIN_SAMPLE_RATE 8000
+#define WP_MAX_SAMPLE_RATE 96000
 
 /* English text for an error code, static, never NULL. For logs only: the UI shows its own
  * localized text per code (ARB files in the app). */
