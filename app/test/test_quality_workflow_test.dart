@@ -1,4 +1,4 @@
-// #57, #10, #58, #13, #59, #11, #64, #77, #67: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
+// #57, #10, #58, #13, #59, #11, #64, #77, #67, #79, #89: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
 import 'dart:io';
@@ -53,6 +53,40 @@ List<String> emsdkProblems(Map<String, String> workflows, String docs) {
       !documented.containsAll(versions) ||
       !versions.containsAll(documented)) {
     problems.add('docs/TESTS.md names $documented, workflows $versions');
+  }
+  return problems;
+}
+
+/// #89: what keeps one job (or workflow) from taking emsdk from the cache.
+/// Empty when `actions/cache` keeps `${{ runner.temp }}/emsdk` under a key
+/// with the runner OS and `EMSDK_VERSION`, before the install step, and the
+/// install step only runs without a cache hit.
+List<String> emsdkCacheProblems(String text) {
+  final problems = <String>[];
+  final cache = RegExp(
+    r'- name: [^\n]*\n(?:\s+if: [^\n]*\n)?\s+id: (\S+)\n\s+uses: actions/cache@v\d+\n'
+    r'\s+with:\n\s+path: \$\{\{ runner\.temp \}\}/emsdk\n(?:\s+#[^\n]*\n)?'
+    r'\s+key: ([^\n]+)\n',
+  ).firstMatch(text);
+  if (cache == null) return ['no actions/cache for runner.temp/emsdk'];
+  final key = cache.group(2)!;
+  if (!key.contains(r'${{ env.EMSDK_VERSION }}')) {
+    problems.add('key $key without EMSDK_VERSION');
+  }
+  if (!key.contains(r'${{ runner.os }}')) {
+    problems.add('key $key without the runner OS');
+  }
+  final install = RegExp(
+    r'- name: Install Emscripten[^\n]*\n\s+if: ([^\n]*)\n\s+run: \|\n\s+git clone',
+  ).firstMatch(text);
+  if (install == null) {
+    problems.add('install step without condition');
+  } else {
+    if (install.start < cache.start) problems.add('install before the cache');
+    final hit = "steps.${cache.group(1)}.outputs.cache-hit != 'true'";
+    if (!install.group(1)!.contains(hit)) {
+      problems.add('install runs also on a cache hit: ${install.group(1)}');
+    }
   }
   return problems;
 }
@@ -576,6 +610,55 @@ void main() {
       final oldDocs = docs.replaceFirst('Emscripten 7.0.0', 'Emscripten 6.0.0');
       expect(emsdkProblems(workflows, oldDocs), isNotEmpty);
     });
+  });
+
+  group('#89 emsdk from the cache', () {
+    final pages = read('../.github/workflows/pages.yml');
+
+    test(
+      '#89/AK1 contract and fuzz use the cached emsdk, key with version',
+      () {
+        for (final name in ['contract', 'fuzz']) {
+          expect(
+            emsdkCacheProblems(job(workflow, name)),
+            isEmpty,
+            reason: name,
+          );
+        }
+        // the other installs of EMSDK_VERSION use the same cache
+        expect(emsdkCacheProblems(job(workflow, 'web')), isEmpty);
+        expect(emsdkCacheProblems(job(pages, 'deploy')), isEmpty);
+      },
+    );
+
+    test('#89/AK2 a new EMSDK_VERSION means a new key and a new install', () {
+      final contract = job(workflow, 'contract');
+      expect(
+        contract,
+        contains(r'key: emsdk-${{ runner.os }}-${{ env.EMSDK_VERSION }}'),
+      );
+      final fixedKey = contract.replaceFirst(
+        r'${{ env.EMSDK_VERSION }}',
+        '7.0.0',
+      );
+      expect(emsdkCacheProblems(fixedKey), isNotEmpty);
+      final always = contract.replaceFirst(
+        "if: steps.emsdk.outputs.cache-hit != 'true'",
+        'if: always()',
+      );
+      expect(emsdkCacheProblems(always), isNotEmpty);
+      final noCache = contract.replaceFirst('actions/cache@', 'actions/other@');
+      expect(emsdkCacheProblems(noCache), isNotEmpty);
+    });
+
+    test(
+      '#89/AK4 only the official actions/cache, no third-party emsdk action',
+      () {
+        for (final text in [workflow, pages]) {
+          expect(text, isNot(contains('setup-emsdk')));
+        }
+      },
+    );
   });
 
   group('#13/AK4 web build and web tests in Chrome', () {

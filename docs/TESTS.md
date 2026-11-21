@@ -689,7 +689,9 @@ in `smoke_test.dart`. Windows und Linux folgen mit #60.
   `clang-format` und `clang-tidy` in Hauptversion 23 wie Homebrew `llvm` (über `pipx`), der Kern mit clang-18 und
   passendem `llvm-cov-18`, `actionlint` in fester Version mit Prüfsumme (#64), in den Jobs `contract`, `fuzz` und `web` sowie in `pages.yml`
 Emscripten 7.0.0 über `emsdk` (`EMSDK_VERSION`, je Workflow an einer Stelle, nie `latest`, wie Homebrew `emscripten`
-lokal; nach einem Update alle drei nachführen, #77, #79). Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
+lokal; nach einem Update alle drei nachführen, #77, #79). Die emsdk-Installation liegt im Zwischenspeicher von
+`actions/cache` (Schlüssel `emsdk-<Runner-OS>-<EMSDK_VERSION>`); bei einem Treffer entfällt die Installation, eine neue
+Version gibt einen neuen Schlüssel und wird beim nächsten Lauf neu installiert (#89). Mutationstests der geänderten Zeilen laufen nächtlich im Job `mutants-diff` (#11).
 - **Lokal geprüft** werden die Workflows mit `actionlint` und ShellCheck (`make lint`, #64) und über
   `test_quality_workflow_test.dart`. Ob alle Jobs auf den Runnern laufen, zeigen erst die Läufe nach dem Push.
 
@@ -704,8 +706,8 @@ deutlich länger angesetzt.
 | `checks` | ≈ 15 | 60 | ≈ 900 Linux |
 | `web` | ≈ 10 | 20 | ≈ 200 Linux |
 | `sanitize`, `network-free` | ≈ 8 und 3 | 30 und 80 | ≈ 480 Linux |
-| `contract` (emsdk 3, nativ 2, WASM 5) | ≈ 10 | 30 | ≈ 300 Linux |
-| `sanitize-thread`, `fuzz` (2 × 20 min, dazu emsdk 3 und WASM 2, #67), `property` | ≈ 10, 50, 10 | 22 | ≈ 1540 Linux |
+| `contract` (emsdk 3, aus dem Zwischenspeicher unter 1, #89; nativ 2, WASM 5) | ≈ 10 | 30 | ≈ 300 Linux |
+| `sanitize-thread`, `fuzz` (2 × 20 min, dazu emsdk 3, aus dem Zwischenspeicher unter 1, und WASM 2, #67, #89), `property` | ≈ 10, 50, 10 | 22 | ≈ 1540 Linux |
 
 Das sind rund **400 macOS-Minuten** und rund **3400 Linux-Minuten** im Monat. Bei einem privaten Repository zählt
 GitHub macOS-Minuten zehnfach: 400 × 10 = 4000 von 2000 Gratis-Minuten (GitHub Free), also über dem Kontingent; dann

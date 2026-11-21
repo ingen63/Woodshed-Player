@@ -79,8 +79,16 @@ jobs:
           curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" \
             | tar -xJ -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
-      - name: Install Emscripten (fixed version, #79)
+      - name: Emscripten from the cache (#89)
         if: steps.tag.outputs.tag != ''
+        id: emsdk
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/emsdk
+          # a new EMSDK_VERSION gives a new key, so the next run installs it afresh
+          key: emsdk-${{ runner.os }}-${{ env.EMSDK_VERSION }}
+      - name: Install Emscripten (fixed version, #79)
+        if: steps.tag.outputs.tag != '' && steps.emsdk.outputs.cache-hit != 'true'
         run: |
           git clone --quiet --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
           "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION" >/dev/null
