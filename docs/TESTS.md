@@ -497,9 +497,9 @@ riesige Texte), fremde Versionsnummer, fehlende oder unsinnige Stempel, abgeschn
 | Ziel | Eingabe | Invarianten |
 |---|---|---|
 | `fuzz_decoder` | rohe Bytes als Datei: `wp::decodeMemory` (Kern im Browser, Worker) mit einer vom ersten Byte gewählten Rate, `wp::fileDuration` über eine temporäre Datei | Ergebnis OK oder ein dokumentierter Fehlercode; bei OK mindestens ein Frame, genau Frames × 2 endliche Samples, Wellenform endlich; die Dauer positiv oder ein Fehlercode |
-| `fuzz_capi` | ein kleines Programm aus Befehlen über die C-API von `wp_core.h` (`wp_core_offline`, derselbe `wp::Player` wie in der App, ohne Audiogerät): Laden aus Bytes, PCM und Datei, Play, Pause, Seek, Tempo, Loop, Lautstärke, Rendern, Metronom, Wellenform; Argumente auch NaN, unendlich, negativ, riesig | nach jedem Befehl Position und Dauer endlich, 0 ≤ Position ≤ Dauer, Loop-Zähler fällt nie, Metronom 20–300 BPM, jedes gerenderte Sample endlich, Fehlercodes dokumentiert |
+| `fuzz_capi` | ein kleines Programm aus Befehlen über die C-API von `wp_core.h` (`wp_core_offline`, derselbe `wp::Player` wie in der App, ohne Audiogerät): Laden aus Bytes, PCM und Datei, Play, Pause, Seek, Tempo, Loop, Lautstärke, Rendern, Metronom, Wellenform; seit #85 auch Spuren des Lade-Workers (`wp_web_track_*`), stückweises Laden von PCM (`wp_web_pcm_*`), Laden ohne Warten (`wp_load_async`, `wp_load_wait`) und `wp_file_duration`; Argumente auch NaN, unendlich, negativ, riesig | nach jedem Befehl Position und Dauer endlich, 0 ≤ Position ≤ Dauer, Loop-Zähler fällt nie, Metronom 20–300 BPM, jedes gerenderte Sample endlich, Fehlercodes dokumentiert; je Funktion von #85 die Invarianten der Tabelle unten |
 
-Der Startkorpus (`core/tests/fuzz/corpus/<ziel>/`, 19 Dateien, 78 kB) ist erzeugt: `core/tools/make_fuzz_corpus.py`
+Der Startkorpus (`core/tests/fuzz/corpus/<ziel>/`, 23 Dateien, 207 kB) ist erzeugt: `core/tools/make_fuzz_corpus.py`
 schreibt kleine WAV-Dateien (8/16/24 Bit, Float, Mono/Stereo), beschädigte WAV-Köpfe, die ersten 1500 Bytes des
 eigenen Testaudios und Befehlsprogramme; keine fremden Audiodateien. Gefundene Eingaben liegen in
 `core/tests/fuzz/regressions/<ziel>/`. Beide Ordner laufen in **jedem** Build als `ctest`-Fall `fuzz_<ziel>_replay`
@@ -555,9 +555,57 @@ aus, mit leerem Arbeitskorpus und festem Seed (1, 2, 11, 12, 13):
 | nachher (#66) | 2158, 2668, 3178, 3198, 3354 | 3178 |
 
 Die Abdeckung blieb gleich oder stieg (cov 2367–2400 vorher, 2406–2462 nachher). Alle 29 Funktionen der C-API, die
-`fuzz_capi` aufruft, erreicht schon der Startkorpus allein; geprüft mit
+`fuzz_capi` damals aufrief (seit #85 sind es 43), erreicht schon der Startkorpus allein; geprüft mit
 `core/build-fuzz/fuzz_capi -runs=0 -print_coverage=1 core/tests/fuzz/regressions/capi core/tests/fuzz/corpus/capi`
 (jede Funktion als `COVERED_FUNC`). Seit #86 prüft das der Test `fuzz_capi_reached` in jedem Build.
+
+**Übrige Web-API im Fuzzing (#85).** `fuzz_capi` ruft seit #85 auch die 14 Funktionen auf, die vorher nur
+Unit- und Referenztests erreichten. Die neuen Befehle stehen hinten in der Befehlsliste (`Op` in `fuzz_capi.cpp`),
+damit die eingecheckten Programme ihre Bedeutung behalten; nur in `regressions/capi/nonfinite_arguments` wurden 9
+Befehlsbytes auf ihren bisherigen Wert modulo 20 umgeschrieben (gleiche Befehle, gleiche Argumente). Argumente kommen
+aus `anyRate` (übliche Rate; unter `WP_MIN_SAMPLE_RATE` bis `INT_MIN`; über 96 kHz bis 768 kHz, dem Höchstwert eines
+Web-Audio-`AudioContext`; jeder `int` bis `INT_MAX`), `anyCount` (plausibel, negativ bis −2³¹ + 1, jeder `int`) und
+Samples mit NaN, ±unendlich und 3·10³⁸. Fehlercodes gelten als dokumentiert, wenn sie zwischen `WP_OK` und
+`WP_ERR_UNSUPPORTED_SAMPLE_RATE` liegen. Unter ASan/UBSan (`make fuzz`, `make sanitize`) ist zudem jeder
+Speicherfehler und jedes undefinierte Verhalten ein Fund.
+
+| Funktion | Invarianten |
+|---|---|
+| `wp_web_track_decode` | NULL genau dann, wenn `*err` ≠ `WP_OK`; `*err` dokumentiert (auch ohne `err` kein Absturz); Rate unter `WP_MIN_SAMPLE_RATE` ergibt `WP_ERR_UNSUPPORTED_SAMPLE_RATE`; Daten NULL ergibt NULL |
+| `wp_web_track_convert` | wie oben; Rate zu klein: `WP_ERR_UNSUPPORTED_SAMPLE_RATE` (vor allem anderen), sonst ohne Daten, Kanäle < 1 oder Frames < 1 `WP_ERR_INVALID_ARGUMENT`; NaN und unendlich im Eingang kommen endlich heraus |
+| `wp_web_track_frames`, `_duration`, `_data` | für jede Spur: mindestens 1 Frame, Dauer = Frames / Rate (endlich, > 0), Daten nicht NULL, jedes der Frames × 2 Samples endlich und höchstens ±8; für NULL: 0, 0,0 und NULL |
+| `wp_web_track_waveform` | `WP_OK` oder `WP_ERR_INVALID_ARGUMENT` (immer bei NULL); bei `WP_OK` jedes Paar endlich mit Min ≤ Max |
+| `wp_web_track_free` | gibt frei (ASan meldet doppelte Freigabe und Lecks), NULL ist erlaubt |
+| `wp_web_pcm_begin` | Frames < 1: `WP_ERR_INVALID_ARGUMENT`, sonst `WP_OK` oder `WP_ERR_OUT_OF_MEMORY`; verwirft einen unfertigen Titel |
+| `wp_web_pcm_append` | genau dann `WP_OK`, wenn begonnen, Daten nicht NULL, 1 ≤ Frames ≤ noch angekündigte Frames; mehr wird abgewiesen, ohne zu lesen (der Puffer ist dann kleiner als angegeben, ASan sähe jedes Lesen) |
+| `wp_web_pcm_commit` | genau dann nicht `WP_ERR_INVALID_ARGUMENT`, wenn genau die angekündigten Frames kamen; bei `WP_OK` Dauer = Frames / Rate des Players, Position 0, pausiert, Wellenform `WP_ERR_INVALID_ARGUMENT` (die hat der Worker); sonst Dauer unverändert |
+| `wp_load_async` | dokumentierter Code; leerer Pfad `WP_ERR_INVALID_ARGUMENT`; bei einem Fehler meldet `wp_load_state` denselben Code; Zustand immer `WP_LOAD_*` oder dokumentierter Fehler, Fortschritt 0–1 |
+| `wp_load_wait` | dokumentierter Code, danach nie `WP_LOAD_RUNNING`; Ergebnis = Fehlercode des Zustands bzw. `WP_OK` |
+| `wp_file_duration` | endlich; > 0 oder ein dokumentierter Fehlercode (ganzzahlig); fehlende Datei `WP_ERR_FILE_NOT_FOUND`, leerer Pfad und NULL `WP_ERR_INVALID_ARGUMENT` |
+| alle mit NULL | Player, Spur oder Pfad NULL (Befehl `kNullArgs`): `WP_ERR_INVALID_ARGUMENT`, 0 oder NULL, kein Absturz |
+
+- **Wie die Web-App:** Ein Befehl übernimmt die aktuelle Spur in Stücken von 64–8255 Frames mit
+  `wp_web_pcm_begin/append/commit`, wie das AudioWorklet den Titel vom Worker übernimmt. Die einzelnen Befehle
+  `wp_web_pcm_*` laufen gegen ein Modell im Fuzzer (begonnen, angekündigt, angehängt), das jede Antwort vorhersagt.
+- **Laden ohne Warten:** Nach `wp_load_async` läuft das Laden weiter, während die folgenden Befehle rendern, seeken
+  oder neu laden (das bricht ab); am Ende wird der Player mit laufendem Laden zerstört. Jedes Laden schreibt eine
+  eigene Datei, weil das laufende die vorige noch lesen kann. Solange ein Laden läuft, veröffentlicht dessen Thread
+  Dauer und Position 0, ein Render-Block womöglich zugleich noch die alte Position. Bis nach dem Ende des Ladens ein
+  Block gerendert ist, entfallen deshalb die Prüfungen, die zwei Abfragen vergleichen (Position ≤ Dauer, Dauer
+  unverändert nach einem Fehler, Position 0 nach dem Laden).
+- **Grenzen der Argumente (Speicher):** Damit eine Eingabe unter den 2 GB von `make fuzz` bleibt, wandelt
+  `wp_web_track_convert` höchstens 4 × 96 000 Frames Ausgabe (bei hoher Zielrate kommen weniger Eingangsframes) und
+  bekommt höchstens 2²⁰ Samples, sonst NULL als Daten; `wp_web_track_decode` mit einer Rate über 768 kHz bekommt
+  eine erzeugte WAV-Datei mit 1–4 Frames statt der Eingabebytes, sonst würde eine ganze Datei bei `INT_MAX` Hz
+  Gigabytes. `wp_web_pcm_begin` reserviert höchstens 2²⁴ Frames (128 MiB). `wp_web_pcm_append` bekommt jede Zahl
+  bis `INT_MAX`, wenn sie über den angekündigten Frames liegt (Abweisung ohne Lesen), sonst höchstens 8192 Frames.
+- **Zählt als Laden (#66):** Dekodieren, Wandeln und `wp_load_async` zählen zu den höchstens 4 Ladebefehlen je
+  Eingabe; `wp_file_duration` liest nur den Kopf und zählt nicht.
+- **Durchsatz:** gemessen wie bei #66 (gleicher Mac, `make fuzz`-Build, je 60 s vom eingecheckten Korpus aus,
+  leerer Arbeitskorpus, Seeds 1, 2, 11, 12, 13): 4337, 3479, 1898, 4404, 3129 Eingaben pro Minute, Median 3479
+  (#66: 3178), ohne Fund; cov 2837–2890 (#66: 2406–2462). Ein eigenes Fuzz-Ziel braucht es deshalb nicht.
+- Startkorpus: `tracks`, `pcm_pieces`, `async_load` und `web_extremes` (INT_MAX, INT_MIN, NaN, zu viele Frames,
+  NULL-Puffer). `fuzz_capi_reached` meldet `43 of 43 C API functions reached`.
 
 **Erreichte Befehle im Korpus (#86).** Der `ctest`-Fall `fuzz_capi_reached` läuft in jedem Build (Release, Debug,
 Sanitizer, WASM unter Node.js), ohne libFuzzer und ohne Homebrew-Clang. Er spielt Regressionsfälle und Startkorpus

@@ -67,7 +67,12 @@ def decoder_corpus():
 # fuzz_capi: first byte picks the rate (index into 8000, 22050, 44100, 48000, 96000)
 (LOAD_ENCODED, LOAD_PCM, LOAD_FILE, PLAY, PAUSE, SEEK, RATE, LOOP, VOLUME, RENDER, RENDER_LONG,
  METRO_START, METRO_STOP, METRO_BPM, METRO_METER, METRO_SUBDIV, METRO_VOLUME, METRO_RAMP,
- METRO_RAMP_SEC, WAVEFORM) = range(20)
+ METRO_RAMP_SEC, WAVEFORM,
+ # #85
+ TRACK_DECODE, TRACK_CONVERT, TRACK_WAVEFORM, TRACK_FREE, TRACK_TO_PLAYER, PCM_BEGIN, PCM_APPEND,
+ PCM_COMMIT, LOAD_ASYNC, LOAD_WAIT, FILE_DURATION, NULL_ARGS) = range(32)
+# path kinds of LOAD_ASYNC and FILE_DURATION
+PATH_FILE, PATH_MISSING, PATH_EMPTY, PATH_FOLDER = range(4)
 
 
 def u16(v):
@@ -86,6 +91,34 @@ def sec(s):
 def raw(d):
     """Any double (kind >= 230)."""
     return bytes([255]) + struct.pack("<d", d)
+
+
+def i32(v):
+    return struct.pack("<i", v)
+
+
+def rate(index):
+    """anyRate: one of the usual rates (index into 8000, 22050, 44100, 48000, 96000)."""
+    return bytes([index])
+
+
+def raw_rate(v):
+    """anyRate: any int (kind >= 240)."""
+    return bytes([255]) + i32(v)
+
+
+def count(v):
+    """anyCount: a plausible count (kind < 200)."""
+    return bytes([0]) + u32(v)
+
+
+def raw_count(v):
+    """anyCount: any int (kind >= 230)."""
+    return bytes([255]) + i32(v)
+
+
+def with_bytes(data):
+    return u16(len(data)) + data
 
 
 def program(rate_index, *ops):
@@ -115,6 +148,43 @@ def capi_corpus():
                             (RATE, bytes([200]), struct.pack("<d", 1e-300)),
                             (VOLUME, bytes([200]), struct.pack("<f", 0.5)), (PLAY,),
                             (RENDER_LONG, bytes([8])), (PAUSE,), (RENDER, u16(0))),
+        # #85: tracks of the loading worker, taken over by the player as the web app does
+        "tracks": program(3, (TRACK_DECODE, rate(3), bytes([0]), with_bytes(tone)),
+                          (TRACK_WAVEFORM, sec(0), sec(2), bytes([64])),
+                          (TRACK_TO_PLAYER, u16(4000)), (PLAY,), (RENDER_LONG, bytes([8])),
+                          (TRACK_CONVERT, count(2), count(12000), rate(2), rate(3), bytes([1])),
+                          (TRACK_TO_PLAYER, u16(100)), (TRACK_FREE,),
+                          (TRACK_WAVEFORM, sec(0), sec(1), bytes([8]))),
+        # #85: PCM piece by piece, complete and incomplete
+        "pcm_pieces": program(2, (PCM_BEGIN, count(10000)), (PCM_APPEND, count(8192), bytes([0])),
+                              (PCM_APPEND, count(1808), bytes([0])), (PCM_COMMIT,), (PLAY,),
+                              (RENDER_LONG, bytes([4])), (PCM_APPEND, count(10), bytes([0])),
+                              (PCM_BEGIN, count(100)), (PCM_APPEND, count(50), bytes([0])),
+                              (PCM_COMMIT,)),
+        # #85: loading without waiting, rendering meanwhile, file duration, NULL arguments; the last
+        # load is still running when the player is destroyed
+        "async_load": program(1, (LOAD_ASYNC, bytes([PATH_FILE]), with_bytes(tone)),
+                              (PLAY,), (RENDER_LONG, bytes([4])), (LOAD_WAIT,), (PLAY,),
+                              (RENDER_LONG, bytes([4])),
+                              (FILE_DURATION, bytes([PATH_FILE]), with_bytes(tone)),
+                              (FILE_DURATION, bytes([PATH_MISSING]), u16(0)),
+                              (LOAD_ASYNC, bytes([PATH_MISSING]), u16(0)), (LOAD_WAIT,),
+                              (NULL_ARGS,), (LOAD_ASYNC, bytes([PATH_FILE]), with_bytes(tone))),
+        # #85: extreme arguments: rates INT_MAX and INT_MIN, NaN samples, counts beyond the
+        # announced frames, NULL buffers
+        "web_extremes": program(4, (TRACK_DECODE, raw_rate(2**31 - 1), bytes([3]), u16(0)),
+                                (TRACK_CONVERT, raw_count(-1), raw_count(2**31 - 1),
+                                 raw_rate(-2**31), rate(2), bytes([0])),
+                                (TRACK_CONVERT, count(1), count(500), rate(0),
+                                 raw_rate(2**31 - 1), bytes([1])),
+                                (TRACK_WAVEFORM, raw(float("nan")), raw(float("inf")), bytes([64])),
+                                (PCM_BEGIN, raw_count(2**31 - 1)),
+                                (PCM_APPEND, raw_count(2**31 - 1), bytes([0])),
+                                (PCM_APPEND, count(1), bytes([0x80])), (PCM_COMMIT,),
+                                (PCM_BEGIN, raw_count(-2**31)), (PCM_COMMIT,),
+                                (FILE_DURATION, bytes([PATH_FOLDER]), u16(0)),
+                                (FILE_DURATION, bytes([PATH_EMPTY]), u16(0)),
+                                (LOAD_ASYNC, bytes([PATH_EMPTY]), u16(0)), (LOAD_WAIT,)),
     }
 
 
