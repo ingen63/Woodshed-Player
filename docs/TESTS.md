@@ -64,7 +64,7 @@ zugeordnet.
 | Render-Pfad ohne Speicheranforderung und ohne Sperre, Befehle aus vielen Threads | vorhanden: `engine_tests.cpp` (`renderDoesNotAllocate`, `commandsFromManyThreadsWhileRendering`, Queue-Fälle), `realtime_tests.cpp` (#57/AK4, `Player::render` mit Tempo, Loop, Metronom), `player_tests.cpp` (`controlFromSecondThreadWhileRendering`, #57/AK2) | – |
 | Wellenform (Minimum/Maximum je Abschnitt, Grenzen) | vorhanden: `waveform_tests.cpp`, `wp_waveform_ffi_test.dart`, `web_binding_test.dart` (#34/AK3) | – |
 | Seek auf t beginnt bei Sample round(t × Abtastrate); Pause und Fortsetzen ohne verlorenes Sample | vorhanden: `reference_tests.cpp` (#9/AK3, Rampe, t knapp unter und über einem halben Sample, im Stand und beim Spielen) | – |
-| Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | vorhanden: `player_tests.cpp` (`truncatedAndWrongAudioFiles`, #10/AK3), `core/tests/fuzz/` mit Wiederholung von Korpus und Regressionsfällen in jedem Build (`fuzz_*_replay`), `make fuzz` (#10/AK4), dieselben Eingaben gegen den WASM-Kern (`make test-wasm`, `make fuzz-wasm`, #67; Funde mit `make fuzz-wasm-findings`, #88) | – |
+| Abgeschnittene oder falsche Audiodateien, Fuzzing von Decoder und C-API | vorhanden: `player_tests.cpp` (`truncatedAndWrongAudioFiles`, #10/AK3), `core/tests/fuzz/` mit Wiederholung von Korpus und Regressionsfällen in jedem Build (`fuzz_*_replay`, erreichte Befehle `fuzz_capi_reached`, #86), `make fuzz` (#10/AK4), dieselben Eingaben gegen den WASM-Kern (`make test-wasm`, `make fuzz-wasm`, #67; Funde mit `make fuzz-wasm-findings`, #88) | – |
 | AddressSanitizer, UBSan, ThreadSanitizer | vorhanden: `make sanitize`, `make sanitize-thread`, Selbsttest `tests/sanitizer/selftest.cpp`, Workflow `test-quality.yml` (#57) | – |
 | Lange Datei (60 min): Laden, Wellenform, Rendern, Spitzenspeicher | vorhanden, nächtlich: `core/tests/bench_tests.cpp` (`bench_long_file`, #59/AK2, Grenze #75/AK2), `make bench` | – |
 | Lange Titel (über 5 min): Länge aus dem Dateikopf einmal reservieren, Rückfall bei `bad_alloc`, falsche Längenangabe | vorhanden: `player_tests.cpp` (`longTitleReservesHeaderLength`, #75/AK1; `longTitleWithWrongHeaderLength`, #75/AK3), nächtlich `bench_tests.cpp` (`bench_reserve_fallback`, #75/AK1) | – |
@@ -557,7 +557,25 @@ aus, mit leerem Arbeitskorpus und festem Seed (1, 2, 11, 12, 13):
 Die Abdeckung blieb gleich oder stieg (cov 2367–2400 vorher, 2406–2462 nachher). Alle 29 Funktionen der C-API, die
 `fuzz_capi` aufruft, erreicht schon der Startkorpus allein; geprüft mit
 `core/build-fuzz/fuzz_capi -runs=0 -print_coverage=1 core/tests/fuzz/regressions/capi core/tests/fuzz/corpus/capi`
-(jede Funktion als `COVERED_FUNC`).
+(jede Funktion als `COVERED_FUNC`). Seit #86 prüft das der Test `fuzz_capi_reached` in jedem Build.
+
+**Erreichte Befehle im Korpus (#86).** Der `ctest`-Fall `fuzz_capi_reached` läuft in jedem Build (Release, Debug,
+Sanitizer, WASM unter Node.js), ohne libFuzzer und ohne Homebrew-Clang. Er spielt Regressionsfälle und Startkorpus
+von `fuzz_capi` ab (`fuzz_capi_replay --reached core/tests/fuzz/fuzz_capi.cpp …`) und schlägt fehl, wenn eine
+Funktion der C-API, die `fuzz_capi` aufruft, von keiner Eingabe erreicht wird; jede fehlende Funktion steht als
+`C API function not reached by any input: wp_…` im Protokoll, dazu `N of M C API functions reached`.
+
+- Jeder Aufruf der C-API in `fuzz_capi.cpp` geht über `WP_FUZZ_CALL(wp_…, …)` (`fuzz_util.hpp`). Das Makro merkt
+  sich den Namen, aber nur beim Abspielen mit `--reached`; im libFuzzer-Programm kostet es eine Verzweigung.
+- Welche Funktionen `fuzz_capi` aufruft, liest der Test aus dem Quelltext (Kommentare ausgenommen), es gibt keine
+  feste Liste: Ein neuer Befehl (etwa für #85) wird automatisch mitgeprüft. Ein Aufruf `wp_…(` ohne
+  `WP_FUZZ_CALL` lässt den Test ebenfalls fehlschlagen (`called without WP_FUZZ_CALL`), weil er nicht prüfbar wäre.
+- Schlägt der Test nach einem neuen Befehl fehl, braucht der Startkorpus ein Programm mit diesem Befehl
+  (`core/tools/make_fuzz_corpus.py`).
+
+Von Hand gezeigt (21.11.2026, nicht eingecheckt): Ohne den letzten Befehl (Wellenform) in `corpus/capi/encoded_wav`
+meldet der Test `wp_waveform` und `28 of 29`, ohne den letzten Befehl (Metronom aus) in `corpus/capi/metronome`
+meldet er `wp_metro_stop`.
 
 **Golden-Dateien (AK5).** `app/test/golden/` hält `library.json` jeder Version mit erfundenen Titeln
 (`README.md` dort): Swift `[Track]`, Swift `{folders, tracks}`, Format 2 von #36 (ein Feld `loop`, erzeugt mit dem

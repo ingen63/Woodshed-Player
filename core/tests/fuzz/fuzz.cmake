@@ -25,3 +25,8 @@ foreach(name decoder capi)
     wp_strict_warnings(fuzz_${name})
   endif()
 endforeach()
+# #86/AK1, AK2: the checked-in capi inputs together reach every C API function fuzz_capi calls (read from its
+# source, see replay_main.cpp); the test names each function no input reaches.
+add_test(NAME fuzz_capi_reached
+  COMMAND fuzz_capi_replay --reached ${WP_FUZZ_DIR}/fuzz_capi.cpp ${WP_FUZZ_DIR}/regressions/capi
+    ${WP_FUZZ_DIR}/corpus/capi)

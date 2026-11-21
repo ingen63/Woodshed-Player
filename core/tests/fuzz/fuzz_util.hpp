@@ -1,5 +1,6 @@
 // Helpers of the fuzz targets (#10/AK4): invariant checks that abort (so libFuzzer and the replay
-// tests see a finding), a reader for the input bytes and a temporary file per process.
+// tests see a finding), a reader for the input bytes, a temporary file per process and a record of
+// the C API functions reached (#86).
 #pragma once
 
 #include <cstddef>
@@ -7,6 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <set>
 #include <string>
 
 #if defined(_WIN32)
@@ -26,7 +28,30 @@
     }                                                                                              \
   } while (0)
 
+// #86: calls a function of the C API and notes its name, so the replay test fuzz_capi_reached can
+// tell which functions the checked-in inputs reach. The replay program finds every function a
+// target calls by these calls in its source; a call to wp_* without WP_FUZZ_CALL fails that test.
+#define WP_FUZZ_CALL(fn, ...) (::wp::fuzz::reached(#fn), fn(__VA_ARGS__))
+
 namespace wp::fuzz {
+
+// #86: names of the C API functions reached so far; recorded only while `tracking` is set (replay
+// with --reached), so the libFuzzer programs pay a single branch per call.
+struct ReachedApi {
+  bool tracking = false;
+  std::set<std::string> names;
+};
+
+inline ReachedApi &reachedApi() {
+  static ReachedApi r;
+  return r;
+}
+
+inline void reached(const char *name) {
+  ReachedApi &r = reachedApi();
+  if (r.tracking)
+    r.names.insert(name);
+}
 
 // Reads values from the input; past the end it yields zeros, so every input is a valid program.
 class Reader {
