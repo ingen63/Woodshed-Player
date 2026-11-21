@@ -1015,7 +1015,7 @@ er belegt) oder `#61`:
 
 | Bereich | Tests | Was sie prüfen |
 |---|---|---|
-| `metadata.dart` | `app/test/metadata_test.dart` (Gruppen «#16/AK4 … (#61)») | ID3v2-Kodierungen (UTF-16 mit und ohne BOM, ungerade Länge, Terminator), Struktur (Versionen, Frame-Grenzen, erweiterter Kopf, Unsynchronisation, Kompression), Bilder, FLAC (Blockgrenzen, Kommentarzahl, Bild mit Beschreibung), WAV (LIST/INFO, Füllbytes, id3-Chunk), beschädigter Block am Ende (#91) |
+| `metadata.dart` | `app/test/metadata_test.dart` (Gruppen «#16/AK4 … (#61)») | ID3v2-Kodierungen (UTF-16 mit und ohne BOM, ungerade Länge, Terminator), Struktur (Versionen, Frame-Grenzen, erweiterter Kopf, Unsynchronisation, Kompression), Bilder, FLAC (Blockgrenzen, Kommentarzahl, Bild mit Beschreibung), WAV (LIST/INFO, Füllbytes, id3-Chunk), beschädigter Block am Ende (#91), beschädigtes ID3v2-Tag am Anfang (#96) |
 | `stamps.dart` | `app/test/stamps_test.dart` | Stempel (UTC, Vergleich, `parse` und Grenzen), Uhr (`observe`), JSON-Vergleich, Frist der Grabsteine genau 90 Tage |
 | `track.dart` | `app/test/track_rules_test.dart` | Loop-ID beim Verschieben und Anlegen, `LoopRange`, alte Einträge, Vorgaben fehlender geteilter Felder |
 | `library.dart` | `app/test/library_rules_test.dart` | Benachrichtigung bei jedem Laden, fehlende Dateien, Stempel nach Laden und Abgleich, Abwesenheit von Dateien, Audio aus der Cloud, Speichern (Entprellen mit der Testuhr von `testWidgets`, `flush`, `dispose`), Import, Ordner, Verschieben, Titel und Dauer |
@@ -1358,3 +1358,11 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     (`core/tests/reference_tests.cpp`, `sampleRateUpperLimit`, 96 000 Hz, 96 001 Hz und `INT_MAX`), nativ und im
     WASM-Kern; `fuzz_capi` ruft Dekodieren und Wandeln ohne die Hilfsbegrenzung auf. Hätte gefangen werden müssen von
     `fuzz_capi` mit beliebigen Raten; bis #85 rief es Dekodieren und Wandeln in eine Spur nicht auf.
+36. 21.11.2026, #96 (aus #91): `readMetadata` (`app/lib/library/metadata.dart`) warf bei einem beschädigten
+    ID3v2-Tag am Dateianfang (erweiterter Kopf über das Tag hinaus, v2.4-Frame mit Längenangabe, aber kürzer als
+    4 Byte), und die App verwarf darauf alle Felder der Datei: die FLAC-Kommentare und das Bild hinter dem Tag, in MP3
+    das ID3v1-Tag am Ende und die schon gelesenen Frames des Tags selbst. Eine beschädigte Stelle beendet jetzt nur
+    das Lesen des ID3v2-Tags; die Frames davor, die FLAC-Blöcke und das ID3v1-Tag bleiben. Hätte gefangen werden
+    müssen von `metadata_test.dart` (#16/AK4, #91), das beschädigte Blöcke nur in FLAC und im `id3 `-Chunk von WAV
+    prüfte. Test: Gruppe «#96 damaged ID3v2 tag at the start keeps the other fields» (`#96/AK1`, `#96/AK2`,
+    `#96/AK3`) in `metadata_test.dart`.

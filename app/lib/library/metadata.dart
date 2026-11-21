@@ -2,6 +2,7 @@
 // MP3 (ID3v2.2/2.3/2.4, ID3v1), FLAC (Vorbis-Kommentare, PICTURE) und WAV (LIST/INFO, id3-Block).
 // Fehlerhafte oder fehlende Angaben ergeben leere Felder, nie eine Ausnahme.
 // A damaged WAV chunk or FLAC block keeps the fields read before it (#91).
+// A damaged ID3v2 tag keeps its earlier frames, FLAC blocks and ID3v1 (#96).
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -145,57 +146,63 @@ TrackMetadata _readId3v2(Uint8List bytes, int at) {
     (at + 10 + size).clamp(0, bytes.length),
   );
   if (flags & 0x80 != 0 && major < 4) tag = _deunsync(tag);
-  var pos = 0;
-  if (flags & 0x40 != 0 && major >= 3) {
-    pos = major == 3 ? 4 + _be(tag, 0, 4) : _syncsafe(tag, 0);
-  }
 
   String? title, artist, album;
   Uint8List? artwork;
   var artworkIsFront = false;
   final idLen = major == 2 ? 3 : 4;
   final headerLen = major == 2 ? 6 : 10;
-  while (pos + headerLen <= tag.length) {
-    final id = String.fromCharCodes(tag.sublist(pos, pos + idLen));
-    if (id.codeUnitAt(0) == 0) break; // Auffüllung
-    final frameSize = switch (major) {
-      2 => _be(tag, pos + 3, 3),
-      3 => _be(tag, pos + 4, 4),
-      _ => _syncsafe(tag, pos + 4),
-    };
-    final formatFlags = major == 2 ? 0 : tag[pos + 9];
-    final dataStart = pos + headerLen;
-    final dataEnd = dataStart + frameSize;
-    if (frameSize <= 0 || dataEnd > tag.length) break;
-    pos = dataEnd;
-
-    var data = Uint8List.sublistView(tag, dataStart, dataEnd);
-    if (major == 4) {
-      if (formatFlags & 0x0c != 0) continue; // komprimiert oder verschlüsselt
-      if (formatFlags & 0x01 != 0) {
-        data = Uint8List.sublistView(data, 4); // Längenangabe
-      }
-      if (formatFlags & 0x02 != 0) data = _deunsync(data);
-    } else if (major == 3 && formatFlags & 0xc0 != 0) {
-      continue; // komprimiert oder verschlüsselt
+  // A damaged extended header or frame ends the tag (#96): the fields read
+  // so far stay, and the caller still reads FLAC blocks or the ID3v1 tag.
+  try {
+    var pos = 0;
+    if (flags & 0x40 != 0 && major >= 3) {
+      pos = major == 3 ? 4 + _be(tag, 0, 4) : _syncsafe(tag, 0);
     }
-    if (data.isEmpty) continue;
+    while (pos + headerLen <= tag.length) {
+      final id = String.fromCharCodes(tag.sublist(pos, pos + idLen));
+      if (id.codeUnitAt(0) == 0) break; // padding
+      final frameSize = switch (major) {
+        2 => _be(tag, pos + 3, 3),
+        3 => _be(tag, pos + 4, 4),
+        _ => _syncsafe(tag, pos + 4),
+      };
+      final formatFlags = major == 2 ? 0 : tag[pos + 9];
+      final dataStart = pos + headerLen;
+      final dataEnd = dataStart + frameSize;
+      if (frameSize <= 0 || dataEnd > tag.length) break;
+      pos = dataEnd;
 
-    switch (id) {
-      case 'TIT2' || 'TT2':
-        title ??= _text(data);
-      case 'TPE1' || 'TP1':
-        artist ??= _text(data);
-      case 'TALB' || 'TAL':
-        album ??= _text(data);
-      case 'APIC' || 'PIC':
-        final pic = _picture(data, id == 'PIC');
-        if (pic != null &&
-            (artwork == null || (!artworkIsFront && pic.$2 == 3))) {
-          artwork = pic.$1;
-          artworkIsFront = pic.$2 == 3;
+      var data = Uint8List.sublistView(tag, dataStart, dataEnd);
+      if (major == 4) {
+        if (formatFlags & 0x0c != 0) continue; // compressed or encrypted
+        if (formatFlags & 0x01 != 0) {
+          data = Uint8List.sublistView(data, 4); // data length indicator
         }
+        if (formatFlags & 0x02 != 0) data = _deunsync(data);
+      } else if (major == 3 && formatFlags & 0xc0 != 0) {
+        continue; // compressed or encrypted
+      }
+      if (data.isEmpty) continue;
+
+      switch (id) {
+        case 'TIT2' || 'TT2':
+          title ??= _text(data);
+        case 'TPE1' || 'TP1':
+          artist ??= _text(data);
+        case 'TALB' || 'TAL':
+          album ??= _text(data);
+        case 'APIC' || 'PIC':
+          final pic = _picture(data, id == 'PIC');
+          if (pic != null &&
+              (artwork == null || (!artworkIsFront && pic.$2 == 3))) {
+            artwork = pic.$1;
+            artworkIsFront = pic.$2 == 3;
+          }
+      }
     }
+  } catch (_) {
+    // keep the fields read before the damaged part
   }
   return TrackMetadata(
     title: title,

@@ -884,4 +884,77 @@ void main() {
       expect(m.artwork, cover);
     });
   });
+
+  group('#96 damaged ID3v2 tag at the start keeps the other fields', () {
+    /// ID3v2 tags that are damaged right at the start, so no frame is read.
+    final damaged = <Uint8List>[
+      rawId3(3, [0, 0], flags: 0x40), // extended header beyond the tag
+      rawId3(4, [0, 0], flags: 0x40), // the same in v2.4
+      // v2.4 frame with a data length indicator but shorter than 4 bytes
+      rawId3(4, frame(4, 'TIT2', [0, 1], flags: 0x01)),
+    ];
+
+    test('#96/AK1 FLAC: a damaged ID3v2 tag before fLaC keeps the blocks', () {
+      for (final tag in damaged) {
+        final m = readMetadata(
+          Uint8List.fromList([
+            ...tag,
+            ...flac(
+              comments: ['TITLE=Aus FLAC', 'ARTIST=Band'],
+              pictures: [(3, cover)],
+            ),
+          ]),
+        );
+        expect(m.title, 'Aus FLAC', reason: '$tag');
+        expect(m.artist, 'Band', reason: '$tag');
+        expect(m.artwork, cover, reason: '$tag');
+      }
+    });
+
+    test('#96/AK2 MP3: a damaged ID3v2 tag at the start keeps ID3v1', () {
+      String field(String s) => s.padRight(30, '\u0000');
+      final v1 = latin1.encode(
+        'TAG${field('V1 Titel')}${field('V1 Band')}${field('V1 Album')}'
+            .padRight(128, '\u0000'),
+      );
+      for (final tag in damaged) {
+        final m = readMetadata(
+          Uint8List.fromList([
+            ...tag,
+            0xff, 0xfb, 0x90, 0x00, // MP3 frame header
+            ...List.filled(100, 0),
+            ...v1,
+          ]),
+        );
+        expect(m.title, 'V1 Titel', reason: '$tag');
+        expect(m.artist, 'V1 Band', reason: '$tag');
+        expect(m.album, 'V1 Album', reason: '$tag');
+      }
+    });
+
+    test('#96/AK3 frames before the damaged frame are kept', () {
+      final tag = rawId3(4, [
+        ...frame(4, 'TIT2', text(0, 'Davor')),
+        ...frame(4, 'APIC', apic(3, cover)),
+        ...frame(4, 'TPE1', [0, 1], flags: 0x01), // damaged
+        ...frame(4, 'TALB', text(0, 'Danach')),
+      ]);
+      final m = readMetadata(tag);
+      expect(m.title, 'Davor');
+      expect(m.artwork, cover);
+      expect(m.artist, isNull);
+      expect(m.album, isNull);
+
+      // Before FLAC the frames read so far fill fields the blocks lack.
+      final f = readMetadata(
+        Uint8List.fromList([
+          ...tag,
+          ...flac(comments: ['ARTIST=Band']),
+        ]),
+      );
+      expect(f.title, 'Davor');
+      expect(f.artist, 'Band');
+      expect(f.artwork, cover);
+    });
+  });
 }

@@ -212,6 +212,10 @@ app/lib/library/metadata.dart | dart_false_to_true | var artworkIsFront = false;
 # gleichwertig: Bleibt genau ein Frame-Kopf übrig, liegen seine Daten hinter dem Tag (Grösse > 0)
 # oder er ist leer (Grösse 0); beides beendet das Lesen wie das Ende der Schleife.
 app/lib/library/metadata.dart | dart_le_to_lt | while (pos + headerLen <= tag.length) {
+# gleichwertig: Läuft die Schleife weiter, obwohl kein ganzer Frame-Kopf mehr im Tag steht, liest sie
+# den Kopf über das Tagende hinaus und wirft oder bricht an der Auffüllung ab. Die Ausnahme beendet das
+# Lesen des Tags mit den schon gelesenen Feldern (#96), wie das Ende der Schleife.
+app/lib/library/metadata.dart | dart_add_to_sub | while (pos + headerLen <= tag.length) {
 # gleichwertig: Ein Blockkopf genau am Dateiende gehört zu einem leeren Block (sonst reicht er über das
 # Ende und das Lesen endet). Ein leerer Kommentar- oder Bildblock ist beschädigt und beendet das Lesen,
 # andere Blöcke werden übergangen; die schon gelesenen Felder bleiben in beiden Fällen (#91).
