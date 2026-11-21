@@ -806,4 +806,82 @@ void main() {
       expect(readMetadata(wav([('junk', tag)])).title, isNull);
     });
   });
+
+  group('#91 damaged block at the end keeps the fields read so far', () {
+    test('#91/AK1 WAV: a damaged or cut id3 chunk keeps LIST/INFO', () {
+      final tag = id3(3, [('TIT2', text(0, 'Aus ID3'))]);
+      final broken = <List<int>>[
+        'ID3'.codeUnits, // only the mark
+        [...'ID3'.codeUnits, 3, 0], // header cut before the flags
+        rawId3(3, [0, 0], flags: 0x40), // extended header beyond the tag
+        for (var n = 3; n < 13; n++) tag.sublist(0, n), // header cut
+      ];
+      for (final chunk in broken) {
+        for (final pad in [false, true]) {
+          // Without pad the chunk ends exactly at the end of the file.
+          final f = wav([
+            (
+              'LIST',
+              info([
+                ('INAM', utf8.encode('Aus INFO')),
+                ('IART', utf8.encode('Band')),
+              ]),
+            ),
+            ('id3 ', chunk),
+          ]);
+          final bytes = chunk.length.isOdd && !pad
+              ? Uint8List.sublistView(f, 0, f.length - 1)
+              : f;
+          final m = readMetadata(bytes);
+          expect(m.title, 'Aus INFO', reason: '$chunk pad $pad');
+          expect(m.artist, 'Band', reason: '$chunk pad $pad');
+        }
+      }
+    });
+
+    test('#91/AK1 WAV: chunks after a damaged id3 chunk are still read', () {
+      final m = readMetadata(
+        wav([
+          ('id3 ', 'ID3'.codeUnits),
+          ('LIST', info([('INAM', utf8.encode('Danach'))])),
+        ]),
+      );
+      expect(m.title, 'Danach');
+    });
+
+    test('#91/AK2 FLAC: an empty last comment or picture block header at '
+        'the end keeps earlier blocks', () {
+      for (final type in [4, 6]) {
+        final f = rawFlac(
+          [
+            (0, List.filled(34, 0)),
+            (4, vorbis([utf8.encode('TITLE=Davor')])),
+            (6, flacPicture(3, cover)),
+          ],
+          lastFlag: false,
+          tail: [type | 0x80, 0, 0, 0],
+        );
+        final m = readMetadata(f);
+        expect(m.title, 'Davor', reason: 'type $type');
+        expect(m.artwork, cover, reason: 'type $type');
+      }
+    });
+
+    test('#91/AK2 FLAC: a damaged comment block keeps the entries before', () {
+      final comments = vorbis([
+        utf8.encode('TITLE=Erste'),
+        utf8.encode('ARTIST=Band'),
+      ]);
+      // The second entry claims more bytes than the file holds.
+      final f = rawFlac([
+        (0, List.filled(34, 0)),
+        (6, flacPicture(3, cover)),
+        (4, [...comments.sublist(0, comments.length - 15), ...le32(9999)]),
+      ]);
+      final m = readMetadata(f);
+      expect(m.title, 'Erste');
+      expect(m.artist, isNull);
+      expect(m.artwork, cover);
+    });
+  });
 }

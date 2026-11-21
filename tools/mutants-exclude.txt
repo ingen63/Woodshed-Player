@@ -194,8 +194,10 @@ core/web/wp_core_web.cpp | cxx_remove_void_call | p->pending.reset();
 
 # ---- app/lib/library/metadata.dart (#61) ----
 # Grenzfall: Nur wenn die gesuchte Kennung genau am Ende der Daten steht. Dann folgt nichts Lesbares:
-# «fLaC» ohne Blöcke, «WAVE» ohne Chunks, «INFO» ohne Einträge; ein id3-Chunk aus genau «ID3» ist
-# ohnehin kein lesbares Tag (das unveränderte Lesen bricht dort ab und liefert leere Felder).
+# «fLaC» ohne Blöcke, «WAVE» ohne Chunks, «INFO» ohne Einträge; ein id3-Chunk aus genau «ID3» wird
+# übergangen oder bricht ab, beide Wege behalten die Felder aus LIST/INFO (#91). Anders wird es nur,
+# wenn ein ID3-Tag vor «fLaC» am Ende 128 Bytes vor dem Dateiende zufällig «TAG» enthält: Dann liest
+# der Mutant dort ein ID3v1-Tag.
 app/lib/library/metadata.dart | dart_lt_to_le | if (b.length < at + s.length) return false;
 # gleichwertig: Eine Datei unter oder genau bei 14 Bytes (ID3-Kopf von 10 Bytes und «fLaC») hat für
 # kein Feld Platz; beide Wege (FLAC nach ID3 bzw. ID3 allein) liefern leere Felder.
@@ -210,8 +212,9 @@ app/lib/library/metadata.dart | dart_false_to_true | var artworkIsFront = false;
 # gleichwertig: Bleibt genau ein Frame-Kopf übrig, liegen seine Daten hinter dem Tag (Grösse > 0)
 # oder er ist leer (Grösse 0); beides beendet das Lesen wie das Ende der Schleife.
 app/lib/library/metadata.dart | dart_le_to_lt | while (pos + headerLen <= tag.length) {
-# Grenzfall: Nur ein leerer Block, dessen 4 Bytes Kopf genau am Dateiende stehen. Er enthält kein
-# Feld; ein leerer Kommentar- oder Bildblock dort ist beschädigt (das unveränderte Lesen bricht ab).
+# gleichwertig: Ein Blockkopf genau am Dateiende gehört zu einem leeren Block (sonst reicht er über das
+# Ende und das Lesen endet). Ein leerer Kommentar- oder Bildblock ist beschädigt und beendet das Lesen,
+# andere Blöcke werden übergangen; die schon gelesenen Felder bleiben in beiden Fällen (#91).
 app/lib/library/metadata.dart | dart_le_to_lt | while (p + 4 <= b.length) {
 # Grenzfall: Nur eine Längenangabe, die genau am Ende des Kommentarblocks endet; ihr Wert läge
 # ausserhalb des Blocks (beschädigter Block).

@@ -1,6 +1,7 @@
 // Liest Titel, Künstler, Album und Cover aus Audiodateien (#16), ohne Abhängigkeiten:
 // MP3 (ID3v2.2/2.3/2.4, ID3v1), FLAC (Vorbis-Kommentare, PICTURE) und WAV (LIST/INFO, id3-Block).
 // Fehlerhafte oder fehlende Angaben ergeben leere Felder, nie eine Ausnahme.
+// A damaged WAV chunk or FLAC block keeps the fields read before it (#91).
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -257,42 +258,46 @@ TrackMetadata _readFlac(Uint8List b, int at) {
     final len = _be(b, p + 1, 3);
     final start = p + 4;
     if (start + len > b.length) break;
-    if (type == 4) {
-      var q = start;
-      q += 4 + _le32(b, q); // Hersteller
-      final count = _le32(b, q);
-      q += 4;
-      for (var i = 0; i < count && q + 4 <= start + len; i++) {
-        final l = _le32(b, q);
+    try {
+      if (type == 4) {
+        var q = start;
+        q += 4 + _le32(b, q); // Hersteller
+        final count = _le32(b, q);
         q += 4;
-        final entry = utf8.decode(b.sublist(q, q + l), allowMalformed: true);
-        q += l;
-        final eq = entry.indexOf('=');
-        if (eq < 0) continue;
-        final value = _clean(entry.substring(eq + 1));
-        switch (entry.substring(0, eq).toUpperCase()) {
-          case 'TITLE':
-            title ??= value;
-          case 'ARTIST':
-            artist ??= value;
-          case 'ALBUM':
-            album ??= value;
+        for (var i = 0; i < count && q + 4 <= start + len; i++) {
+          final l = _le32(b, q);
+          q += 4;
+          final entry = utf8.decode(b.sublist(q, q + l), allowMalformed: true);
+          q += l;
+          final eq = entry.indexOf('=');
+          if (eq < 0) continue;
+          final value = _clean(entry.substring(eq + 1));
+          switch (entry.substring(0, eq).toUpperCase()) {
+            case 'TITLE':
+              title ??= value;
+            case 'ARTIST':
+              artist ??= value;
+            case 'ALBUM':
+              album ??= value;
+          }
+        }
+      } else if (type == 6) {
+        var q = start;
+        final picType = _be(b, q, 4);
+        q += 4;
+        q += 4 + _be(b, q, 4); // MIME
+        q += 4 + _be(b, q, 4); // Beschreibung
+        q += 16; // Breite, Höhe, Farbtiefe, Farben
+        final dataLen = _be(b, q, 4);
+        q += 4;
+        if (q + dataLen <= start + len &&
+            (artwork == null || (!artworkIsFront && picType == 3))) {
+          artwork = Uint8List.fromList(b.sublist(q, q + dataLen));
+          artworkIsFront = picType == 3;
         }
       }
-    } else if (type == 6) {
-      var q = start;
-      final picType = _be(b, q, 4);
-      q += 4;
-      q += 4 + _be(b, q, 4); // MIME
-      q += 4 + _be(b, q, 4); // Beschreibung
-      q += 16; // Breite, Höhe, Farbtiefe, Farben
-      final dataLen = _be(b, q, 4);
-      q += 4;
-      if (q + dataLen <= start + len &&
-          (artwork == null || (!artworkIsFront && picType == 3))) {
-        artwork = Uint8List.fromList(b.sublist(q, q + dataLen));
-        artworkIsFront = picType == 3;
-      }
+    } catch (_) {
+      break; // damaged block (#91): keep the fields read so far
     }
     p = start + len;
     if (last) break;
@@ -341,7 +346,14 @@ TrackMetadata _readWav(Uint8List b) {
         TrackMetadata(title: title, artist: artist, album: album),
       );
     } else if ((id == 'id3 ' || id == 'ID3 ') && _starts(b, start, 'ID3')) {
-      meta = _readId3v2(Uint8List.sublistView(b, start, end), 0).fillFrom(meta);
+      try {
+        meta = _readId3v2(
+          Uint8List.sublistView(b, start, end),
+          0,
+        ).fillFrom(meta);
+      } catch (_) {
+        // Damaged or cut ID3 tag (#91): keep the fields from LIST/INFO.
+      }
     }
     p = start + len + (len & 1);
   }

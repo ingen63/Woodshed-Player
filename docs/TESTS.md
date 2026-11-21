@@ -926,7 +926,7 @@ er belegt) oder `#61`:
 
 | Bereich | Tests | Was sie prüfen |
 |---|---|---|
-| `metadata.dart` | `app/test/metadata_test.dart` (Gruppen «#16/AK4 … (#61)») | ID3v2-Kodierungen (UTF-16 mit und ohne BOM, ungerade Länge, Terminator), Struktur (Versionen, Frame-Grenzen, erweiterter Kopf, Unsynchronisation, Kompression), Bilder, FLAC (Blockgrenzen, Kommentarzahl, Bild mit Beschreibung), WAV (LIST/INFO, Füllbytes, id3-Chunk) |
+| `metadata.dart` | `app/test/metadata_test.dart` (Gruppen «#16/AK4 … (#61)») | ID3v2-Kodierungen (UTF-16 mit und ohne BOM, ungerade Länge, Terminator), Struktur (Versionen, Frame-Grenzen, erweiterter Kopf, Unsynchronisation, Kompression), Bilder, FLAC (Blockgrenzen, Kommentarzahl, Bild mit Beschreibung), WAV (LIST/INFO, Füllbytes, id3-Chunk), beschädigter Block am Ende (#91) |
 | `stamps.dart` | `app/test/stamps_test.dart` | Stempel (UTC, Vergleich, `parse` und Grenzen), Uhr (`observe`), JSON-Vergleich, Frist der Grabsteine genau 90 Tage |
 | `track.dart` | `app/test/track_rules_test.dart` | Loop-ID beim Verschieben und Anlegen, `LoopRange`, alte Einträge, Vorgaben fehlender geteilter Felder |
 | `library.dart` | `app/test/library_rules_test.dart` | Benachrichtigung bei jedem Laden, fehlende Dateien, Stempel nach Laden und Abgleich, Abwesenheit von Dateien, Audio aus der Cloud, Speichern (Entprellen mit der Testuhr von `testWidgets`, `flush`, `dispose`), Import, Ordner, Verschieben, Titel und Dauer |
@@ -1221,3 +1221,11 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     `library_rules_test.dart` (500 × 10 ms); beide warten jetzt ebenfalls mit `eventually`. Die Regelprüfung von
     #13/AK2 deckte `app/test/` nicht ab. Test: «#78/AK2 widget tests wait for states, not in fixed-count loops» in `ui_test_rules_test.dart`, mit
     den alten Schleifen als Regressionsfall.
+30. 21.11.2026, #91 (aus #61): `readMetadata` (`app/lib/library/metadata.dart`) warf bei einem beschädigten Block
+    am Dateiende, und die App verwarf darauf alle Felder der Datei: in WAV ein `id3 `-Chunk aus nur «ID3» oder mit
+    abgeschnittenem Tag nach einem lesbaren `LIST/INFO`, in FLAC der 4 Byte lange Kopf eines leeren Kommentar- oder
+    Bildblocks am Ende. Die Mutanten `_starts` (`<` → `<=`) und `_readFlac` (`p + 4 <= b.length` → `<`) lieferten
+    dort mehr Felder als das Original und waren als Grenzfall ausgeschlossen; der Test von #16/AK4 prüfte abgeschnittene
+    Tags nur auf «keine Ausnahme». Ein beschädigter `id3 `-Chunk wird jetzt übergangen, ein beschädigter FLAC-Block
+    beendet das Lesen; die bis dahin gelesenen Felder bleiben. Die beiden Ausschlüsse sind neu begründet. Test:
+    Gruppe «#91 damaged block at the end keeps the fields read so far» (`#91/AK1`, `#91/AK2`) in `metadata_test.dart`.
