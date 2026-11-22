@@ -795,7 +795,7 @@ Version gibt einen neuen Schlüssel und wird beim nächsten Lauf neu installiert
 - **Lokal geprüft** werden die Workflows mit `actionlint` und ShellCheck (`make lint`, #64) und über
   `test_quality_workflow_test.dart`. Ob alle Jobs auf den Runnern laufen, zeigen erst die Läufe nach dem Push.
 
-**Verbrauch an Minuten** (#13/AK10, Schätzung vom 20.11.2026, nach den ersten Läufen nachführen). Annahmen: ungefähr
+**Verbrauch an Minuten** (#13/AK10, Schätzung vom 20.11.2026, `contract` gemessen am 22.11.2026, die übrigen Jobs nach den ersten Läufen nachführen). Annahmen: ungefähr
 20 Nächte im Monat mit neuem Commit, 60 Pushes mit Code-Änderung, davon 20 mit Web-Änderung, 2 Läufe von Hand mit
 `nightly=true`. Lokal gemessen: Oberflächentests 0:45 min, Release-Build 0:50 min (warm); auf dem Runner ohne Cache
 deutlich länger angesetzt.
@@ -806,10 +806,10 @@ deutlich länger angesetzt.
 | `checks` | ≈ 15 | 60 | ≈ 900 Linux |
 | `web` | ≈ 10 | 20 | ≈ 200 Linux |
 | `sanitize`, `network-free` | ≈ 8 und 3 | 30 und 80 | ≈ 480 Linux |
-| `contract` (emsdk 3, aus dem Zwischenspeicher unter 1, #89; nativ 2, WASM 5) | ≈ 10 | 30 | ≈ 300 Linux |
+| `contract` (gemessen am 21. und 22.11.2026 auf GitHub, #80: emsdk aus dem Zwischenspeicher 8 s und 7 s, #89; nativ 21 s und 16 s, WASM 38 s und 34 s; gesamt 1:14 und 1:04 min, je Job auf ganze Minuten aufgerundet) | ≈ 2 | 30 | ≈ 60 Linux |
 | `sanitize-thread`, `fuzz` (2 × 20 min, dazu emsdk 3, aus dem Zwischenspeicher unter 1, und WASM 2, #67, #89), `property` | ≈ 10, 50, 10 | 22 | ≈ 1540 Linux |
 
-Das sind rund **530 macOS-Minuten** und rund **3400 Linux-Minuten** im Monat. Bei einem privaten Repository zählt
+Das sind rund **530 macOS-Minuten** und rund **3200 Linux-Minuten** im Monat (900 + 200 + 480 + 60 + 1540 = 3180). Bei einem privaten Repository zählt
 GitHub macOS-Minuten zehnfach: 530 × 10 = 5300 von 2000 Gratis-Minuten (GitHub Free), also über dem Kontingent; dann
 müssten die macOS-Läufe seltener werden (z. B. nur wöchentlich). Das Repository ist öffentlich (GitHub Pages), dort
 sind Standard-Runner kostenlos; die Grenze entfällt, die Schätzung bleibt als Richtwert.
