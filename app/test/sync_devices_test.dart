@@ -628,9 +628,10 @@ void main() {
         cloud.beforePut = (name) async {
           if (name == a.file) {
             // the storage writes the copy anew before it would be removed
+            // (same length, other content: compared byte by byte)
             cloud.putDirect(
               changing,
-              CloudSync.encodeDevice(other.library.state, a.id, 12, base.clock),
+              CloudSync.encodeDevice(other.library.state, a.id, 2, base.clock),
             );
           }
         };

@@ -1,4 +1,5 @@
 // #17: Zusammenspiel von Bibliothek, Player und Metronom ohne Oberfläche; #22 Drag & Drop über den Kanal.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -193,5 +194,15 @@ void main() {
       File('${dir.path}/lib/device.json').readAsStringSync(),
     ) as Map;
     expect((device['lastUsed'] as Map).keys, contains(a.id));
+
+    // #39/AK4: once the download got through, the row stops showing it before the track is loaded.
+    cloud.offline = false;
+    seen.clear();
+    unawaited(
+      app.controller.select(a),
+    ); // the fake core loads only on timer ticks
+    await until(() => app.player.isLoading);
+    expect(seen.first, a.id, reason: 'the row shows the download');
+    expect(seen.last, isNull, reason: 'and stops showing it');
   });
 }
