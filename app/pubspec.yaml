@@ -72,6 +72,11 @@ flutter:
   assets:
     - assets/fonts/inter/OFL.txt
     - assets/fonts/jetbrains-mono/OFL.txt
+    # License texts of the core libraries (#119), copies from core/third_party/
+    - assets/licenses/miniaudio/LICENSE
+    - assets/licenses/signalsmith-stretch/LICENSE.txt
+    - assets/licenses/signalsmith-linear/LICENSE.txt
+    - assets/licenses/flac/COPYING.Xiph
   fonts:
     - family: Inter
       fonts:

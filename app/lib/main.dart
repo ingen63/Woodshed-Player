@@ -8,6 +8,7 @@ import 'l10n/app_localizations.dart';
 import 'library/library.dart';
 import 'app/platform_native.dart'
     if (dart.library.js_interop) 'app/platform_web.dart';
+import 'ui/core_licenses.dart';
 import 'ui/font_licenses.dart';
 import 'ui/home_page.dart';
 import 'ui/style.dart';
@@ -19,6 +20,7 @@ export 'app/platform_native.dart'
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerFontLicenses();
+  registerCoreLicenses();
   if (smokeRequested) {
     // #13/AK5: smoke test of the built app, fixed language, ends the process
     await runSmokeApp(

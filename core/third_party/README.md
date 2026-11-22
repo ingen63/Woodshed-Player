@@ -9,4 +9,4 @@ Unverändert übernommen, Lizenztexte im jeweiligen Ordner. miniaudio und Signal
 | `signalsmith-linear/` | https://github.com/Signalsmith-Audio/linear (von signalsmith-stretch benötigt) | Tag 0.6.6 | MIT |
 | `flac/` | https://github.com/xiph/flac (libFLAC, #113) | Tag 1.5.0 (1507800) | BSD-3-Clause (`COPYING.Xiph`) |
 
-Aktualisieren: neue Version holen, Dateien ersetzen, Version hier nachführen, `ctest` im Kern laufen lassen.
+Aktualisieren: neue Version holen, Dateien ersetzen, Version hier nachführen, `ctest` im Kern laufen lassen. Die Lizenzdatei zusätzlich nach `app/assets/licenses/<Ordner>/` kopieren; die App zeigt sie auf der Lizenzseite (#119), ein Test prüft, dass jede Bibliothek dieser Tabelle dort steht und der Text gleich ist.
