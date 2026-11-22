@@ -19,8 +19,6 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get backToLibrary => pseudo(super.backToLibrary);
   @override
-  String get practiceMetronome => pseudo(super.practiceMetronome);
-  @override
   String get noFolder => pseudo(super.noFolder);
   @override
   String get noTracksWithoutFolder => pseudo(super.noTracksWithoutFolder);
@@ -253,8 +251,6 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String bpm(int bpm) => pseudo(super.bpm(bpm));
   @override
-  String get tap => pseudo(super.tap);
-  @override
   String get tapKey => pseudo(super.tapKey);
   @override
   String get metronomeKeysHint => pseudo(super.metronomeKeysHint);
@@ -282,19 +278,6 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String bpmStep(int step) => pseudo(super.bpmStep(step));
   @override
   String get everyBars => pseudo(super.everyBars);
-  @override
-  String get done => pseudo(super.done);
-  @override
-  String get settings => pseudo(super.settings);
-  @override
-  String moduleRampTime(int start, int target, int minutes) =>
-      pseudo(super.moduleRampTime(start, target, minutes));
-  @override
-  String moduleRampBars(int step, int bars) =>
-      pseudo(super.moduleRampBars(step, bars));
-  @override
-  String moduleDetails(String meter, String subdivision) =>
-      pseudo(super.moduleDetails(meter, subdivision));
   @override
   String loadNotFound(String file) => pseudo(super.loadNotFound(file));
   @override
@@ -417,6 +400,44 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get playlistOnAllDevices => pseudo(super.playlistOnAllDevices);
   @override
   String get playlistOnThisDevice => pseudo(super.playlistOnThisDevice);
+  @override
+  String get areas => pseudo(super.areas);
+  @override
+  String get areaPlayer => pseudo(super.areaPlayer);
+  @override
+  String get areaPractice => pseudo(super.areaPractice);
+  @override
+  String get areaMetronome => pseudo(super.areaMetronome);
+  @override
+  String areaRunning(String area) => pseudo(super.areaRunning(area));
+  @override
+  String get shuffle => pseudo(super.shuffle);
+  @override
+  String get shuffleOn => pseudo(super.shuffleOn);
+  @override
+  String get repeatOff => pseudo(super.repeatOff);
+  @override
+  String get repeatList => pseudo(super.repeatList);
+  @override
+  String get repeatTrack => pseudo(super.repeatTrack);
+  @override
+  String get previousTrack => pseudo(super.previousTrack);
+  @override
+  String get nextTrack => pseudo(super.nextTrack);
+  @override
+  String playingFrom(String list) => pseudo(super.playingFrom(list));
+  @override
+  String get chooseOtherTrack => pseudo(super.chooseOtherTrack);
+  @override
+  String miniPaused(String time) => pseudo(super.miniPaused(time));
+  @override
+  String get miniPlayTrack => pseudo(super.miniPlayTrack);
+  @override
+  String miniMetronome(int bpm) => pseudo(super.miniMetronome(bpm));
+  @override
+  String get searchLibrary => pseudo(super.searchLibrary);
+  @override
+  String get noSearchResults => pseudo(super.noSearchResults);
 }
 
 /// Loads [PseudoLocalizations] for any locale.

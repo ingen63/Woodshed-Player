@@ -241,6 +241,7 @@ class TestApp {
     Directory dir, {
     double? duration = 30,
     SyncService Function(Library library)? sync,
+    Random? random,
   }) {
     library = Library(
       IoFileStore(dir),
@@ -263,6 +264,7 @@ class TestApp {
       metronome: MetronomeController(metronome),
       files: files,
       sync: sync?.call(library),
+      random: random ?? Random(7),
     );
   }
 

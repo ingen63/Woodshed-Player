@@ -789,6 +789,15 @@ class Library extends ChangeNotifier {
     await saving;
   }
 
+  /// #115/AK7: the area last chosen on this device (its name); null until one is chosen.
+  String? get area => _device.area;
+
+  /// Remembers the area chosen on this device; a failed write keeps it for this run only.
+  Future<void> setArea(String name) async {
+    if (_device.area == name) return;
+    await _updateDevice(_device.copyWith(area: name));
+  }
+
   /// The file of track [id] is never removed to keep the limit («Keep offline»).
   bool keptOffline(String id) => _device.keepOffline.contains(id);
 

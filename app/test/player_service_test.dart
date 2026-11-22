@@ -127,28 +127,58 @@ void main() {
       expect(h.core.isPlaying, isFalse);
     });
 
-    test(
-      'Leertaste im aktiven Loop springt beim Stoppen zum Loop-Anfang',
-      () async {
-        final h = Harness();
-        await h.loadReady(
-          '/a.mp3',
-          100,
-          settings: const PlaybackSettings(
-            loopEnabled: true,
-            loopStart: 20,
-            loopEnd: 40,
-          ),
-        );
-        h.service.togglePlayPauseReturningToLoop();
-        expect(h.service.isPlaying, isTrue);
-        h.core.pos = 33;
-        h.fire();
-        h.service.togglePlayPauseReturningToLoop();
-        expect(h.service.isPlaying, isFalse);
-        expect(h.service.position, 20);
-      },
-    );
+    test('#115/AK12 pause in Practice goes back to the loop start', () async {
+      final h = Harness();
+      await h.loadReady(
+        '/a.mp3',
+        100,
+        settings: const PlaybackSettings(
+          loopEnabled: true,
+          loopStart: 20,
+          loopEnd: 40,
+        ),
+      );
+      h.service.play();
+      h.core.pos = 33;
+      h.fire();
+      h.service.pauseToStart();
+      expect(h.service.isPlaying, isFalse);
+      expect(h.service.position, 20);
+      expect(h.core.calls.last, 'seek 20.0');
+    });
+
+    test('#115/AK12 pause in Practice without an active loop goes to the track start', () async {
+      final h = Harness();
+      await h.loadReady(
+        '/a.mp3',
+        100,
+        settings: const PlaybackSettings(loopStart: 20, loopEnd: 40),
+      );
+      h.service.play();
+      h.core.pos = 33;
+      h.fire();
+      h.service.pauseToStart();
+      expect(h.service.isPlaying, isFalse);
+      expect(h.service.position, 0);
+      expect(h.core.calls.last, 'seek 0.0');
+    });
+
+    test('#115/AK11 M mutes and gives back the volume before', () async {
+      final h = Harness();
+      await h.loadReady('/a.mp3', 100);
+      h.service.setVolume(0.6);
+      h.service.toggleMute();
+      expect(h.service.volume, 0);
+      expect(h.core.volumeValue, 0);
+      h.service.toggleMute();
+      expect(h.service.volume, 0.6);
+      h.service.setVolume(0);
+      h.service.toggleMute();
+      expect(
+        h.service.volume,
+        0.6,
+      ); // muted by the slider: back to the last volume heard
+    });
 
     test('Dateiende: Kern hört auf, Zustand folgt', () async {
       final h = Harness();

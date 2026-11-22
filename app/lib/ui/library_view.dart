@@ -4,6 +4,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app/app_controller.dart';
@@ -21,6 +22,7 @@ class LibraryView extends StatefulWidget {
     this.onSelected,
     bool? touch,
     this.cacheControls = kIsWeb,
+    this.searchFocus,
   }) : touch =
            touch ??
            (kIsWeb
@@ -39,6 +41,9 @@ class LibraryView extends StatefulWidget {
   /// tracks can be kept offline. Desktop and mobile keep every file.
   final bool cacheControls;
 
+  /// #115/AK11: focus of the search field, given by the window so that ⌘K reaches it.
+  final FocusNode? searchFocus;
+
   @override
   State<LibraryView> createState() => _LibraryViewState();
 }
@@ -52,9 +57,33 @@ class _LibraryViewState extends State<LibraryView> {
   AppController get c => widget.controller;
   Library get lib => c.library;
 
+  /// #115/AK11: the search (⌘K): tracks whose title or artist contain it, as one list.
+  final _search = TextEditingController();
+  FocusNode? _ownSearchFocus;
+  FocusNode get _searchFocus =>
+      widget.searchFocus ?? (_ownSearchFocus ??= FocusNode());
+
+  @override
+  void dispose() {
+    _search.dispose();
+    _ownSearchFocus?.dispose();
+    super.dispose();
+  }
+
+  /// #115/AK9: a track chosen in the library plays within its folder.
   void _select(Track t) {
-    c.select(t);
+    c.selectInFolder(t);
     widget.onSelected?.call();
+  }
+
+  List<Track> _matches(String query) {
+    final q = query.toLowerCase();
+    return [
+      for (final t in lib.sortedTracks)
+        if (t.title.toLowerCase().contains(q) ||
+            (t.artist?.toLowerCase().contains(q) ?? false))
+          t,
+    ];
   }
 
   @override
@@ -66,9 +95,16 @@ class _LibraryViewState extends State<LibraryView> {
         final loose = lib.sortedTracksIn(null);
         final empty =
             lib.tracks.isEmpty && folders.isEmpty && lib.playlists.isEmpty;
+        final query = _search.text.trim();
         return Column(
           children: [
             _Header(controller: c),
+            if (!empty)
+              _SearchField(
+                controller: _search,
+                focus: _searchFocus,
+                onChanged: () => setState(() {}),
+              ),
             if (lib.isImporting) const LinearProgressIndicator(minHeight: 2),
             const Divider(height: 1),
             if (lib.heldNames case final names when names.isNotEmpty)
@@ -79,6 +115,8 @@ class _LibraryViewState extends State<LibraryView> {
             Expanded(
               child: empty
                   ? _EmptyLibrary(onAdd: () => c.pickAndImport())
+                  : query.isNotEmpty
+                  ? _searchResults(query)
                   : ListView(
                       key: const Key('libraryList'),
                       padding: const EdgeInsets.only(bottom: 24),
@@ -120,6 +158,18 @@ class _LibraryViewState extends State<LibraryView> {
           ],
         );
       },
+    );
+  }
+
+  Widget _searchResults(String query) {
+    final found = _matches(query);
+    if (found.isEmpty) {
+      return _Placeholder(context.l10n.noSearchResults, onDrop: (_) {});
+    }
+    return ListView(
+      key: const Key('searchResults'),
+      padding: const EdgeInsets.only(bottom: 24),
+      children: [for (final t in found) _row(t)],
     );
   }
 
@@ -693,6 +743,60 @@ Future<void> newPlaylist(BuildContext context, Library lib) async {
   final l = context.l10n;
   final name = await askName(context, l.newPlaylist);
   if (name != null) lib.createPlaylist(name, fallback: l.newPlaylist);
+}
+
+/// #115/AK11: search field of the library; ⌘K puts the cursor into it, Esc empties it.
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.focus,
+    required this.onChanged,
+  });
+  final TextEditingController controller;
+  final FocusNode focus;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final platform = Theme.of(context).platform;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            controller.clear();
+            focus.unfocus();
+            onChanged();
+          },
+        },
+        child: TextField(
+          key: const Key('librarySearch'),
+          controller: controller,
+          focusNode: focus,
+          onChanged: (_) => onChanged(),
+          decoration: InputDecoration(
+            isDense: true,
+            prefixIcon: const Icon(WsIcons.search, size: 16),
+            hintText: KeyboardPresence.available(platform)
+                ? '${l.searchLibrary}  ${shortcutLabel(platform, 'K', command: true)}'
+                : l.searchLibrary,
+            suffixIcon: controller.text.isEmpty
+                ? null
+                : IconButton(
+                    key: const Key('librarySearchClear'),
+                    tooltip: l.close,
+                    icon: const Icon(WsIcons.close, size: 14),
+                    onPressed: () {
+                      controller.clear();
+                      onChanged();
+                    },
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// #114: a row of a playlist being dragged: moved within its playlist, copied into another one. Library

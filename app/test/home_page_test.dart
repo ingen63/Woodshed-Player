@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/sync/sync_service.dart';
 import 'package:woodshed_player/time_format.dart';
@@ -59,12 +60,37 @@ Future<TestApp> pumpApp(
   return app;
 }
 
-/// Titel in der Liste antippen und das Laden abschliessen.
-Future<void> select(WidgetTester tester, TestApp app, String title) async {
+/// Titel in der Liste antippen und das Laden abschliessen. #115: the library is in the area Player; then the
+/// area [area] is shown (Practice unless given), where the tests of the practice screen look.
+Future<void> select(
+  WidgetTester tester,
+  TestApp app,
+  String title, {
+  AppArea? area = AppArea.practice,
+}) async {
+  if (find.byKey(Key('track:$title')).evaluate().isEmpty) {
+    app.controller.setArea(AppArea.player);
+    await tester.pump();
+    final back = find.byKey(const Key('backToLibrary'));
+    if (back.evaluate().isNotEmpty) {
+      await tester.tap(back);
+      await tester.pump();
+    }
+    final drawer = find.byKey(const Key('libraryToggle'));
+    if (find.byKey(Key('track:$title')).evaluate().isEmpty &&
+        drawer.evaluate().isNotEmpty) {
+      await tester.tap(drawer);
+      await tester.pumpAndSettle();
+    }
+  }
   await tester.tap(find.byKey(Key('track:$title')));
   await tester.pump();
   app.finishLoads(30);
   await tester.pump();
+  if (area != null) {
+    app.controller.setArea(area);
+    await tester.pump();
+  }
 }
 
 /// Mit der Maus von [from] nach [to] ziehen (Draggable auf dem Desktop).
@@ -89,10 +115,10 @@ void main() {
       expect(find.text('Bibliothek'), findsOneWidget);
       expect(find.byKey(const Key('track:Bossa')), findsOneWidget);
       expect(
-        find.byKey(const Key('card:empty')),
+        find.byKey(const Key('playerScreen')),
         findsOneWidget,
-      ); // Player daneben
-      expect(find.byType(NavigationBar), findsNothing);
+      ); // #115: the area Player beside it
+      expect(find.byKey(const Key('areaTabBar')), findsNothing);
     });
 
     testWidgets(
@@ -100,18 +126,19 @@ void main() {
       (tester) async {
         final app = await pumpApp(tester, size: phone);
         expect(find.byKey(const Key('layout:phone')), findsOneWidget);
-        expect(
-          find.byKey(const Key('card:empty')),
-          findsNothing,
-        ); // Player nicht sichtbar
-        await select(tester, app, 'Bossa');
-        expect(find.byKey(const Key('trackTitle')), findsOneWidget);
-        expect(find.byKey(const Key('card:loop')), findsOneWidget);
+        expect(find.byKey(const Key('areaTabBar')), findsOneWidget);
+        expect(find.byKey(const Key('playerScreen')), findsNothing);
+        await select(tester, app, 'Bossa', area: null);
+        expect(find.byKey(const Key('playerScreen')), findsOneWidget);
         expect(find.byKey(const Key('track:Bossa')), findsNothing);
         await tester.tap(find.byKey(const Key('backToLibrary')));
         await tester.pump();
-        expect(find.byKey(const Key('card:loop')), findsNothing);
+        expect(find.byKey(const Key('playerScreen')), findsNothing);
         expect(find.byKey(const Key('track:Bossa')), findsOneWidget);
+        // #115: the loaded track stays as a mini bar under the library and opens the player again
+        await tester.tap(find.byKey(const Key('openPlayer')));
+        await tester.pump();
+        expect(find.byKey(const Key('playerScreen')), findsOneWidget);
       },
     );
   });
@@ -272,7 +299,7 @@ void main() {
       final app = await pumpApp(tester, titles: [], files: {'x.mp3': mp3});
       await select(tester, app, 'Mit Cover');
       expect(find.byKey(const Key('trackTitle')), findsOneWidget);
-      expect(find.text('Testband'), findsWidgets);
+      expect(find.textContaining('Testband'), findsWidgets);
       final art = app.library.artworkPath(app.library.tracks.single)!;
       expect(find.byKey(Key('artwork:$art')), findsWidgets);
 

@@ -277,12 +277,11 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
 
   void togglePlayPause() => _playing ? pause() : play();
 
-  /// Leertaste: wie Play/Pause, Stoppen in einem aktiven Loop springt aber zum Loop-Anfang zurück.
-  void togglePlayPauseReturningToLoop() {
-    if (!_playing) return play();
+  /// #115/AK12: pause in the area Practice: stops and goes back to the loop start, without an active loop
+  /// to the start of the track, so «Play» always begins at the start of the passage.
+  void pauseToStart() {
     pause();
-    final loop = activeLoop;
-    if (loop != null) seek(loop.$1);
+    seek(activeLoop?.$1 ?? 0);
   }
 
   void seek(double seconds) {
@@ -297,6 +296,18 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
   }
 
   void skip(double delta) => seek(_position + delta);
+
+  /// #115/AK11: «M» in the area Player: silent, and back to the volume before.
+  void toggleMute() {
+    if (_volume > 0) {
+      _unmuted = _volume;
+      setVolume(0);
+    } else {
+      setVolume(_unmuted);
+    }
+  }
+
+  double _unmuted = 1.0;
 
   void setVolume(double v) {
     _volume = v.clamp(0, 1).toDouble();

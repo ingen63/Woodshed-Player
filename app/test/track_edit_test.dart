@@ -159,7 +159,7 @@ void main() {
     testWidgets('#24/AK1 #24/AK2 edit via context menu, library and player '
         'update', (tester) async {
       final app = await pumpApp(tester);
-      await select(tester, app, 'Bossa');
+      await select(tester, app, 'Bossa', area: null); // #115: area Player
       await tester.tap(
         find.byKey(const Key('track:Bossa')),
         buttons: kSecondaryButton,
@@ -175,7 +175,7 @@ void main() {
 
       expect(find.byKey(const Key('track:Samba')), findsOneWidget);
       expect(find.byKey(const Key('track:Bossa')), findsNothing);
-      final title = tester.widget<Text>(find.byKey(const Key('trackTitle')));
+      final title = tester.widget<Text>(find.byKey(const Key('playerTitle')));
       expect(title.data, 'Samba');
       expect(find.text('Duo'), findsWidgets);
       final t = app.library.track(app.player.trackId!)!;

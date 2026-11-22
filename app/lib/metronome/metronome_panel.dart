@@ -20,8 +20,12 @@ class MetronomePanel extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final s = controller.settings;
-        final theme = Theme.of(context);
         final l = context.l10n;
+        final narrow = WsLayout.of(context).size == WsSize.phone;
+        final rampMode = _RampMode(
+          controller: controller,
+          byTime: s.rampByTime,
+        );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 16,
@@ -60,9 +64,10 @@ class MetronomePanel extends StatelessWidget {
                         l.bpm(s.bpm),
                         key: const Key('metronomeBpm'),
                         textAlign: TextAlign.center,
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                        // #115: in the area Metronome the tempo is its largest number
+                        style: WsTheme.of(context).number(
+                          WsLayout.of(context).bpm,
+                          color: WsTheme.of(context).blue,
                         ),
                       ),
                     ),
@@ -145,11 +150,11 @@ class MetronomePanel extends StatelessWidget {
                   title: l.autoTempoRamp,
                   value: s.rampEnabled,
                   onChanged: (v) => controller.setRamp(enabled: v),
-                  trailing: _RampMode(
-                    controller: controller,
-                    byTime: s.rampByTime,
-                  ),
+                  trailing: narrow ? null : rampMode,
                 ),
+                // #115: on the phone the title keeps the whole line, «Bars | Time» goes below it
+                if (narrow)
+                  Align(alignment: Alignment.centerLeft, child: rampMode),
                 Dimmed(
                   enabled: s.rampEnabled,
                   child: _RampSettings(controller: controller, settings: s),
@@ -252,159 +257,6 @@ class _RampSettings extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-/// Modul «Metronom» im Übe-Bildschirm (#30): BPM in Blau, Start/Stopp, −/+, Tap; alle Einstellungen
-/// öffnen sich als Dialog (Desktop/Tablet) bzw. als Blatt von unten (Phone).
-class MetronomeModule extends StatelessWidget {
-  const MetronomeModule({super.key, required this.controller});
-
-  final MetronomeController controller;
-
-  void _openSettings(BuildContext context) {
-    final m = WsLayout.of(context);
-    Widget panel(BuildContext context) => WsLayout(
-      metrics: m,
-      child: ExcludeFocus(child: MetronomePanel(controller: controller)),
-    );
-    if (m.size == WsSize.phone) {
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (context) => DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.85,
-          builder: (context, scroll) => SingleChildScrollView(
-            controller: scroll,
-            padding: const EdgeInsets.all(WsSpace.l),
-            child: panel(context),
-          ),
-        ),
-      );
-    } else {
-      showDialog<void>(
-        context: context,
-        builder: (context) => Dialog(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(WsSpace.l),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: WsSpace.m,
-                children: [
-                  panel(context),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: BorderedButton(
-                      key: const Key('metronomeSettingsClose'),
-                      label: context.l10n.done,
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: controller,
-      builder: (context, _) {
-        final ws = WsTheme.of(context);
-        final m = WsLayout.of(context);
-        final s = controller.settings;
-        final l = context.l10n;
-        final ramp = s.rampEnabled
-            ? s.rampByTime
-                  ? l.moduleRampTime(s.rampStart, s.rampTarget, s.rampMinutes)
-                  : l.moduleRampBars(s.rampStep, s.rampEveryBars)
-            : null;
-        final bpm = Text(
-          '${s.bpm}',
-          key: const Key('moduleBpm'),
-          style: ws.number(m.bpm, color: ws.blue),
-        );
-        final details = Text(
-          l.moduleDetails(
-            MetronomeSettings.meterLabel(s.meter),
-            subdivisionLabel(l, s.subdivision),
-          ),
-          style: TextStyle(color: ws.muted, fontSize: m.body),
-        );
-        final toggle = BorderedButton(
-          key: const Key('moduleMetronomeToggle'),
-          label: controller.running ? l.stop : l.start,
-          icon: controller.running ? WsIcons.stop : WsIcons.play,
-          iconOnly: true,
-          selected: controller.running,
-          onPressed: controller.toggle,
-        );
-        final controls = Row(
-          spacing: WsSpace.s,
-          children: [
-            RepeatButton(
-              icon: Icons.remove,
-              tooltip: l.slower,
-              onStep: () => controller.changeBpm(-1),
-            ),
-            RepeatButton(
-              icon: Icons.add,
-              tooltip: l.faster,
-              onStep: () => controller.changeBpm(1),
-            ),
-            Expanded(
-              child: BorderedButton(
-                key: const Key('moduleTap'),
-                label: l.tap,
-                expand: true,
-                onPressed: controller.tap,
-              ),
-            ),
-            toggle,
-            BorderedButton(
-              key: const Key('metronomeSettings'),
-              label: l.settings,
-              icon: WsIcons.slider,
-              iconOnly: true,
-              onPressed: () => _openSettings(context),
-            ),
-          ],
-        );
-        return WsCard(
-          key: const Key('module:metronome'),
-          children: [
-            CardHeader(
-              title: l.metronome,
-              trailing: const ShortcutBadge('M · T · ↑↓'),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              spacing: WsSpace.m,
-              children: [
-                bpm,
-                Expanded(child: details),
-              ],
-            ),
-            controls,
-            if (ramp != null)
-              Text(
-                ramp,
-                key: const Key('moduleRamp'),
-                style: TextStyle(color: ws.blue, fontSize: 12),
-              ),
-          ],
-        );
-      },
     );
   }
 }

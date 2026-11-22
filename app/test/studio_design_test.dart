@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/main.dart';
 import 'package:woodshed_player/ui/home_page.dart';
 import 'package:woodshed_player/time_format.dart';
@@ -130,7 +131,14 @@ void main() {
 
         final app = await pumpApp(tester, size: desktop);
         await choose(tester, app, 'Bossa');
-        for (final key in ['clock', 'speedValue', 'moduleBpm', 'time:Anfang']) {
+        // #115/AK5: the BPM is in the area Metronome
+        app.controller.setArea(AppArea.metronome);
+        await tester.pump();
+        final bpm = tester.widget<Text>(find.byKey(const Key('metronomeBpm')));
+        expect(bpm.style?.fontFamily, numberFont);
+        app.controller.setArea(AppArea.practice);
+        await tester.pump();
+        for (final key in ['clock', 'speedValue', 'time:Anfang']) {
           final texts = find.descendant(
             of: find.byKey(Key(key)),
             matching: find.byWidgetPredicate(
@@ -172,21 +180,24 @@ void main() {
       expect(WsSize.forWidth(599), WsSize.phone);
     });
 
-    testWidgets('Desktop: feste Bibliothek, drei Module nebeneinander', (
-      tester,
-    ) async {
-      final app = await pumpApp(tester, size: desktop);
-      await choose(tester, app, 'Bossa');
-      expect(find.byKey(const Key('layout:desktop')), findsOneWidget);
-      expect(find.byKey(const Key('track:Bossa')), findsOneWidget);
-      expect(
-        tester.getTopLeft(find.byKey(const Key('track:Bossa'))).dx,
-        lessThan(tester.getTopLeft(find.byKey(const Key('card:speed'))).dx),
-      );
-      final y = top(tester, 'card:speed');
-      expect(top(tester, 'card:ramp'), y);
-      expect(top(tester, 'module:metronome'), y);
-    });
+    testWidgets(
+      'Desktop: feste Bibliothek im Player, Module nebeneinander im Üben',
+      (tester) async {
+        final app = await pumpApp(tester, size: desktop);
+        await choose(tester, app, 'Bossa');
+        expect(find.byKey(const Key('layout:desktop')), findsOneWidget);
+        final y = top(tester, 'card:speed');
+        expect(top(tester, 'card:ramp'), y);
+        expect(find.byKey(const Key('module:metronome')), findsNothing);
+        // #115: the library stays beside the area Player
+        app.controller.setArea(AppArea.player);
+        await tester.pump();
+        expect(
+          tester.getTopLeft(find.byKey(const Key('track:Bossa'))).dx,
+          lessThan(tester.getTopLeft(find.byKey(const Key('playerScreen'))).dx),
+        );
+      },
+    );
 
     testWidgets('Tablet: Bibliothek einblendbar, zwei Spalten', (tester) async {
       final app = await pumpApp(tester, size: tablet);
@@ -200,7 +211,7 @@ void main() {
       expect(find.byKey(const Key('track:Bossa')), findsNothing); // zu
       final y = top(tester, 'card:speed');
       expect(top(tester, 'card:ramp'), y);
-      expect(top(tester, 'module:metronome'), greaterThan(y));
+      expect(find.byKey(const Key('module:metronome')), findsNothing);
       expect(
         tester.getSize(find.byKey(const Key('card:speed'))).width,
         lessThan(tablet.width / 2),
@@ -216,7 +227,11 @@ void main() {
       await choose(tester, app, 'Bossa');
       expect(find.byKey(const Key('track:Bossa')), findsNothing);
       final bar = tester.getRect(find.byKey(const Key('thumbBar')));
-      expect(bar.bottom, closeTo(phone.height, 1));
+      // #115: directly above the tab bar of the areas
+      expect(
+        bar.bottom,
+        closeTo(tester.getRect(find.byKey(const Key('areaTabBar'))).top, 1),
+      );
       for (final k in ['here:Anfang', 'playPause', 'here:Ende']) {
         final r = tester.getRect(find.byKey(Key(k)));
         expect(bar.contains(r.center), isTrue, reason: k);
@@ -544,16 +559,13 @@ void main() {
         await tester.tap(find.byKey(const Key('here:Ende')));
         await tester.pump();
         expect(app.core.loop, (3.0, 7.0));
-        await tester.ensureVisible(
-          find.byKey(const Key('moduleMetronomeToggle')),
-        );
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('moduleMetronomeToggle')));
+        // #115: the metronome is in its own area
+        await tester.tap(find.byKey(const Key('area:metronome')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('metronomeToggle')));
         await tester.pump();
         expect(app.metronome.isRunning, isTrue);
         expect(app.player.isPlaying, isFalse); // nie gleichzeitig
-        await tester.tap(find.byKey(const Key('metronomeSettings')));
-        await tester.pumpAndSettle();
         expect(find.byKey(const Key('card:meter')), findsOneWidget);
         expect(tester.takeException(), isNull);
       });

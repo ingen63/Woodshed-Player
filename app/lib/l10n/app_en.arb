@@ -4,7 +4,6 @@
   "cancel": "Cancel",
   "library": "Library",
   "backToLibrary": "Back to library",
-  "practiceMetronome": "Practice · Metronome",
   "noFolder": "No folder",
   "noTracksWithoutFolder": "No tracks without a folder",
   "addMp3Ellipsis": "Add MP3 …",
@@ -257,7 +256,6 @@
       }
     }
   },
-  "tap": "Tap",
   "tapKey": "Tap (T)",
   "metronomeKeysHint": "Keys: M = start/stop, ↑ / ↓ = tempo ±1 (with Shift ±10), T = tap tempo. Track and metronome never play at the same time.",
   "meterAndSound": "Meter and sound",
@@ -279,44 +277,6 @@
     }
   },
   "everyBars": "Every … bars",
-  "done": "Done",
-  "settings": "Settings",
-  "moduleRampTime": "Auto {start}→{target} BPM in {minutes} min",
-  "@moduleRampTime": {
-    "placeholders": {
-      "start": {
-        "type": "int"
-      },
-      "target": {
-        "type": "int"
-      },
-      "minutes": {
-        "type": "int"
-      }
-    }
-  },
-  "moduleRampBars": "Auto +{step} BPM / {bars, plural, =1{1 bar} other{{bars} bars}}",
-  "@moduleRampBars": {
-    "placeholders": {
-      "step": {
-        "type": "int"
-      },
-      "bars": {
-        "type": "int"
-      }
-    }
-  },
-  "moduleDetails": "BPM · {meter} · {subdivision}",
-  "@moduleDetails": {
-    "placeholders": {
-      "meter": {
-        "type": "String"
-      },
-      "subdivision": {
-        "type": "String"
-      }
-    }
-  },
   "loadNotFound": "The file “{file}” was not found. Was it moved or deleted?",
   "@loadNotFound": {
     "placeholders": {
@@ -593,5 +553,101 @@
   "playlistOnThisDevice": "Only on this device",
   "@playlistOnThisDevice": {
     "description": "#114/AK9: never leaves this device"
+  },
+  "areas": "Areas",
+  "@areas": {
+    "description": "#115: label of the tab bar for Player, Practice and Metronome"
+  },
+  "areaPlayer": "Player",
+  "@areaPlayer": {
+    "description": "#115: area with the library and simple playback"
+  },
+  "areaPractice": "Practice",
+  "@areaPractice": {
+    "description": "#115: area with loop, tempo and ramp"
+  },
+  "areaMetronome": "Metronome",
+  "@areaMetronome": {
+    "description": "#115: area with the metronome alone"
+  },
+  "areaRunning": "{area}, running",
+  "@areaRunning": {
+    "description": "#115: tab of the area where something plays (screen readers)",
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "shuffle": "Shuffle",
+  "@shuffle": {
+    "description": "#115/AK8: plays the list in a random order"
+  },
+  "shuffleOn": "Shuffle on",
+  "@shuffleOn": {
+    "description": "#115/AK8: state of the shuffle button"
+  },
+  "repeatOff": "Repeat: off",
+  "@repeatOff": {
+    "description": "#115/AK8"
+  },
+  "repeatList": "Repeat: list",
+  "@repeatList": {
+    "description": "#115/AK8: the list starts over after its last track"
+  },
+  "repeatTrack": "Repeat: track",
+  "@repeatTrack": {
+    "description": "#115/AK8: the track starts over"
+  },
+  "previousTrack": "To start or previous track",
+  "@previousTrack": {
+    "description": "#115/AK9: to the start; within the first 3 s to the previous track"
+  },
+  "nextTrack": "Next track",
+  "@nextTrack": {
+    "description": "#115/AK9"
+  },
+  "playingFrom": "From «{list}»",
+  "@playingFrom": {
+    "description": "#115: the folder or playlist the track plays from",
+    "placeholders": {
+      "list": {
+        "type": "String"
+      }
+    }
+  },
+  "chooseOtherTrack": "Choose another track ›",
+  "@chooseOtherTrack": {
+    "description": "#115: Practice: goes to the library in the area Player"
+  },
+  "miniPaused": "paused · {time}",
+  "@miniPaused": {
+    "description": "#115: mini bar of a paused track; time is mm:ss",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "miniPlayTrack": "Play track, stops the metronome",
+  "@miniPlayTrack": {
+    "description": "#115/AK6: mini bar in the area Metronome"
+  },
+  "miniMetronome": "Metronome · {bpm} BPM",
+  "@miniMetronome": {
+    "description": "#115: mini bar while the metronome runs",
+    "placeholders": {
+      "bpm": {
+        "type": "int"
+      }
+    }
+  },
+  "searchLibrary": "Search",
+  "@searchLibrary": {
+    "description": "#115/AK11: search field of the library (⌘K)"
+  },
+  "noSearchResults": "No matches",
+  "@noSearchResults": {
+    "description": "#115: search without a match"
   }
 }

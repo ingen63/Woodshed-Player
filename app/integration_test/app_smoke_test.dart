@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/app/platform_native.dart';
 import 'package:wp_core/wp_core.dart';
 
@@ -34,13 +35,15 @@ void main() {
     expect(find.byKey(const Key('track:Sine test tone')), findsOneWidget);
     // 4 s at 44.1 kHz, resampled to the device rate: still 4 s
     expect(p.duration, closeTo(4.0, 0.01));
+    // #115: loop and tempo are in the area Practice
+    await showArea(tester, AppArea.practice);
     expect(find.byKey(const Key('card:loop')), findsOneWidget);
 
-    // Play/pause with the button
+    // Play/pause with the button; #115/AK12: a pause in Practice goes back to the start of the track
     await tester.tap(find.byKey(const Key('playPause')));
     await pumpUntil(tester, () => p.isPlaying && p.position > 0.2, 'playing');
     await tester.tap(find.byKey(const Key('playPause')));
-    await pumpUntil(tester, () => !p.isPlaying, 'paused');
+    await pumpUntil(tester, () => !p.isPlaying && p.position == 0, 'paused');
 
     // Loop with the «here» buttons: start where playback was paused, end while playing at least 1 s
     // later (a loop needs 1 s, #22); playback then jumps back to the start.
@@ -98,14 +101,18 @@ void main() {
     ]) {
       setSize(tester, size);
       await tester.pumpAndSettle();
+      expect(find.byKey(Key('layout:$name')), findsOneWidget, reason: name);
+      // #115: the waveform is in the area Practice
+      await showArea(tester, AppArea.practice);
+      expect(find.byKey(const Key('waveformOverview')), findsOneWidget);
+      expect(find.byKey(const Key('waveformDetail')), findsOneWidget);
+
+      // play/pause in the area Player, which keeps the position at a pause
+      await showArea(tester, AppArea.player);
       if (name == 'phone') {
         await tester.tap(find.byKey(const Key('openPlayer')));
         await tester.pumpAndSettle();
       }
-      expect(find.byKey(Key('layout:$name')), findsOneWidget, reason: name);
-      expect(find.byKey(const Key('waveformOverview')), findsOneWidget);
-      expect(find.byKey(const Key('waveformDetail')), findsOneWidget);
-
       p.seek(0);
       await pumpUntil(tester, () => p.position == 0, '$name: at 0');
       // #99: on iOS the controls are taller; at 1100 px the button sits just below the window
@@ -123,6 +130,10 @@ void main() {
       // #106/AK2: pause keeps the position reached while playing
       expect(p.position, greaterThanOrEqualTo(reached), reason: name);
       expect(p.position, greaterThan(0.2), reason: name);
+      if (name == 'phone') {
+        await tester.tap(find.byKey(const Key('backToLibrary')));
+        await tester.pumpAndSettle();
+      }
     }
   });
 

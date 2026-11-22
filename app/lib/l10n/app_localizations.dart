@@ -122,12 +122,6 @@ abstract class AppLocalizations {
   /// **'Back to library'**
   String get backToLibrary;
 
-  /// No description provided for @practiceMetronome.
-  ///
-  /// In en, this message translates to:
-  /// **'Practice · Metronome'**
-  String get practiceMetronome;
-
   /// No description provided for @noFolder.
   ///
   /// In en, this message translates to:
@@ -788,12 +782,6 @@ abstract class AppLocalizations {
   /// **'{bpm} BPM'**
   String bpm(int bpm);
 
-  /// No description provided for @tap.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap'**
-  String get tap;
-
   /// No description provided for @tapKey.
   ///
   /// In en, this message translates to:
@@ -877,36 +865,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Every … bars'**
   String get everyBars;
-
-  /// No description provided for @done.
-  ///
-  /// In en, this message translates to:
-  /// **'Done'**
-  String get done;
-
-  /// No description provided for @settings.
-  ///
-  /// In en, this message translates to:
-  /// **'Settings'**
-  String get settings;
-
-  /// No description provided for @moduleRampTime.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto {start}→{target} BPM in {minutes} min'**
-  String moduleRampTime(int start, int target, int minutes);
-
-  /// No description provided for @moduleRampBars.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto +{step} BPM / {bars, plural, =1{1 bar} other{{bars} bars}}'**
-  String moduleRampBars(int step, int bars);
-
-  /// No description provided for @moduleDetails.
-  ///
-  /// In en, this message translates to:
-  /// **'BPM · {meter} · {subdivision}'**
-  String moduleDetails(String meter, String subdivision);
 
   /// No description provided for @loadNotFound.
   ///
@@ -1261,6 +1219,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only on this device'**
   String get playlistOnThisDevice;
+
+  /// #115: label of the tab bar for Player, Practice and Metronome
+  ///
+  /// In en, this message translates to:
+  /// **'Areas'**
+  String get areas;
+
+  /// #115: area with the library and simple playback
+  ///
+  /// In en, this message translates to:
+  /// **'Player'**
+  String get areaPlayer;
+
+  /// #115: area with loop, tempo and ramp
+  ///
+  /// In en, this message translates to:
+  /// **'Practice'**
+  String get areaPractice;
+
+  /// #115: area with the metronome alone
+  ///
+  /// In en, this message translates to:
+  /// **'Metronome'**
+  String get areaMetronome;
+
+  /// #115: tab of the area where something plays (screen readers)
+  ///
+  /// In en, this message translates to:
+  /// **'{area}, running'**
+  String areaRunning(String area);
+
+  /// #115/AK8: plays the list in a random order
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle'**
+  String get shuffle;
+
+  /// #115/AK8: state of the shuffle button
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle on'**
+  String get shuffleOn;
+
+  /// #115/AK8
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat: off'**
+  String get repeatOff;
+
+  /// #115/AK8: the list starts over after its last track
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat: list'**
+  String get repeatList;
+
+  /// #115/AK8: the track starts over
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat: track'**
+  String get repeatTrack;
+
+  /// #115/AK9: to the start; within the first 3 s to the previous track
+  ///
+  /// In en, this message translates to:
+  /// **'To start or previous track'**
+  String get previousTrack;
+
+  /// #115/AK9
+  ///
+  /// In en, this message translates to:
+  /// **'Next track'**
+  String get nextTrack;
+
+  /// #115: the folder or playlist the track plays from
+  ///
+  /// In en, this message translates to:
+  /// **'From «{list}»'**
+  String playingFrom(String list);
+
+  /// #115: Practice: goes to the library in the area Player
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another track ›'**
+  String get chooseOtherTrack;
+
+  /// #115: mini bar of a paused track; time is mm:ss
+  ///
+  /// In en, this message translates to:
+  /// **'paused · {time}'**
+  String miniPaused(String time);
+
+  /// #115/AK6: mini bar in the area Metronome
+  ///
+  /// In en, this message translates to:
+  /// **'Play track, stops the metronome'**
+  String get miniPlayTrack;
+
+  /// #115: mini bar while the metronome runs
+  ///
+  /// In en, this message translates to:
+  /// **'Metronome · {bpm} BPM'**
+  String miniMetronome(int bpm);
+
+  /// #115/AK11: search field of the library (⌘K)
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get searchLibrary;
+
+  /// #115: search without a match
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get noSearchResults;
 }
 
 class _AppLocalizationsDelegate

@@ -19,6 +19,10 @@ abstract final class WsIcons {
   static const musicNote = IconData(0xf46b, fontFamily: _f, fontPackage: _p);
   static const location = IconData(0xf6f1, fontFamily: _f, fontPackage: _p);
   static const backwardEnd = IconData(0xf57b, fontFamily: _f, fontPackage: _p);
+  static const forwardEnd = IconData(0xf682, fontFamily: _f, fontPackage: _p);
+  static const shuffle = IconData(0xf4a9, fontFamily: _f, fontPackage: _p);
+  static const repeatOne = IconData(0xf7c0, fontFamily: _f, fontPackage: _p);
+  static const search = IconData(0xf4a5, fontFamily: _f, fontPackage: _p);
   static const leftRight = IconData(0xf500, fontFamily: _f, fontPackage: _p);
   static const metronome = IconData(0xf70b, fontFamily: _f, fontPackage: _p);
   static const timer = IconData(0xf868, fontFamily: _f, fontPackage: _p);

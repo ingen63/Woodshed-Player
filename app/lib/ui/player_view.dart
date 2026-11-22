@@ -1,5 +1,6 @@
 // Übe-Bildschirm im Design «Studio» (#30, docs/design/A-*.dc.html): Kopf mit Titel und Zeit,
-// Zeitleiste (Wellenform), Loop-Leiste, Module Tempo · Steigerung · Metronom und Wiedergabe.
+// Zeitleiste (Wellenform), Loop-Leiste, Module Tempo · Steigerung und Wiedergabe (#115: the metronome has
+// its own area).
 // Desktop: drei Module nebeneinander; Tablet: zwei Spalten; Phone: einspaltig, S/Play/E unten.
 import 'dart:math';
 
@@ -126,9 +127,9 @@ class PlayerView extends StatelessWidget {
     required this.state,
     required this.actions,
     this.extraCards = const [],
-    this.metronome,
     this.leading,
     this.headerTrailing,
+    this.onChooseTrack,
   });
 
   final PlayerViewState state;
@@ -137,14 +138,14 @@ class PlayerView extends StatelessWidget {
   /// Weitere Module am Ende.
   final List<Widget> extraCards;
 
-  /// Metronom-Modul (drittes Modul am Desktop).
-  final Widget? metronome;
-
   /// Links im Kopf: Bibliothek einblenden (Tablet) bzw. zurück zur Bibliothek (Phone).
   final Widget? leading;
 
   /// Rechts im Kopf, z. B. der Aufnahme-Knopf.
   final Widget? headerTrailing;
+
+  /// #115: link «Choose another track» under the title (to the library in the area Player).
+  final VoidCallback? onChooseTrack;
 
   @override
   Widget build(BuildContext context) {
@@ -154,6 +155,7 @@ class PlayerView extends StatelessWidget {
       state: s,
       leading: leading,
       trailing: headerTrailing,
+      onChooseTrack: onChooseTrack,
     );
     final top = <Widget>[header, if (s.error != null) _ErrorCard(s.error!)];
     if (!s.loaded) {
@@ -161,7 +163,6 @@ class PlayerView extends StatelessWidget {
         children: [
           ...top,
           _EmptyCard(onOpen: actions.open),
-          ?metronome,
           ...extraCards,
         ],
       );
@@ -206,7 +207,6 @@ class PlayerView extends StatelessWidget {
                 children: [
                   Expanded(child: tempo),
                   if (ramp != null) Expanded(child: ramp),
-                  if (metronome != null) Expanded(child: metronome!),
                 ],
               ),
             ),
@@ -230,7 +230,6 @@ class PlayerView extends StatelessWidget {
                 ],
               ),
             ),
-            ?metronome,
             transport,
             ...extraCards,
           ],
@@ -246,7 +245,6 @@ class PlayerView extends StatelessWidget {
                   loop,
                   tempo,
                   ?ramp,
-                  ?metronome,
                   transport,
                   ...extraCards,
                 ],
@@ -330,9 +328,15 @@ class _EmptyCard extends StatelessWidget {
 // MARK: Kopf
 
 class _Header extends StatelessWidget {
-  const _Header({required this.state, this.leading, this.trailing});
+  const _Header({
+    required this.state,
+    this.leading,
+    this.trailing,
+    this.onChooseTrack,
+  });
   final PlayerViewState state;
   final Widget? leading, trailing;
+  final VoidCallback? onChooseTrack;
 
   @override
   Widget build(BuildContext context) {
@@ -368,6 +372,20 @@ class _Header extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: m.body - 1, color: ws.muted),
+          ),
+        if (onChooseTrack != null)
+          ExcludeFocus(
+            child: InkWell(
+              key: const Key('chooseTrack'),
+              onTap: onChooseTrack,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  context.l10n.chooseOtherTrack,
+                  style: TextStyle(fontSize: m.body - 1, color: ws.amber),
+                ),
+              ),
+            ),
           ),
       ],
     );

@@ -78,6 +78,12 @@ Future<AppController> startApp(
   return controller;
 }
 
+/// #115: shows area [a] by its tab and waits for the frame.
+Future<void> showArea(WidgetTester tester, AppArea a) async {
+  await tester.tap(find.byKey(Key('area:${a.name}')));
+  await tester.pumpAndSettle();
+}
+
 void setSize(WidgetTester tester, Size size) {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;

@@ -6,6 +6,7 @@
 // removed to stay below the limit (they stay in the library, their file is in the cloud) and when each
 // track was last used here (the oldest go first).
 // #110: whether the hint «Add to Home Screen» (#39/AK6) was closed in this browser on this device.
+// #115: the area (Player, Practice, Metronome) last chosen on this device, opened again after a restart.
 // #107: own tracks and folders (#114: and playlists) held back from the sync until the user keeps or removes
 // them.
 import 'dart:convert';
@@ -27,6 +28,7 @@ class DeviceSettings {
     this.heldTracks = const {},
     this.heldFolders = const {},
     this.heldPlaylists = const {},
+    this.area,
   });
 
   static const fileName = 'device.json';
@@ -69,6 +71,9 @@ class DeviceSettings {
   /// #114: playlists held back like [heldTracks] and [heldFolders].
   final Set<String> heldPlaylists;
 
+  /// #115/AK7: name of the area last chosen here (`player`, `practice`, `metronome`); null until one is chosen.
+  final String? area;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -80,6 +85,7 @@ class DeviceSettings {
     Set<String>? heldTracks,
     Set<String>? heldFolders,
     Set<String>? heldPlaylists,
+    String? area,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -92,6 +98,7 @@ class DeviceSettings {
     heldTracks: heldTracks ?? this.heldTracks,
     heldFolders: heldFolders ?? this.heldFolders,
     heldPlaylists: heldPlaylists ?? this.heldPlaylists,
+    area: area ?? this.area,
   );
 
   Map<String, Object?> toJson() => {
@@ -106,6 +113,7 @@ class DeviceSettings {
     if (heldTracks.isNotEmpty) 'heldTracks': [...heldTracks]..sort(),
     if (heldFolders.isNotEmpty) 'heldFolders': [...heldFolders]..sort(),
     if (heldPlaylists.isNotEmpty) 'heldPlaylists': [...heldPlaylists]..sort(),
+    if (area != null) 'area': area,
   };
 
   static String newDeviceId([Random? random]) {
@@ -148,6 +156,10 @@ class DeviceSettings {
             heldTracks: _ids(j['heldTracks']),
             heldFolders: _ids(j['heldFolders']),
             heldPlaylists: _ids(j['heldPlaylists']),
+            area: switch (j['area']) {
+              final String v when v.isNotEmpty => v,
+              _ => null,
+            },
           );
         }
       }

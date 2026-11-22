@@ -127,8 +127,15 @@ class MetronomeController extends ChangeNotifier {
     onRunningChanged?.call(true);
   }
 
+  /// #115/AK13: stopping sets an active ramp back to its start tempo.
   void stop() {
     _backend.stop();
+    if (_settings.rampEnabled) {
+      _backend.bpm = _settings.rampStart;
+      _settings = _settings.copyWith(
+        bpm: _backend.bpm,
+      ); // the tempo is not stored
+    }
     notifyListeners();
     onRunningChanged?.call(false);
   }

@@ -1,17 +1,20 @@
-// Hauptfenster im Design «Studio» (#30). Nach Fensterbreite: Desktop (> 1000) mit fester Bibliothek
-// links, Tablet (600–1000) mit einblendbarer Bibliothek, Phone (< 600) mit Bibliothek als eigener Seite.
-// Alle Zustände liegen in den Controllern; ein Wechsel der Grösse verliert weder Wiedergabe noch Loop.
+// Main window in the design «Studio» (#30) with the areas Player, Practice and Metronome (#115). By window
+// width: desktop (> 1000) with the area switcher in the title bar and the library beside the player,
+// tablet (600–1000) with the switcher on top and the library as a drawer, phone (< 600) with a tab bar at
+// the bottom. All state lives in the controllers; neither a change of size nor of area loses playback,
+// the metronome, position, loop or tempo (#115/AK3).
 import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app/app_controller.dart';
-import '../metronome/metronome_panel.dart';
 import '../metronome/practice_shortcuts.dart';
 import 'about_dialog.dart';
+import 'areas.dart';
 import 'library_view.dart';
 import 'messages.dart';
+import 'player_screen.dart';
 import 'player_view.dart';
 import 'style.dart';
 
@@ -36,9 +39,13 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  bool _phonePlayer = false; // Phone: Übe-Seite statt Bibliothek
+  /// Phone, area Player: the full player instead of the library.
+  bool _phonePlayer = false;
   Timer? _metronomeTicker;
   final _scaffold = GlobalKey<ScaffoldState>();
+
+  /// #115/AK11: ⌘K puts the cursor into the search field of the library.
+  final _searchFocus = FocusNode();
 
   /// Hält den Aufnahme-Knopf (und eine laufende Aufnahme) über Layout-Wechsel hinweg.
   final _recordingKey = GlobalKey();
@@ -73,6 +80,7 @@ class _HomePageState extends State<HomePage> {
     c.removeListener(_showMessage);
     c.metronome.removeListener(_updateTicker);
     _metronomeTicker?.cancel();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -113,10 +121,11 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void _playPause() {
+  /// #115/AK12: Play/Pause in the area Practice; a pause goes back to the loop start or the track start.
+  void _practicePlayPause() {
     final p = c.player;
     if (!p.hasTrack) return;
-    p.isPlaying ? p.togglePlayPauseReturningToLoop() : c.session.playTitle();
+    p.isPlaying ? p.pauseToStart() : c.session.playTitle();
   }
 
   void _deleteCurrent() {
@@ -124,35 +133,40 @@ class _HomePageState extends State<HomePage> {
     if (t != null) confirmDeleteTrack(context, c, t);
   }
 
+  void _setArea(AppArea a) => c.setArea(a);
+
+  /// #115/AK11: ⌘K in the area Player: the search field (on the tablet in the drawer, on the phone in the
+  /// library instead of the full player).
+  void _search() {
+    final state = _scaffold.currentState;
+    if (state != null && state.hasDrawer && !state.isDrawerOpen) {
+      state.openDrawer();
+    }
+    if (_phonePlayer) setState(() => _phonePlayer = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocus.requestFocus();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final p = c.player;
     final platform = Theme.of(context).platform;
     final meta = isApplePlatform(platform);
+    SingleActivator command(LogicalKeyboardKey key, {bool shift = false}) =>
+        SingleActivator(key, meta: meta, control: !meta, shift: shift);
     return CallbackShortcuts(
       bindings: {
-        SingleActivator(
-          LogicalKeyboardKey.keyO,
-          meta: meta,
-          control: !meta,
-        ): () =>
-            c.pickAndImport(),
-        SingleActivator(
-          LogicalKeyboardKey.keyN,
-          meta: meta,
-          control: !meta,
-          shift: true,
-        ): () =>
+        command(LogicalKeyboardKey.keyO): () => c.pickAndImport(),
+        command(LogicalKeyboardKey.keyN, shift: true): () =>
             newFolder(context, c.library),
+        // #115: ⌘1, ⌘2, ⌘3 (Ctrl outside Apple) switch the area
+        command(LogicalKeyboardKey.digit1): () => _setArea(AppArea.player),
+        command(LogicalKeyboardKey.digit2): () => _setArea(AppArea.practice),
+        command(LogicalKeyboardKey.digit3): () => _setArea(AppArea.metronome),
       },
-      child: PracticeShortcuts(
-        metronome: c.metronome,
-        onPlayPause: _playPause,
-        onLoopStart: () => p.hasTrack ? p.setLoopStart(p.position) : null,
-        onLoopEnd: () => p.hasTrack ? p.setLoopEnd(p.position) : null,
-        onSpeedStep: (n) => p.hasTrack ? p.adjustSpeed(n) : null,
-        onDelete: _deleteCurrent,
-        child: LayoutBuilder(
+      child: ListenableBuilder(
+        listenable: Listenable.merge([c, c.player, c.metronome]),
+        builder: (context, _) => LayoutBuilder(
           builder: (context, box) {
             final metrics = WsMetrics(WsSize.forWidth(box.maxWidth), platform);
             final layout = switch (metrics.size) {
@@ -162,28 +176,60 @@ class _HomePageState extends State<HomePage> {
             };
             return WsLayout(
               metrics: metrics,
-              child: widget.installHint && !c.library.installHintClosed
-                  ? Column(
-                      children: [
-                        _InstallHint(
-                          onClose: () => setState(
-                            () => unawaited(c.library.closeInstallHint()),
+              child: _shortcuts(
+                widget.installHint && !c.library.installHintClosed
+                    ? Column(
+                        children: [
+                          _InstallHint(
+                            onClose: () => setState(
+                              () => unawaited(c.library.closeInstallHint()),
+                            ),
                           ),
-                        ),
-                        Expanded(
-                          child: MediaQuery.removePadding(
-                            context: context,
-                            removeTop: true,
-                            child: layout,
+                          Expanded(
+                            child: MediaQuery.removePadding(
+                              context: context,
+                              removeTop: true,
+                              child: layout,
+                            ),
                           ),
-                        ),
-                      ],
-                    )
-                  : layout,
+                        ],
+                      )
+                    : layout,
+              ),
             );
           },
         ),
       ),
+    );
+  }
+
+  /// #115/AK11: the shortcuts of the area shown: like Spotify in Player, the practice shortcuts in Practice
+  /// and Metronome (Space there starts and stops the metronome). One Focus for all areas, so that a switch
+  /// keeps the widgets below (library, search, recording).
+  Widget _shortcuts(Widget child) {
+    final p = c.player;
+    final area = c.area;
+    final player = PlayerShortcuts(
+      controller: c,
+      onSearch: _search,
+      child: const SizedBox(),
+    );
+    final practice = PracticeShortcuts(
+      metronome: c.metronome,
+      onPlayPause: area == AppArea.metronome
+          ? c.metronome.toggle
+          : _practicePlayPause,
+      onLoopStart: () => p.hasTrack ? p.setLoopStart(p.position) : null,
+      onLoopEnd: () => p.hasTrack ? p.setLoopEnd(p.position) : null,
+      onSpeedStep: (n) => p.hasTrack ? p.adjustSpeed(n) : null,
+      onDelete: _deleteCurrent,
+      child: const SizedBox(),
+    );
+    return Focus(
+      key: const Key('shortcuts'),
+      autofocus: true,
+      onKeyEvent: area == AppArea.player ? player.onKey : practice.onKey,
+      child: child,
     );
   }
 
@@ -195,95 +241,222 @@ class _HomePageState extends State<HomePage> {
     return KeyedSubtree(key: _recordingKey, child: button);
   }
 
-  Widget _desktop() => Scaffold(
-    key: const Key('layout:desktop'),
-    body: SafeArea(
-      child: Row(
-        children: [
-          Builder(
-            builder: (context) => Container(
-              width: 280,
-              color: WsTheme.of(context).panel,
-              child: LibraryView(controller: c),
-            ),
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(child: _player(trailing: _recording())),
-        ],
-      ),
-    ),
-  );
+  Set<AppArea> get _running => runningAreas(c);
 
-  Widget _tablet() => Scaffold(
-    key: _scaffold,
-    drawer: Drawer(
-      key: const Key('libraryDrawer'),
-      width: 340,
-      child: SafeArea(
-        child: LibraryView(
-          controller: c,
-          onSelected: () => _scaffold.currentState?.closeDrawer(),
-        ),
-      ),
-    ),
-    body: SafeArea(
-      key: const Key('layout:tablet'),
-      child: _player(
-        leading: BorderedButton(
-          key: const Key('libraryToggle'),
-          label: context.l10n.library,
-          icon: WsIcons.sidebar,
-          onPressed: () => _scaffold.currentState?.openDrawer(),
-        ),
-        trailing: _recording(),
-      ),
-    ),
-  );
+  /// #115: what plays in another area: the track in the area Metronome, the metronome elsewhere.
+  Widget? _miniBar({VoidCallback? onOpenTrack}) {
+    final area = c.area;
+    if (area == AppArea.metronome) {
+      return c.player.hasTrack
+          ? TrackMiniBar(controller: c, onOpen: onOpenTrack)
+          : null;
+    }
+    if (c.metronome.running) {
+      return MetronomeMiniBar(
+        controller: c,
+        onOpen: () => _setArea(AppArea.metronome),
+      );
+    }
+    return null;
+  }
 
-  Widget _phone() {
-    final showPlayer = _phonePlayer;
-    return PopScope(
-      canPop: !showPlayer,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && showPlayer) setState(() => _phonePlayer = false);
-      },
-      child: Scaffold(
-        key: const Key('layout:phone'),
-        body: SafeArea(
-          child: showPlayer
-              ? _player(
-                  leading: Builder(
-                    builder: (context) => SizedBox.square(
-                      dimension: WsLayout.of(context).target,
-                      child: IconButton(
-                        key: const Key('backToLibrary'),
-                        tooltip: context.l10n.backToLibrary,
-                        icon: const Icon(WsIcons.chevronLeft),
-                        onPressed: () => setState(() => _phonePlayer = false),
-                      ),
+  Widget _content({Widget? playerLeading}) => switch (c.area) {
+    AppArea.player => PlayerScreen(controller: c, leading: playerLeading),
+    AppArea.practice => _practice(),
+    AppArea.metronome => MetronomeScreen(controller: c),
+  };
+
+  Widget _desktop() {
+    final ws = WsTheme.of(context);
+    final mini = _miniBar(onOpenTrack: () => _setArea(c.trackArea));
+    return Scaffold(
+      key: const Key('layout:desktop'),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: ws.panel,
+                border: Border(bottom: BorderSide(color: ws.border)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  const Expanded(child: SizedBox()),
+                  AreaSwitcher(
+                    area: c.area,
+                    running: _running,
+                    onSelect: _setArea,
+                  ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _recording(),
                     ),
                   ),
-                )
-              : Column(
-                  children: [
-                    Expanded(
-                      child: LibraryView(
-                        controller: c,
-                        onSelected: () => setState(() => _phonePlayer = true),
-                      ),
-                    ),
-                    _NowPlayingBar(
-                      controller: c,
-                      onOpen: () => setState(() => _phonePlayer = true),
-                    ),
-                  ],
-                ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: c.area == AppArea.player
+                  ? Row(
+                      children: [
+                        Container(
+                          width: 280,
+                          color: ws.panel,
+                          child: LibraryView(
+                            controller: c,
+                            searchFocus: _searchFocus,
+                          ),
+                        ),
+                        const VerticalDivider(width: 1),
+                        Expanded(child: _content()),
+                      ],
+                    )
+                  : _content(),
+            ),
+            ?mini,
+          ],
         ),
       ),
     );
   }
 
-  Widget _player({Widget? leading, Widget? trailing}) => ListenableBuilder(
+  Widget _tablet() {
+    final mini = _miniBar(onOpenTrack: () => _setArea(c.trackArea));
+    return Scaffold(
+      key: _scaffold,
+      drawer: Drawer(
+        key: const Key('libraryDrawer'),
+        width: 340,
+        child: SafeArea(
+          child: LibraryView(
+            controller: c,
+            searchFocus: _searchFocus,
+            onSelected: () => _scaffold.currentState?.closeDrawer(),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        key: const Key('layout:tablet'),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                WsSpace.l,
+                WsSpace.m,
+                WsSpace.l,
+                0,
+              ),
+              child: Row(
+                spacing: WsSpace.m,
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: BorderedButton(
+                        key: const Key('libraryToggle'),
+                        label: context.l10n.library,
+                        icon: WsIcons.sidebar,
+                        onPressed: () => _scaffold.currentState?.openDrawer(),
+                      ),
+                    ),
+                  ),
+                  AreaSwitcher(
+                    area: c.area,
+                    running: _running,
+                    onSelect: _setArea,
+                  ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _recording(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: _content()),
+            ?mini,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _phone() {
+    final area = c.area;
+    final full = area == AppArea.player && _phonePlayer;
+    final Widget content;
+    Widget? mini;
+    if (area == AppArea.player && !full) {
+      content = LibraryView(
+        controller: c,
+        searchFocus: _searchFocus,
+        onSelected: () => setState(() => _phonePlayer = true),
+      );
+      mini = c.player.hasTrack
+          ? TrackMiniBar(
+              key: const Key('openPlayer'),
+              controller: c,
+              onOpen: () => setState(() => _phonePlayer = true),
+            )
+          : null;
+      if (c.metronome.running) {
+        mini = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [?_miniBar(), ?mini],
+        );
+      }
+    } else {
+      content = _content(
+        playerLeading: Builder(
+          builder: (context) => SizedBox.square(
+            dimension: WsLayout.of(context).target,
+            child: IconButton(
+              key: const Key('backToLibrary'),
+              tooltip: context.l10n.backToLibrary,
+              icon: const Icon(WsIcons.chevronDown),
+              onPressed: () => setState(() => _phonePlayer = false),
+            ),
+          ),
+        ),
+      );
+      mini = _miniBar(onOpenTrack: () => _setArea(c.trackArea));
+    }
+    return PopScope(
+      canPop: !full,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && full) setState(() => _phonePlayer = false);
+      },
+      child: Scaffold(
+        key: const Key('layout:phone'),
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Expanded(child: content),
+              ?mini,
+              AreaTabBar(
+                area: area,
+                running: _running,
+                onSelect: (a) {
+                  if (a == area && a == AppArea.player) {
+                    setState(() => _phonePlayer = false);
+                  }
+                  _setArea(a);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// #115/AK5: the area Practice: the practice screen without the metronome module.
+  Widget _practice() => ListenableBuilder(
     listenable: Listenable.merge([c.player, c.library]),
     builder: (context, _) {
       final p = c.player;
@@ -299,9 +472,7 @@ class _HomePageState extends State<HomePage> {
             ),
           Expanded(
             child: PlayerView(
-              leading: leading,
-              headerTrailing: trailing,
-              metronome: MetronomeModule(controller: c.metronome),
+              onChooseTrack: () => _setArea(AppArea.player),
               state: PlayerViewState(
                 title: p.hasTrack ? c.currentTitle : null,
                 artist: track?.artist,
@@ -323,7 +494,7 @@ class _HomePageState extends State<HomePage> {
               ),
               actions: PlayerViewActions(
                 open: () => c.pickAndImport(),
-                playPause: c.session.toggleTitle,
+                playPause: _practicePlayPause,
                 seek: p.seek,
                 volume: p.setVolume,
                 speedOn: p.setSpeedEnabled,
@@ -346,60 +517,6 @@ class _HomePageState extends State<HomePage> {
       );
     },
   );
-}
-
-/// Phone: Leiste unter der Bibliothek, öffnet die Übe-Seite (auch ohne Titel, fürs Metronom).
-class _NowPlayingBar extends StatelessWidget {
-  const _NowPlayingBar({required this.controller, required this.onOpen});
-  final AppController controller;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final ws = WsTheme.of(context);
-    final m = WsLayout.of(context);
-    return ListenableBuilder(
-      listenable: Listenable.merge([controller.player, controller.library]),
-      builder: (context, _) {
-        final p = controller.player;
-        return Material(
-          color: ws.panel,
-          child: InkWell(
-            key: const Key('openPlayer'),
-            onTap: onOpen,
-            child: Container(
-              constraints: BoxConstraints(minHeight: m.target + 8),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: ws.border)),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: WsSpace.l),
-              child: Row(
-                spacing: WsSpace.m,
-                children: [
-                  Icon(
-                    p.isPlaying ? WsIcons.pause : WsIcons.musicNote,
-                    size: 18,
-                    color: ws.amber,
-                  ),
-                  Expanded(
-                    child: Text(
-                      p.hasTrack
-                          ? controller.currentTitle ?? ''
-                          : context.l10n.practiceMetronome,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  Icon(WsIcons.chevronRight, size: 16, color: ws.muted),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 /// #39/AK6: how to install the app on iPhone and iPad (Share → Add to Home Screen); can be closed.

@@ -22,9 +22,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get backToLibrary => 'Zurück zur Bibliothek';
 
   @override
-  String get practiceMetronome => 'Üben · Metronom';
-
-  @override
   String get noFolder => 'Ohne Ordner';
 
   @override
@@ -437,9 +434,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get tap => 'Tap';
-
-  @override
   String get tapKey => 'Tap (T)';
 
   @override
@@ -485,33 +479,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get everyBars => 'Alle … Takte';
-
-  @override
-  String get done => 'Fertig';
-
-  @override
-  String get settings => 'Einstellungen';
-
-  @override
-  String moduleRampTime(int start, int target, int minutes) {
-    return 'Auto $start→$target BPM in $minutes min';
-  }
-
-  @override
-  String moduleRampBars(int step, int bars) {
-    String _temp0 = intl.Intl.pluralLogic(
-      bars,
-      locale: localeName,
-      other: '$bars Takte',
-      one: '1 Takt',
-    );
-    return 'Auto +$step BPM / $_temp0';
-  }
-
-  @override
-  String moduleDetails(String meter, String subdivision) {
-    return 'BPM · $meter · $subdivision';
-  }
 
   @override
   String loadNotFound(String file) {
@@ -765,4 +732,69 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get playlistOnThisDevice => 'Nur auf diesem Gerät';
+
+  @override
+  String get areas => 'Bereiche';
+
+  @override
+  String get areaPlayer => 'Player';
+
+  @override
+  String get areaPractice => 'Üben';
+
+  @override
+  String get areaMetronome => 'Metronom';
+
+  @override
+  String areaRunning(String area) {
+    return '$area, läuft';
+  }
+
+  @override
+  String get shuffle => 'Zufällige Wiedergabe';
+
+  @override
+  String get shuffleOn => 'Zufällige Wiedergabe an';
+
+  @override
+  String get repeatOff => 'Wiederholen: aus';
+
+  @override
+  String get repeatList => 'Wiederholen: Liste';
+
+  @override
+  String get repeatTrack => 'Wiederholen: Titel';
+
+  @override
+  String get previousTrack => 'Zum Anfang oder vorheriger Titel';
+
+  @override
+  String get nextTrack => 'Nächster Titel';
+
+  @override
+  String playingFrom(String list) {
+    return 'Aus «$list»';
+  }
+
+  @override
+  String get chooseOtherTrack => 'Anderen Titel wählen ›';
+
+  @override
+  String miniPaused(String time) {
+    return 'pausiert · $time';
+  }
+
+  @override
+  String get miniPlayTrack => 'Titel abspielen, stoppt das Metronom';
+
+  @override
+  String miniMetronome(int bpm) {
+    return 'Metronom · $bpm BPM';
+  }
+
+  @override
+  String get searchLibrary => 'Suchen';
+
+  @override
+  String get noSearchResults => 'Keine Treffer';
 }

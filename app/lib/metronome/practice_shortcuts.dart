@@ -31,7 +31,8 @@ class PracticeShortcuts extends StatelessWidget {
             ctx.findAncestorWidgetOfExactType<EditableText>() != null);
   }
 
-  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+  /// Handles [event]; public so that one Focus can switch between the shortcuts of the areas (#115).
+  KeyEventResult onKey(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent || _typing()) return KeyEventResult.ignored;
     final key = event.logicalKey;
     final shift = HardwareKeyboard.instance.isShiftPressed;
@@ -72,5 +73,5 @@ class PracticeShortcuts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Focus(autofocus: true, onKeyEvent: _onKey, child: child);
+      Focus(autofocus: true, onKeyEvent: onKey, child: child);
 }
