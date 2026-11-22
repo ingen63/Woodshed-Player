@@ -883,6 +883,200 @@ void main() {
       expect(read('lib/main.dart'), contains('installHint: installHintWanted'));
     });
   });
+
+  group('#110 closed hint «Add to Home Screen» stays away', () {
+    Future<void> pumpHome(WidgetTester tester, TestApp app, bool hint) =>
+        tester.pumpWidget(
+          MaterialApp(
+            locale: testLocale,
+            localizationsDelegates: testDelegates,
+            supportedLocales: testLocales,
+            theme: woodshedTheme(Brightness.light),
+            home: HomePage(controller: app.controller, installHint: hint),
+          ),
+        );
+
+    Library memoryLibrary(MemoryFileStore store) => Library(
+      store,
+      probe: (_) => 1,
+      readSource: (_) async => null,
+      saveDelay: Duration.zero,
+    );
+
+    testWidgets('#110/AK1 after closing, a new start shows no hint', (
+      tester,
+    ) async {
+      tester.view.physicalSize = phone;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final dir = Directory.systemTemp.createTempSync('wp_install_hint_110');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final first = TestApp(Directory('${dir.path}/lib'));
+      await tester.runAsync(first.library.load);
+      await pumpHome(tester, first, true);
+      expect(find.byKey(const Key('installHint')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('installHintClose')));
+      await tester.pump();
+      // the write to device.json is real file I/O
+      final device = File('${dir.path}/lib/device.json');
+      await waitUntil(
+        tester,
+        () => device.readAsStringSync().contains('"installHintClosed":true'),
+        'device.json remembers the closed hint',
+      );
+      expect(find.byKey(const Key('installHint')), findsNothing);
+      expect(first.library.installHintClosed, isTrue);
+
+      // reload / restart: a new library reads device.json again
+      final second = TestApp(Directory('${dir.path}/lib'));
+      await tester.runAsync(second.library.load);
+      expect(second.library.installHintClosed, isTrue);
+      await pumpHome(tester, second, true);
+      await tester.pump();
+      expect(find.byKey(const Key('installHint')), findsNothing);
+    });
+
+    test('#110/AK1 the choice is kept in device.json', () async {
+      final store = MemoryFileStore();
+      final lib = memoryLibrary(store);
+      await lib.load();
+      expect(lib.installHintClosed, isFalse);
+      expect(
+        utf8.decode(store.files['device.json']!),
+        isNot(contains('installHintClosed')),
+      );
+      await lib.closeInstallHint();
+      expect(lib.installHintClosed, isTrue);
+      final device =
+          jsonDecode(utf8.decode(store.files['device.json']!)) as Map;
+      expect(device['installHintClosed'], isTrue);
+      final again = memoryLibrary(store);
+      await again.load();
+      expect(again.installHintClosed, isTrue);
+      // the device ID and other device settings stay
+      expect(again.device.deviceId, lib.device.deviceId);
+    });
+
+    test('#110/AK1 closing twice notifies and writes only once', () async {
+      final store = _CountingStore();
+      final lib = memoryLibrary(store);
+      await lib.load();
+      var notified = 0;
+      lib.addListener(() => notified++);
+      final before = store.deviceWrites;
+      await lib.closeInstallHint();
+      await lib.closeInstallHint();
+      expect(notified, 1);
+      expect(store.deviceWrites, before + 1);
+    });
+
+    test('#110/AK1 only a true value counts as closed', () async {
+      for (final v in ['false', '1', '"yes"', 'null']) {
+        final store = MemoryFileStore();
+        store.files['device.json'] = bytes(
+          '{"deviceId":"0123456789abcdef","installHintClosed":$v}',
+        );
+        final lib = memoryLibrary(store);
+        await lib.load();
+        expect(lib.installHintClosed, isFalse, reason: v);
+      }
+    });
+
+    test('#110/AK2 the choice is device-local and never synced', () async {
+      final cloud = InMemoryProvider();
+      final a = await webDevice(cloud);
+      await a.add('a', 10);
+      await a.library.closeInstallHint();
+      await a.library.save();
+      await a.sync.syncNow();
+      expect(
+        utf8.decode(a.store.files['library.json']!),
+        isNot(contains('installHintClosed')),
+      );
+      expect(
+        a.library.state.settings.values.keys,
+        isNot(contains('installHintClosed')),
+      );
+      for (final f in cloud.files.entries) {
+        expect(
+          utf8.decode(f.value, allowMalformed: true),
+          isNot(contains('installHintClosed')),
+          reason: f.key,
+        );
+      }
+      final b = await webDevice(cloud);
+      await b.sync.syncNow();
+      expect(b.library.tracks, hasLength(1));
+      expect(b.library.installHintClosed, isFalse);
+    });
+
+    testWidgets('#110/AK3 not closed: the hint shows as before', (
+      tester,
+    ) async {
+      tester.view.physicalSize = phone;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final dir = Directory.systemTemp.createTempSync('wp_install_hint_110');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final app = TestApp(Directory('${dir.path}/lib'));
+      await tester.runAsync(app.library.load);
+      expect(app.library.installHintClosed, isFalse);
+      await pumpHome(tester, app, true);
+      expect(find.byKey(const Key('installHint')), findsOneWidget);
+      // installed or another device (installHint false): no hint, closed or not
+      await pumpHome(tester, app, false);
+      expect(find.byKey(const Key('installHint')), findsNothing);
+    });
+
+    testWidgets(
+      '#110/AK4 storing fails: closed for this run, shown again next start, no message',
+      (tester) async {
+        tester.view.physicalSize = phone;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final store = _ReadOnlyDeviceStore();
+        final lib = memoryLibrary(store);
+        await tester.runAsync(lib.load);
+        await tester.runAsync(lib.closeInstallHint);
+        expect(lib.installHintClosed, isTrue); // this run
+        expect(lib.lastError, isNull);
+        expect(store.files['device.json'], isNull);
+        final again = memoryLibrary(store);
+        await tester.runAsync(again.load);
+        expect(again.installHintClosed, isFalse); // next start: as before
+        expect(again.lastError, isNull);
+
+        // and in the UI no message appears when closing fails: device.json is a folder, nothing is written
+        final dir = Directory.systemTemp.createTempSync('wp_install_hint_110');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        Directory('${dir.path}/lib/device.json').createSync(recursive: true);
+        final app = TestApp(Directory('${dir.path}/lib'));
+        await tester.runAsync(app.library.load);
+        await pumpHome(tester, app, true);
+        expect(find.byKey(const Key('installHint')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('installHintClose')));
+        await tester.pump();
+        expect(find.byKey(const Key('installHint')), findsNothing);
+        expect(app.library.lastError, isNull);
+        expect(find.byKey(const Key('message')), findsNothing);
+      },
+    );
+
+    test('#110/AK5 native apps and the desktop never show the hint', () {
+      expect(
+        read('lib/app/platform_native.dart'),
+        contains('bool get installHintWanted => false;'),
+      );
+      expect(
+        wantsInstallHint(
+          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
+          maxTouchPoints: 0,
+          standalone: false,
+        ),
+        isFalse,
+      );
+    });
+  });
 }
 
 /// A store that cannot tell how much it uses (a browser without a storage estimate).
@@ -890,4 +1084,23 @@ class _NoStorageInfo extends MemoryFileStore {
   @override
   Future<StorageInfo> storageInfo() async =>
       throw UnsupportedError('no estimate');
+}
+
+/// Counts the writes of `device.json`.
+class _CountingStore extends MemoryFileStore {
+  int deviceWrites = 0;
+  @override
+  Future<void> write(String name, Uint8List bytes) {
+    if (name == 'device.json') deviceWrites++;
+    return super.write(name, bytes);
+  }
+}
+
+/// A browser that cannot store `device.json` (private browsing).
+class _ReadOnlyDeviceStore extends MemoryFileStore {
+  @override
+  Future<void> write(String name, Uint8List bytes) async {
+    if (name == 'device.json') throw StateError('storage not available');
+    return super.write(name, bytes);
+  }
 }

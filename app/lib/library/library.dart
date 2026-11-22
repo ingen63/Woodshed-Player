@@ -573,6 +573,17 @@ class Library extends ChangeNotifier {
     await saving;
   }
 
+  /// The hint «Add to Home Screen» was closed on this device (#110, device-local, never synced).
+  bool get installHintClosed => _device.installHintClosed;
+
+  /// Remembers that the hint was closed; a failed write keeps it closed for this run only (#110/AK4).
+  Future<void> closeInstallHint() async {
+    if (_device.installHintClosed) return;
+    final saving = _updateDevice(_device.copyWith(installHintClosed: true));
+    notifyListeners();
+    await saving;
+  }
+
   /// The file of track [id] is never removed to keep the limit («Keep offline»).
   bool keptOffline(String id) => _device.keepOffline.contains(id);
 

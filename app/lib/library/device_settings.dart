@@ -5,6 +5,7 @@
 // #39/AK3: the audio cache of this device: its limit, the tracks kept offline, the tracks whose file was
 // removed to stay below the limit (they stay in the library, their file is in the cloud) and when each
 // track was last used here (the oldest go first).
+// #110: whether the hint «Add to Home Screen» (#39/AK6) was closed in this browser on this device.
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -20,6 +21,7 @@ class DeviceSettings {
     this.evicted = const {},
     this.lastUsed = const {},
     this.libraryId,
+    this.installHintClosed = false,
   });
 
   static const fileName = 'device.json';
@@ -50,6 +52,9 @@ class DeviceSettings {
   /// holding another library ID is not merged.
   final String? libraryId;
 
+  /// The hint «Add to Home Screen» was closed here and stays away (#110). Written only once true.
+  final bool installHintClosed;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -57,6 +62,7 @@ class DeviceSettings {
     Set<String>? evicted,
     Map<String, int>? lastUsed,
     String? libraryId,
+    bool? installHintClosed,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -65,6 +71,7 @@ class DeviceSettings {
     evicted: evicted ?? this.evicted,
     lastUsed: lastUsed ?? this.lastUsed,
     libraryId: libraryId ?? this.libraryId,
+    installHintClosed: installHintClosed ?? this.installHintClosed,
   );
 
   Map<String, Object?> toJson() => {
@@ -75,6 +82,7 @@ class DeviceSettings {
     if (evicted.isNotEmpty) 'evicted': [...evicted]..sort(),
     if (lastUsed.isNotEmpty) 'lastUsed': lastUsed,
     if (libraryId != null) 'libraryId': libraryId,
+    if (installHintClosed) 'installHintClosed': true,
   };
 
   static String newDeviceId([Random? random]) {
@@ -113,6 +121,7 @@ class DeviceSettings {
               final String v when v.isNotEmpty => v,
               _ => null,
             },
+            installHintClosed: j['installHintClosed'] == true,
           );
         }
       }

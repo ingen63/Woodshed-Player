@@ -26,7 +26,8 @@ class HomePage extends StatefulWidget {
   });
   final AppController controller;
 
-  /// #39/AK6: hint «Add to Home Screen» on top until it is closed (iPhone/iPad in the browser).
+  /// #39/AK6: hint «Add to Home Screen» on top until it is closed (iPhone/iPad in the browser); once
+  /// closed it stays away on this device (#110).
   final bool installHint;
 
   /// Aufnahme-Knopf (#4); sichtbar nur auf macOS, Windows und Linux (#30/AK10).
@@ -38,7 +39,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool _phonePlayer = false; // Phone: Übe-Seite statt Bibliothek
-  bool _hintClosed = false;
   Timer? _metronomeTicker;
   final _scaffold = GlobalKey<ScaffoldState>();
 
@@ -192,11 +192,13 @@ class _HomePageState extends State<HomePage> {
             };
             return WsLayout(
               metrics: metrics,
-              child: widget.installHint && !_hintClosed
+              child: widget.installHint && !c.library.installHintClosed
                   ? Column(
                       children: [
                         _InstallHint(
-                          onClose: () => setState(() => _hintClosed = true),
+                          onClose: () => setState(
+                            () => unawaited(c.library.closeInstallHint()),
+                          ),
                         ),
                         Expanded(
                           child: MediaQuery.removePadding(
