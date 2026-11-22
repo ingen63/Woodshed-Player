@@ -13,6 +13,7 @@ const _scalarTypes = {
   'long long': 'Int64',
   'float': 'Float',
   'double': 'Double',
+  'size_t': 'Size', // #116
 };
 
 /// Native type of a pointer's target; `char` is bound as `Utf8` (C strings).
@@ -20,6 +21,8 @@ const _pointeeTypes = {
   'char': 'Utf8',
   'float': 'Float',
   'wp_player': '_Player',
+  'void': 'Void', // #116: file bytes
+  'wp_trim_result': '_TrimResult', // #116
 };
 
 /// Maps a C type from wp_core.h to the native type of the Dart binding, or `null` if unknown.
@@ -31,8 +34,10 @@ String? nativeTypeFor(String cType) {
       .trim();
   if (t.endsWith('*')) {
     final target = t.substring(0, t.length - 1).trim();
-    if (target.contains('*')) return null;
-    final native = _pointeeTypes[target];
+    // #116: a pointer to a pointer (wp_trim_result **out)
+    final native = target.endsWith('*')
+        ? nativeTypeFor(target)
+        : _pointeeTypes[target];
     return native == null ? null : 'Pointer<$native>';
   }
   return _scalarTypes[t];
@@ -198,6 +203,14 @@ void main() {
       define('WP_ERR_UNSUPPORTED_SAMPLE_RATE'),
     );
     expect(WpSampleRate.min, define('WP_MIN_SAMPLE_RATE'));
+    expect(
+      WpTrimmed.minSeconds,
+      double.parse(
+        RegExp(r'#define WP_TRIM_MIN_SECONDS ([\d.]+)')
+            .firstMatch(header)!
+            .group(1)!,
+      ),
+    );
     expect(WpSampleRate.max, define('WP_MAX_SAMPLE_RATE'));
     expect(WpCode.loadIdle, define('WP_LOAD_IDLE'));
     expect(WpCode.loadRunning, define('WP_LOAD_RUNNING'));
@@ -249,7 +262,15 @@ void main() {
       expect(nativeTypeFor('const char *'), 'Pointer<Utf8>');
       expect(nativeTypeFor('float *'), 'Pointer<Float>');
       expect(nativeTypeFor('wp_player *'), 'Pointer<_Player>');
-      expect(nativeTypeFor('char **'), isNull);
+      expect(nativeTypeFor('short *'), isNull);
+      // #116: sizes, untyped bytes and the result of wp_trim through an out pointer
+      expect(nativeTypeFor('size_t'), 'Size');
+      expect(nativeTypeFor('const void *'), 'Pointer<Void>');
+      expect(
+        nativeTypeFor('wp_trim_result **'),
+        'Pointer<Pointer<_TrimResult>>',
+      );
+      expect(nativeTypeFor('short **'), isNull);
     });
 
     test('#100/AK2: Double instead of Float in wp_set_volume is reported', () {
@@ -286,7 +307,7 @@ void main() {
       final extended = header.replaceFirst(
         'WP_API void wp_play(wp_player *p);',
         'WP_API void wp_play(wp_player *p);\n'
-            'WP_API unsigned short wp_new_call(wp_player *p, size_t n);',
+            'WP_API unsigned short wp_new_call(wp_player *p, ssize_t n);',
       );
       final findings = compareSignatures(extended, binding);
       expect(
@@ -298,7 +319,7 @@ void main() {
       );
       expect(
         findings,
-        contains((function: 'wp_new_call', detail: 'unknown C type "size_t"')),
+        contains((function: 'wp_new_call', detail: 'unknown C type "ssize_t"')),
       );
     });
 

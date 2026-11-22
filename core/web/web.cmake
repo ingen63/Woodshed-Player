@@ -36,6 +36,25 @@ add_library(wp_playercore STATIC src/player_core.cpp)
 target_link_libraries(wp_playercore PUBLIC wp_engine wp_miniaudio)
 wp_strict_warnings(wp_playercore)
 
+# #116: libFLAC (FLAC encoded again when trimming), the FLAC writer and the trimming itself, as natively
+set(WP_FLAC_DEFS FLAC__NO_DLL HAVE_CONFIG_H)
+set(WP_FLAC_INCLUDES ${WP_FLAC}/include ${CMAKE_CURRENT_SOURCE_DIR}/src/flac_config
+  ${WP_FLAC}/src/libFLAC/include)
+add_library(wp_flac STATIC ${WP_FLAC_SOURCES})
+target_compile_definitions(wp_flac PRIVATE ${WP_FLAC_DEFS})
+target_include_directories(wp_flac SYSTEM PUBLIC ${WP_FLAC_INCLUDES})
+target_compile_options(wp_flac PRIVATE ${WP_TEST_COMPILE})
+add_library(wp_flacwriter STATIC src/flac_writer.cpp)
+target_include_directories(wp_flacwriter PUBLIC src)
+target_link_libraries(wp_flacwriter PUBLIC wp_flac)
+wp_strict_warnings(wp_flacwriter)
+target_compile_options(wp_flacwriter PUBLIC ${WP_TEST_COMPILE})
+add_library(wp_trim STATIC src/trim.cpp)
+target_include_directories(wp_trim PUBLIC include src)
+target_link_libraries(wp_trim PUBLIC wp_miniaudio wp_flacwriter)
+target_link_options(wp_trim PUBLIC ${WP_TEST_LINK})
+wp_strict_warnings(wp_trim)
+
 enable_testing()
 foreach(t engine metronome waveform)
   add_executable(${t}_tests tests/${t}_tests.cpp)
@@ -49,6 +68,11 @@ target_include_directories(player_tests PRIVATE include)
 target_compile_definitions(player_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
 wp_strict_warnings(player_tests)
 add_test(NAME player_tests COMMAND player_tests)
+add_executable(trim_tests tests/trim_tests.cpp src/trim_api.cpp)
+target_link_libraries(trim_tests PRIVATE wp_trim wp_playercore)
+target_compile_definitions(trim_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
+wp_strict_warnings(trim_tests)
+add_test(NAME trim_tests COMMAND trim_tests)
 
 # #9: the same reference cases as natively; compared against the native outputs (#9/AK7)
 include(tests/reference.cmake)
@@ -58,14 +82,21 @@ include(tests/reference.cmake)
 include(tests/fuzz/fuzz.cmake)
 
 # ---- Kern fürs AudioWorklet ----
-add_executable(wp_core_web web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp src/miniaudio_impl.c ${WP_ENGINE_SOURCES})
+# #116: trimming (src/trim*.cpp, the FLAC writer and libFLAC) is part of the web core.
+set(WP_WEB_OWN web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp src/trim.cpp
+  src/trim_api.cpp src/flac_writer.cpp ${WP_ENGINE_SOURCES})
+add_executable(wp_core_web ${WP_WEB_OWN} src/miniaudio_impl.c ${WP_FLAC_SOURCES})
 target_include_directories(wp_core_web PRIVATE include web ${WP_ENGINE_INCLUDES})
-target_include_directories(wp_core_web SYSTEM PRIVATE ${WP_ENGINE_SYSTEM_INCLUDES} ${WP_THIRD_PARTY}/miniaudio)
-# #7: strict warnings for our own sources only, not for miniaudio_impl.c (compiles miniaudio itself).
+target_include_directories(wp_core_web SYSTEM PRIVATE ${WP_ENGINE_SYSTEM_INCLUDES} ${WP_THIRD_PARTY}/miniaudio
+  ${WP_FLAC_INCLUDES})
+# #7: strict warnings for our own sources only, not for miniaudio_impl.c (compiles miniaudio itself)
+# and libFLAC.
 if(WP_STRICT_WARNINGS)
-  set_source_files_properties(web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp ${WP_ENGINE_SOURCES}
+  set_source_files_properties(${WP_WEB_OWN}
     TARGET_DIRECTORY wp_core_web PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
 endif()
+set_source_files_properties(${WP_FLAC_SOURCES} TARGET_DIRECTORY wp_core_web PROPERTIES
+  COMPILE_DEFINITIONS "${WP_FLAC_DEFS}")
 target_compile_definitions(wp_core_web PRIVATE ${WP_MINIAUDIO_DEFS})
 target_compile_options(wp_core_web PRIVATE -msimd128 -O3 ${WP_WASM_EXCEPTIONS})
 target_link_options(wp_core_web PRIVATE -O3 ${WP_WASM_EXCEPTIONS} -sSTANDALONE_WASM --no-entry -sFILESYSTEM=0

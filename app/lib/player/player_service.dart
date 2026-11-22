@@ -145,6 +145,14 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
         corePlaying,
       );
       _countLoopPasses();
+      // #116/AK2: listening to a range ends at its end (or when playback stopped), back at its start
+      final preview = _preview;
+      if (preview != null &&
+          _seekTarget == null &&
+          (_position >= preview.$2 || (!_playing && _playGrace <= 0))) {
+        ended = false;
+        stopPreview();
+      }
     }
     if (!_playing && _pending == null && _seekTarget == null) {
       _timer?.cancel();
@@ -220,6 +228,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
       _playGrace = 0;
       _error = null;
       _settings = _normalized(p.settings, _duration);
+      _preview = null;
       _lastLoopPasses = core.loopPasses;
       _ramp.reset();
       _applySettings();
@@ -241,6 +250,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
     if (_playing) core.pause();
     _path = _title = _trackId = null;
     _playing = false;
+    _preview = null;
     _seekTarget = null;
     _position = _duration = 0;
     _settings = const PlaybackSettings();
@@ -276,6 +286,32 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
   }
 
   void togglePlayPause() => _playing ? pause() : play();
+
+  // ---- Listening to a range before trimming (#116/AK2) ----
+  (double, double)? _preview;
+
+  /// The range being listened to with [previewRange]; null otherwise.
+  (double, double)? get preview => _preview;
+
+  /// #116/AK2: plays [start] … [end] once, without the track's loop, and stops at [end] back at [start]. The
+  /// settings of the track stay as they are; its loop applies again afterwards.
+  void previewRange(double start, double end) {
+    if (!hasTrack) return;
+    _preview = (start, end);
+    core.clearLoop();
+    seek(start);
+    play();
+  }
+
+  /// Ends listening to a range: pauses at its start and puts the track's loop back.
+  void stopPreview() {
+    final p = _preview;
+    if (p == null) return;
+    _preview = null;
+    pause();
+    seek(p.$1);
+    _applySettings();
+  }
 
   /// #115/AK12: pause in the area Practice: stops and goes back to the loop start, without an active loop
   /// to the start of the track, so «Play» always begins at the start of the passage.

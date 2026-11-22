@@ -656,5 +656,149 @@
   "noSearchResults": "No matches",
   "@noSearchResults": {
     "description": "#115: search without a match"
+  },
+  "trimTrackEllipsis": "Trim start and end …",
+  "@trimTrackEllipsis": {
+    "description": "#116/AK1: context menu item of a track"
+  },
+  "trimUnavailable": "M4A files cannot be trimmed yet.",
+  "@trimUnavailable": {
+    "description": "#116: hint of the greyed out menu item for M4A"
+  },
+  "trimTitle": "Trim «{title}»",
+  "@trimTitle": {
+    "description": "#116/AK1: title of the trim view",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trimStart": "Start",
+  "@trimStart": {
+    "description": "#116/AK1: field and handle of the new start"
+  },
+  "trimEnd": "End",
+  "@trimEnd": {
+    "description": "#116/AK1: field and handle of the new end"
+  },
+  "trimRemaining": "Remaining: {length}",
+  "@trimRemaining": {
+    "description": "#116/AK1: length between the bounds, mm:ss.d",
+    "placeholders": {
+      "length": {
+        "type": "String"
+      }
+    }
+  },
+  "trimTimeHint": "mm:ss.d",
+  "@trimTimeHint": {
+    "description": "#116/AK1: hint in the time fields"
+  },
+  "trimRangeInvalid": "At least 1 s must remain, and the end must lie after the start.",
+  "@trimRangeInvalid": {
+    "description": "#116/AK7: bounds that cannot be used"
+  },
+  "trimPreview": "Listen",
+  "@trimPreview": {
+    "description": "#116/AK2: plays the part between the bounds"
+  },
+  "trimStopPreview": "Stop",
+  "@trimStopPreview": {
+    "description": "#116/AK2: stops listening"
+  },
+  "trimApply": "Trim …",
+  "@trimApply": {
+    "description": "#116/AK3: asks before trimming"
+  },
+  "trimConfirmTitle": "Trim the audio file?",
+  "@trimConfirmTitle": {
+    "description": "#116/AK3: title of the question before trimming"
+  },
+  "trimConfirmText": "The audio file of «{title}» keeps only {start} to {end}. The parts cut off are deleted; this cannot be undone.",
+  "@trimConfirmText": {
+    "description": "#116/AK3: question before trimming; start and end as mm:ss.d",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "trimConfirm": "Trim",
+  "@trimConfirm": {
+    "description": "#116/AK3: confirms trimming"
+  },
+  "trimming": "Trimming …",
+  "@trimming": {
+    "description": "#116: while the file is trimmed"
+  },
+  "trimFailedFormat": "«{title}» could not be trimmed: this file type cannot be trimmed, or the file is damaged.",
+  "@trimFailedFormat": {
+    "description": "#116/AK9",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trimFailedTooShort": "«{title}» was not trimmed: at least 1 s must remain.",
+  "@trimFailedTooShort": {
+    "description": "#116/AK7, AK9",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trimFailedNotOnDevice": "«{title}» could not be trimmed: its audio file is not on this device.",
+  "@trimFailedNotOnDevice": {
+    "description": "#116/AK9",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trimFailedNoSpace": "«{title}» could not be trimmed: there is not enough storage space. The track is unchanged.",
+  "@trimFailedNoSpace": {
+    "description": "#116/AK9",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trimFailedMemory": "«{title}» could not be trimmed: there is not enough memory. The track is unchanged.",
+  "@trimFailedMemory": {
+    "description": "#116/AK9",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trimFailedReadOnly": "«{title}» could not be trimmed: the library is from a newer version of the app and is read-only.",
+  "@trimFailedReadOnly": {
+    "description": "#116/AK9",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trimFailedOther": "«{title}» could not be trimmed: the file could not be read or written. The track is unchanged.",
+  "@trimFailedOther": {
+    "description": "#116/AK9",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
   }
 }

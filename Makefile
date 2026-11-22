@@ -198,7 +198,7 @@ sanitize-thread:
 # core/build-fuzz/artifacts/<target>/crash-* (or leak-, timeout-, oom-). Check it into
 # core/tests/fuzz/regressions/<target>/ once the bug is fixed.
 FUZZ_SECONDS ?= 60
-FUZZ_TARGETS ?= decoder capi
+FUZZ_TARGETS ?= decoder capi trim
 FUZZ_DIR      = core/build-fuzz
 FUZZ_CC      ?= $(if $(filter Darwin,$(shell uname -s)),$(LLVM_BIN)/clang,clang)
 FUZZ_CXX     ?= $(if $(filter Darwin,$(shell uname -s)),$(LLVM_BIN)/clang++,clang++)

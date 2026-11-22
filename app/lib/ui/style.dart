@@ -35,6 +35,7 @@ abstract final class WsIcons {
   static const tray = IconData(0xf871, fontFamily: _f, fontPackage: _p);
   static const add = IconData(0xf489, fontFamily: _f, fontPackage: _p);
   static const pencil = IconData(0xf37e, fontFamily: _f, fontPackage: _p);
+  static const scissors = IconData(0xf7c9, fontFamily: _f, fontPackage: _p);
   static const trash = IconData(0xf4c4, fontFamily: _f, fontPackage: _p);
   static const chevronDown = IconData(0xf5d5, fontFamily: _f, fontPackage: _p);
   static const chevronRight = IconData(0xf3d3, fontFamily: _f, fontPackage: _p);

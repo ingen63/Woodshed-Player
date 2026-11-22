@@ -456,6 +456,57 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get searchLibrary => pseudo(super.searchLibrary);
   @override
   String get noSearchResults => pseudo(super.noSearchResults);
+  @override
+  String get trimTrackEllipsis => pseudo(super.trimTrackEllipsis);
+  @override
+  String get trimUnavailable => pseudo(super.trimUnavailable);
+  @override
+  String trimTitle(String title) => pseudo(super.trimTitle(title));
+  @override
+  String get trimStart => pseudo(super.trimStart);
+  @override
+  String get trimEnd => pseudo(super.trimEnd);
+  @override
+  String trimRemaining(String length) => pseudo(super.trimRemaining(length));
+  @override
+  String get trimTimeHint => pseudo(super.trimTimeHint);
+  @override
+  String get trimRangeInvalid => pseudo(super.trimRangeInvalid);
+  @override
+  String get trimPreview => pseudo(super.trimPreview);
+  @override
+  String get trimStopPreview => pseudo(super.trimStopPreview);
+  @override
+  String get trimApply => pseudo(super.trimApply);
+  @override
+  String get trimConfirmTitle => pseudo(super.trimConfirmTitle);
+  @override
+  String trimConfirmText(String title, String start, String end) =>
+      pseudo(super.trimConfirmText(title, start, end));
+  @override
+  String get trimConfirm => pseudo(super.trimConfirm);
+  @override
+  String get trimming => pseudo(super.trimming);
+  @override
+  String trimFailedFormat(String title) =>
+      pseudo(super.trimFailedFormat(title));
+  @override
+  String trimFailedTooShort(String title) =>
+      pseudo(super.trimFailedTooShort(title));
+  @override
+  String trimFailedNotOnDevice(String title) =>
+      pseudo(super.trimFailedNotOnDevice(title));
+  @override
+  String trimFailedNoSpace(String title) =>
+      pseudo(super.trimFailedNoSpace(title));
+  @override
+  String trimFailedMemory(String title) =>
+      pseudo(super.trimFailedMemory(title));
+  @override
+  String trimFailedReadOnly(String title) =>
+      pseudo(super.trimFailedReadOnly(title));
+  @override
+  String trimFailedOther(String title) => pseudo(super.trimFailedOther(title));
 }
 
 /// Loads [PseudoLocalizations] for any locale.

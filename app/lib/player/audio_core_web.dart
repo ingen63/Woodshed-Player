@@ -298,6 +298,22 @@ class WebAudioCore implements AudioCore {
 
   static int _code(JSObject track) => (track['code'] as JSNumber).toDartInt;
 
+  /// #116: cuts the file [bytes] to [start] … [end] seconds in the loader worker, with the same core code as
+  /// natively (MP3, WAV, FLAC and AAC in ADTS; the browser only decodes AAC, it does not cut it).
+  Future<WpTrimmed> trim(Uint8List bytes, double start, double end) async {
+    final copy = Uint8List.fromList(bytes).buffer.toJS;
+    final r =
+        (await _ask('trim', [copy, start.toJS, end.toJS], [copy])) as JSObject;
+    final code = (r['code'] as JSNumber).toDartInt;
+    final out = r['bytes'];
+    if (code != WpCode.ok || out == null) return WpTrimmed.failed(code);
+    return WpTrimmed(
+      (out as JSUint8Array).toDart,
+      (r['start'] as JSNumber).toDartDouble,
+      (r['end'] as JSNumber).toDartDouble,
+    );
+  }
+
   /// AAC/M4A u. a.: the browser decodes, the worker converts to stereo at the context's rate. null if the
   /// browser cannot decode it either.
   Future<JSObject?> _decodeInBrowser(Uint8List bytes) async {

@@ -26,6 +26,7 @@ Future<TestApp> pumpApp(
   List<String> titles = const ['Ärger', 'Bossa', 'Zebra'],
   Map<String, Uint8List> files = const {},
   SyncService? sync,
+  AudioTrimmer? trimmer,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -35,6 +36,7 @@ Future<TestApp> pumpApp(
   final app = TestApp(
     Directory('${dir.path}/lib'),
     sync: sync == null ? null : (_) => sync,
+    trimmer: trimmer,
   );
   await tester.runAsync(() async {
     await app.library.load();

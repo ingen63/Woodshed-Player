@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "flac_writer.hpp"
 #include "wp_core.h"
 #include "wp_core_web.h"
 
@@ -875,6 +876,49 @@ std::vector<unsigned char> wavInMemory(int rate, int frames) {
   return b;
 }
 
+// #116: trimming through the C API. A 2 s WAV (16 bit, 44.1 kHz) cut to [0.5, 1.75] keeps
+// round(0.5 × 44100) = 22050 to round(1.75 × 44100) = 77175, that is 55125 frames of 2 bytes after
+// the 44-byte header; the same sine as FLAC (encoded by libFLAC) stays FLAC and lossless. The new
+// files are recorded byte by byte, so native and WASM must cut and encode to the same bytes.
+void trimInMemory() {
+  const auto wav = wavInMemory(kRate, 2 * kRate);
+  wp_trim_result *r = nullptr;
+  CHECK(wp_trim(wav.data(), wav.size(), 0.5, 1.75, &r) == WP_OK);
+  if (!r)
+    return;
+  CHECK(wp_trim_size(r) == 44 + 55125 * 2);
+  CHECK(wp_trim_start(r) == 22050.0 / kRate && wp_trim_end(r) == 77175.0 / kRate);
+  const auto *bytes = static_cast<const unsigned char *>(wp_trim_data(r));
+  // the samples are those of the old file from frame 22050 on
+  CHECK(std::equal(bytes + 44, bytes + wp_trim_size(r), wav.begin() + 44 + 22050 * 2));
+  record("trim_wav", std::vector<float>(bytes, bytes + wp_trim_size(r)));
+  wp_trim_free(r);
+
+  std::vector<uint8_t> flac;
+  wp::FlacWriter w;
+  CHECK(w.openMemory(&flac, kRate, 1, 16));
+  std::vector<int32_t> pcm;
+  for (size_t i = 44; i + 1 < wav.size(); i += 2)
+    pcm.push_back(static_cast<int16_t>(wav[i] | (wav[i + 1] << 8)));
+  CHECK(w.writeInt(pcm.data(), static_cast<uint32_t>(pcm.size())));
+  CHECK(w.close());
+  CHECK(wp_trim(flac.data(), flac.size(), 0.5, 1.75, &r) == WP_OK);
+  if (!r)
+    return;
+  CHECK(std::memcmp(wp_trim_data(r), "fLaC", 4) == 0);
+  wp_player *p = wp_web_create(kRate);
+  CHECK(wp_web_load_encoded(p, wp_trim_data(r), wp_trim_size(r)) == WP_OK);
+  CHECK(std::lround(wp_duration(p) * kRate) == 55125);
+  const auto *b = static_cast<const unsigned char *>(wp_trim_data(r));
+  record("trim_flac", std::vector<float>(b, b + wp_trim_size(r)));
+  wp_trim_free(r);
+  wp_destroy(p);
+  // too short, M4A-like or no audio: an error and no result
+  CHECK(wp_trim(wav.data(), wav.size(), 0.5, 1.25, &r) == WP_ERR_INVALID_ARGUMENT && !r);
+  const std::string junk(512, 'x');
+  CHECK(wp_trim(junk.data(), junk.size(), 0.0, 1.0, &r) == WP_ERR_UNSUPPORTED_FORMAT && !r);
+}
+
 void webEntryPointsAtTheirLimits() {
   // #11 (found by mutation testing): the browser entry points of wp_core_web.h at their limits.
   // A title decoded into a track (0.5 s at 8000 Hz = 4000 frames) has its length, duration and
@@ -1107,6 +1151,7 @@ int main(int argc, char **argv) {
   run("#9/AK7 load from file, waveform, errors", loadFromFile);
   run("#9/AK7 recording unavailable offline", recordingUnavailableOffline);
   run("#11 browser entry points at their limits", webEntryPointsAtTheirLimits);
+  run("#116/AK4 #116/AK7 trimming WAV and FLAC in memory", trimInMemory);
   run("#76/AK1 #76/AK2 sample rate lower limit", sampleRateLowerLimit);
   run("#97/AK1 #97/AK2 #97/AK3 sample rate upper limit", sampleRateUpperLimit);
 

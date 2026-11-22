@@ -6,12 +6,16 @@
 // in `device.json` (device_settings.dart).
 // #114: playlists (named lists of track IDs in their own order) are records of the shared state too; one
 // «only on this device» never leaves the device.
+// #116: trimming a track's file gives it a new ID (the SHA-256 of the new file). The old record becomes a
+// tombstone naming its successor (`replacedBy`), so every device shows the trimmed track instead of the old
+// one, and a playlist entry made elsewhere for the old ID finds the new one.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart';
+import 'package:wp_core/wp_types.dart' show WpCode, WpTrimmed;
 
 import '../app/file_platform.dart';
 import 'device_settings.dart';
@@ -75,6 +79,44 @@ class ImportFailed extends LibraryMessage {
   final List<String> files;
 }
 
+/// #116/AK9: why trimming a track failed; the UI words it in the user's language.
+enum TrimProblem {
+  /// The format cannot be trimmed (M4A) or the file is damaged.
+  format,
+
+  /// Less than 1 s would remain.
+  tooShort,
+
+  /// The audio file is not on this device.
+  notOnDevice,
+
+  /// No space left to store the trimmed file.
+  noSpace,
+
+  /// Not enough memory to trim.
+  memory,
+
+  /// The library is from a newer app and read-only.
+  readOnly,
+
+  /// Anything else (a read or write error).
+  failed,
+}
+
+/// #116/AK9: trimming [title] failed for [problem]; the track is unchanged.
+class TrimFailed extends LibraryMessage {
+  const TrimFailed(this.title, this.problem);
+  final String title;
+  final TrimProblem problem;
+}
+
+/// #116: cuts an audio file to [start] … [end] seconds (the core: FFI natively, WASM in the browser).
+typedef AudioTrimmer = Future<WpTrimmed> Function(
+  Uint8List bytes,
+  double start,
+  double end,
+);
+
 class ImportResult {
   const ImportResult(this.imported, this.failed, [this.duplicates = const []]);
   final List<Track> imported;
@@ -118,6 +160,10 @@ class Library extends ChangeNotifier {
   static String trackName(String fileName) => LibraryFiles.trackName(fileName);
   static String _artworkName(String id) => LibraryFiles.artworkName(id);
 
+  /// Name of the cover picture of track [id] in the store.
+  @visibleForTesting
+  static String artworkNameFor(String id) => _artworkName(id);
+
   List<Track> _tracks = [];
   List<TrackFolder> _folders = [];
 
@@ -138,6 +184,34 @@ class Library extends ChangeNotifier {
 
   /// Tracks whose audio file is not on this device (synced from another one, #37).
   final _absent = <String>{};
+
+  /// #116: tracks trimmed since the last commit: old ID → new ID.
+  final _replacements = <String, String>{};
+
+  /// #116: field of a trimmed track's tombstone naming the ID of the trimmed track.
+  static const replacedByField = 'replacedBy';
+
+  /// #116/AK8: the record was replaced by a trimmed track. It stays hidden even when a change made elsewhere
+  /// at the same time revives it (no second track; the next save deletes it again); importing the old file
+  /// anew stamps its file name later than the replacement and brings it back.
+  static bool replaced(StampedRecord r) {
+    final by = r.stamps[replacedByField];
+    final file = r.stamps['fileName'];
+    return r.values[replacedByField] is String &&
+        by != null &&
+        (file == null || !(file > by));
+  }
+
+  /// #116: the track [id] stands for now: the trimmed one if it was replaced, possibly more than once.
+  String current(String id) {
+    var at = id;
+    for (var i = 0; i < 16; i++) {
+      final r = _state.tracks[at];
+      if (r == null || !replaced(r)) break;
+      at = r.values[replacedByField] as String;
+    }
+    return at;
+  }
 
   /// Called after the library saved a change made on this device (not after [mergeRemote]); the sync
   /// engine schedules a sync (#37).
@@ -385,7 +459,7 @@ class Library extends ChangeNotifier {
     final folderIds = {for (final f in _folders) f.id};
     _tracks = [
       for (final e in _state.tracks.entries)
-        if (e.value.alive)
+        if (e.value.alive && !replaced(e.value))
           switch (Track.fromShared(e.key, e.value.values)) {
             final t
                 when t.folderId != null && !folderIds.contains(t.folderId) =>
@@ -438,10 +512,21 @@ class Library extends ChangeNotifier {
             old[e.key]?.update(e.value, stamp) ??
             StampedRecord.create(e.value, stamp),
     };
+    final tracks = records(_state.tracks, {
+      for (final t in _tracks) t.id: t.toShared(),
+    });
+    // #116: a trimmed track's old record names its successor in the same stamp as its deletion
+    for (final MapEntry(key: old, value: next) in _replacements.entries) {
+      final r = _state.tracks[old];
+      if (r != null && r.alive && !tracks[old]!.alive) {
+        tracks[old] = r
+            .update({...r.values, replacedByField: next}, stamp)
+            .delete(stamp);
+      }
+    }
+    _replacements.clear();
     _state = SharedState(
-      tracks: records(_state.tracks, {
-        for (final t in _tracks) t.id: t.toShared(),
-      }),
+      tracks: tracks,
       folders: records(_state.folders, {
         for (final f in _folders) f.id: f.toShared(),
       }),
@@ -1261,7 +1346,8 @@ class Library extends ChangeNotifier {
     final p = playlist(id);
     if (p == null) return const [];
     final byId = {for (final t in _tracks) t.id: t};
-    return [for (final e in p.entries) ?byId[e]];
+    // #116: an entry for a track trimmed on another device finds the trimmed one
+    return [for (final e in p.entries) ?byId[current(e)]];
   }
 
   /// New playlist, shared on all devices (#114/AK9); a blank [name] becomes [fallback].
@@ -1355,6 +1441,143 @@ class Library extends ChangeNotifier {
     _playlists[i] = next;
     save();
     notifyListeners();
+  }
+
+  // ---- Trimming (#116) ----
+
+  /// #116: whether a track of this file type can be trimmed: MP3, WAV, FLAC and AAC (ADTS). M4A cannot
+  /// (the menu item stays greyed out with a hint).
+  static bool trimmable(Track t) {
+    final name = t.fileName;
+    final dot = name.lastIndexOf('.');
+    final ext = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
+    return const {'mp3', 'wav', 'flac', 'aac'}.contains(ext);
+  }
+
+  /// #116: cuts the audio file of track [id] to [start] … [end] seconds with [trim]; the old file is not
+  /// kept. The track gets the ID of the new file and keeps title, artist, folder, playlists, order and
+  /// tempo (AK5); its loops move by the part cut off at the start, are clamped to the new length or dropped
+  /// (AK6). The old record becomes a tombstone naming the new ID, so a sync replaces the track on the other
+  /// devices and removes the old file from the cloud (AK8). Returns the new ID; null on failure, with
+  /// [lastError] set to [TrimFailed] and the track unchanged (AK9).
+  Future<String?> trimTrack(
+    String id,
+    double start,
+    double end,
+    AudioTrimmer trim,
+  ) async {
+    final t = track(id);
+    if (t == null) return null;
+    String? fail(TrimProblem p) {
+      lastError = TrimFailed(t.title, p);
+      notifyListeners();
+      return null;
+    }
+
+    if (_readOnly) return fail(TrimProblem.readOnly);
+    if (!trimmable(t)) return fail(TrimProblem.format);
+    if (end - start < WpTrimmed.minSeconds) return fail(TrimProblem.tooShort);
+    if (!hasFile(id)) return fail(TrimProblem.notOnDevice);
+    final Uint8List? bytes;
+    final WpTrimmed cut;
+    try {
+      bytes = await store.read(trackName(t.fileName));
+      if (bytes == null) return fail(TrimProblem.notOnDevice);
+      cut = await trim(bytes, start, end);
+    } catch (_) {
+      return fail(TrimProblem.failed);
+    }
+    final out = cut.bytes;
+    if (cut.code != WpCode.ok || out == null) {
+      return fail(switch (cut.code) {
+        WpCode.invalidArgument => TrimProblem.tooShort,
+        WpCode.unsupportedFormat => TrimProblem.format,
+        WpCode.outOfMemory => TrimProblem.memory,
+        _ => TrimProblem.failed,
+      });
+    }
+    final newId = out.length > _hashInline
+        ? await compute(_sha256Hex, out)
+        : _sha256Hex(out);
+    if (newId == id) return id; // nothing was cut off
+    final dot = t.fileName.lastIndexOf('.');
+    final fileName = '$newId${dot < 0 ? '' : t.fileName.substring(dot)}';
+    final dest = trackName(fileName);
+    try {
+      await store.write(dest, out);
+    } catch (e) {
+      await store.delete(dest).catchError((_) {});
+      return fail(_isNoSpace(e) ? TrimProblem.noSpace : TrimProblem.failed);
+    }
+    var artwork = false;
+    if (t.hasArtwork) {
+      try {
+        final a = await store.read(_artworkName(id));
+        if (a != null) {
+          await store.write(_artworkName(newId), a);
+          artwork = true;
+        }
+      } catch (_) {} // the track goes on without its picture
+    }
+    final i = _tracks.indexWhere((x) => x.id == id);
+    if (i < 0 || _readOnly) {
+      // deleted (or replaced by a sync) meanwhile: the new file is not needed
+      await store.delete(dest).catchError((_) {});
+      await store.delete(_artworkName(newId)).catchError((_) {});
+      return null;
+    }
+    _tracks[i] = _tracks[i].trimmed(
+      id: newId,
+      fileName: fileName,
+      start: cut.start,
+      duration: cut.end - cut.start,
+      hasArtwork: artwork,
+    );
+    // the trimmed file may already be in the library as a track of its own: this one takes its place
+    _tracks.removeWhere((x) => x.id == newId && !identical(x, _tracks[i]));
+    _replacements[id] = newId;
+    _playlists = [
+      for (final p in _playlists)
+        p.entries.contains(id)
+            ? p.copyWith(
+                entries: [for (final e in p.entries) e == id ? newId : e],
+              )
+            : p,
+    ];
+    if (inUse == id) inUse = newId;
+    _absent.remove(newId);
+    final d = _device;
+    _shared = null;
+    await _updateDevice(
+      d.copyWith(
+        keepOffline: d.keepOffline.contains(id)
+            ? ({...d.keepOffline}
+                ..remove(id)
+                ..add(newId))
+            : null,
+        lastUsed: d.lastUsed.containsKey(id)
+            ? ({...d.lastUsed}..[newId] = d.lastUsed[id]!)
+            : null,
+        heldTracks: d.heldTracks.contains(id)
+            ? ({...d.heldTracks}..remove(id))
+            : null,
+      ),
+    );
+    _forgetOnDevice({id});
+    await store.delete(trackName(t.fileName)).catchError((_) {});
+    await store.delete(_artworkName(id)).catchError((_) {});
+    save();
+    notifyListeners();
+    unawaited(refreshStorage());
+    return newId;
+  }
+
+  /// #116/AK9: the write failed for lack of space (file system: ENOSPC; browser: QuotaExceededError).
+  static bool _isNoSpace(Object e) {
+    final s = '$e'.toLowerCase();
+    return s.contains('no space') ||
+        s.contains('errno = 28') ||
+        s.contains('quota');
   }
 
   // ---- Title and artist (#24) ----

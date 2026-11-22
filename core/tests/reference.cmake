@@ -2,14 +2,15 @@
 # web/web.cmake (WebAssembly under Node.js) after wp_playercore exists.
 #
 # wp_core_offline is the C API of wp_core.h without an audio device: web/wp_core_web.cpp (the same
-# source as the browser core) with file loading (WP_WEB_FILES) and src/recorder_stub.cpp. The
+# source as the browser core) with file loading (WP_WEB_FILES), src/recorder_stub.cpp and #116
+# src/trim_api.cpp. The
 # native run writes every recorded output to reference_native.bin in its build folder; the WASM
 # run compares against core/build/reference_native.bin (WP_REFERENCE_DUMP), tolerance 1e-6
 # (#9/AK7). reference_api_coverage fails if a WP_API function of wp_core.h has no reference case.
-add_library(wp_core_offline STATIC web/wp_core_web.cpp src/recorder_stub.cpp)
+add_library(wp_core_offline STATIC web/wp_core_web.cpp src/recorder_stub.cpp src/trim_api.cpp)
 target_include_directories(wp_core_offline PUBLIC include web)
 target_compile_definitions(wp_core_offline PUBLIC WP_WEB_FILES)
-target_link_libraries(wp_core_offline PUBLIC wp_playercore)
+target_link_libraries(wp_core_offline PUBLIC wp_playercore wp_trim)
 wp_strict_warnings(wp_core_offline)
 wp_mutate(wp_core_offline)
 

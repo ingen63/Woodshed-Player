@@ -1,6 +1,7 @@
 // Dienste der App auf Desktop und Handy (#34 trennt sie vom Web): Bibliothek im App-Ordner, Audio-Kern
 // über FFI mit eigenem Audiogerät, Aufnahme auf macOS. Gegenstück im Browser: platform_web.dart.
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:wp_core/wp_core.dart';
@@ -49,6 +50,9 @@ Future<AppController> createAppController({
     player: PlayerService(WpAudioCore(player)),
     metronome: metronome,
     files: files,
+    // #116: FLAC is encoded again, so the cut runs off the UI isolate
+    trimmer: (bytes, start, end) =>
+        Isolate.run(() => wpTrim(bytes, start, end)),
   );
   await controller.start();
   return controller;

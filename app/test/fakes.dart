@@ -252,6 +252,7 @@ class TestApp {
     double? duration = 30,
     SyncService Function(Library library)? sync,
     Random? random,
+    AudioTrimmer? trimmer,
   }) {
     library = Library(
       IoFileStore(dir),
@@ -275,6 +276,7 @@ class TestApp {
       files: files,
       sync: sync?.call(library),
       random: random ?? Random(7),
+      trimmer: trimmer,
     );
   }
 
@@ -309,11 +311,26 @@ class MemoryFileStore extends FileStore {
   bool persisted = false;
   Completer<void>? hashGate;
 
+  /// #116/AK9: every write fails with this text (e.g. «No space left on device»); null: writes work.
+  String? failWrites;
+
   @override
   Future<Uint8List?> read(String name) async => files[name];
+
+  /// #116/AK9: writes fail after leaving part of the file behind (the disk filled up while writing).
+  bool partialWrites = false;
+
   @override
-  Future<void> write(String name, Uint8List bytes) async =>
-      files[name] = Uint8List.fromList(bytes);
+  Future<void> write(String name, Uint8List bytes) async {
+    if (failWrites case final e?) {
+      if (partialWrites) {
+        files[name] = Uint8List.fromList(bytes.take(3).toList());
+      }
+      throw Exception(e);
+    }
+    files[name] = Uint8List.fromList(bytes);
+  }
+
   @override
   Future<bool> exists(String name) async => files.containsKey(name);
   @override

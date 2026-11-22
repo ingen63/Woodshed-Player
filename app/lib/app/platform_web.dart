@@ -50,6 +50,7 @@ Future<AppController> createAppController({
     player: PlayerService(core),
     metronome: metronome,
     files: files,
+    trimmer: core.trim, // #116: in the core's loader worker
   );
   if (WebMediaSession.create() case final api?) {
     MediaSessionLink(api, controller); // lives as long as the page

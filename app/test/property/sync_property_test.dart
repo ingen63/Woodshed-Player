@@ -14,6 +14,9 @@
 // - #114: playlists are created, renamed, filled, reordered, emptied, deleted and switched between «on all
 //   devices» and «only on this device» at random; the merge stays commutative and associative, the devices
 //   converge, and a playlist only on one device never reaches another device or the cloud (#114/AK10).
+// - #116: tracks are trimmed at random (new ID); every device shows the trimmed track instead of the old one,
+//   the old audio file leaves the cloud (#116/AK8), the merge stays commutative and associative and the
+//   devices converge. Importing the old file again later brings it back as a track of its own.
 // - AK7, #53/AK5: a damaged device file in the cloud (foreign version number, missing stamps, changed
 //   types, extreme values, truncated) never crashes the sync and never loses local data; it is skipped
 //   without an error (a newer format gets an understandable message in every language) and read again
@@ -35,7 +38,7 @@ import 'package:woodshed_player/ui/messages.dart';
 import '../fakes.dart';
 import 'corrupt.dart';
 import 'library_property_test.dart'
-    show playlistStep, randomSettings, randomText;
+    show playlistStep, randomSettings, randomText, trimStep;
 import 'property.dart';
 
 final en = lookupAppLocalizations(const Locale('en'));
@@ -124,6 +127,9 @@ void main() {
       final deletions = <(String, Hlc)>[];
       // #98/AK5: newest change of each track seen on any device
       final lastChange = <String, Hlc>{};
+      // #116: old ID → stamp of its tombstone for every trim; old IDs imported again afterwards
+      final trims = <String, Hlc>{};
+      final reimported = <String>{};
       final steps = 10 + r.nextInt(30);
       // #104/AK5: step from which a device syncs; before that it works on its own library only
       final joinAt = {
@@ -141,7 +147,7 @@ void main() {
           clock = clock.add(Duration(days: 85 + r.nextInt(20)));
           log.add('+days');
         }
-        switch (r.nextInt(10)) {
+        switch (r.nextInt(11)) {
           case 0 || 1:
             final names = [
               for (final s in sources.keys)
@@ -152,6 +158,9 @@ void main() {
               ...res.imported.map((t) => t.id),
               ...res.duplicates.map((t) => t.id),
             ]);
+            reimported.addAll(
+              res.imported.map((t) => t.id).where(trims.containsKey),
+            );
             log.add('${d.name} import ${names.length}');
           case 2:
             if (ids.isNotEmpty) {
@@ -187,6 +196,22 @@ void main() {
             }
           case 7:
             log.add('${d.name} ${playlistStep(r, lib)}');
+          case 8:
+            // #116: the old ID counts as deleted, the new one as imported
+            final before = {for (final t in lib.tracks) t.id};
+            final what = await trimStep(r, lib);
+            final after = {for (final t in lib.tracks) t.id};
+            if (what == 'trim') {
+              final old = before.difference(after).single;
+              final next = after.difference(before).single;
+              final stamp = lib.state.tracks[old]!.deleted!;
+              trims[old] = stamp;
+              reimported.remove(old);
+              deleted.add(old);
+              imported.add(next);
+              deletions.add(('t$old', stamp));
+            }
+            log.add('${d.name} $what');
           default:
             if (step < joinAt[d]!) {
               log.add('${d.name} not yet');
@@ -298,6 +323,29 @@ void main() {
           cloud.files.keys.any((k) => k.startsWith('audio/$id')),
           isTrue,
           reason: 'audio not in the cloud: $reason',
+        );
+      }
+
+      // #116/AK8: a trimmed track shows nowhere under its old ID and its old audio file is gone from the cloud,
+      // unless the old file was imported again afterwards, here or (#104, #107) as an own copy of a device
+      // that kept it, which stamps its file name later than the trim. As for a deleted track, this holds while
+      // the tombstone exists: once purged (a device offline for more than 90 days), #98, #104 and #107 decide
+      // (one may be held back until the user answers, the cloud file stays).
+      for (final MapEntry(key: old, value: stamp) in trims.entries) {
+        final horizon = end.purged;
+        final file = end.tracks[old]?.stamps['fileName'];
+        if (reimported.contains(old) ||
+            (horizon != null && !(stamp > horizon)) ||
+            (file != null && file > stamp)) {
+          continue;
+        }
+        for (final d in devices) {
+          expect(d.library.track(old), isNull, reason: '$old shown: $reason');
+        }
+        expect(
+          cloud.files.keys.any((k) => k.startsWith('audio/$old')),
+          isFalse,
+          reason: 'old audio of $old in the cloud: $reason',
         );
       }
 

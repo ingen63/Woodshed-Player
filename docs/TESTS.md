@@ -51,6 +51,8 @@ zugeordnet.
 | Sortieren und Verschieben verlieren und verdoppeln keinen Titel; Speichern und Laden ergibt denselben Stand (Zufallstests) | vorhanden: `property/library_property_test.dart` (#10/AK1) | – |
 | Verfälschte `library.json` (Typwechsel, fehlende Felder, falsche Verweise, Extremwerte, abgeschnitten) ohne Absturz, mit Meldung | vorhanden: `property/library_files_property_test.dart` (#10/AK3) | – |
 | Golden-Dateien jeder Version (auch Format 2), Migration idempotent | vorhanden: `golden_files_test.dart` (#10/AK5), `property/library_files_property_test.dart` (#10/AK8) | – |
+| Anfang und Ende abschneiden: WAV und FLAC genau auf das Sample (FLAC verlustfrei, Tags bleiben), MP3 an Frame-Grenzen mit LAME-Kopf genau auf das Sample und ohne Knacken (CBR, VBR, MPEG-2, mit und ohne LAME-Kopf, ID3 bleibt), ADTS an der nächsten Frame-Grenze, M4A abgelehnt, mindestens 1 s | vorhanden: `core/tests/trim_tests.cpp` (#116/AK4, AK7, Testaudio `clicks3.*` aus `make_test_audio.sh`), `reference_tests` (Bytes nativ = WASM), `wp_core_web_test.mjs` (Kürzen im Browser), `wp_trim_ffi_test.dart`, Fuzz-Ziel `fuzz_trim` | – |
+| Gekürzter Titel: neue ID, Titel, Artist, Ordner, Playlists, Tempo bleiben, Loops verschoben, begrenzt oder entfernt, Fehler lassen den Titel unverändert; Ansicht mit Wellenform, Griffen, `mm:ss.d`, Probehören, Rückfrage; M4A ausgegraut | vorhanden: `trim_test.dart` (#116/AK2, AK5–AK9), `trim_view_test.dart` (#116/AK1–AK3, AK7, AK9), `property/library_property_test.dart` (#116) | – |
 | 10'000 Titel in 500 Ordnern: Laden, Sortieren, Speichern je ≤ 1 s | vorhanden, nächtlich: `app/bench/library_bench_test.dart` (#59/AK3), `make bench` | – |
 
 ### Wiedergabe
@@ -145,6 +147,7 @@ zugeordnet.
 | Gerät länger als 90 Tage offline: gelöschte Titel und Ordner kommen nach dem Bereinigen der Grabsteine nicht zurück, erneuter Import belebt | vorhanden: `stamps_test.dart` (#98/AK2–AK4), `property/sync_property_test.dart` (#98/AK2–AK5) | – |
 | Gerät gleicht zum ersten Mal ab, die Cloud hat schon einen Bereinigungs-Horizont: eigene Titel und Ordner bleiben mit Audiodatei erhalten, Geräte mit früherem Abgleich verlieren Gelöschtes weiter | vorhanden: `sync_test.dart` (#104/AK2–AK4), `stamps_test.dart` (#104), `property/sync_property_test.dart` (#104/AK5) | – |
 | Gerät mit früherem Abgleich, 91 Tage offline: eigene, nie abgeglichene Titel und Ordner vor dem Horizont werden zurückgehalten und erst nach «Behalten» oder «Entfernen» abgeglichen bzw. gelöscht, auch nach Neustart; kein Hinweis bei gewöhnlichem und erstem Abgleich; Hinweis und Dialog mit Zahl und ersten 10 Namen | vorhanden: `sync_test.dart` (#107/AK1–AK6), `stamps_test.dart` (#107), `sync_app_test.dart` (#107/AK7), `property/sync_property_test.dart` (#107/AK8) | – |
+| Gekürzter Titel (#116): auf anderen Geräten der neue statt des alten, keine zweite Kopie auch bei gleichzeitiger Änderung, Playlist-Einträge folgen, alte Audiodatei verschwindet aus der Cloud; erneuter Import belebt den alten | vorhanden: `trim_test.dart` (#116/AK8), `property/sync_property_test.dart` (#116) | – |
 | Verfälschte Gerätedateien aus der Cloud ohne Absturz und ohne Datenverlust, übersprungen und später erneut gelesen; neueres Format mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7, #53/AK5) | – |
 | Kein Reparatur-Dialog mehr (#65 entfernt); «App aktualisieren» bei neuerem Format mit einfachem OK, Texte in jeder ARB-Datei | vorhanden: `cloud_state_message_test.dart` (#111/AK1–AK3) | – |
 | Eine Datei je Gerät, mehrere Quellen, Brücke, Speicher ohne bedingtes Schreiben, Konfliktkopien, Sicherungen je Gerät, verwaiste Gerätedateien, `format.json` | vorhanden: `sync_devices_test.dart` (#53/AK1–AK10), `sync_test.dart` (#53/AK7) | – |
@@ -503,6 +506,7 @@ riesige Texte), fremde Versionsnummer, fehlende oder unsinnige Stempel, abgeschn
 | Ziel | Eingabe | Invarianten |
 |---|---|---|
 | `fuzz_decoder` | rohe Bytes als Datei: `wp::decodeMemory` (Kern im Browser, Worker) mit einer vom ersten Byte gewählten Rate, `wp::fileDuration` über eine temporäre Datei | Ergebnis OK oder ein dokumentierter Fehlercode; bei OK mindestens ein Frame, genau Frames × 2 endliche Samples, Wellenform endlich; die Dauer positiv oder ein Fehlercode |
+| `fuzz_trim` (#116) | zwei Bytes Anfang und Länge (in 1/16 s), danach eine beliebige Datei: `wp::trim::trim` (WAV, FLAC, MP3, ADTS, alles andere) | Ergebnis OK oder ein dokumentierter Fehlercode, bei Fehler keine Bytes; bei OK dasselbe Format wie vorher, Anfang und Ende endlich, mindestens 1 s abzüglich einer ADTS-Frame-Länge; das Ergebnis lässt sich erneut kürzen |
 | `fuzz_capi` | ein kleines Programm aus Befehlen über die C-API von `wp_core.h` (`wp_core_offline`, derselbe `wp::Player` wie in der App, ohne Audiogerät): Laden aus Bytes, PCM und Datei, Play, Pause, Seek, Tempo, Loop, Lautstärke, Rendern, Metronom, Wellenform; seit #85 auch Spuren des Lade-Workers (`wp_web_track_*`), stückweises Laden von PCM (`wp_web_pcm_*`), Laden ohne Warten (`wp_load_async`, `wp_load_wait`) und `wp_file_duration`; Argumente auch NaN, unendlich, negativ, riesig | nach jedem Befehl Position und Dauer endlich, 0 ≤ Position ≤ Dauer, Loop-Zähler fällt nie, Metronom 20–300 BPM, jedes gerenderte Sample endlich, Fehlercodes dokumentiert; je Funktion von #85 die Invarianten der Tabelle unten |
 
 Der Startkorpus (`core/tests/fuzz/corpus/<ziel>/`, 23 Dateien, 207 kB) ist erzeugt: `core/tools/make_fuzz_corpus.py`
@@ -882,7 +886,19 @@ zeigt nur, was ausgeführt wird. Vorbild ist VivaPlan (cargo-mutants, #38/#40/#4
 
 **Ausführen.** `make mutants` mutiert alles, `make mutants-diff` nur die seit `BASE` (Vorgabe `origin/main`) geänderten
 Zeilen (Commits seit der Basis und Arbeitsbaum, wie `coverage-diff`). Beides ruft `app/tool/mutants_run.dart` auf
-(`MUTANTS_JOBS`, Vorgabe 4; `MUTANTS_ARGS`, z. B. `--part core`, `--part dart`, `--file engine` oder `--fresh`). Die
+(`MUTANTS_JOBS`, Vorgabe 4; `MUTANTS_ARGS`, z. B. `--part core`, `--part dart`, `--file engine` oder `--fresh`). Zwei Schalter verwenden den vorigen Lauf desselben Ordners (`results.json`) wieder:
+
+- `--rerun` nach neuen Tests: Dart-Mutanten, die der vorige Lauf erkannt hat (getötet, Zeitüberschreitung, nicht
+  übersetzbar) oder ausgeschlossen hat, behalten ihr Ergebnis; nur die nicht erkannten und neue laufen. Ein Mutant
+  wird an Datei, Spalte, Mutator, Ersatz und Quellzeile erkannt, nicht an der Zeilennummer: Eine verschobene Zeile
+  behält ihr Ergebnis, eine geänderte gilt als neuer Mutant. Ein ausgeschlossener Mutant bekommt die aktuellen
+  Ausschlüsse neu. Für den Kern braucht es nichts: Mulls Zwischenspeicher behält erkannte Mutanten ohnehin.
+- `--exclusions-only` nach einer Änderung an `tools/mutants-exclude.txt`: kein Mutant läuft; die Ausschlüsse werden
+  auf den vorigen Lauf neu angewandt und die Ergebnisse neu geschrieben.
+
+Gemessen an #113, #114 und #115 (22.11.2026) liefen die Mutationstests je Issue zwei- bis dreimal ganz und brauchten
+25 bis 65 Minuten, mehr als die Hälfte der Zeit eines Issues; im Versuch mit `loop_ramp.dart` dauerte der volle Lauf
+78 s, `--rerun` und `--exclusions-only` je 1 s. Die
 Ergebnisse liegen in `local/mutants/full/` bzw. `local/mutants/diff/` (nicht eingecheckt): `summary.txt` (Zahlen je
 Teil, jeder nicht erkannte Mutant mit Datei, Zeile und Spalte), `missed.txt` (nur die nicht erkannten) und
 `results.json` (alle Mutanten, für die Übersichtsseite #12). Das Werkzeug endet mit Code 3, wenn ein Mutant nicht
@@ -938,7 +954,8 @@ Plugin). Im Workflow: die Debian-Pakete für Ubuntu 24.04 und LLVM 18 (`clang-18
 
 - **Umfang:** Dateien in `app/lib/` ohne Oberfläche (kein Import von `flutter/material`, `widgets`, `cupertino`,
   `material_ui`) und ohne Web-Code (`dart:js_interop`, `package:web`, `*_web.dart`), ohne `main.dart`, `smoke.dart`
-  (Start der App, Rauchtest) und die erzeugten `l10n`-Dateien. Die Oberfläche prüfen Widget- und Oberflächentests, den
+  (Start der App, Rauchtest), `app_controller.dart` (verbindet die Oberfläche; seine nächsten Tests sind
+  überwiegend Widget-Tests, jeder Mutant dauerte Minuten, #115: 80 Mutanten) und die erzeugten `l10n`-Dateien. Die Oberfläche prüfen Widget- und Oberflächentests, den
   Web-Code die Web-Tests im Chrome (`make test-web`).
 - **Mutationen** nur im Code, nie in Kommentaren oder Zeichenketten: Vergleiche (`<`↔`<=`, `>`↔`>=`, `==`↔`!=`),
   `&&`↔`||`, `+`↔`-`, `*`↔`/`, `~/`→`*`, `%`→`~/`, `+=`↔`-=`, `++`↔`--`, Wegfall eines vorangestellten `!`,

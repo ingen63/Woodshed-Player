@@ -3,7 +3,8 @@
 
 Only generated data, no foreign audio files: small WAV files (8/16/24-bit, float, mono and stereo,
 sine and ramp), damaged WAV headers, the first bytes of the project's own test audio
-(core/tests/audio/sine440.*, made by make_test_audio.sh) and command programs for fuzz_capi
+(core/tests/audio/sine440.*, made by make_test_audio.sh), for fuzz_trim (#116) the clicks3.* files
+of the same script after two bytes of start and length, and command programs for fuzz_capi
 (format in core/tests/fuzz/fuzz_capi.cpp). Run again after changing the format of fuzz_capi.
 """
 import math
@@ -188,6 +189,29 @@ def capi_corpus():
     }
 
 
+def whole(name):
+    with open(os.path.join(AUDIO, name), "rb") as f:
+        return f.read()
+
+
+def trim_corpus():
+    """#116 fuzz_trim: two bytes start and length in 1/16 s, then the file."""
+    cut = lambda start, length, data: bytes([start, length]) + data
+    return {
+        "wav16_mono": cut(4, 18, wav(12000)),
+        "wav_float_stereo": cut(2, 16, wav(9000, 2, 8000, 32, fmt=3)),
+        "wav_too_short": cut(0, 16, wav(4000)),
+        "mp3_cbr": cut(8, 24, whole("clicks3.mp3")),
+        "mp3_vbr": cut(12, 20, whole("clicks3_vbr.mp3")),
+        "mp3_mpeg2": cut(1, 40, whole("clicks3_22k.mp3")),
+        "mp3_head": cut(0, 16, head("clicks3.mp3", 3000)),
+        "adts": cut(8, 24, whole("clicks3.aac")),
+        "flac": cut(8, 24, whole("clicks3.flac")),
+        "m4a_head": cut(0, 16, head("sine440.m4a", 1500)),
+        "garbage": cut(0, 16, bytes(range(256))),
+    }
+
+
 def write(kind, files):
     d = os.path.join(OUT, kind)
     os.makedirs(d, exist_ok=True)
@@ -200,4 +224,5 @@ def write(kind, files):
 if __name__ == "__main__":
     write("decoder", decoder_corpus())
     write("capi", capi_corpus())
+    write("trim", trim_corpus())
     sys.exit(0)

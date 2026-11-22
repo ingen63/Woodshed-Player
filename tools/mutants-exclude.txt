@@ -399,3 +399,122 @@ core/src/flac_writer.cpp | cxx_remove_void_call | FLAC__stream_encoder_delete(en
 # nichts), hängt vom Speicher ab; ein Test darauf wäre nicht verlässlich. Das Schliessen selbst prüft
 # micStopsOnReopenAndDestruction über close() bzw. ein zweites open().
 core/src/recorder_core.cpp | cxx_remove_void_call | MicInput::~MicInput() { close(); }
+
+# ---- core/src/trim.cpp, core/src/flac_writer.cpp (#116) ----
+# Grenzfall: Schranken gegen Lesen über das Ende der Datei (Tags, Chunks, Blöcke, Frame-Köpfe). Ein
+# vertauschtes Rechenzeichen oder «>=» statt «>» ändert nur, ob eine Datei verworfen wird, die genau an
+# dieser Stelle endet oder abgeschnitten ist; die Prüfung danach (Signatur, Länge, gültiger Kopf, der
+# nächste Frame) lehnt dieselben Eingaben ab. Fuzzing (fuzz_trim) findet dabei keinen Absturz.
+core/src/trim.cpp | cxx_le_to_lt | return pos <= size && size - pos >= n && std::memcmp(data + pos, tag, n) == 0;
+core/src/trim.cpp | cxx_ge_to_gt | while (tagAt(data, size, p, "ID3") && size - p >= 10) {
+core/src/trim.cpp | cxx_sub_to_add | if (end - from >= 128 && tagAt(data, size, end - 128, "TAG"))
+core/src/trim.cpp | cxx_ge_to_gt | if (end - from >= 128 && tagAt(data, size, end - 128, "TAG"))
+core/src/trim.cpp | cxx_sub_to_add | if (end - from >= 15 && tagAt(data, size, end - 9, "LYRICS200")) {
+core/src/trim.cpp | cxx_ge_to_gt | if (end - from >= 15 && tagAt(data, size, end - 9, "LYRICS200")) {
+core/src/trim.cpp | cxx_sub_to_add | if (digits && end - from >= len + 15)
+core/src/trim.cpp | cxx_ge_to_gt | if (digits && end - from >= len + 15)
+core/src/trim.cpp | cxx_add_to_sub | if (digits && end - from >= len + 15)
+core/src/trim.cpp | cxx_sub_to_add | if (end - from >= 32 && tagAt(data, size, end - 32, "APETAGEX")) {
+core/src/trim.cpp | cxx_ge_to_gt | if (end - from >= 32 && tagAt(data, size, end - 32, "APETAGEX")) {
+core/src/trim.cpp | cxx_sub_to_add | if (len >= 32 && end - from >= len)
+core/src/trim.cpp | cxx_ge_to_gt | if (len >= 32 && end - from >= len)
+core/src/trim.cpp | cxx_le_to_lt | while (p <= size && size - p >= 8) {
+core/src/trim.cpp | cxx_sub_to_add | while (p <= size && size - p >= 8) {
+core/src/trim.cpp | cxx_ge_to_gt | while (p <= size && size - p >= 8) {
+core/src/trim.cpp | cxx_sub_to_add | if (tagAt(data, size, p, "fmt ") && len >= 16 && size - p - 8 >= 16)
+core/src/trim.cpp | cxx_sub_to_add | else if (tagAt(data, size, p, "fact") && len >= 4 && size - p - 8 >= 4)
+core/src/trim.cpp | cxx_sub_to_add | if (size - p - 8 < size_t{len} + (len & 1))
+core/src/trim.cpp | cxx_lt_to_le | if (size - p - 8 < size_t{len} + (len & 1))
+core/src/trim.cpp | cxx_ge_to_gt | if (tag == 0xFFFE && fmtLen >= 26 && size - fmt >= 26)
+core/src/trim.cpp | cxx_lt_to_le | if (p > size || size - p < 4)
+core/src/trim.cpp | cxx_sub_to_add | if (size - p - 4 < len)
+core/src/trim.cpp | cxx_lt_to_le | if (size - p - 4 < len)
+core/src/trim.cpp | cxx_add_to_sub | const size_t head = 4 + (crc ? 2 : 0) + static_cast<size_t>(sideInfo);
+core/src/trim.cpp | cxx_gt_to_ge | return len > head ? len - head : 0;
+core/src/trim.cpp | cxx_gt_to_ge | if (p > size || size - p < 4)
+core/src/trim.cpp | cxx_lt_to_le | while (p < to) {
+core/src/trim.cpp | cxx_gt_to_ge | const bool ok = mp3Header(data, to, p, f) && f.mainData() > 0 && f.len <= to - p &&
+core/src/trim.cpp | cxx_sub_to_add | const bool ok = mp3Header(data, to, p, f) && f.mainData() > 0 && f.len <= to - p &&
+core/src/trim.cpp | cxx_ge_to_gt | if (f.len >= 40 && std::memcmp(b + 36, "VBRI", 4) == 0) {
+core/src/trim.cpp | cxx_lt_to_le | if (f.crc || f.len < xing + 8 ||
+core/src/trim.cpp | cxx_add_to_sub | if (f.crc || f.len < xing + 8 ||
+core/src/trim.cpp | cxx_lt_to_le | if (f.len < lame + kLameTag)
+core/src/trim.cpp | cxx_add_to_sub | if (f.len < lame + kLameTag)
+core/src/trim.cpp | cxx_gt_to_ge | if (p > size || size - p < 7)
+core/src/trim.cpp | cxx_lt_to_le | if (p > size || size - p < 7)
+core/src/trim.cpp | cxx_lt_to_le | for (size_t p = audio; p < tags;) {
+core/src/trim.cpp | cxx_le_to_lt | if (adtsHeader(data, tags, p, f, ri) && f.len <= tags - p &&
+core/src/trim.cpp | cxx_sub_to_add | if (adtsHeader(data, tags, p, f, ri) && f.len <= tags - p &&
+core/src/trim.cpp | cxx_lt_to_le | (rateIndex < 0 || ri == rateIndex)) {
+
+# gleichwertig: reserve() legt nur Speicher an; Inhalt und Grösse des Ergebnisses bleiben gleich.
+core/src/trim.cpp | cxx_remove_void_call | r.bytes.reserve(dataHeader + 8 + keep + 1 + (size - afterData));
+core/src/trim.cpp | cxx_add_to_sub | r.bytes.reserve(dataHeader + 8 + keep + 1 + (size - afterData));
+core/src/trim.cpp | cxx_sub_to_add | r.bytes.reserve(dataHeader + 8 + keep + 1 + (size - afterData));
+core/src/trim.cpp | cxx_add_to_sub | r.bytes.reserve(audio + info.size() + bytes.size() + (size - tags));
+core/src/trim.cpp | cxx_sub_to_add | r.bytes.reserve(audio + info.size() + bytes.size() + (size - tags));
+
+# gleichwertig: sampleRange() wird nur mit einer Länge > 0 erreicht, wo sie 0 ist, bleibt ohnehin weniger
+# als 1 s; dr_flac meldet MA_AT_END nur zusammen mit 0 Frames (die Bedingung prüft got == 0 zuerst);
+# libFLAC schreibt genau zwei Blöcke (Stream-Info und Vorbis-Kommentar), «--i» statt «++i» besucht
+# dieselben; FlacWriter: «>=» beim Vergrössern und beim Springen ans Ende ergibt dieselben Bytes.
+core/src/flac_writer.cpp | cxx_gt_to_ge | if (offset > w->memory_->size())
+core/src/trim.cpp | cxx_le_to_lt | if (!(rate > 0) || total <= 0 || std::isnan(start) || std::isnan(end))
+core/src/trim.cpp | cxx_ne_to_eq | if (got == 0 || (rr != MA_SUCCESS && rr != MA_AT_END))
+core/src/trim.cpp | cxx_pre_inc_to_pre_dec | for (size_t i = 1; i < fresh.size(); ++i)
+
+# gleichwertig: Bit-Reservoir und Grenzen der MP3-Frames: k0 und last liegen schon vorher innerhalb der
+# Frames (min/clamp greifen nie); «want» bestimmt nur, wie viele Bytes Reservoir der leere Frame trägt,
+# mehr als nötig ändert die Ausgabe nicht, und bei den erzeugten Dateien reicht schon das Reservoir von
+# k0 − 1; in mainDataBefore() ändern «have <= n» und «j >= 0» nichts, weil want hier nie grösser ist
+# als die Bytes davor; bitrateFor() findet für Layer III immer einen Index unter 14.
+core/src/trim.cpp | cxx_lt_to_le | for (int index = 1; index < 15; ++index)
+core/src/trim.cpp | cxx_ge_to_gt | if (static_cast<size_t>(frameLength(a.version, index, a.rate, 0)) >=
+core/src/trim.cpp | cxx_lt_to_le | while (have < n && j > 0) {
+core/src/trim.cpp | cxx_gt_to_ge | while (have < n && j > 0) {
+core/src/trim.cpp | cxx_sub_to_add | const auto k0 = static_cast<size_t>(std::min(n - 1, r0 / spf));
+core/src/trim.cpp | cxx_sub_to_add | const auto last = static_cast<size_t>(std::clamp((r1 + spf - 1) / spf - 1, 0LL, n - 1));
+core/src/trim.cpp | cxx_sub_to_add | const size_t before = frames[k0 - 1].mainData();
+core/src/trim.cpp | cxx_sub_to_add | const size_t want = std::max(mainDataBegin(data, frames[k0 - 1]),
+core/src/trim.cpp | cxx_sub_to_add | mainDataBegin(data, frames[k0]) -
+
+# Grenzfall: Liegt das gewünschte Sample genau in der Mitte zwischen zwei ADTS-Frame-Grenzen, nimmt «>=»
+# die frühere statt der späteren Grenze; beide liegen eine halbe Frame-Länge (12 ms) daneben.
+core/src/trim.cpp | cxx_gt_to_ge | return (it == at.end() || *it - s > s - at[i - 1]) ? i - 1 : i;
+# Mull-Grenze: Von Hand gemessen (Mutant im Quelltext angewandt, nativ gebaut): trim_tests,
+# fuzz_trim_replay oder reference_tests scheitern an jedem dieser Mutanten, etwa weil eine Datei dann
+# leer, ohne Kopf oder ohne Audio ist. Im Mutationsbau lässt Mull sie wirkungslos (mit gesetzter
+# Mutanten-Variable laufen die Tests unverändert durch), wie bei den übrigen Aufrufen in docs/TESTS.md.
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data, dataHeader + 4);
+core/src/trim.cpp | cxx_remove_void_call | r.bytes.resize(r.bytes.size() + 4);
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data + body + static_cast<size_t>(first) * align, keep);
+core/src/trim.cpp | cxx_remove_void_call | r.bytes.push_back(0);
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data + afterData, size - afterData);
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data, pos + 4); // ID3v2 before the stream (if any) and «fLaC»
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, encoded.data() + freshFrames, encoded.size() - freshFrames);
+core/src/trim.cpp | cxx_remove_void_call | append(bytes, empty.data(), empty.size());
+core/src/trim.cpp | cxx_remove_void_call | out.push_back(empty.size());
+core/src/trim.cpp | cxx_remove_void_call | append(bytes, data + frames[i].pos, frames[i].len);
+core/src/trim.cpp | cxx_remove_void_call | out.push_back(frames[i].len);
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data, audio);
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, info.data(), info.size());
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, bytes.data(), bytes.size());
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data + tags, size - tags);
+core/src/trim.cpp | cxx_remove_void_call | frames.push_back(f);
+core/src/trim.cpp | cxx_remove_void_call | at.push_back(at.back() + f.samples);
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data + frames[i].pos, frames[i].len);
+core/src/trim_api.cpp | cxx_ne_to_eq | if (r.code != WP_OK)
+
+# ---- app/lib/library/library.dart (#116) ----
+# gleichwertig: current() folgt höchstens 16 Ersetzungen und dient nur als Schutz gegen einen Kreis in
+# einer beschädigten Datei; ob 16 oder 17 Schritte, das Ergebnis ist ein Titel des Kreises bzw. das
+# Ende der Kette, die nie so lang wird.
+app/lib/library/library.dart | dart_lt_to_le | for (var i = 0; i < 16; i++) {
+# gleichwertig: Ab welcher Grösse der SHA-256 in einem eigenen Isolate gerechnet wird, ändert den
+# Hash nicht.
+app/lib/library/library.dart | dart_gt_to_ge | final newId = out.length > _hashInline
+# gleichwertig: same() ist nur eine Abkürzung vor dem Schreiben von device.json (#114, im Diff seit
+# origin/main). Mit «!=» schreibt _setHeld() auch bei gleichen Mengen, und eine Teilmenge mit anderer
+# Länge gilt nur dann als gleich, wenn alle drei Mengen zugleich so wachsen; die gehaltenen Mengen
+# kommen aber aus lostTo() und werden nach jedem Abgleich ganz neu gesetzt.
+app/lib/library/library.dart | dart_eq_to_ne | a.length == b.length && a.containsAll(b);

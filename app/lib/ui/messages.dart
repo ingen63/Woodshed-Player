@@ -121,6 +121,15 @@ String libraryMessageText(AppLocalizations l, LibraryMessage m) => switch (m) {
   ImportFailed(:final files) => l.importFailed(files.join('\n')),
   TrackNotOnDevice(:final title) => l.trackNotOnDevice(title),
   CloudStateTooNew() => l.cloudStateTooNew,
+  TrimFailed(:final title, :final problem) => switch (problem) {
+    TrimProblem.format => l.trimFailedFormat(title),
+    TrimProblem.tooShort => l.trimFailedTooShort(title),
+    TrimProblem.notOnDevice => l.trimFailedNotOnDevice(title),
+    TrimProblem.noSpace => l.trimFailedNoSpace(title),
+    TrimProblem.memory => l.trimFailedMemory(title),
+    TrimProblem.readOnly => l.trimFailedReadOnly(title),
+    TrimProblem.failed => l.trimFailedOther(title),
+  },
 };
 
 String sortOrderLabel(AppLocalizations l, TrackSortOrder o) => switch (o) {

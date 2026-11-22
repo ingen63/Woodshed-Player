@@ -1375,6 +1375,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No matches'**
   String get noSearchResults;
+
+  /// #116/AK1: context menu item of a track
+  ///
+  /// In en, this message translates to:
+  /// **'Trim start and end …'**
+  String get trimTrackEllipsis;
+
+  /// #116: hint of the greyed out menu item for M4A
+  ///
+  /// In en, this message translates to:
+  /// **'M4A files cannot be trimmed yet.'**
+  String get trimUnavailable;
+
+  /// #116/AK1: title of the trim view
+  ///
+  /// In en, this message translates to:
+  /// **'Trim «{title}»'**
+  String trimTitle(String title);
+
+  /// #116/AK1: field and handle of the new start
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get trimStart;
+
+  /// #116/AK1: field and handle of the new end
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get trimEnd;
+
+  /// #116/AK1: length between the bounds, mm:ss.d
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining: {length}'**
+  String trimRemaining(String length);
+
+  /// #116/AK1: hint in the time fields
+  ///
+  /// In en, this message translates to:
+  /// **'mm:ss.d'**
+  String get trimTimeHint;
+
+  /// #116/AK7: bounds that cannot be used
+  ///
+  /// In en, this message translates to:
+  /// **'At least 1 s must remain, and the end must lie after the start.'**
+  String get trimRangeInvalid;
+
+  /// #116/AK2: plays the part between the bounds
+  ///
+  /// In en, this message translates to:
+  /// **'Listen'**
+  String get trimPreview;
+
+  /// #116/AK2: stops listening
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get trimStopPreview;
+
+  /// #116/AK3: asks before trimming
+  ///
+  /// In en, this message translates to:
+  /// **'Trim …'**
+  String get trimApply;
+
+  /// #116/AK3: title of the question before trimming
+  ///
+  /// In en, this message translates to:
+  /// **'Trim the audio file?'**
+  String get trimConfirmTitle;
+
+  /// #116/AK3: question before trimming; start and end as mm:ss.d
+  ///
+  /// In en, this message translates to:
+  /// **'The audio file of «{title}» keeps only {start} to {end}. The parts cut off are deleted; this cannot be undone.'**
+  String trimConfirmText(String title, String start, String end);
+
+  /// #116/AK3: confirms trimming
+  ///
+  /// In en, this message translates to:
+  /// **'Trim'**
+  String get trimConfirm;
+
+  /// #116: while the file is trimmed
+  ///
+  /// In en, this message translates to:
+  /// **'Trimming …'**
+  String get trimming;
+
+  /// #116/AK9
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be trimmed: this file type cannot be trimmed, or the file is damaged.'**
+  String trimFailedFormat(String title);
+
+  /// #116/AK7, AK9
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» was not trimmed: at least 1 s must remain.'**
+  String trimFailedTooShort(String title);
+
+  /// #116/AK9
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be trimmed: its audio file is not on this device.'**
+  String trimFailedNotOnDevice(String title);
+
+  /// #116/AK9
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be trimmed: there is not enough storage space. The track is unchanged.'**
+  String trimFailedNoSpace(String title);
+
+  /// #116/AK9
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be trimmed: there is not enough memory. The track is unchanged.'**
+  String trimFailedMemory(String title);
+
+  /// #116/AK9
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be trimmed: the library is from a newer version of the app and is read-only.'**
+  String trimFailedReadOnly(String title);
+
+  /// #116/AK9
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be trimmed: the file could not be read or written. The track is unchanged.'**
+  String trimFailedOther(String title);
 }
 
 class _AppLocalizationsDelegate

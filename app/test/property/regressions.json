@@ -33,6 +33,21 @@
       "seed": 1819107984,
       "found": "2026-11-19",
       "note": "the first save of a new device stamped the default sort order and appearance as the newest change; the devices did not converge"
+    },
+    {
+      "seed": 1819139660,
+      "found": "2026-11-22",
+      "note": "#116: the old audio file of a trimmed track stayed in the cloud"
+    },
+    {
+      "seed": 1819266364,
+      "found": "2026-11-22",
+      "note": "#116: an old track held back after the purge horizon (#107) counted as shown"
+    },
+    {
+      "seed": 1820850164,
+      "found": "2026-11-22",
+      "note": "#116: a device joining late kept its own copy of the old file (#104), restamped after the trim"
     }
   ],
   "damaged state.json never crashes and never loses local data": [

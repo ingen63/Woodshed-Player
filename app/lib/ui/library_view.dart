@@ -14,6 +14,7 @@ import '../time_format.dart';
 import 'about_dialog.dart';
 import 'messages.dart';
 import 'style.dart';
+import 'trim_view.dart';
 
 class LibraryView extends StatefulWidget {
   LibraryView({
@@ -374,6 +375,7 @@ class _LibraryViewState extends State<LibraryView> {
                 onPressed: () => editTrack(context, lib, t),
                 child: Text(l.editTrackEllipsis),
               ),
+              trimMenuItem(context, c, t),
             ],
           ),
         if (tracks.isEmpty)
@@ -406,6 +408,7 @@ class _LibraryViewState extends State<LibraryView> {
           onPressed: () => editTrack(context, lib, t),
           child: Text(l.editTrackEllipsis),
         ),
+        trimMenuItem(context, c, t),
         SubmenuButton(
           leadingIcon: const Icon(WsIcons.folder, size: 16),
           menuChildren: [
@@ -489,6 +492,31 @@ class _LibraryViewState extends State<LibraryView> {
 }
 
 /// Edits title and artist of an imported or recorded track (#24); the audio file stays unchanged.
+/// #116/AK1: «Trim start and end …»; greyed out for M4A, with the reason below it.
+Widget trimMenuItem(BuildContext context, AppController c, Track t) {
+  final l = context.l10n;
+  final can = Library.trimmable(t);
+  return MenuItemButton(
+    key: const Key('trimTrack'),
+    leadingIcon: const Icon(WsIcons.scissors, size: 16),
+    onPressed: can ? () => openTrimView(context, c, t) : null,
+    child: can
+        ? Text(l.trimTrackEllipsis)
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l.trimTrackEllipsis),
+              Text(
+                l.trimUnavailable,
+                key: const Key('trimUnavailable'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+  );
+}
+
 Future<void> editTrack(BuildContext context, Library lib, Track t) async {
   final r = await showDialog<(String, String)>(
     context: context,

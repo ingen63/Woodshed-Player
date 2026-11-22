@@ -10,7 +10,8 @@
 set(WP_FUZZ_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzz)
 set(wp_fuzz_libs_decoder wp_playercore)
 set(wp_fuzz_libs_capi wp_core_offline)
-foreach(name decoder capi)
+set(wp_fuzz_libs_trim wp_trim) # #116
+foreach(name decoder capi trim)
   set(src ${WP_FUZZ_DIR}/fuzz_${name}.cpp)
   add_executable(fuzz_${name}_replay ${src} ${WP_FUZZ_DIR}/replay_main.cpp)
   target_link_libraries(fuzz_${name}_replay PRIVATE ${wp_fuzz_libs_${name}})

@@ -33,6 +33,8 @@ final DynamicLibrary _lib = () {
 
 final class _Player extends Opaque {}
 
+final class _TrimResult extends Opaque {}
+
 final _create = _lib
     .lookupFunction<Pointer<_Player> Function(), Pointer<_Player> Function()>(
       'wp_create',
@@ -361,6 +363,76 @@ double wpFileDuration(String path) {
     return _fileDuration(c);
   } finally {
     malloc.free(c);
+  }
+}
+
+final _trim = _lib
+    .lookupFunction<
+      Int32 Function(
+        Pointer<Void>,
+        Size,
+        Double,
+        Double,
+        Pointer<Pointer<_TrimResult>>,
+      ),
+      int Function(
+        Pointer<Void>,
+        int,
+        double,
+        double,
+        Pointer<Pointer<_TrimResult>>,
+      )
+    >('wp_trim');
+final _trimData = _lib
+    .lookupFunction<
+      Pointer<Void> Function(Pointer<_TrimResult>),
+      Pointer<Void> Function(Pointer<_TrimResult>)
+    >('wp_trim_data');
+final _trimSize = _lib
+    .lookupFunction<
+      Size Function(Pointer<_TrimResult>),
+      int Function(Pointer<_TrimResult>)
+    >('wp_trim_size');
+final _trimStart = _lib
+    .lookupFunction<
+      Double Function(Pointer<_TrimResult>),
+      double Function(Pointer<_TrimResult>)
+    >('wp_trim_start');
+final _trimEnd = _lib
+    .lookupFunction<
+      Double Function(Pointer<_TrimResult>),
+      double Function(Pointer<_TrimResult>)
+    >('wp_trim_end');
+final _trimFree = _lib
+    .lookupFunction<
+      Void Function(Pointer<_TrimResult>),
+      void Function(Pointer<_TrimResult>)
+    >('wp_trim_free');
+
+/// #116: keeps [start]–[end] seconds of the audio file [bytes] (MP3, WAV, FLAC, AAC in ADTS) and returns
+/// the new file in the same format. Blocks while it cuts (FLAC is encoded again); call it off the UI
+/// isolate for large files.
+WpTrimmed wpTrim(Uint8List bytes, double start, double end) {
+  final data = malloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+  final out = malloc<Pointer<_TrimResult>>();
+  try {
+    data.asTypedList(bytes.length).setAll(0, bytes);
+    final code = _trim(data.cast(), bytes.length, start, end, out);
+    if (code != WpCode.ok) return WpTrimmed.failed(code);
+    final r = out.value;
+    try {
+      final size = _trimSize(r);
+      return WpTrimmed(
+        Uint8List.fromList(_trimData(r).cast<Uint8>().asTypedList(size)),
+        _trimStart(r),
+        _trimEnd(r),
+      );
+    } finally {
+      _trimFree(r);
+    }
+  } finally {
+    malloc.free(data);
+    malloc.free(out);
   }
 }
 

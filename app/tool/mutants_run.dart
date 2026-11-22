@@ -50,6 +50,12 @@ List<(String, List<String>)> coreTestPrograms(String core) => [
     'fuzz_capi_replay',
     ['$core/tests/fuzz/regressions/capi', '$core/tests/fuzz/corpus/capi'],
   ),
+  // #116: trimming
+  ('trim_tests', []),
+  (
+    'fuzz_trim_replay',
+    ['$core/tests/fuzz/regressions/trim', '$core/tests/fuzz/corpus/trim'],
+  ),
 ];
 
 late String root;

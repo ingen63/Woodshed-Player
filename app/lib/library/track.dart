@@ -140,6 +140,57 @@ class Track {
     return copyWith(settings: s);
   }
 
+  /// #116/AK5, AK6: the same track after its file was trimmed to [start] … [start] + [duration] seconds and
+  /// stored as [fileName] under the new [id]. Title, artist, folder, order, tempo and the other settings stay;
+  /// every loop moves by [start] so it marks the same passage, is clamped to the new length if it reaches
+  /// outside it and is dropped if it lies outside entirely. A dropped active loop switches the loop off.
+  Track trimmed({
+    required String id,
+    required String fileName,
+    required double start,
+    required double duration,
+    required bool hasArtwork,
+  }) {
+    final moved = <String, LoopRange?>{
+      for (final e in loops.entries) e.key: ?e.value?.trimmed(start, duration),
+    };
+    var s = settings;
+    String? active = loopId;
+    if (active != null) {
+      final r = LoopRange(
+        settings.loopStart,
+        settings.loopEnd,
+      ).trimmed(start, duration);
+      if (r == null) {
+        moved.remove(active);
+        active = null;
+        s = s.copyWith(loopEnabled: false, loopStart: 0, loopEnd: 0);
+      } else {
+        moved[active] = r;
+        s = s.copyWith(loopStart: r.start, loopEnd: r.end);
+      }
+    } else {
+      s = s.copyWith(loopStart: 0, loopEnd: 0);
+    }
+    return Track(
+      id: id,
+      fileName: fileName,
+      originalFileName: originalFileName,
+      title: title,
+      artist: artist,
+      album: album,
+      duration: duration,
+      hasArtwork: hasArtwork,
+      dateAdded: dateAdded,
+      customOrder: customOrder,
+      settings: s,
+      folderId: folderId,
+      loopId: active,
+      loops: Map.unmodifiable(moved),
+      noUpload: noUpload,
+    );
+  }
+
   /// Entry of the former `library.json` (format 1, Swift app); `id` is still the UUID there. Its loop gets
   /// the fixed ID «0».
   factory Track.fromLegacyJson(Map<String, Object?> j) {
@@ -272,6 +323,14 @@ class LoopRange {
   final double end;
 
   Map<String, Object?> toJson() => {'start': start, 'end': end};
+
+  /// #116/AK6: this loop in a file trimmed to [cut] … [cut] + [length] seconds: moved by [cut], clamped to
+  /// 0 … [length]; null if it lies entirely outside (touching a bound counts as outside).
+  LoopRange? trimmed(double cut, double length) {
+    final s = start - cut, e = end - cut;
+    if (e <= 0 || s >= length) return null;
+    return LoopRange(max(0.0, s), min(length, e));
+  }
 
   /// null for a deleted loop or invalid contents.
   static LoopRange? fromJson(Object? j) {

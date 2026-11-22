@@ -822,4 +822,91 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noSearchResults => 'Keine Treffer';
+
+  @override
+  String get trimTrackEllipsis => 'Anfang und Ende abschneiden …';
+
+  @override
+  String get trimUnavailable => 'M4A-Dateien lassen sich noch nicht kürzen.';
+
+  @override
+  String trimTitle(String title) {
+    return '«$title» kürzen';
+  }
+
+  @override
+  String get trimStart => 'Anfang';
+
+  @override
+  String get trimEnd => 'Ende';
+
+  @override
+  String trimRemaining(String length) {
+    return 'Bleibt: $length';
+  }
+
+  @override
+  String get trimTimeHint => 'mm:ss.d';
+
+  @override
+  String get trimRangeInvalid =>
+      'Es muss mindestens 1 s bleiben, und das Ende muss nach dem Anfang liegen.';
+
+  @override
+  String get trimPreview => 'Probehören';
+
+  @override
+  String get trimStopPreview => 'Stopp';
+
+  @override
+  String get trimApply => 'Kürzen …';
+
+  @override
+  String get trimConfirmTitle => 'Audiodatei kürzen?';
+
+  @override
+  String trimConfirmText(String title, String start, String end) {
+    return 'Die Audiodatei von «$title» behält nur $start bis $end. Die abgeschnittenen Teile werden gelöscht; das lässt sich nicht rückgängig machen.';
+  }
+
+  @override
+  String get trimConfirm => 'Kürzen';
+
+  @override
+  String get trimming => 'Wird gekürzt …';
+
+  @override
+  String trimFailedFormat(String title) {
+    return '«$title» konnte nicht gekürzt werden: Dieser Dateityp lässt sich nicht kürzen, oder die Datei ist beschädigt.';
+  }
+
+  @override
+  String trimFailedTooShort(String title) {
+    return '«$title» wurde nicht gekürzt: Es muss mindestens 1 s bleiben.';
+  }
+
+  @override
+  String trimFailedNotOnDevice(String title) {
+    return '«$title» konnte nicht gekürzt werden: Die Audiodatei ist nicht auf diesem Gerät.';
+  }
+
+  @override
+  String trimFailedNoSpace(String title) {
+    return '«$title» konnte nicht gekürzt werden: Es ist nicht genug Speicherplatz frei. Der Titel ist unverändert.';
+  }
+
+  @override
+  String trimFailedMemory(String title) {
+    return '«$title» konnte nicht gekürzt werden: Es ist nicht genug Arbeitsspeicher frei. Der Titel ist unverändert.';
+  }
+
+  @override
+  String trimFailedReadOnly(String title) {
+    return '«$title» konnte nicht gekürzt werden: Die Bibliothek stammt aus einer neueren Version der App und ist schreibgeschützt.';
+  }
+
+  @override
+  String trimFailedOther(String title) {
+    return '«$title» konnte nicht gekürzt werden: Die Datei liess sich nicht lesen oder schreiben. Der Titel ist unverändert.';
+  }
 }

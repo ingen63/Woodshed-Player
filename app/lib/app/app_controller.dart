@@ -32,6 +32,7 @@ class AppController extends ChangeNotifier {
     required this.files,
     SyncService? sync,
     Random? random,
+    this.trimmer,
   }) : session = PracticeSession(player, metronome),
        sync = sync ?? NoSync(),
        _random = random ?? Random() {
@@ -52,6 +53,9 @@ class AppController extends ChangeNotifier {
   final SyncService sync;
 
   final Random _random;
+
+  /// #116: cuts audio files (the core); null where trimming is not available (tests without a core).
+  final AudioTrimmer? trimmer;
 
   /// #115/AK7: the area shown, the one last chosen on this device.
   AppArea get area => AppArea.named(library.area);
@@ -314,6 +318,41 @@ class AppController extends ChangeNotifier {
     final first = [...r.imported, ...r.duplicates].firstOrNull;
     if (!player.hasTrack && first != null) await select(first);
     return r;
+  }
+
+  // ---- Trimming (#116) ----
+
+  /// The track whose file is being trimmed; null otherwise.
+  String? get trimming => _trimming;
+  String? _trimming;
+
+  /// #116/AK1: loads [t] for the trim view (waveform, listening), unless it is the loaded track already.
+  Future<bool> openForTrim(Track t) async {
+    if (player.trackId == t.id) return true;
+    return select(t);
+  }
+
+  /// #116: cuts the file of track [id] to [start] … [end] seconds. A loaded track is loaded again with its
+  /// new file, at its start. On failure the track stays as it was and the library reports why (AK9).
+  /// Returns the new ID, null on failure.
+  Future<String?> trimTrack(String id, double start, double end) async {
+    final trim = trimmer;
+    if (trim == null || _trimming != null) return null;
+    final loaded = player.trackId == id;
+    if (loaded) {
+      player.stopPreview();
+      player.pause();
+    }
+    _trimming = id;
+    notifyListeners();
+    final next = await library.trimTrack(id, start, end, trim);
+    _trimming = null;
+    if (next != null && next != id && loaded) {
+      final t = library.track(next);
+      if (t != null) await _load(t);
+    }
+    notifyListeners();
+    return next;
   }
 
   void deleteTracks(Set<String> ids) {

@@ -6,6 +6,8 @@
 #ifndef WP_CORE_H
 #define WP_CORE_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -105,6 +107,28 @@ WP_API void wp_metro_set_ramp(wp_player *p, int enabled, int start_bpm, int targ
  * Taktanfang; danach eine Stufe Ziel, dann wieder Start. Ersetzt die Steigerung nach Takten. */
 WP_API void wp_metro_set_ramp_timed(wp_player *p, int enabled, int start_bpm, int target_bpm,
                                     int duration_seconds);
+
+/* ---- Trimming start and end of a file (#116) ---- */
+/* Shortest part that may remain, in seconds. */
+#define WP_TRIM_MIN_SECONDS 1.0
+typedef struct wp_trim_result wp_trim_result;
+/* Keeps [start, end] seconds of the audio file in data/size (the whole file) and writes the new
+ * file to *out (free it with wp_trim_free). Same format as before: WAV and FLAC exact to the sample
+ * (FLAC encoded again, lossless), MP3 at frame boundaries without encoding again (exact with
+ * decoders that honour the LAME tag, such as the core's), AAC in ADTS at the nearest frame
+ * boundary. start and end are clamped to the file; at least WP_TRIM_MIN_SECONDS must remain. WP_OK,
+ * WP_ERR_INVALID_ARGUMENT (no data or out, range too short, NaN), WP_ERR_UNSUPPORTED_FORMAT
+ * (MP4/M4A, unknown or damaged file) or WP_ERR_OUT_OF_MEMORY; on an error *out is NULL. */
+WP_API int wp_trim(const void *data, size_t size, double start, double end, wp_trim_result **out);
+/* Bytes of the trimmed file, valid until wp_trim_free. */
+WP_API const void *wp_trim_data(const wp_trim_result *r);
+WP_API size_t wp_trim_size(const wp_trim_result *r);
+/* Where the new file starts and ends in the old one (seconds); differs from the request only where
+ * frame boundaries forced it (ADTS: at most half a frame, MP3 without LAME tag: not before 12 ms).
+ */
+WP_API double wp_trim_start(const wp_trim_result *r);
+WP_API double wp_trim_end(const wp_trim_result *r);
+WP_API void wp_trim_free(wp_trim_result *r);
 
 /* ---- Recording: system audio (macOS 14.2+) or microphone (macOS, #113); elsewhere < 0 ---- */
 /* Error codes of wp_rec_start (#44); the UI maps each one to its own localized text. */

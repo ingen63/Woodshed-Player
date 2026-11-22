@@ -5,6 +5,8 @@
 // - Saving and loading gives the same state.
 // - #114: playlists take part (created, filled, reordered, switched to «only on this device», deleted); they
 //   list only tracks of the library, and saving and loading keeps them with their order.
+// - #116: tracks are trimmed at random: the track keeps its place (no track lost or added), its loops lie
+//   within the new length, and no playlist names the old ID any more.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -12,6 +14,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/library/library.dart';
+import 'package:wp_core/wp_types.dart';
 
 import '../fakes.dart';
 import 'property.dart';
@@ -85,7 +88,7 @@ Future<String> randomOperation(TestLibrary t) async {
   final realFolders = lib.folders.map((f) => f.id).toList();
   final folders = [null, ...realFolders];
   String? anyId() => ids.isEmpty ? null : pick(r, ids);
-  switch (r.nextInt(13)) {
+  switch (r.nextInt(14)) {
     case 0:
       await t.importSome(1 + r.nextInt(3), folderId: pick(r, folders));
       return 'import';
@@ -150,10 +153,58 @@ Future<String> randomOperation(TestLibrary t) async {
       return 'delete';
     case 11:
       return playlistStep(r, lib);
+    case 12:
+      return trimStep(r, lib);
     default:
       lib.appearance = pick(r, Appearance.values);
       return 'appearance';
   }
+}
+
+/// #116: «trims» by appending the range to the bytes, so every cut gives a new file and ID.
+Future<WpTrimmed> markTrim(Uint8List b, double start, double end) async =>
+    WpTrimmed(
+      Uint8List.fromList([...b, ...utf8.encode('|$start-$end')]),
+      start,
+      end,
+    );
+
+/// #116: trims a random track of [lib] to a random range of at least 1 s and checks the result: the same
+/// number of tracks, the new one as long as the range, its loops within it, no playlist naming the old ID.
+/// A track without its file on this device stays unchanged. Returns its name for the log.
+Future<String> trimStep(Random r, Library lib) async {
+  final ids = lib.tracks.map((t) => t.id).toList();
+  if (ids.isEmpty) return 'trim nothing';
+  final id = pick(r, ids);
+  final d = max(1.0, lib.track(id)!.duration);
+  final a = r.nextDouble() * (d - 1);
+  final b = a + 1 + r.nextDouble() * (d - a - 1);
+  final count = ids.length;
+  final next = await lib.trimTrack(id, a, b, markTrim);
+  if (next == null) {
+    expect(lib.track(id), isNotNull, reason: 'a failed trim lost the track');
+    expect(lib.hasFile(id), isFalse, reason: 'trim failed: ${lib.lastError}');
+    lib.lastError = null;
+    return 'trim failed';
+  }
+  expect(lib.tracks.length, count, reason: 'trim added or lost a track');
+  expect(lib.track(id), isNull, reason: 'old track still shown');
+  final n = lib.track(next)!;
+  expect(n.duration, closeTo(b - a, 1e-9));
+  for (final l in [
+    ...n.loops.values.nonNulls,
+    if (n.loopId != null) LoopRange(n.settings.loopStart, n.settings.loopEnd),
+  ]) {
+    expect(
+      l.start >= 0 && l.end <= n.duration + 1e-9 && l.start < l.end,
+      isTrue,
+      reason: 'loop ${l.start}–${l.end} outside 0–${n.duration}',
+    );
+  }
+  for (final p in lib.playlists) {
+    expect(p.entries, isNot(contains(id)), reason: 'playlist names the old ID');
+  }
+  return 'trim';
 }
 
 /// #114: one random change to the playlists of [lib]; returns its name for the log.
@@ -263,6 +314,11 @@ void main() {
             expected = after;
           } else if (op == 'delete') {
             expect(before.difference(after).length, lessThanOrEqualTo(1));
+            expected = after;
+          } else if (op == 'trim') {
+            // #116: one track replaced by its trimmed version
+            expect(before.difference(after).length, 1);
+            expect(after.difference(before).length, 1);
             expected = after;
           }
           checkTracks(t.library, expected, '$op (step $i)');

@@ -206,7 +206,7 @@ class _Overview extends StatelessWidget {
               children: [
                 Positioned.fill(
                   child: CustomPaint(
-                    painter: _WavePainter(
+                    painter: WavePainter(
                       wave: wave,
                       start: 0,
                       end: duration,
@@ -246,8 +246,8 @@ class _Overview extends StatelessWidget {
 }
 
 /// Zeichnet Balken aus Minimum und Maximum je Abschnitt; im Loop in Bernstein.
-class _WavePainter extends CustomPainter {
-  _WavePainter({
+class WavePainter extends CustomPainter {
+  WavePainter({
     required this.wave,
     required this.start,
     required this.end,
@@ -287,7 +287,7 @@ class _WavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_WavePainter old) =>
+  bool shouldRepaint(WavePainter old) =>
       old.wave != wave ||
       old.loop != loop ||
       old.color != color ||
@@ -356,7 +356,7 @@ class _LaneState extends State<_Lane> {
               children: [
                 Positioned.fill(
                   child: CustomPaint(
-                    painter: _WavePainter(
+                    painter: WavePainter(
                       wave: widget.wave,
                       start: widget.start,
                       end: widget.end,

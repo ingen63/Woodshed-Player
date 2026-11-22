@@ -16,6 +16,7 @@ import 'package:woodshed_player/app/file_platform_web.dart';
 import 'package:woodshed_player/app/file_store_web.dart';
 import 'package:woodshed_player/app/platform_web.dart';
 import 'package:woodshed_player/app/smoke.dart';
+import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/player/audio_core_web.dart';
 import 'package:wp_core/wp_types.dart';
 
@@ -116,4 +117,34 @@ void main() {
       p.pause();
     },
   );
+
+  test('#116/AK4 #116/AK8 trimming in the browser: the core in the loader worker cuts the file', () async {
+    final c = await createAppController();
+    final key = (c.files as WebFilePlatform).register(
+      'Sine.wav',
+      sineWav(seconds: 3),
+    );
+    final r = await c.importFiles([key]);
+    final old = r.imported.single;
+    // 44.1 kHz WAV, [0.5, 2.0] s: 66150 frames of 2 bytes after the 44-byte header
+    final next = await c.trimTrack(old.id, 0.5, 2.0);
+    expect(next, isNotNull, reason: '${c.message}');
+    expect(c.library.track(old.id), isNull);
+    final t = c.library.track(next!)!;
+    expect(t.title, old.title);
+    expect(t.duration, 1.5);
+    final bytes = await c.library.readAudio(t);
+    expect(bytes!.length, 44 + 66150 * 2);
+    expect(
+      await c.library.store.exists(Library.trackName(old.fileName)),
+      isFalse,
+    );
+    // loaded again with the new file
+    expect(c.player.trackId, next);
+    expect(c.player.duration, closeTo(1.5, 0.01));
+    // less than 1 s is refused by the core as well, the track stays
+    final core = c.player.core as WebAudioCore;
+    final short = await core.trim(bytes, 0.2, 0.9);
+    expect(short.code, WpCode.invalidArgument);
+  });
 }

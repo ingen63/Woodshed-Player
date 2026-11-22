@@ -112,6 +112,16 @@ function(wp_mutate target)
   endif()
 endfunction()
 
+# #113: libFLAC sources (encoder and decoder of native FLAC); #116: also in the web core (trimming)
+set(WP_FLAC ${WP_THIRD_PARTY}/flac)
+set(WP_FLAC_SOURCES
+  ${WP_FLAC}/src/libFLAC/bitmath.c ${WP_FLAC}/src/libFLAC/bitreader.c
+  ${WP_FLAC}/src/libFLAC/bitwriter.c ${WP_FLAC}/src/libFLAC/cpu.c ${WP_FLAC}/src/libFLAC/crc.c
+  ${WP_FLAC}/src/libFLAC/fixed.c ${WP_FLAC}/src/libFLAC/float.c ${WP_FLAC}/src/libFLAC/format.c
+  ${WP_FLAC}/src/libFLAC/lpc.c ${WP_FLAC}/src/libFLAC/md5.c ${WP_FLAC}/src/libFLAC/memory.c
+  ${WP_FLAC}/src/libFLAC/stream_decoder.c ${WP_FLAC}/src/libFLAC/stream_encoder.c
+  ${WP_FLAC}/src/libFLAC/stream_encoder_framing.c ${WP_FLAC}/src/libFLAC/window.c)
+
 if(EMSCRIPTEN)
   include(web/web.cmake)  # eigener Zweig: Tests unter Node.js, Kern fürs AudioWorklet
   return()
@@ -152,14 +162,7 @@ wp_mutate(wp_playercore)
 
 # #113: libFLAC (third_party/flac, BSD-3-Clause), only native FLAC: no Ogg, no threads, no SIMD.
 # Its config.h is ours (src/flac_config). Third-party code: no strict warnings, headers as SYSTEM.
-set(WP_FLAC ${WP_THIRD_PARTY}/flac)
-add_library(wp_flac STATIC
-  ${WP_FLAC}/src/libFLAC/bitmath.c ${WP_FLAC}/src/libFLAC/bitreader.c
-  ${WP_FLAC}/src/libFLAC/bitwriter.c ${WP_FLAC}/src/libFLAC/cpu.c ${WP_FLAC}/src/libFLAC/crc.c
-  ${WP_FLAC}/src/libFLAC/fixed.c ${WP_FLAC}/src/libFLAC/float.c ${WP_FLAC}/src/libFLAC/format.c
-  ${WP_FLAC}/src/libFLAC/lpc.c ${WP_FLAC}/src/libFLAC/md5.c ${WP_FLAC}/src/libFLAC/memory.c
-  ${WP_FLAC}/src/libFLAC/stream_decoder.c ${WP_FLAC}/src/libFLAC/stream_encoder.c
-  ${WP_FLAC}/src/libFLAC/stream_encoder_framing.c ${WP_FLAC}/src/libFLAC/window.c)
+add_library(wp_flac STATIC ${WP_FLAC_SOURCES})
 if(WIN32)
   target_sources(wp_flac PRIVATE ${WP_FLAC}/src/share/win_utf8_io/win_utf8_io.c)
 endif()
@@ -172,12 +175,26 @@ if(UNIX)
   target_link_libraries(wp_flac PRIVATE m)
 endif()
 
+# #113: FLAC writer on libFLAC (recording, #116: trimming)
+add_library(wp_flacwriter STATIC src/flac_writer.cpp)
+target_include_directories(wp_flacwriter PUBLIC src)
+target_link_libraries(wp_flacwriter PUBLIC wp_flac)
+wp_strict_warnings(wp_flacwriter)
+wp_mutate(wp_flacwriter)
+
+# #116: trimming start and end of a file in memory (WAV, FLAC, MP3, ADTS)
+add_library(wp_trim STATIC src/trim.cpp)
+target_include_directories(wp_trim PUBLIC include src)
+target_link_libraries(wp_trim PUBLIC wp_miniaudio wp_flacwriter)
+wp_strict_warnings(wp_trim)
+wp_mutate(wp_trim)
+
 # #68: platform-independent part of the recording (ring buffer, writer thread, WAV or FLAC file,
 # level, #113: microphone through miniaudio), tested without an audio device; recorder_mac.mm only
 # drives Core Audio.
-add_library(wp_reccore STATIC src/recorder_core.cpp src/flac_writer.cpp)
+add_library(wp_reccore STATIC src/recorder_core.cpp)
 target_include_directories(wp_reccore PUBLIC include)
-target_link_libraries(wp_reccore PUBLIC wp_miniaudio wp_flac Threads::Threads)
+target_link_libraries(wp_reccore PUBLIC wp_miniaudio wp_flacwriter Threads::Threads)
 wp_strict_warnings(wp_reccore)
 wp_mutate(wp_reccore)
 
@@ -187,9 +204,9 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
 else()
   set(WP_RECORDER src/recorder_stub.cpp)
 endif()
-add_library(wp_core SHARED src/player.cpp ${WP_RECORDER})
+add_library(wp_core SHARED src/player.cpp src/trim_api.cpp ${WP_RECORDER})
 target_include_directories(wp_core PUBLIC include)
-target_link_libraries(wp_core PRIVATE wp_playercore)
+target_link_libraries(wp_core PRIVATE wp_playercore wp_trim)
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   target_link_libraries(wp_core PRIVATE wp_reccore)
 endif()
@@ -241,6 +258,13 @@ add_executable(recorder_tests tests/recorder_tests.cpp)
 target_link_libraries(recorder_tests PRIVATE wp_reccore wp_playercore)
 wp_strict_warnings(recorder_tests)
 add_test(NAME recorder_tests COMMAND recorder_tests)
+
+# #116: trimming WAV, FLAC, MP3 and ADTS; the results decoded again by the core (wp_playercore)
+add_executable(trim_tests tests/trim_tests.cpp src/trim_api.cpp)
+target_link_libraries(trim_tests PRIVATE wp_trim wp_playercore)
+target_compile_definitions(trim_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
+wp_strict_warnings(trim_tests)
+add_test(NAME trim_tests COMMAND trim_tests)
 
 # #61: the device shell (src/player.cpp) compiled into the test itself, on the null device
 add_executable(device_tests tests/device_tests.cpp)
@@ -294,7 +318,8 @@ include(tests/fuzz/fuzz.cmake)
 # memory ends as killed or timeout (#11/AK4).
 if(WP_MULL_PLUGIN)
   set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests recorder_tests capi_tests
-    device_tests realtime_tests reference_tests fuzz_decoder_replay fuzz_capi_replay)
+    device_tests realtime_tests reference_tests trim_tests fuzz_decoder_replay fuzz_capi_replay
+    fuzz_trim_replay)
   foreach(t IN LISTS WP_MUTANT_TESTS)
     target_sources(${t} PRIVATE tests/mutants/memory_guard.cpp tests/mutants/mutant_switch.cpp)
   endforeach()

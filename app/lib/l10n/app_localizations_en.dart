@@ -816,4 +816,91 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noSearchResults => 'No matches';
+
+  @override
+  String get trimTrackEllipsis => 'Trim start and end …';
+
+  @override
+  String get trimUnavailable => 'M4A files cannot be trimmed yet.';
+
+  @override
+  String trimTitle(String title) {
+    return 'Trim «$title»';
+  }
+
+  @override
+  String get trimStart => 'Start';
+
+  @override
+  String get trimEnd => 'End';
+
+  @override
+  String trimRemaining(String length) {
+    return 'Remaining: $length';
+  }
+
+  @override
+  String get trimTimeHint => 'mm:ss.d';
+
+  @override
+  String get trimRangeInvalid =>
+      'At least 1 s must remain, and the end must lie after the start.';
+
+  @override
+  String get trimPreview => 'Listen';
+
+  @override
+  String get trimStopPreview => 'Stop';
+
+  @override
+  String get trimApply => 'Trim …';
+
+  @override
+  String get trimConfirmTitle => 'Trim the audio file?';
+
+  @override
+  String trimConfirmText(String title, String start, String end) {
+    return 'The audio file of «$title» keeps only $start to $end. The parts cut off are deleted; this cannot be undone.';
+  }
+
+  @override
+  String get trimConfirm => 'Trim';
+
+  @override
+  String get trimming => 'Trimming …';
+
+  @override
+  String trimFailedFormat(String title) {
+    return '«$title» could not be trimmed: this file type cannot be trimmed, or the file is damaged.';
+  }
+
+  @override
+  String trimFailedTooShort(String title) {
+    return '«$title» was not trimmed: at least 1 s must remain.';
+  }
+
+  @override
+  String trimFailedNotOnDevice(String title) {
+    return '«$title» could not be trimmed: its audio file is not on this device.';
+  }
+
+  @override
+  String trimFailedNoSpace(String title) {
+    return '«$title» could not be trimmed: there is not enough storage space. The track is unchanged.';
+  }
+
+  @override
+  String trimFailedMemory(String title) {
+    return '«$title» could not be trimmed: there is not enough memory. The track is unchanged.';
+  }
+
+  @override
+  String trimFailedReadOnly(String title) {
+    return '«$title» could not be trimmed: the library is from a newer version of the app and is read-only.';
+  }
+
+  @override
+  String trimFailedOther(String title) {
+    return '«$title» could not be trimmed: the file could not be read or written. The track is unchanged.';
+  }
 }

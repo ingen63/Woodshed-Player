@@ -221,6 +221,27 @@ const tests = {
     check(core.pumpPcm() === WP_ERR_INVALID_ARGUMENT, 'unfinished one discarded');
     near(core.duration, 2.0, 1e-9, 'previous title stays playable');
   },
+  // #116/AK4: the browser trims in the core too, AAC in ADTS included (the browser only decodes it).
+  async trimInTheCore() {
+    const decoder = await createDecoder(wasm);
+    const mp3 = decoder.trim(readFileSync(join(audioDir, 'clicks3.mp3')), 0.7, 2.2);
+    check(mp3.code === WP_OK && mp3.bytes.length > 0, 'MP3 trimmed');
+    near(mp3.start, 0.7, 1 / 44100, 'MP3 start');
+    near(mp3.end, 2.2, 1 / 44100, 'MP3 end');
+    const d = decoder.decode(mp3.bytes, 44100);
+    check(d.code === WP_OK && Math.abs(d.pcm.length / 2 - 66150) <= 1, 'MP3 is 1.5 s long');
+    // ADTS: frames of 1024 samples, 0.7 s → frame 30, 2.2 s → frame 95
+    const aac = decoder.trim(readFileSync(join(audioDir, 'clicks3.aac')), 0.7, 2.2);
+    check(aac.code === WP_OK && aac.bytes[0] === 0xff && (aac.bytes[1] & 0xf6) === 0xf0, 'ADTS stays ADTS');
+    near(aac.start, (30 * 1024) / 44100, 1e-9, 'ADTS start at a frame boundary');
+    near(aac.end, (95 * 1024) / 44100, 1e-9, 'ADTS end at a frame boundary');
+    const flac = decoder.trim(readFileSync(join(audioDir, 'clicks3.flac')), 0.7, 2.2);
+    check(flac.code === WP_OK && new TextDecoder().decode(flac.bytes.subarray(0, 4)) === 'fLaC', 'FLAC stays FLAC');
+    const short = decoder.trim(readFileSync(join(audioDir, 'clicks3.mp3')), 1.0, 1.5);
+    check(short.code === WP_ERR_INVALID_ARGUMENT && !short.bytes, 'less than 1 s refused');
+    const m4a = decoder.trim(readFileSync(join(audioDir, 'sine440.m4a')), 0, 1);
+    check(m4a.code === WP_ERR_UNSUPPORTED_FORMAT, 'M4A not trimmed');
+  },
   // #93: running out of memory reports WP_ERR_OUT_OF_MEMORY instead of aborting the WASM core (it is
   // built with -fwasm-exceptions); the previous title stays playable and loading works again.
   async outOfMemoryIsReported() {

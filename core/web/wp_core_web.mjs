@@ -226,6 +226,30 @@ export class WpDecoder {
       this.#result((err) => this.x.wp_web_track_decode(ptr, u8.byteLength, sampleRate, err), bins));
   }
 
+  // #116: keeps [start, end] seconds of the file `bytes` (MP3, WAV, FLAC or AAC in ADTS; the same core
+  // code as natively, so the browser cuts alike). { code, bytes, start, end }: the new file (own
+  // buffer, transferable) and where it starts and ends in the old one, or only `code` on failure.
+  trim(bytes, start, end) {
+    const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    return this.#copyIn(u8, (ptr) => {
+      const out = this.x.wp_web_alloc(4);
+      if (!out) return { code: WP_ERR_OUT_OF_MEMORY };
+      try {
+        const code = this.x.wp_trim(ptr, u8.byteLength, start, end, out);
+        if (code !== WP_OK) return { code };
+        const r = new Uint32Array(this.x.memory.buffer, out, 1)[0];
+        try {
+          const data = new Uint8Array(this.x.memory.buffer, this.x.wp_trim_data(r), this.x.wp_trim_size(r)).slice();
+          return { code: WP_OK, bytes: data, start: this.x.wp_trim_start(r), end: this.x.wp_trim_end(r) };
+        } finally {
+          this.x.wp_trim_free(r);
+        }
+      } finally {
+        this.x.wp_web_free(out);
+      }
+    });
+  }
+
   // PCM as decodeAudioData returns it (one Float32Array per channel, any rate).
   convert(channels, srcRate, sampleRate, bins = { perSecond: 200, max: 400000 }) {
     const n = channels.length;

@@ -112,3 +112,19 @@ class WpException implements Exception {
   @override
   String toString() => message;
 }
+
+/// #116: a file trimmed by the core: its bytes and where it starts and ends in the old file (seconds), or
+/// the error code ([WpCode], < 0) with no bytes.
+class WpTrimmed {
+  const WpTrimmed(Uint8List this.bytes, this.start, this.end)
+    : code = WpCode.ok;
+  const WpTrimmed.failed(this.code) : bytes = null, start = 0, end = 0;
+
+  final int code;
+  final Uint8List? bytes;
+  final double start;
+  final double end;
+
+  /// Shortest part that may remain (WP_TRIM_MIN_SECONDS).
+  static const minSeconds = 1.0;
+}
