@@ -172,7 +172,7 @@ void main() {
       expect(fuzz, contains("github.event_name == 'workflow_dispatch'"));
       expect(fuzz, contains('run: make fuzz FUZZ_SECONDS='));
       expect(fuzz, contains('if: failure()'));
-      expect(fuzz, contains('actions/upload-artifact@v4'));
+      expect(fuzz, contains('actions/upload-artifact@'));
       expect(fuzz, contains('core/build-fuzz/artifacts/'));
     });
   });

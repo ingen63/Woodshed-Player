@@ -305,11 +305,16 @@ test-ios:
 
 # Web code in a real browser (#13/AK4): the WASM core next to the test page (test/web/wp_core/, not
 # checked in), Chrome with autoplay allowed (the AudioContext needs no click then).
+# #112: a run that hangs (e.g. Chrome never loads the test page) stops after WEB_TEST_LIMIT seconds with
+# a message instead of blocking the CI job until its timeout. perl, because macOS has no `timeout`.
+WEB_TEST_LIMIT ?= 300
 test-web:
 	app/tool/build_web_core.sh
 	mkdir -p app/test/web/wp_core && cp app/web/wp_core/* app/test/web/wp_core/
 	cd app && CHROME_EXECUTABLE="$(CURDIR)/tools/chrome_autoplay.sh" \
-	  flutter test --platform chrome --reporter failures-only test/web/
+	  perl -e '$$SIG{ALRM} = sub { kill "KILL", -$$$$; }; setpgrp; alarm shift; system @ARGV; exit($$? >> 8 || ($$? ? 1 : 0))' \
+	  $(WEB_TEST_LIMIT) flutter test --platform chrome --reporter failures-only test/web/ \
+	  || { s=$$?; [ $$s -eq 137 ] && echo "test-web: Chrome tests did not finish within $(WEB_TEST_LIMIT) s (#112)" >&2; exit $$s; }
 	$(MAKE) --no-print-directory test-web-start
 
 # #72/AK3: the built web app starts in headless Chrome without failed requests, foreign hosts or

@@ -52,10 +52,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # tags for git describe
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Check WASM core of the W0 page (#32/AK3)
@@ -69,7 +69,7 @@ jobs:
           if [ -z "$tag" ]; then echo "::notice::No tag yet, the web app is left out"; else echo "Web app from $tag"; fi
       - name: Check out the tag for the app build
         if: steps.tag.outputs.tag != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.tag.outputs.tag }}
           path: app-src
@@ -82,7 +82,7 @@ jobs:
       - name: Emscripten from the cache (#89)
         if: steps.tag.outputs.tag != ''
         id: emsdk
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/emsdk
           # a new EMSDK_VERSION gives a new key, so the next run installs it afresh
@@ -127,9 +127,9 @@ jobs:
           CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
           APP_DIR: ${{ steps.tag.outputs.tag != '' && 'app-src/app/build/web' || '' }}
         run: python3 site/build_site.py _site ${APP_DIR:+--app "$APP_DIR"}
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

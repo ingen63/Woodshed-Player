@@ -63,7 +63,7 @@ jobs:
       code: ${{ steps.diff.outputs.code }}
       web: ${{ steps.diff.outputs.web }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Paths changed by the push
@@ -103,7 +103,7 @@ jobs:
       LLVM_COV: llvm-cov-18
       LLVM_PROFDATA: llvm-profdata-18
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # coverage-diff compares with the commit before the push
       - uses: subosito/flutter-action@v2
@@ -172,7 +172,7 @@ jobs:
           echo "available=true" >> "$GITHUB_OUTPUT"
       - name: Overview page as artifact (#13/AK9, #12)
         if: ${{ !cancelled() && steps.report.outputs.available == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-quality-report
           path: |
@@ -181,7 +181,7 @@ jobs:
           if-no-files-found: ignore
       - name: Coverage data as artifact
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: |
@@ -221,13 +221,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Emscripten from the cache (#89)
         id: emsdk
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/emsdk
           # a new EMSDK_VERSION gives a new key, so the next run installs it afresh
@@ -259,7 +259,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Address space layout for the sanitizers
         # newer Ubuntu kernels use more ASLR bits than the sanitizer runtimes of older clang accept
         run: sudo sysctl -w vm.mmap_rnd_bits=28
@@ -279,10 +279,10 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Emscripten from the cache (#89)
         id: emsdk
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/emsdk
           # a new EMSDK_VERSION gives a new key, so the next run installs it afresh
@@ -310,7 +310,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -354,7 +354,7 @@ jobs:
       # the real device.
       WP_AUDIO_BACKEND: 'null'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -392,7 +392,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Address space layout for the sanitizers
         run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: make sanitize-thread (#57/AK2)
@@ -411,11 +411,11 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Address space layout for the sanitizers
         run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: Corpus of earlier nights (not checked in)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: core/build-fuzz/corpus
           key: fuzz-corpus-${{ github.run_id }}
@@ -427,7 +427,7 @@ jobs:
       - name: Emscripten from the cache (#89)
         if: ${{ !cancelled() }}
         id: emsdk
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/emsdk
           # a new EMSDK_VERSION gives a new key, so the next run installs it afresh
@@ -452,7 +452,7 @@ jobs:
           make fuzz-wasm-findings
       - name: Inputs of the finding
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-findings
           path: |
@@ -472,7 +472,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -492,7 +492,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -530,7 +530,7 @@ jobs:
       MULL_CC: clang-18
       MULL_CXX: clang++-18
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: subosito/flutter-action@v2
@@ -585,7 +585,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Results as artifact
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mutants-diff
           path: |
