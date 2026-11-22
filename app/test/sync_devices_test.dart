@@ -998,10 +998,6 @@ void main() {
         await s.syncNow();
         expect(s.status, SyncStatus.off);
         expect(s.inCloud('x'), isFalse);
-        expect(
-          await s.repairCloudState(CloudStateRepair.restoreBackup),
-          CloudRepairResult.failed,
-        );
       },
     );
   });

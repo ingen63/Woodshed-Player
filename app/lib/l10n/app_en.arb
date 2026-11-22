@@ -412,45 +412,9 @@
   "@fileOnOneDevice": {
     "description": "Track row (#37): the audio file is on another device and not in the cloud."
   },
-  "cloudStateUnreadable": "The library in the cloud is damaged and was not applied. Your data on this device are unchanged. You can restore the last valid backup from the cloud (it is merged with the data on this device) or replace the library in the cloud with the data on this device.",
-  "@cloudStateUnreadable": {
-    "description": "Sync (#10/AK7, #65): state.json in the cloud is damaged; nothing was merged, local data unchanged. Offers both repairs."
-  },
   "cloudStateTooNew": "The library in the cloud was saved by a newer version of Woodshed Player. Please update the app. Until then, nothing is synced.",
   "@cloudStateTooNew": {
     "description": "Sync (#10/AK7): state.json in the cloud has a newer format version."
-  },
-  "cloudStateRestoreBackup": "Restore backup",
-  "@cloudStateRestoreBackup": {
-    "description": "Sync (#65): button, suggested repair: restore the last valid backup and merge it with this device."
-  },
-  "cloudStateOverwrite": "Use this device",
-  "@cloudStateOverwrite": {
-    "description": "Sync (#65): button, replace state.json in the cloud with the data on this device."
-  },
-  "cloudStateLater": "Later",
-  "@cloudStateLater": {
-    "description": "Sync (#65): button, close the dialog without repairing."
-  },
-  "cloudStateRestored": "The library in the cloud was restored from the last valid backup and merged with the data on this device. Syncing continues.",
-  "@cloudStateRestored": {
-    "description": "Sync (#65): repair from backup done."
-  },
-  "cloudStateOverwritten": "The library in the cloud was replaced with the data on this device. Syncing continues.",
-  "@cloudStateOverwritten": {
-    "description": "Sync (#65): state.json replaced with the local state."
-  },
-  "cloudStateReadableAgain": "The library in the cloud is readable again. Syncing continues.",
-  "@cloudStateReadableAgain": {
-    "description": "Sync (#65): state.json was repaired elsewhere before this repair started."
-  },
-  "cloudStateNoBackup": "There is no valid backup in the cloud. You can replace the library in the cloud with the data on this device; nothing on this device is lost.",
-  "@cloudStateNoBackup": {
-    "description": "Sync (#65): no readable backup; only overwriting is left."
-  },
-  "cloudStateRepairFailed": "The library in the cloud could not be repaired. Your data on this device are unchanged. Please try again later.",
-  "@cloudStateRepairFailed": {
-    "description": "Sync (#65): repair failed (offline, conflicts)."
   },
   "trackNotOnDevice": "The audio file of «{title}» is only on another device and not in the cloud.",
   "@trackNotOnDevice": {

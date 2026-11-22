@@ -589,41 +589,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileOnOneDevice => 'File only on one device';
 
   @override
-  String get cloudStateUnreadable =>
-      'The library in the cloud is damaged and was not applied. Your data on this device are unchanged. You can restore the last valid backup from the cloud (it is merged with the data on this device) or replace the library in the cloud with the data on this device.';
-
-  @override
   String get cloudStateTooNew =>
       'The library in the cloud was saved by a newer version of Woodshed Player. Please update the app. Until then, nothing is synced.';
-
-  @override
-  String get cloudStateRestoreBackup => 'Restore backup';
-
-  @override
-  String get cloudStateOverwrite => 'Use this device';
-
-  @override
-  String get cloudStateLater => 'Later';
-
-  @override
-  String get cloudStateRestored =>
-      'The library in the cloud was restored from the last valid backup and merged with the data on this device. Syncing continues.';
-
-  @override
-  String get cloudStateOverwritten =>
-      'The library in the cloud was replaced with the data on this device. Syncing continues.';
-
-  @override
-  String get cloudStateReadableAgain =>
-      'The library in the cloud is readable again. Syncing continues.';
-
-  @override
-  String get cloudStateNoBackup =>
-      'There is no valid backup in the cloud. You can replace the library in the cloud with the data on this device; nothing on this device is lost.';
-
-  @override
-  String get cloudStateRepairFailed =>
-      'The library in the cloud could not be repaired. Your data on this device are unchanged. Please try again later.';
 
   @override
   String trackNotOnDevice(String title) {

@@ -1010,65 +1010,11 @@ abstract class AppLocalizations {
   /// **'File only on one device'**
   String get fileOnOneDevice;
 
-  /// Sync (#10/AK7, #65): state.json in the cloud is damaged; nothing was merged, local data unchanged. Offers both repairs.
-  ///
-  /// In en, this message translates to:
-  /// **'The library in the cloud is damaged and was not applied. Your data on this device are unchanged. You can restore the last valid backup from the cloud (it is merged with the data on this device) or replace the library in the cloud with the data on this device.'**
-  String get cloudStateUnreadable;
-
   /// Sync (#10/AK7): state.json in the cloud has a newer format version.
   ///
   /// In en, this message translates to:
   /// **'The library in the cloud was saved by a newer version of Woodshed Player. Please update the app. Until then, nothing is synced.'**
   String get cloudStateTooNew;
-
-  /// Sync (#65): button, suggested repair: restore the last valid backup and merge it with this device.
-  ///
-  /// In en, this message translates to:
-  /// **'Restore backup'**
-  String get cloudStateRestoreBackup;
-
-  /// Sync (#65): button, replace state.json in the cloud with the data on this device.
-  ///
-  /// In en, this message translates to:
-  /// **'Use this device'**
-  String get cloudStateOverwrite;
-
-  /// Sync (#65): button, close the dialog without repairing.
-  ///
-  /// In en, this message translates to:
-  /// **'Later'**
-  String get cloudStateLater;
-
-  /// Sync (#65): repair from backup done.
-  ///
-  /// In en, this message translates to:
-  /// **'The library in the cloud was restored from the last valid backup and merged with the data on this device. Syncing continues.'**
-  String get cloudStateRestored;
-
-  /// Sync (#65): state.json replaced with the local state.
-  ///
-  /// In en, this message translates to:
-  /// **'The library in the cloud was replaced with the data on this device. Syncing continues.'**
-  String get cloudStateOverwritten;
-
-  /// Sync (#65): state.json was repaired elsewhere before this repair started.
-  ///
-  /// In en, this message translates to:
-  /// **'The library in the cloud is readable again. Syncing continues.'**
-  String get cloudStateReadableAgain;
-
-  /// Sync (#65): no readable backup; only overwriting is left.
-  ///
-  /// In en, this message translates to:
-  /// **'There is no valid backup in the cloud. You can replace the library in the cloud with the data on this device; nothing on this device is lost.'**
-  String get cloudStateNoBackup;
-
-  /// Sync (#65): repair failed (offline, conflicts).
-  ///
-  /// In en, this message translates to:
-  /// **'The library in the cloud could not be repaired. Your data on this device are unchanged. Please try again later.'**
-  String get cloudStateRepairFailed;
 
   /// No description provided for @trackNotOnDevice.
   ///

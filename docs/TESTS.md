@@ -145,7 +145,7 @@ zugeordnet.
 | Gerät länger als 90 Tage offline: gelöschte Titel und Ordner kommen nach dem Bereinigen der Grabsteine nicht zurück, erneuter Import belebt | vorhanden: `stamps_test.dart` (#98/AK2–AK4), `property/sync_property_test.dart` (#98/AK2–AK5) | – |
 | Gerät gleicht zum ersten Mal ab, die Cloud hat schon einen Bereinigungs-Horizont: eigene Titel und Ordner bleiben mit Audiodatei erhalten, Geräte mit früherem Abgleich verlieren Gelöschtes weiter | vorhanden: `sync_test.dart` (#104/AK2–AK4), `stamps_test.dart` (#104), `property/sync_property_test.dart` (#104/AK5) | – |
 | Verfälschte Gerätedateien aus der Cloud ohne Absturz und ohne Datenverlust, übersprungen und später erneut gelesen; neueres Format mit Meldung | vorhanden: `property/sync_property_test.dart` (#10/AK7, #53/AK5) | – |
-| Dialog zur beschädigten `state.json` (seit #53 von der Engine nicht mehr ausgelöst) | vorhanden: `cloud_repair_test.dart` (#65/AK1, #65/AK3) | – |
+| Kein Reparatur-Dialog mehr (#65 entfernt); «App aktualisieren» bei neuerem Format mit einfachem OK, Texte in jeder ARB-Datei | vorhanden: `cloud_state_message_test.dart` (#111/AK1–AK3) | – |
 | Eine Datei je Gerät, mehrere Quellen, Brücke, Speicher ohne bedingtes Schreiben, Konfliktkopien, Sicherungen je Gerät, verwaiste Gerätedateien, `format.json` | vorhanden: `sync_devices_test.dart` (#53/AK1–AK10), `sync_test.dart` (#53/AK7) | – |
 | Zusammenführen von 10'000 Titeln ≤ 2 s | vorhanden, nächtlich: `app/bench/library_bench_test.dart` (#59/AK3), `make bench` | – |
 | Nur die Anbietermodule (`app/lib/sync/providers/`) öffnen Verbindungen, keine Analyse- oder Werbepakete, kein Netzwerk im Kern | vorhanden: `make network-free`, `app/tool/network_free_test.dart` (#58) | – |
@@ -484,20 +484,14 @@ riesige Texte), fremde Versionsnummer, fehlende oder unsinnige Stempel, abgeschn
 - AK8: Für jede Golden-Datei und jede verfälschte, die noch öffnet, ändert ein zweites Laden und Speichern nach der
   Migration nichts (gleicher Inhalt von `library.json`) und meldet nichts; `migrateLegacyLibrary` zweimal auf
   dieselbe Datei gibt dasselbe Ergebnis.
-- `sync_property_test.dart`: Gerät A legt `state.json` in die Cloud, Gerät B hat eigene, nie abgeglichene Titel. Die
-  verfälschte `state.json` darf nie abstürzen; B behält jeden eigenen Titel unverändert, und was B gespeichert hat,
-  lädt ohne Meldung gleich wieder. Unbrauchbare Dateien prüft die Sync-Engine vor dem Zusammenführen
-  (`CloudSync._readState`): Version genau 2, keine Zahl ausserhalb des Bereichs eines double, Stempel lesbar und im
-  Bereich, jeder Datensatz darstellbar. Sonst bleibt die Bibliothek unberührt, die Datei in der Cloud ebenso, der
-  Abgleich wartet (Status `damaged`, ohne automatische Wiederholung) auf die Wahl der Reparatur (#65), und die Meldung «Bibliothek in der Cloud beschädigt» bzw. «neuere
-  Version» erscheint einmal je Version der Datei. Stand 19.11.2026 bei 2 × 1000 Fällen: rund 69 % abgewiesen, 28 %
-  noch gültig und übernommen, 3 % neuere Version.
-- `sync_property_test.dart` (#65/AK4): A gleicht mehrmals ab (Sicherungen unter `backup/`), B hat eigene Titel. Die
-  `state.json` wird so verfälscht, dass sie unbrauchbar ist (geprüft auf einem Wegwerf-Gerät), manche oder alle
-  Sicherungen ebenso; manchmal bricht vor der Reparatur die Verbindung ab. B wählt zufällig einen Weg (ohne gültige
-  Sicherung danach «Dieses Gerät verwenden»). Danach behält B jeden eigenen Titel unverändert samt Audiodatei, lädt
-  ohne Meldung wieder, und A und B kommen auf denselben Stand, ohne dass ein Titel verloren geht. Stand 20.11.2026
-  bei 3 × 90 Fällen: rund 52 % ersetzt, 43 % aus der Sicherung, 5 % ohne gültige Sicherung.
+- `sync_property_test.dart` (#10/AK7, #53/AK5): Gerät A legt seine Gerätedatei `devices/<id>.json` in die Cloud,
+  Gerät B hat eigene, nie abgeglichene Titel. Die verfälschte Gerätedatei darf nie abstürzen; B behält jeden eigenen
+  Titel unverändert, und was B gespeichert hat, lädt ohne Meldung gleich wieder. Unbrauchbare Dateien prüft die
+  Sync-Engine vor dem Zusammenführen: Version genau 2, keine Zahl ausserhalb des Bereichs eines double, Stempel lesbar
+  und im Bereich, jeder Datensatz darstellbar. Sonst wird die Datei ohne Meldung übersprungen und in der Cloud nicht
+  angefasst, bis ihr Gerät sie neu schreibt; nur ein neueres Format meldet einmal je Version «App aktualisieren»
+  (`cloudStateTooNew`). Seit #53 gibt es keine gemeinsame `state.json` und damit keinen Reparatur-Dialog mehr (#65,
+  entfernt mit #111).
 - Kern (AK3): `player_tests.cpp` (`truncatedAndWrongAudioFiles`) schneidet WAV, FLAC und MP3 an 10 Stellen ab
   (leer, Teil des Kopfs, nur Kopf, Teile der Daten) und lädt falsche Inhalte hinter bekannten Endungen: Ergebnis ist
   immer der lesbare Teil oder `WP_ERR_UNSUPPORTED_FORMAT` (in der App «Format nicht unterstützt», `loadUnsupported`),
@@ -647,8 +641,8 @@ neue Golden-Datei.
 
 **Grenzen.** Der nächtliche Fuzz- und Zufallslauf lässt sich erst nach dem Push beobachten; lokal belegt sind
 `make fuzz` (60 s je Ziel), `make fuzz-wasm` und `make property` mit bis zu 2000 Fällen. libFuzzer selbst läuft
-nicht unter WebAssembly; dort werden nur die nativ gefundenen Eingaben nachgespielt (#67). Eine beschädigte `state.json` bleibt in der Cloud liegen, bis die Nutzerin oder der Nutzer
-eine Reparatur wählt (#65).
+nicht unter WebAssembly; dort werden nur die nativ gefundenen Eingaben nachgespielt (#67). Eine beschädigte Gerätedatei bleibt in der Cloud liegen, bis ihr Gerät
+sie neu schreibt (#53).
 
 ## Netzwerkfreiheit (#58)
 
@@ -1037,7 +1031,7 @@ er belegt) oder `#61`:
 | `stamps.dart` | `app/test/stamps_test.dart` | Stempel (UTC, Vergleich, `parse` und Grenzen), Uhr (`observe`), JSON-Vergleich, Frist der Grabsteine genau 90 Tage |
 | `track.dart` | `app/test/track_rules_test.dart` | Loop-ID beim Verschieben und Anlegen, `LoopRange`, alte Einträge, Vorgaben fehlender geteilter Felder |
 | `library.dart` | `app/test/library_rules_test.dart` | Benachrichtigung bei jedem Laden, fehlende Dateien, Stempel nach Laden und Abgleich, Abwesenheit von Dateien, Audio aus der Cloud, Speichern (Entprellen mit der Testuhr von `testWidgets`, `flush`, `dispose`), Import, Ordner, Verschieben, Titel und Dauer |
-| `sync_engine.dart` | `app/test/sync_rules_test.dart` | Zeitgeber (Testuhr), Wiederholungen ohne Verbindung, Abgleich während eines Abgleichs, Status, Audiodateien, Konflikte, Inhalt von `state.json`, Reparatur, `dispose` |
+| `sync_engine.dart` | `app/test/sync_rules_test.dart` | Zeitgeber (Testuhr), Wiederholungen ohne Verbindung, Abgleich während eines Abgleichs, Status, Audiodateien, Konflikte, Inhalt der Gerätedatei, `dispose` |
 | übrige Dart-Dateien | `app/test/app_controller_rules_test.dart`, `migration_rules_test.dart`, `support_rules_test.dart`, `mutation_cases_test.dart` | Meldungen und `dispose` des AppController, Titel nur auf einem anderen Gerät, Migration, natürliche Sortierung, Geräte-ID, Dateispeicher, Plattformkanal, Wellenform im Browser, Cloud im Speicher, Metronom nach `restore` |
 | Kern | `core/tests/device_tests.cpp` (neu), `core/tests/player_tests.cpp` | Gerätehülle von innen: `player.cpp` wird in das Testprogramm übersetzt, Meldungen von miniaudio und Neustart des Null-Geräts; Reservierung beim Laden aus Datei und Speicher (grösste einzelne Reservierung, stilles FLAC mit falscher oder unplausibler Länge), Fortschritt nach dem Laden, kein Speicher für den Lade-Thread (nativ und im WASM-Build, der wie der Browser-Kern mit `-fwasm-exceptions` übersetzt ist, #93), Stille und Metronom-Rate bei nicht unterstützter Rate |
 
@@ -1226,7 +1220,7 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
 15. 19.11.2026, #10/AK7, Zufallstest Abgleich: Eine `state.json` mit `1e400` wurde zusammengeführt; danach scheiterte
     jedes Speichern der Bibliothek, Änderungen gingen nicht mehr auf die Platte. Ebenso wurden Typwechsel
     übernommen. Behoben: `CloudSync._readState` prüft vor dem Zusammenführen, Stempel ausserhalb des Bereichs gelten
-    als ungültig (`Hlc.parse`), Meldungen `cloudStateUnreadable` und `cloudStateTooNew`. Regressionsfall und Test
+    als ungültig (`Hlc.parse`), Meldungen `cloudStateUnreadable` (mit #111 entfernt) und `cloudStateTooNew`. Regressionsfall und Test
     «one message per damaged version».
 16. 19.11.2026, #10: Im vollen Lauf von `flutter test` schlug `home_page_test.dart` («#17/AK1 Liste Sortierung
     umstellen») erneut einmal fehl, einzeln grün; wie Fall 3, noch nicht behoben. Geklärt in #62 wie Fall 3:

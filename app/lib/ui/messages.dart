@@ -113,13 +113,7 @@ String libraryMessageText(AppLocalizations l, LibraryMessage m) => switch (m) {
   LibraryTooNew() => l.libraryTooNew,
   ImportFailed(:final files) => l.importFailed(files.join('\n')),
   TrackNotOnDevice(:final title) => l.trackNotOnDevice(title),
-  CloudStateUnreadable() => l.cloudStateUnreadable,
   CloudStateTooNew() => l.cloudStateTooNew,
-  CloudStateRestored() => l.cloudStateRestored,
-  CloudStateOverwritten() => l.cloudStateOverwritten,
-  CloudStateReadableAgain() => l.cloudStateReadableAgain,
-  CloudStateNoBackup() => l.cloudStateNoBackup,
-  CloudStateRepairFailed() => l.cloudStateRepairFailed,
 };
 
 String sortOrderLabel(AppLocalizations l, TrackSortOrder o) => switch (o) {

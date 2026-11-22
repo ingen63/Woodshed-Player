@@ -45,8 +45,8 @@ void main() {
       final a = await app('a');
       var n = 0;
       a.controller.addListener(() => n++);
-      a.library.report(const CloudStateUnreadable());
-      expect(a.controller.message, isA<CloudStateUnreadable>());
+      a.library.report(const CloudStateTooNew(3));
+      expect(a.controller.message, isA<CloudStateTooNew>());
       expect(n, 1);
       a.controller.clearMessage();
       expect(a.controller.message, isNull);
@@ -75,7 +75,7 @@ void main() {
       expect(a.controller, isA<AppController>());
       a.controller.dispose();
       expect(sync.disposed, isTrue);
-      a.library.report(const CloudStateUnreadable());
+      a.library.report(const CloudStateTooNew(3));
       expect(a.controller.message, isNull);
       expect(() => a.controller.addListener(() {}), throwsA(isA<Error>()));
     });

@@ -737,16 +737,6 @@ class CloudSync extends SyncService {
     } catch (_) {} // a failed delete leaves the file; the next sync tries again
   }
 
-  /// #65 repaired a damaged shared `state.json`. Since #53 every device writes only its own file: a
-  /// damaged file of another device is skipped and read again later, the own file is written again from
-  /// this device. So nothing is ever damaged as a whole; this just syncs.
-  @override
-  Future<CloudRepairResult> repairCloudState(CloudStateRepair how) async {
-    if (_disposed || library.readOnly) return CloudRepairResult.failed;
-    await sync();
-    return CloudRepairResult.notDamaged;
-  }
-
   Duration _backoff(int attempt) {
     final ms = backoffBase.inMilliseconds * pow(2, attempt - 1);
     return Duration(milliseconds: min(ms, backoffMax.inMilliseconds).round());

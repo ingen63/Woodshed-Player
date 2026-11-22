@@ -119,17 +119,13 @@ void main() {
       // testWidgets fails if a timer is still pending at the end
     });
 
-    testWidgets('a repair syncs at once and ends a waiting change', (
+    testWidgets('a sync runs at once and ends a waiting change', (
       tester,
     ) async {
       final cloud = InMemoryProvider();
       final a = await _ownDevice(cloud, 1);
       a.sync.localChanged();
-      // #53: nothing is damaged as a whole any more; the repair just syncs
-      expect(
-        await a.sync.repairCloudState(CloudStateRepair.restoreBackup),
-        CloudRepairResult.notDamaged,
-      );
+      await a.sync.sync();
       final reads = _stateReads(cloud);
       expect(reads, 1);
       await tester.pump(const Duration(milliseconds: 100));
@@ -397,16 +393,13 @@ void main() {
     });
   });
 
-  group('#65 repairing since #53', () {
-    test('a disposed engine or a read-only library does not repair', () async {
+  group('#37 sync() (without the repair of #65, #111)', () {
+    test('a disposed engine or a read-only library sends nothing', () async {
       final cloud = InMemoryProvider();
       final d = Device(cloud, 1);
       await d.library.load();
       d.sync.dispose();
-      expect(
-        await d.sync.repairCloudState(CloudStateRepair.overwriteWithLocal),
-        CloudRepairResult.failed,
-      );
+      await d.sync.sync();
       expect(cloud.requests, isEmpty);
 
       final store = MemoryFileStore()
@@ -420,14 +413,12 @@ void main() {
       await library.load();
       final s = CloudSync(cloud, library);
       addTearDown(s.dispose);
-      expect(
-        await s.repairCloudState(CloudStateRepair.overwriteWithLocal),
-        CloudRepairResult.failed,
-      );
+      await s.sync();
+      expect(s.status, SyncStatus.tooNew);
       expect(cloud.requests, isEmpty);
     });
 
-    test('a repair writes the latest local state, also a change still waiting to be saved', () async {
+    test('a sync writes the latest local state, also a change still waiting to be saved', () async {
       final cloud = InMemoryProvider();
       final library = Library(
         MemoryFileStore(),
@@ -440,10 +431,7 @@ void main() {
       addTearDown(s.dispose);
       addTearDown(library.dispose);
       library.metronomePreset = {'bpm': 66};
-      expect(
-        await s.repairCloudState(CloudStateRepair.overwriteWithLocal),
-        CloudRepairResult.notDamaged,
-      );
+      await s.sync();
       expect(
         ((_fileOf(cloud, library)['settings']! as Map)['values']
             as Map)['metronome.bpm'],
