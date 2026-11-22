@@ -14,6 +14,7 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     registerFileChannel(flutterViewController.engine.binaryMessenger)
+    registerKeychainChannel(flutterViewController.engine.binaryMessenger)
     registerForDraggedTypes([.fileURL])
 
     super.awakeFromNib()
@@ -127,5 +128,59 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
 
   @objc func showAbout(_ sender: Any?) {
     channel?.invokeMethod("showAbout", arguments: nil)
+  }
+
+  // MARK: Keychain (#54/AK1): the refresh token of the cloud sign-in, as a generic password of this app.
+
+  private var keychainChannel: FlutterMethodChannel?
+
+  func registerKeychainChannel(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "woodshed/keychain", binaryMessenger: messenger)
+    keychainChannel = channel
+    channel.setMethodCallHandler { call, result in
+      guard let args = call.arguments as? [String: Any], let key = args["key"] as? String else {
+        result(FlutterError(code: "args", message: "key missing", details: nil))
+        return
+      }
+      let query: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: Bundle.main.bundleIdentifier ?? "WoodshedPlayer",
+        kSecAttrAccount as String: key,
+      ]
+      switch call.method {
+      case "read":
+        var item: CFTypeRef?
+        var q = query
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        let status = SecItemCopyMatching(q as CFDictionary, &item)
+        if status == errSecSuccess, let data = item as? Data {
+          result(String(data: data, encoding: .utf8))
+        } else if status == errSecItemNotFound {
+          result(nil)
+        } else {
+          result(FlutterError(code: "keychain", message: "read: \(status)", details: nil))
+        }
+      case "write":
+        let data = Data(((args["value"] as? String) ?? "").utf8)
+        var status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if status == errSecItemNotFound {
+          var add = query
+          add[kSecValueData as String] = data
+          add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+          status = SecItemAdd(add as CFDictionary, nil)
+        }
+        result(
+          status == errSecSuccess
+            ? nil : FlutterError(code: "keychain", message: "write: \(status)", details: nil))
+      case "delete":
+        let status = SecItemDelete(query as CFDictionary)
+        result(
+          status == errSecSuccess || status == errSecItemNotFound
+            ? nil : FlutterError(code: "keychain", message: "delete: \(status)", details: nil))
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
   }
 }

@@ -33,6 +33,14 @@ class CloudOffline implements Exception {
   String toString() => 'CloudOffline($detail)';
 }
 
+/// The sign-in at the provider is missing, expired or was revoked (#54/AK5): the engine waits as when
+/// offline and makes no request; the app asks the user to sign in again, never during playback.
+class CloudSignInRequired extends CloudOffline {
+  const CloudSignInRequired([super.detail]);
+  @override
+  String toString() => 'CloudSignInRequired($detail)';
+}
+
 /// A conditional [CloudProvider.put] failed: the file changed (or appeared) in the meantime.
 class VersionConflict implements Exception {
   const VersionConflict(this.name);

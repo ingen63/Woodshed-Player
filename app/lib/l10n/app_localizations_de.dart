@@ -909,4 +909,158 @@ class AppLocalizationsDe extends AppLocalizations {
   String trimFailedOther(String title) {
     return '«$title» konnte nicht gekürzt werden: Die Datei liess sich nicht lesen oder schreiben. Der Titel ist unverändert.';
   }
+
+  @override
+  String get settings => 'Einstellungen';
+
+  @override
+  String get syncSection => 'Abgleich';
+
+  @override
+  String get syncOff => 'Aus – alles bleibt auf diesem Gerät';
+
+  @override
+  String get syncGoogle => 'Google Drive';
+
+  @override
+  String get syncGoogleWebOnly =>
+      'Auf iPhone und iPad läuft der Abgleich mit Google Drive in der Web-App.';
+
+  @override
+  String get syncSignIn => 'Mit Google anmelden';
+
+  @override
+  String get syncSigningIn => 'Warte auf die Anmeldung im Browser …';
+
+  @override
+  String get syncSignInFailed =>
+      'Die Anmeldung hat nicht geklappt. Versuch es noch einmal.';
+
+  @override
+  String get syncSignInAgain =>
+      'Die Anmeldung bei Google ist abgelaufen. Melde Dich neu an, damit der Abgleich weiterläuft.';
+
+  @override
+  String get syncBrowserDone =>
+      'Angemeldet. Du kannst dieses Fenster schliessen und zu Woodshed Player zurückkehren.';
+
+  @override
+  String get syncNotSignedIn => 'Nicht angemeldet';
+
+  @override
+  String get syncSignOut => 'Abmelden';
+
+  @override
+  String get syncSignOutText =>
+      'Die Anmeldung wird von diesem Gerät entfernt und der Abgleich hört auf. Die Bibliothek bleibt auf diesem Gerät, die Dateien in Google Drive bleiben dort.';
+
+  @override
+  String get syncStatusOff => 'Aus';
+
+  @override
+  String get syncStatusWaiting => 'Wartet auf den ersten Abgleich';
+
+  @override
+  String get syncStatusIdle => 'Aktuell';
+
+  @override
+  String get syncStatusSyncing => 'Gleicht ab …';
+
+  @override
+  String get syncStatusOffline =>
+      'Keine Verbindung – Änderungen warten und gehen später hinaus';
+
+  @override
+  String get syncStatusFailed => 'Einige Dateien liessen sich nicht abgleichen';
+
+  @override
+  String get syncStatusTooNew =>
+      'In Google Drive liegt ein neueres Format. Aktualisiere die App.';
+
+  @override
+  String get syncStatusForeign =>
+      'In Google Drive liegt eine andere Bibliothek.';
+
+  @override
+  String syncLastSync(String time) {
+    return 'Letzter Abgleich: $time';
+  }
+
+  @override
+  String get syncNever => 'Noch nicht abgeglichen';
+
+  @override
+  String syncErrors(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien fehlgeschlagen',
+      one: '1 Datei fehlgeschlagen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncDevices => 'Letzter Abgleich je Gerät';
+
+  @override
+  String get syncThisDevice => 'Dieses Gerät';
+
+  @override
+  String syncDevice(String id) {
+    return 'Gerät $id';
+  }
+
+  @override
+  String get syncUnknown => 'unbekannt';
+
+  @override
+  String get syncNow => 'Jetzt abgleichen';
+
+  @override
+  String get syncRestoreEllipsis => 'Sicherung wiederherstellen …';
+
+  @override
+  String get syncRestoreTitle => 'Sicherung wiederherstellen';
+
+  @override
+  String get syncRestoreText =>
+      'Die Bibliothek geht auf den gewählten Stand zurück, auf allen Geräten. Was seither geändert wurde, ist dann rückgängig gemacht.';
+
+  @override
+  String get syncRestoreNone => 'Noch keine Sicherungen.';
+
+  @override
+  String syncBackupOf(String time) {
+    return 'Stand vom $time';
+  }
+
+  @override
+  String get syncRestoreDone => 'Sicherung wiederhergestellt.';
+
+  @override
+  String get syncFoldersTitle => 'Ordner abgleichen';
+
+  @override
+  String get syncFoldersText =>
+      'Wähle die Ordner, deren Audiodateien nach Google Drive gehen. Titel, Ordner und Einstellungen werden immer abgeglichen.';
+
+  @override
+  String syncFree(String size) {
+    return 'Frei in Google Drive: $size';
+  }
+
+  @override
+  String get syncFreeUnknown => 'Freier Platz in Google Drive unbekannt';
+
+  @override
+  String get syncNoFolders => 'Keine Ordner: Alle Titel werden abgeglichen.';
+
+  @override
+  String get syncStart => 'Abgleich starten';
+
+  @override
+  String syncLine(String status) {
+    return 'Abgleich: $status';
+  }
 }

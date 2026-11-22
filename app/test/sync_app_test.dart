@@ -40,7 +40,9 @@ class NoNetwork extends HttpOverrides {
 }
 
 /// Files of lib/ reachable through imports and exports from [entry] (both branches of conditional imports).
-Set<String> reachable(String entry) {
+/// Deferred imports are left out unless [deferred] (#54/AK6: the provider module is loaded only once a
+/// sync is chosen).
+Set<String> reachable(String entry, {bool deferred = false}) {
   final seen = <String>{};
   final todo = [entry];
   final directive = RegExp(r'^(?:import|export)\s[^;]*;', multiLine: true);
@@ -50,6 +52,9 @@ Set<String> reachable(String entry) {
     if (!seen.add(path)) continue;
     final text = File(path).readAsStringSync();
     for (final d in directive.allMatches(text)) {
+      if (!deferred && RegExp(r'\sdeferred\s+as\s').hasMatch(d.group(0)!)) {
+        continue;
+      }
       for (final u in uri.allMatches(d.group(0)!)) {
         final s = u.group(1)!;
         if (s.startsWith('dart:') ||
@@ -77,7 +82,8 @@ void main() {
           final dir = Directory.systemTemp.createTempSync('wp_nosync');
           addTearDown(() => dir.deleteSync(recursive: true));
           final app = TestApp(Directory('${dir.path}/lib'));
-          expect(app.controller.sync, isA<NoSync>());
+          // #54: the switch points to NoSync while no sync is chosen
+          expect(app.controller.cloud.sync.inner, isA<NoSync>());
           expect(app.controller.sync.status, SyncStatus.off);
           await app.library.load();
           await app.controller.start();
@@ -93,7 +99,7 @@ void main() {
       },
     );
 
-    test('the app does not import the sync engine or any provider', () {
+    test('the app imports the sync engine and the providers only deferred', () {
       final files = {
         ...reachable('lib/main.dart'),
         ...reachable('lib/app/platform_native.dart'),
@@ -107,7 +113,7 @@ void main() {
       ]) {
         expect(files.where((f) => f.endsWith(module)), isEmpty, reason: module);
       }
-      // no HTTP client anywhere in the app yet (providers come with #38 in app/lib/sync/providers/, #58)
+      // no HTTP client outside the deferred provider modules (app/lib/sync/providers/, #58)
       for (final f in files) {
         final text = File(f).readAsStringSync();
         expect(

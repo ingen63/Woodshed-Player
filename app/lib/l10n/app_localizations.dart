@@ -1507,6 +1507,258 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'«{title}» could not be trimmed: the file could not be read or written. The track is unchanged.'**
   String trimFailedOther(String title);
+
+  /// No description provided for @settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settings;
+
+  /// No description provided for @syncSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get syncSection;
+
+  /// No description provided for @syncOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off – everything stays on this device'**
+  String get syncOff;
+
+  /// No description provided for @syncGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Drive'**
+  String get syncGoogle;
+
+  /// No description provided for @syncGoogleWebOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'On iPhone and iPad, sync with Google Drive runs in the web app.'**
+  String get syncGoogleWebOnly;
+
+  /// No description provided for @syncSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Google'**
+  String get syncSignIn;
+
+  /// No description provided for @syncSigningIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the sign-in in the browser …'**
+  String get syncSigningIn;
+
+  /// No description provided for @syncSignInFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The sign-in did not work. Try again.'**
+  String get syncSignInFailed;
+
+  /// No description provided for @syncSignInAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'The sign-in at Google has expired. Sign in again to keep syncing.'**
+  String get syncSignInAgain;
+
+  /// No description provided for @syncBrowserDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in. You can close this window and go back to Woodshed Player.'**
+  String get syncBrowserDone;
+
+  /// No description provided for @syncNotSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Not signed in'**
+  String get syncNotSignedIn;
+
+  /// No description provided for @syncSignOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get syncSignOut;
+
+  /// No description provided for @syncSignOutText.
+  ///
+  /// In en, this message translates to:
+  /// **'The sign-in is removed from this device and the sync stops. The library stays on this device, the files in Google Drive stay there too.'**
+  String get syncSignOutText;
+
+  /// No description provided for @syncStatusOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get syncStatusOff;
+
+  /// No description provided for @syncStatusWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the first sync'**
+  String get syncStatusWaiting;
+
+  /// No description provided for @syncStatusIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to date'**
+  String get syncStatusIdle;
+
+  /// No description provided for @syncStatusSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing …'**
+  String get syncStatusSyncing;
+
+  /// No description provided for @syncStatusOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection – changes wait and are sent later'**
+  String get syncStatusOffline;
+
+  /// No description provided for @syncStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Some files could not be synced'**
+  String get syncStatusFailed;
+
+  /// No description provided for @syncStatusTooNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Drive holds a newer format. Update the app.'**
+  String get syncStatusTooNew;
+
+  /// No description provided for @syncStatusForeign.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Drive holds another library.'**
+  String get syncStatusForeign;
+
+  /// No description provided for @syncLastSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Last sync: {time}'**
+  String syncLastSync(String time);
+
+  /// No description provided for @syncNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Not synced yet'**
+  String get syncNever;
+
+  /// No description provided for @syncErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file failed} other{{count} files failed}}'**
+  String syncErrors(int count);
+
+  /// No description provided for @syncDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Last sync per device'**
+  String get syncDevices;
+
+  /// No description provided for @syncThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get syncThisDevice;
+
+  /// No description provided for @syncDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Device {id}'**
+  String syncDevice(String id);
+
+  /// No description provided for @syncUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown'**
+  String get syncUnknown;
+
+  /// No description provided for @syncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get syncNow;
+
+  /// No description provided for @syncRestoreEllipsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore backup …'**
+  String get syncRestoreEllipsis;
+
+  /// No description provided for @syncRestoreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore backup'**
+  String get syncRestoreTitle;
+
+  /// No description provided for @syncRestoreText.
+  ///
+  /// In en, this message translates to:
+  /// **'The library goes back to the chosen state, on all devices. Changes made since then are undone.'**
+  String get syncRestoreText;
+
+  /// No description provided for @syncRestoreNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No backups yet.'**
+  String get syncRestoreNone;
+
+  /// No description provided for @syncBackupOf.
+  ///
+  /// In en, this message translates to:
+  /// **'State of {time}'**
+  String syncBackupOf(String time);
+
+  /// No description provided for @syncRestoreDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup restored.'**
+  String get syncRestoreDone;
+
+  /// No description provided for @syncFoldersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Folders to sync'**
+  String get syncFoldersTitle;
+
+  /// No description provided for @syncFoldersText.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the folders whose audio files go to Google Drive. Titles, folders and settings are always synced.'**
+  String get syncFoldersText;
+
+  /// No description provided for @syncFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free in Google Drive: {size}'**
+  String syncFree(String size);
+
+  /// No description provided for @syncFreeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Free space in Google Drive unknown'**
+  String get syncFreeUnknown;
+
+  /// No description provided for @syncNoFolders.
+  ///
+  /// In en, this message translates to:
+  /// **'No folders: every track is synced.'**
+  String get syncNoFolders;
+
+  /// No description provided for @syncStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start sync'**
+  String get syncStart;
+
+  /// No description provided for @syncLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync: {status}'**
+  String syncLine(String status);
 }
 
 class _AppLocalizationsDelegate

@@ -17,6 +17,7 @@ import 'messages.dart';
 import 'player_screen.dart';
 import 'player_view.dart';
 import 'style.dart';
+import 'sync_settings.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -62,6 +63,8 @@ class _HomePageState extends State<HomePage> {
     c.addListener(_showMessage);
     c.metronome.addListener(_updateTicker);
     _lifecycle = AppLifecycleListener(onResume: () => c.resumed());
+    c.cloud.addListener(_signInHint);
+    c.player.addListener(_signInHint);
     c.files.onShowAbout = () {
       if (mounted) showAbout(context, c.files);
     };
@@ -76,12 +79,52 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    c.cloud.removeListener(_signInHint);
+    c.player.removeListener(_signInHint);
     c.files.onShowAbout = null;
     c.removeListener(_showMessage);
     c.metronome.removeListener(_updateTicker);
     _metronomeTicker?.cancel();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  /// #54/AK5: the hint is shown once per expired sign-in.
+  bool _signInHinted = false;
+
+  /// #54/AK5: the silent renewal of the sign-in failed: ask to sign in again, never during playback.
+  void _signInHint() {
+    if (!c.cloud.needsSignIn) {
+      _signInHinted = false;
+      return;
+    }
+    if (_signInHinted || c.player.isPlaying) return;
+    _signInHinted = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final l = context.l10n;
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          key: const Key('signInHint'),
+          content: Text(l.syncSignInAgain),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l.cancel),
+            ),
+            FilledButton(
+              key: const Key('signInHintSettings'),
+              onPressed: () {
+                Navigator.pop(context);
+                showSyncSettings(this.context, c);
+              },
+              child: Text(l.settings),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   /// Tempo der automatischen Steigerung abholen, solange das Metronom läuft.

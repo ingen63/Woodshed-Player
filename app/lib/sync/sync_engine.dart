@@ -186,6 +186,12 @@ class CloudSync extends SyncService {
   /// Time of the last sync that got through.
   DateTime? lastSync;
 
+  final _devices = <String, DateTime?>{};
+
+  /// #54/AK8: every device whose file a sync read, with the time it last wrote it (its clock); the own
+  /// device with the time of its last write.
+  Map<String, DateTime?> get devices => Map.unmodifiable(_devices);
+
   /// The sources in sync order; the first one is the cloud if there is one.
   List<CloudProvider> get sources => [for (final s in _sources) s.provider];
 
@@ -435,6 +441,7 @@ class CloudSync extends SyncService {
         continue;
       }
       read.files.add(file);
+      if (!file.copy) _seen(file.deviceId, file.written);
       if (e.name == deviceName(me)) {
         read.own = file;
         read.ownBytes = f.bytes;
@@ -514,6 +521,7 @@ class CloudSync extends SyncService {
         deviceName(me),
         encodeDevice(mine, me, generation + 1, now),
       );
+      _seen(me, now);
     }
     await library.markSynced(); // #104
     for (final f in read.files) {
@@ -527,7 +535,16 @@ class CloudSync extends SyncService {
       final again = await s.provider.get(f.name);
       if (again != null && _same(again.bytes, f.bytes)) {
         await s.provider.delete(f.name);
+        if (stale) _devices.remove(f.deviceId);
       }
+    }
+  }
+
+  void _seen(String device, DateTime? written) {
+    final known = _devices[device];
+    if (!_devices.containsKey(device) ||
+        (written != null && (known == null || written.isAfter(known)))) {
+      _devices[device] = written;
     }
   }
 

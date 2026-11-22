@@ -515,3 +515,39 @@ app/lib/library/library.dart | dart_gt_to_ge | final newId = out.length > _hashI
 # Länge gilt nur dann als gleich, wenn alle drei Mengen zugleich so wachsen; die gehaltenen Mengen
 # kommen aber aus lostTo() und werden nach jedem Abgleich ganz neu gesetzt.
 app/lib/library/library.dart | dart_eq_to_ne | a.length == b.length && a.containsAll(b);
+
+# ---- app/lib/library/library.dart (#54) ----
+# gleichwertig: restore() speichert den zurückgeholten Stand gleich danach mit save(); ein noch
+# ausstehender Timer ruft save() später erneut auf, das ohne neue Stempel dieselben Bytes schreibt und
+# onLocalChange nicht aufruft (latest bleibt gleich).
+app/lib/library/library.dart | dart_remove_void_call | _pendingSave?.cancel();
+# gleichwertig: _absent zählt nur für Titel der Bibliothek (hasFile, _plan, Cache); ein verbliebener
+# Eintrag eines entfernten Titels wird nie gelesen, und kommt der Titel per mergeRemote zurück, prüft
+# dieses für neue Titel die Datei neu.
+app/lib/library/library.dart | dart_remove_void_call | _absent.removeWhere((id) => !alive.contains(id));
+
+# ---- app/lib/sync/cloud_account.dart, google_sync.dart (#54) ----
+# gleichwertig: Direkt danach folgt dispose() des Backends bzw. der Engine; ChangeNotifier.dispose
+# entfernt alle Zuhörer, das Abmelden vorher ändert nichts.
+app/lib/sync/cloud_account.dart | dart_remove_void_call | b.removeListener(notifyListeners);
+app/lib/sync/google_sync.dart | dart_remove_void_call | engine.removeListener(notifyListeners);
+
+# ---- app/lib/sync/providers/google_drive_provider.dart (#54) ----
+# gleichwertig: folder wird nur für Einträge aus _children gelesen (list), und dort ist es immer
+# ausdrücklich gesetzt; Einträge aus put() werden nie als Ordner abgefragt.
+app/lib/sync/providers/google_drive_provider.dart | dart_false_to_true | const _Item(this.id, this.version, this.size, {this.folder = false});
+# gleichwertig: Pfade der Engine beginnen nie mit «/», der letzte Schrägstrich steht also nie an
+# Stelle 0; «< 0» und «<= 0» unterscheiden sich nur dort.
+app/lib/sync/providers/google_drive_provider.dart | dart_lt_to_le | final parentPath = slash < 0 ? '' : path.substring(0, slash);
+app/lib/sync/providers/google_drive_provider.dart | dart_lt_to_le | return slash < 0 ? '' : name.substring(0, slash);
+# gleichwertig: Vor dem zweiten Durchgang entfernt get() den Eintrag aus _files; _file() listet den
+# Ordner dann in beiden Fällen neu.
+app/lib/sync/providers/google_drive_provider.dart | dart_true_to_false | for (final fresh in [false, true]) {
+# gleichwertig: copy betrifft nur, ob BytesBuilder die hinzugefügten Listen kopiert; sie werden danach
+# nicht mehr verändert, das Ergebnis ist byte-gleich.
+app/lib/sync/providers/google_drive_provider.dart | dart_false_to_true | final b = BytesBuilder(copy: false)
+app/lib/sync/providers/http_transport_io.dart | dart_false_to_true | final bytes = BytesBuilder(copy: false);
+# gleichwertig: Der Empfänger beantwortet die eine Anfrage vollständig, bevor er schliesst; offen ist
+# dann höchstens eine ruhende Keep-alive-Verbindung, die close() auch ohne force sofort beendet (Test
+# «a browser that keeps its connection open» in google_drive_details_test.dart).
+app/lib/sync/providers/google_auth_desktop.dart | dart_true_to_false | await server.close(force: true);

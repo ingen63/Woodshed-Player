@@ -11,10 +11,14 @@ import '../metronome/metronome_controller.dart';
 import '../metronome/tap_tempo.dart';
 import '../player/audio_core_ffi.dart';
 import '../player/player_service.dart';
+import '../sync/cloud_account.dart';
+// #54/AK6: the provider module is loaded only once Google Drive is chosen
+import '../sync/providers/google_platform_io.dart' deferred as google;
 import '../ui/recording_button.dart';
 import 'app_controller.dart';
 import 'file_platform.dart';
 import 'file_store_io.dart';
+import 'keychain_store.dart';
 import 'library_settings_store.dart';
 import 'smoke.dart';
 
@@ -44,10 +48,27 @@ Future<AppController> createAppController({
     onRunningChanged: files.keepAwake,
   );
   await metronome.restore();
-  // #37: without an account no sync (NoSync); providers and accounts follow in #38/#40.
+  final playerService = PlayerService(WpAudioCore(player));
+  // #54: Google Drive on the desktop; on iPhone and iPad only in the web app. Without a choice NoSync.
+  final cloud = CloudAccount(
+    library: library,
+    chooseFolders: true,
+    loadGoogle: Platform.isIOS || baseDir != null
+        ? null
+        : () async {
+            await google.loadLibrary();
+            return google.openGoogle(
+              library: library,
+              secrets: KeychainStore(),
+              openUrl: files.openUrl,
+              playing: () => playerService.isPlaying,
+            );
+          },
+  );
   final controller = AppController(
     library: library,
-    player: PlayerService(WpAudioCore(player)),
+    player: playerService,
+    cloud: cloud,
     metronome: metronome,
     files: files,
     // #116: FLAC is encoded again, so the cut runs off the UI isolate

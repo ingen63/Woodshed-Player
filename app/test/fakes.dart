@@ -15,6 +15,7 @@ import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/metronome/metronome_controller.dart';
 import 'package:woodshed_player/player/audio_core.dart';
 import 'package:woodshed_player/player/player_service.dart';
+import 'package:woodshed_player/sync/cloud_account.dart';
 import 'package:woodshed_player/sync/sync_service.dart';
 import 'package:wp_core/wp_core.dart';
 
@@ -251,6 +252,7 @@ class TestApp {
     Directory dir, {
     double? duration = 30,
     SyncService Function(Library library)? sync,
+    CloudAccount Function(Library library)? cloud,
     Random? random,
     AudioTrimmer? trimmer,
   }) {
@@ -275,6 +277,7 @@ class TestApp {
       metronome: MetronomeController(metronome),
       files: files,
       sync: sync?.call(library),
+      cloud: cloud?.call(library),
       random: random ?? Random(7),
       trimmer: trimmer,
     );

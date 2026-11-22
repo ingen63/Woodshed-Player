@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:woodshed_player/sync/cloud_account.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/library/library.dart';
@@ -26,6 +27,7 @@ Future<TestApp> pumpApp(
   List<String> titles = const ['Ärger', 'Bossa', 'Zebra'],
   Map<String, Uint8List> files = const {},
   SyncService? sync,
+  CloudAccount Function(Library library)? cloud,
   AudioTrimmer? trimmer,
 }) async {
   tester.view.physicalSize = size;
@@ -36,6 +38,7 @@ Future<TestApp> pumpApp(
   final app = TestApp(
     Directory('${dir.path}/lib'),
     sync: sync == null ? null : (_) => sync,
+    cloud: cloud,
     trimmer: trimmer,
   );
   await tester.runAsync(() async {

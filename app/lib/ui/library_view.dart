@@ -12,6 +12,7 @@ import '../library/library.dart';
 import '../player/play_queue.dart';
 import '../time_format.dart';
 import 'about_dialog.dart';
+import 'sync_settings.dart';
 import 'messages.dart';
 import 'style.dart';
 import 'trim_view.dart';
@@ -143,6 +144,8 @@ class _LibraryViewState extends State<LibraryView> {
                       ],
                     ),
             ),
+            // #54/AK7, AK8: the sync status; a tap opens the settings
+            _SyncLine(controller: widget.controller),
             if (lib.storage case final s?)
               _StorageLine(
                 [
@@ -991,6 +994,49 @@ class _SectionHeader extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// #54/AK8: the sync status in the library footer, e.g. «Sync: Up to date»; a tap opens the settings.
+class _SyncLine extends StatelessWidget {
+  const _SyncLine({required this.controller});
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return ListenableBuilder(
+      listenable: controller.cloud,
+      builder: (context, _) => InkWell(
+        key: const Key('syncButton'),
+        onTap: () => showSyncSettings(context, controller),
+        child: Container(
+          width: double.infinity,
+          constraints: BoxConstraints(minHeight: WsLayout.of(context).target),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(WsIcons.cloud, size: 16, color: muted),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l.syncLine(syncStatusText(l, controller.cloud)),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: muted, fontSize: 11),
+                ),
+              ),
+            ],
           ),
         ),
       ),

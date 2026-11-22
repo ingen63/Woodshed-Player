@@ -8,6 +8,7 @@
 // #110: whether the hint «Add to Home Screen» (#39/AK6) was closed in this browser on this device.
 // #115: the area (Player, Practice, Metronome) last chosen on this device, opened again after a restart.
 // #113: the recording source (system audio or microphone) last chosen on this device.
+// #54: the storage chosen for the sync on this device (the tokens are in the keychain or IndexedDB, never here).
 // #107: own tracks and folders (#114: and playlists) held back from the sync until the user keeps or removes
 // them.
 import 'dart:convert';
@@ -31,6 +32,7 @@ class DeviceSettings {
     this.heldPlaylists = const {},
     this.area,
     this.recordingSource,
+    this.syncProvider,
   });
 
   static const fileName = 'device.json';
@@ -80,6 +82,9 @@ class DeviceSettings {
   /// chosen.
   final String? recordingSource;
 
+  /// #54/AK7: the storage chosen on this device (`google`); null: no sync, no connection (AK6).
+  final String? syncProvider;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -93,6 +98,7 @@ class DeviceSettings {
     Set<String>? heldPlaylists,
     String? area,
     String? recordingSource,
+    String? Function()? syncProvider,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -107,6 +113,7 @@ class DeviceSettings {
     heldPlaylists: heldPlaylists ?? this.heldPlaylists,
     area: area ?? this.area,
     recordingSource: recordingSource ?? this.recordingSource,
+    syncProvider: syncProvider == null ? this.syncProvider : syncProvider(),
   );
 
   Map<String, Object?> toJson() => {
@@ -123,6 +130,7 @@ class DeviceSettings {
     if (heldPlaylists.isNotEmpty) 'heldPlaylists': [...heldPlaylists]..sort(),
     if (area != null) 'area': area,
     if (recordingSource != null) 'recordingSource': recordingSource,
+    if (syncProvider != null) 'syncProvider': syncProvider,
   };
 
   static String newDeviceId([Random? random]) {
@@ -170,6 +178,10 @@ class DeviceSettings {
               _ => null,
             },
             recordingSource: switch (j['recordingSource']) {
+              final String v when v.isNotEmpty => v,
+              _ => null,
+            },
+            syncProvider: switch (j['syncProvider']) {
               final String v when v.isNotEmpty => v,
               _ => null,
             },

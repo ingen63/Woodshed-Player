@@ -800,5 +800,89 @@
         "type": "String"
       }
     }
+  },
+  "settings": "Settings",
+  "syncSection": "Sync",
+  "syncOff": "Off – everything stays on this device",
+  "syncGoogle": "Google Drive",
+  "syncGoogleWebOnly": "On iPhone and iPad, sync with Google Drive runs in the web app.",
+  "syncSignIn": "Sign in with Google",
+  "syncSigningIn": "Waiting for the sign-in in the browser …",
+  "syncSignInFailed": "The sign-in did not work. Try again.",
+  "syncSignInAgain": "The sign-in at Google has expired. Sign in again to keep syncing.",
+  "syncBrowserDone": "Signed in. You can close this window and go back to Woodshed Player.",
+  "syncNotSignedIn": "Not signed in",
+  "syncSignOut": "Sign out",
+  "syncSignOutText": "The sign-in is removed from this device and the sync stops. The library stays on this device, the files in Google Drive stay there too.",
+  "syncStatusOff": "Off",
+  "syncStatusWaiting": "Waiting for the first sync",
+  "syncStatusIdle": "Up to date",
+  "syncStatusSyncing": "Syncing …",
+  "syncStatusOffline": "No connection – changes wait and are sent later",
+  "syncStatusFailed": "Some files could not be synced",
+  "syncStatusTooNew": "Google Drive holds a newer format. Update the app.",
+  "syncStatusForeign": "Google Drive holds another library.",
+  "syncLastSync": "Last sync: {time}",
+  "@syncLastSync": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "syncNever": "Not synced yet",
+  "syncErrors": "{count, plural, =1{1 file failed} other{{count} files failed}}",
+  "@syncErrors": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "syncDevices": "Last sync per device",
+  "syncThisDevice": "This device",
+  "syncDevice": "Device {id}",
+  "@syncDevice": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "syncUnknown": "unknown",
+  "syncNow": "Sync now",
+  "syncRestoreEllipsis": "Restore backup …",
+  "syncRestoreTitle": "Restore backup",
+  "syncRestoreText": "The library goes back to the chosen state, on all devices. Changes made since then are undone.",
+  "syncRestoreNone": "No backups yet.",
+  "syncBackupOf": "State of {time}",
+  "@syncBackupOf": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "syncRestoreDone": "Backup restored.",
+  "syncFoldersTitle": "Folders to sync",
+  "syncFoldersText": "Choose the folders whose audio files go to Google Drive. Titles, folders and settings are always synced.",
+  "syncFree": "Free in Google Drive: {size}",
+  "@syncFree": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "syncFreeUnknown": "Free space in Google Drive unknown",
+  "syncNoFolders": "No folders: every track is synced.",
+  "syncStart": "Start sync",
+  "syncLine": "Sync: {status}",
+  "@syncLine": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
   }
 }

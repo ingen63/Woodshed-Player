@@ -903,4 +903,156 @@ class AppLocalizationsEn extends AppLocalizations {
   String trimFailedOther(String title) {
     return '«$title» could not be trimmed: the file could not be read or written. The track is unchanged.';
   }
+
+  @override
+  String get settings => 'Settings';
+
+  @override
+  String get syncSection => 'Sync';
+
+  @override
+  String get syncOff => 'Off – everything stays on this device';
+
+  @override
+  String get syncGoogle => 'Google Drive';
+
+  @override
+  String get syncGoogleWebOnly =>
+      'On iPhone and iPad, sync with Google Drive runs in the web app.';
+
+  @override
+  String get syncSignIn => 'Sign in with Google';
+
+  @override
+  String get syncSigningIn => 'Waiting for the sign-in in the browser …';
+
+  @override
+  String get syncSignInFailed => 'The sign-in did not work. Try again.';
+
+  @override
+  String get syncSignInAgain =>
+      'The sign-in at Google has expired. Sign in again to keep syncing.';
+
+  @override
+  String get syncBrowserDone =>
+      'Signed in. You can close this window and go back to Woodshed Player.';
+
+  @override
+  String get syncNotSignedIn => 'Not signed in';
+
+  @override
+  String get syncSignOut => 'Sign out';
+
+  @override
+  String get syncSignOutText =>
+      'The sign-in is removed from this device and the sync stops. The library stays on this device, the files in Google Drive stay there too.';
+
+  @override
+  String get syncStatusOff => 'Off';
+
+  @override
+  String get syncStatusWaiting => 'Waiting for the first sync';
+
+  @override
+  String get syncStatusIdle => 'Up to date';
+
+  @override
+  String get syncStatusSyncing => 'Syncing …';
+
+  @override
+  String get syncStatusOffline =>
+      'No connection – changes wait and are sent later';
+
+  @override
+  String get syncStatusFailed => 'Some files could not be synced';
+
+  @override
+  String get syncStatusTooNew =>
+      'Google Drive holds a newer format. Update the app.';
+
+  @override
+  String get syncStatusForeign => 'Google Drive holds another library.';
+
+  @override
+  String syncLastSync(String time) {
+    return 'Last sync: $time';
+  }
+
+  @override
+  String get syncNever => 'Not synced yet';
+
+  @override
+  String syncErrors(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files failed',
+      one: '1 file failed',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncDevices => 'Last sync per device';
+
+  @override
+  String get syncThisDevice => 'This device';
+
+  @override
+  String syncDevice(String id) {
+    return 'Device $id';
+  }
+
+  @override
+  String get syncUnknown => 'unknown';
+
+  @override
+  String get syncNow => 'Sync now';
+
+  @override
+  String get syncRestoreEllipsis => 'Restore backup …';
+
+  @override
+  String get syncRestoreTitle => 'Restore backup';
+
+  @override
+  String get syncRestoreText =>
+      'The library goes back to the chosen state, on all devices. Changes made since then are undone.';
+
+  @override
+  String get syncRestoreNone => 'No backups yet.';
+
+  @override
+  String syncBackupOf(String time) {
+    return 'State of $time';
+  }
+
+  @override
+  String get syncRestoreDone => 'Backup restored.';
+
+  @override
+  String get syncFoldersTitle => 'Folders to sync';
+
+  @override
+  String get syncFoldersText =>
+      'Choose the folders whose audio files go to Google Drive. Titles, folders and settings are always synced.';
+
+  @override
+  String syncFree(String size) {
+    return 'Free in Google Drive: $size';
+  }
+
+  @override
+  String get syncFreeUnknown => 'Free space in Google Drive unknown';
+
+  @override
+  String get syncNoFolders => 'No folders: every track is synced.';
+
+  @override
+  String get syncStart => 'Start sync';
+
+  @override
+  String syncLine(String status) {
+    return 'Sync: $status';
+  }
 }

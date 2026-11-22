@@ -10,6 +10,7 @@ import '../metronome/metronome_controller.dart';
 import '../metronome/practice_session.dart';
 import '../player/play_queue.dart';
 import '../player/player_service.dart';
+import '../sync/cloud_account.dart';
 import '../sync/sync_service.dart';
 import 'file_platform.dart';
 
@@ -31,16 +32,19 @@ class AppController extends ChangeNotifier {
     required this.metronome,
     required this.files,
     SyncService? sync,
+    CloudAccount? cloud,
     Random? random,
     this.trimmer,
   }) : session = PracticeSession(player, metronome),
-       sync = sync ?? NoSync(),
+       cloud = cloud ?? CloudAccount(library: library),
        _random = random ?? Random() {
+    this.sync = sync ?? this.cloud.sync;
     player.onSettingsChanged = library.updateSettings;
     player.onEnded = _trackEnded;
     library.onLocalChange = this.sync.localChanged;
     files.onDropFiles = (paths) => importFiles(paths);
     library.addListener(_libraryChanged);
+    player.addListener(_playerChanged);
   }
 
   final Library library;
@@ -50,7 +54,22 @@ class AppController extends ChangeNotifier {
   final PracticeSession session;
 
   /// Cloud sync (#37); [NoSync] without an account.
-  final SyncService sync;
+  late final SyncService sync;
+
+  /// #54: the chosen storage, sign-in and status for the settings.
+  final CloudAccount cloud;
+
+  bool _wasPlaying = false;
+
+  /// #54/AK5: a sync that waited for playback to end (the browser renews its sign-in by a redirect) goes
+  /// on once playback stops.
+  void _playerChanged() {
+    final playing = player.isPlaying;
+    if (_wasPlaying && !playing && sync.status == SyncStatus.offline) {
+      sync.resumed();
+    }
+    _wasPlaying = playing;
+  }
 
   final Random _random;
 
@@ -72,8 +91,12 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// After loading: first sync (trigger «start», #37).
-  Future<void> start() => sync.start();
+  /// After loading: the chosen storage (#54, nothing without one), then the first sync (trigger «start»,
+  /// #37).
+  Future<void> start() async {
+    await cloud.open();
+    await sync.start();
+  }
 
   /// App back in the foreground (trigger «resume», #37).
   void resumed() => sync.resumed();
@@ -380,9 +403,11 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     library.removeListener(_libraryChanged);
+    player.removeListener(_playerChanged);
     library.onLocalChange = null;
     files.onDropFiles = null;
     sync.dispose();
+    cloud.dispose();
     super.dispose();
   }
 }

@@ -507,6 +507,90 @@ class PseudoLocalizations extends AppLocalizationsEn {
       pseudo(super.trimFailedReadOnly(title));
   @override
   String trimFailedOther(String title) => pseudo(super.trimFailedOther(title));
+  @override
+  String get settings => pseudo(super.settings);
+  @override
+  String get syncSection => pseudo(super.syncSection);
+  @override
+  String get syncOff => pseudo(super.syncOff);
+  @override
+  String get syncGoogle => pseudo(super.syncGoogle);
+  @override
+  String get syncGoogleWebOnly => pseudo(super.syncGoogleWebOnly);
+  @override
+  String get syncSignIn => pseudo(super.syncSignIn);
+  @override
+  String get syncSigningIn => pseudo(super.syncSigningIn);
+  @override
+  String get syncSignInFailed => pseudo(super.syncSignInFailed);
+  @override
+  String get syncSignInAgain => pseudo(super.syncSignInAgain);
+  @override
+  String get syncBrowserDone => pseudo(super.syncBrowserDone);
+  @override
+  String get syncNotSignedIn => pseudo(super.syncNotSignedIn);
+  @override
+  String get syncSignOut => pseudo(super.syncSignOut);
+  @override
+  String get syncSignOutText => pseudo(super.syncSignOutText);
+  @override
+  String get syncStatusOff => pseudo(super.syncStatusOff);
+  @override
+  String get syncStatusWaiting => pseudo(super.syncStatusWaiting);
+  @override
+  String get syncStatusIdle => pseudo(super.syncStatusIdle);
+  @override
+  String get syncStatusSyncing => pseudo(super.syncStatusSyncing);
+  @override
+  String get syncStatusOffline => pseudo(super.syncStatusOffline);
+  @override
+  String get syncStatusFailed => pseudo(super.syncStatusFailed);
+  @override
+  String get syncStatusTooNew => pseudo(super.syncStatusTooNew);
+  @override
+  String get syncStatusForeign => pseudo(super.syncStatusForeign);
+  @override
+  String syncLastSync(String time) => pseudo(super.syncLastSync(time));
+  @override
+  String get syncNever => pseudo(super.syncNever);
+  @override
+  String syncErrors(int count) => pseudo(super.syncErrors(count));
+  @override
+  String get syncDevices => pseudo(super.syncDevices);
+  @override
+  String get syncThisDevice => pseudo(super.syncThisDevice);
+  @override
+  String syncDevice(String id) => pseudo(super.syncDevice(id));
+  @override
+  String get syncUnknown => pseudo(super.syncUnknown);
+  @override
+  String get syncNow => pseudo(super.syncNow);
+  @override
+  String get syncRestoreEllipsis => pseudo(super.syncRestoreEllipsis);
+  @override
+  String get syncRestoreTitle => pseudo(super.syncRestoreTitle);
+  @override
+  String get syncRestoreText => pseudo(super.syncRestoreText);
+  @override
+  String get syncRestoreNone => pseudo(super.syncRestoreNone);
+  @override
+  String syncBackupOf(String time) => pseudo(super.syncBackupOf(time));
+  @override
+  String get syncRestoreDone => pseudo(super.syncRestoreDone);
+  @override
+  String get syncFoldersTitle => pseudo(super.syncFoldersTitle);
+  @override
+  String get syncFoldersText => pseudo(super.syncFoldersText);
+  @override
+  String syncFree(String size) => pseudo(super.syncFree(size));
+  @override
+  String get syncFreeUnknown => pseudo(super.syncFreeUnknown);
+  @override
+  String get syncNoFolders => pseudo(super.syncNoFolders);
+  @override
+  String get syncStart => pseudo(super.syncStart);
+  @override
+  String syncLine(String status) => pseudo(super.syncLine(status));
 }
 
 /// Loads [PseudoLocalizations] for any locale.

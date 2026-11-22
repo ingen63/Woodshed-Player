@@ -892,6 +892,87 @@ class Library extends ChangeNotifier {
     await _updateDevice(_device.copyWith(recordingSource: name));
   }
 
+  /// #54/AK7: the storage chosen for the sync on this device (`google`); null: none.
+  Future<void> setSyncProvider(String? name) async {
+    if (_device.syncProvider == name) return;
+    await _updateDevice(_device.copyWith(syncProvider: () => name));
+  }
+
+  /// #54/AK10: bytes of the audio files of folder [id] on this device.
+  Future<int> folderBytes(String id) async {
+    var sum = 0;
+    for (final t in _tracks) {
+      if (t.folderId != id || !hasFile(t.id)) continue;
+      try {
+        sum += await store.size(trackName(t.fileName)) ?? 0;
+      } catch (_) {}
+    }
+    return sum;
+  }
+
+  static const _publicRecord = StampedRecord({}, {});
+
+  /// #54/AK9: takes the shared state of a backup back. Every track, folder, playlist and setting that
+  /// differs from it gets the value of the backup with a new stamp, so the next sync carries it to the
+  /// other devices; what was not in the backup is deleted. Held records (#107) and playlists only on this
+  /// device (#114/AK10) are not in a backup and stay. A track that comes back without its file here is
+  /// loaded from the cloud; files of tracks that go are removed.
+  Future<bool> restore(SharedState backup) async {
+    if (_readOnly) return false;
+    _pendingSave?.cancel();
+    _pendingSave = null;
+    _commit();
+    final d = _device;
+    final current = _state;
+    final before = {for (final t in _tracks) t.id: t};
+    final keepTracks = [
+      for (final t in _tracks)
+        if (d.heldTracks.contains(t.id)) t,
+    ];
+    final keepFolders = [
+      for (final f in _folders)
+        if (d.heldFolders.contains(f.id)) f,
+    ];
+    final keepPlaylists = [
+      for (final p in _playlists)
+        if (d.heldPlaylists.contains(p.id) ||
+            _isPrivate(current.playlists[p.id] ?? _publicRecord))
+          p,
+    ];
+    _state = backup;
+    _materialize();
+    _state = current;
+    List<T> withKept<T>(List<T> live, List<T> kept, String Function(T) id) {
+      final ids = {for (final x in live) id(x)};
+      return [
+        ...live,
+        for (final x in kept)
+          if (!ids.contains(id(x))) x,
+      ];
+    }
+
+    _tracks = withKept(_tracks, keepTracks, (t) => t.id);
+    _folders = withKept(_folders, keepFolders, (f) => f.id);
+    _playlists = withKept(_playlists, keepPlaylists, (p) => p.id);
+    await save();
+    final alive = {for (final t in _tracks) t.id};
+    for (final t in before.values) {
+      if (!alive.contains(t.id)) {
+        await store.delete(trackName(t.fileName)).catchError((_) {});
+        await store.delete(_artworkName(t.id)).catchError((_) {});
+      }
+    }
+    _absent.removeWhere((id) => !alive.contains(id));
+    for (final t in _tracks) {
+      if (!before.containsKey(t.id) &&
+          !await store.exists(trackName(t.fileName))) {
+        _absent.add(t.id);
+      }
+    }
+    notifyListeners();
+    return true;
+  }
+
   /// The file of track [id] is never removed to keep the limit («Keep offline»).
   bool keptOffline(String id) => _device.keepOffline.contains(id);
 

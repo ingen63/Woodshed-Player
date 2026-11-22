@@ -45,6 +45,8 @@ Der Desktop braucht dafür eine Anmeldung, aber nur einmal: Desktop-Apps bekomme
 
 Pfade (`devices/…`, `audio/…`) bildet der Google-Provider auf Datei-IDs ab und merkt sich diese.
 
+**Umgesetzt in #54 (M3):** `app/lib/sync/providers/google_drive_provider.dart` legt echte Unterordner an (`devices`, `audio`, `backup/<id>`) und merkt sich deren IDs; der Ordner `WoodshedPlayer` entsteht erst beim ersten Schreiben (Lesen legt nichts an). Legen zwei Geräte ihn gleichzeitig an, gilt der älteste, der eigene leere wird gelöscht. Zwei Dateien gleichen Namens in einem Ordner zeigt der Provider nach Erstellzeit als `<name> (1).<ext>`, was die Engine als Konfliktkopie erkennt. Dateien über 5 MB gehen in Blöcken von 8 MB über eine fortsetzbare Sitzung hoch, die nach einem Abbruch beim nächsten Versuch nachfragt, wie viel angekommen ist. Anmeldung: Desktop mit PKCE, Systembrowser und Empfänger auf `127.0.0.1`, Refresh-Token im Schlüsselbund (eigener Kanal `woodshed/keychain`); Web per Weiterleitung mit `response_type=token`, Token in IndexedDB, Erneuerung per Weiterleitung mit `prompt=none`, nie während der Wiedergabe. HTTP ohne neues Paket (`dart:io` bzw. `fetch`). Die App lädt das Google-Modul per `deferred`-Import erst, wenn Google Drive auf dem Gerät gewählt ist. In der nativen iPhone/iPad-App ist Google Drive ausgeblendet; dort läuft der Abgleich über die Web-App.
+
 ## Daten: ein Layout für alle Wege
 
 ```
@@ -119,7 +121,7 @@ Sync-Engine (#37) mit einer Datei je Gerät und mehreren Quellen (#53)
 | M0 | Machbarkeitstest: P1–P4 mit Testkonten und K0 (#52) | 3–4 Tage · **Go/No-Go** je Weg |
 | M1 | Eine Datei je Gerät und mehrere Quellen je Gerät in der Engine (#53, umgesetzt); Tests mit `InMemoryProvider` (zwei, drei Geräte, Brücke, Reihenfolge vertauscht, Abbrüche) | 3–4 Tage |
 | M2 | `OneDriveProvider` (#55): App-Ordner, Upload-Sitzungen, Anmeldung Desktop und Web | 3–4 Tage |
-| M3 | `GoogleDriveProvider` (#54): `drive.file`, Ordner anlegen und finden, Pfade auf IDs, Anmeldung Desktop und Web | 3–4 Tage |
+| M3 | `GoogleDriveProvider` (#54, umgesetzt): `drive.file`, Ordner anlegen und finden, Pfade auf IDs, Anmeldung Desktop und Web | 3–4 Tage |
 | M4 | Direkte Verbindung (#56): Kopplung, Relays, `PeerProvider` (K2/K3 im Konzept ohne Registrierung) | 7–10 Tage |
 | M5 | Oberfläche, parallel in #54, #55, #56 (ersetzt #40): Speicherort wählen und wechseln, Koppeln, Status je Gerät, Texte in allen ARB-Dateien (ersetzt Teile von #40) | 3 Tage |
 | M6 | #41: `README.md`, `DATENSCHUTZ.md`, `CLAUDE.md`, `PLAN-WEB-UND-SYNC.md` nachführen | 0,5 Tage |

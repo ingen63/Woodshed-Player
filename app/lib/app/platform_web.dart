@@ -12,6 +12,9 @@ import '../metronome/metronome_controller.dart';
 import '../metronome/tap_tempo.dart';
 import '../player/audio_core_web.dart';
 import '../player/player_service.dart';
+import '../sync/cloud_account.dart';
+// #54/AK6: the provider module is loaded only once Google Drive is chosen
+import '../sync/providers/google_platform_web.dart' deferred as google;
 import 'app_controller.dart';
 import 'file_platform_web.dart';
 import 'file_store_web.dart';
@@ -44,10 +47,24 @@ Future<AppController> createAppController({
     onRunningChanged: files.keepAwake,
   );
   await metronome.restore();
-  // #37: without an account no sync (NoSync); providers and accounts follow in #38/#40.
+  final player = PlayerService(core);
+  // #54: Google Drive (also on iPhone and iPad); without a choice NoSync.
+  final cloud = CloudAccount(
+    library: library,
+    loadGoogle: () async {
+      await google.loadLibrary();
+      return google.openGoogle(
+        library: library,
+        secrets: null,
+        openUrl: files.openUrl,
+        playing: () => player.isPlaying,
+      );
+    },
+  );
   final controller = AppController(
     library: library,
-    player: PlayerService(core),
+    player: player,
+    cloud: cloud,
     metronome: metronome,
     files: files,
     trimmer: core.trim, // #116: in the core's loader worker
