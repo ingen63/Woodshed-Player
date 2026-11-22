@@ -171,5 +171,14 @@
   "cacheLimitHint": "Audiodateien auf diesem Gerät bis zu dieser Grenze. Darüber werden die am längsten nicht gespielten Titel von diesem Gerät entfernt; sie bleiben in der Bibliothek und in der Cloud und werden beim Abspielen wieder geladen. Titel mit «Offline halten» bleiben immer. Die Einstellung gilt nur für dieses Gerät.",
   "cacheLimitUsed": "{size} Audio auf diesem Gerät",
   "installHint": "App installieren: Teilen antippen, dann «Zum Home-Bildschirm».",
-  "close": "Schliessen"
+  "close": "Schliessen",
+  "heldHint": "{count, plural, =1{Abgleich: 1 Titel oder Ordner, der nur auf diesem Gerät war, behalten?} other{Abgleich: {count} Titel und Ordner, die nur auf diesem Gerät waren, behalten?}}",
+  "heldDecide": "Entscheiden …",
+  "heldTitle": "Titel und Ordner behalten?",
+  "heldText": "{count, plural, =1{Dieses Gerät war lange offline. Dieser Titel oder Ordner wurde nie abgeglichen und ist inzwischen vielleicht auf einem anderen Gerät gelöscht worden:} other{Dieses Gerät war lange offline. Diese {count} Titel und Ordner wurden nie abgeglichen und sind inzwischen vielleicht auf einem anderen Gerät gelöscht worden:}}",
+  "heldMore": "{count, plural, =1{und 1 weiterer} other{und {count} weitere}}",
+  "heldExplain": "Behalten: Sie bleiben hier und kommen auf Deine anderen Geräte. Entfernen: Sie werden auf diesem Gerät gelöscht, samt Audiodatei; die Titel eines entfernten Ordners bleiben.",
+  "heldKeep": "Behalten",
+  "heldRemove": "Entfernen",
+  "heldLater": "Später"
 }

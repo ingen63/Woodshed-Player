@@ -8,6 +8,9 @@
 //   lost (decision in #98).
 // - #104/AK5: some devices sync for the first time only late, often after such a jump; their first sync
 //   loses none of their own tracks (with audio), the purge horizon applies only once a device has synced.
+// - #107/AK8: a device that would lose own tracks or folders to the purge horizon asks first; the test
+//   answers at random («Keep», «Remove» or not yet). Without «Remove» no track that was never deleted is
+//   lost; the exception «last changed before the horizon» (#98/AK5) holds only after «Remove».
 // - AK7, #53/AK5: a damaged device file in the cloud (foreign version number, missing stamps, changed
 //   types, extreme values, truncated) never crashes the sync and never loses local data; it is skipped
 //   without an error (a newer format gets an understandable message in every language) and read again
@@ -92,13 +95,31 @@ void main() {
       for (final d in devices) {
         await d.library.load();
       }
+      final log = <String>[];
       final imported = <String>{};
       final deleted = <String>{};
+      // #107/AK8: tracks removed by the answer «Remove»
+      final removed = <String>{};
+      Future<void> answer(Device d, {bool later = true}) async {
+        final lib = d.library;
+        if (lib.heldNames.isEmpty) return;
+        switch (r.nextInt(later ? 3 : 2)) {
+          case 0:
+            await lib.keepHeld();
+            log.add('${d.name} keep');
+          case 1:
+            removed.addAll(lib.device.heldTracks);
+            await lib.removeHeld();
+            log.add('${d.name} remove');
+          default:
+            log.add('${d.name} later');
+        }
+      }
+
       // #98/AK5: stamp of every deletion of a track or folder
       final deletions = <(String, Hlc)>[];
       // #98/AK5: newest change of each track seen on any device
       final lastChange = <String, Hlc>{};
-      final log = <String>[];
       final steps = 10 + r.nextInt(30);
       // #104/AK5: step from which a device syncs; before that it works on its own library only
       final joinAt = {
@@ -171,6 +192,7 @@ void main() {
             await d.sync.sync();
             cloud.offline = false;
             log.add('${d.name} sync');
+            await answer(d);
             if (first && lib.device.synced) {
               // #104/AK5: nothing of its own lost on the first sync, unless deleted elsewhere
               for (final id in own.difference(deleted)) {
@@ -209,6 +231,7 @@ void main() {
         final before = [for (final d in devices) stateJson(d.library)];
         for (final d in [...devices]..shuffle(r)) {
           await d.sync.sync();
+          await answer(d, later: false);
         }
         changed =
             round == 0 ||
@@ -252,11 +275,15 @@ void main() {
         }
       }
 
-      // No track lost that was never deleted, with its audio on every device and in the cloud; #98/AK5:
-      // except one last changed before the purge horizon.
+      // No track lost that was never deleted, with its audio on every device and in the cloud; #98/AK5,
+      // #107/AK8: except one removed by «Remove» and last changed before the purge horizon.
       for (final id in imported.difference(deleted)) {
         final horizon = end.purged;
-        if (horizon != null && lastChange[id]! < horizon) continue;
+        if (removed.contains(id) &&
+            horizon != null &&
+            lastChange[id]! < horizon) {
+          continue;
+        }
         for (final d in devices) {
           expect(d.library.track(id), isNotNull, reason: '$id lost: $reason');
           expect(d.library.hasFile(id), isTrue, reason: 'audio: $reason');

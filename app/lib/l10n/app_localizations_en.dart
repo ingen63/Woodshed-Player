@@ -666,4 +666,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get close => 'Close';
+
+  @override
+  String heldHint(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Sync: keep $count tracks and folders that were only on this device?',
+      one: 'Sync: keep 1 track or folder that was only on this device?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heldDecide => 'Decide …';
+
+  @override
+  String get heldTitle => 'Keep tracks and folders?';
+
+  @override
+  String heldText(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'This device was offline for a long time. These $count tracks and folders were never synced and may have been deleted on another device meanwhile:',
+      one: 'This device was offline for a long time. This track or folder was never synced and may have been deleted on another device meanwhile:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String heldMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'and $count more',
+      one: 'and 1 more',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heldExplain =>
+      'Keep: they stay here and go to your other devices. Remove: they are deleted on this device, with their audio files; the tracks of a removed folder stay.';
+
+  @override
+  String get heldKeep => 'Keep';
+
+  @override
+  String get heldRemove => 'Remove';
+
+  @override
+  String get heldLater => 'Later';
 }

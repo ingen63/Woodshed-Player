@@ -373,6 +373,24 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get installHint => pseudo(super.installHint);
   @override
   String get close => pseudo(super.close);
+  @override
+  String heldHint(int count) => pseudo(super.heldHint(count));
+  @override
+  String get heldDecide => pseudo(super.heldDecide);
+  @override
+  String get heldTitle => pseudo(super.heldTitle);
+  @override
+  String heldText(int count) => pseudo(super.heldText(count));
+  @override
+  String heldMore(int count) => pseudo(super.heldMore(count));
+  @override
+  String get heldExplain => pseudo(super.heldExplain);
+  @override
+  String get heldKeep => pseudo(super.heldKeep);
+  @override
+  String get heldRemove => pseudo(super.heldRemove);
+  @override
+  String get heldLater => pseudo(super.heldLater);
 }
 
 /// Loads [PseudoLocalizations] for any locale.

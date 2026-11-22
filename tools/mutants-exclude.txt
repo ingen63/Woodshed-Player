@@ -313,6 +313,16 @@ app/lib/library/library.dart | dart_lt_to_le | if (present.length < _tracks.leng
 app/lib/library/library.dart | dart_gt_to_ge | final hash = bytes.length > _hashInline
 app/lib/library/library.dart | dart_gt_to_ge | final id = bytes.length > _hashInline
 
+# ---- app/lib/library/library.dart (#107) ----
+# gleichwertig: Jede ID in heldTracks/heldFolders hat einen Eintrag in _state: load() filtert auf
+# vorhandene, mergeRemote hält nur vorhandene zurück, und nur removeHeld() entfernt Einträge und leert
+# dabei die Mengen. Den Fall «kein Eintrag» gibt es hier also nicht.
+app/lib/library/library.dart | dart_false_to_true | if (_state.tracks[id]?.alive ?? false) id,
+app/lib/library/library.dart | dart_false_to_true | if (_state.folders[id]?.alive ?? false) id,
+# gleichwertig: Ein zurückgehaltener Titel ist nie «ohne Datei hier»: Er wurde nie abgeglichen, also
+# hier importiert und nie hochgeladen, und aus dem Zwischenspeicher fällt nur, was in der Cloud liegt.
+app/lib/library/library.dart | dart_remove_void_call | _absent.removeAll(tracks);
+
 # ---- app/lib/sync (#61) ----
 # gleichwertig: Ein Name mit dem Punkt an erster Stelle (z. B. «audio/.mp3») ergibt als Hash «» bzw.
 # «.mp3»; keines davon ist die ID eines Titels (64 Hex-Ziffern), beide werden gleich übergangen.

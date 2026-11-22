@@ -65,6 +65,11 @@ class _LibraryViewState extends State<LibraryView> {
             _Header(controller: c),
             if (lib.isImporting) const LinearProgressIndicator(minHeight: 2),
             const Divider(height: 1),
+            if (lib.heldNames case final names when names.isNotEmpty)
+              _HeldHint(
+                count: names.length,
+                onDecide: () => showHeldDialog(context, lib),
+              ),
             Expanded(
               child: empty
                   ? _EmptyLibrary(onAdd: () => c.pickAndImport())
@@ -637,6 +642,113 @@ class _StorageLine extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// #107: own tracks and folders are held back from the sync; the button opens the question. Shown in the
+/// library instead of a dialog in the middle of practising.
+class _HeldHint extends StatelessWidget {
+  const _HeldHint({required this.count, required this.onDecide});
+  final int count;
+  final VoidCallback onDecide;
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = WsTheme.of(context);
+    return Container(
+      key: const Key('heldHint'),
+      color: ws.panel2,
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+      // text above the button: the library column may be narrow
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Row(
+            spacing: WsSpace.s,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(WsIcons.warning, size: 18, color: ws.amber),
+              Expanded(child: Text(context.l10n.heldHint(count))),
+            ],
+          ),
+          TextButton(
+            key: const Key('heldDecide'),
+            onPressed: onDecide,
+            child: Text(context.l10n.heldDecide),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Names shown in the question about held tracks and folders (#107); the rest is counted.
+const heldNamesShown = 10;
+
+/// #107: asks whether to keep or remove the held tracks and folders. «Later» or closing leaves them held,
+/// and the hint stays.
+Future<void> showHeldDialog(BuildContext context, Library lib) async {
+  final names = lib.heldNames;
+  if (names.isEmpty) return;
+  final keep = await showDialog<bool>(
+    context: context,
+    builder: (context) => HeldDialog(names: names),
+  );
+  if (keep == true) {
+    await lib.keepHeld();
+  } else if (keep == false) {
+    await lib.removeHeld();
+  }
+}
+
+/// The question of [showHeldDialog]: pops true for «Keep», false for «Remove», null for «Later».
+class HeldDialog extends StatelessWidget {
+  const HeldDialog({super.key, required this.names});
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final more = names.length - heldNamesShown;
+    return AlertDialog(
+      key: const Key('heldDialog'),
+      title: Text(l.heldTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: WsSpace.s,
+          children: [
+            Text(l.heldText(names.length)),
+            Text(
+              [
+                for (final n in names.take(heldNamesShown)) '• $n',
+                if (more > 0) l.heldMore(more),
+              ].join('\n'),
+              key: const Key('heldNames'),
+            ),
+            Text(l.heldExplain),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('heldLater'),
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.heldLater),
+        ),
+        TextButton(
+          key: const Key('heldRemove'),
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(l.heldRemove),
+        ),
+        TextButton(
+          key: const Key('heldKeep'),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(l.heldKeep),
+        ),
+      ],
+    );
+  }
 }
 
 /// Limits offered for the audio cache (#39/AK3), in bytes.

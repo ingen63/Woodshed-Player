@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:woodshed_player/l10n/app_localizations.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/library/stamps.dart'
     show Hlc, SharedState, StampedRecord;
@@ -248,5 +249,125 @@ void main() {
         );
       },
     );
+  });
+  group('#107/AK7 the question about held tracks and folders (German, set in the test)', () {
+    /// Holds every track of [app] back: a remote state whose horizon lies after all of them.
+    Future<void> holdAll(WidgetTester tester, TestApp app) async {
+      await tester.runAsync(() async {
+        await app.library.markSynced();
+        final h = Hlc(
+          app.library.state.latest!.millis + 1000,
+          0,
+          'ffffffffffffffff',
+        );
+        await app.library.mergeRemote(SharedState.empty.copyWith(purged: h));
+      });
+      await tester.pump();
+    }
+
+    testWidgets(
+      'a hint in the library, the dialog names the count and the first 10 names; «Später» keeps the question, «Behalten» keeps the tracks',
+      (tester) async {
+        final titles = [
+          for (var i = 1; i <= 12; i++) 'T${'$i'.padLeft(2, '0')}',
+        ];
+        final app = await pumpApp(tester, titles: titles);
+        expect(find.byKey(const Key('heldHint')), findsNothing);
+        await holdAll(tester, app);
+        expect(app.library.heldNames, titles);
+        expect(find.byKey(const Key('heldHint')), findsOneWidget);
+        expect(
+          find.text(
+            'Abgleich: 12 Titel und Ordner, die nur auf diesem Gerät waren, behalten?',
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('heldDecide')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('heldDialog')), findsOneWidget);
+        expect(find.text('Titel und Ordner behalten?'), findsOneWidget);
+        expect(
+          find.textContaining('Diese 12 Titel und Ordner'),
+          findsOneWidget,
+        );
+        final names = tester
+            .widget<Text>(find.byKey(const Key('heldNames')))
+            .data!;
+        expect(names.split('\n'), [
+          for (final t in titles.take(10)) '• $t',
+          'und 2 weitere',
+        ]);
+        await tester.tap(find.byKey(const Key('heldLater')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('heldDialog')), findsNothing);
+        expect(find.byKey(const Key('heldHint')), findsOneWidget);
+        expect(app.library.heldNames, hasLength(12));
+        await tester.tap(find.byKey(const Key('heldDecide')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('heldKeep')));
+        await tester.pump();
+        await waitUntil(
+          tester,
+          () => app.library.state.tracks.length == 12,
+          'kept tracks back in the shared state',
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('heldHint')), findsNothing);
+        expect(app.library.heldNames, isEmpty);
+        expect(app.library.tracks, hasLength(12));
+        expect(app.library.state.tracks, hasLength(12));
+      },
+    );
+
+    testWidgets('one entry: singular; «Entfernen» removes it', (tester) async {
+      final app = await pumpApp(tester, titles: ['Solo']);
+      await holdAll(tester, app);
+      expect(
+        find.text(
+          'Abgleich: 1 Titel oder Ordner, der nur auf diesem Gerät war, behalten?',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('heldDecide')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Dieser Titel oder Ordner'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('heldNames'))).data,
+        '• Solo',
+      );
+      await tester.tap(find.byKey(const Key('heldRemove')));
+      await tester.pump();
+      await waitUntil(
+        tester,
+        () => app.library.tracks.isEmpty && app.library.heldNames.isEmpty,
+        'held track removed',
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('heldHint')), findsNothing);
+      expect(app.library.tracks, isEmpty);
+    });
+
+    test('the texts in English and German, with plurals', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      expect(en.heldMore(1), 'and 1 more');
+      expect(en.heldMore(5), 'and 5 more');
+      expect(de.heldMore(1), 'und 1 weiterer');
+      expect(de.heldMore(5), 'und 5 weitere');
+      expect(en.heldHint(1), contains('1 track or folder'));
+      expect(en.heldHint(3), contains('3 tracks and folders'));
+      expect(en.heldText(3), contains('These 3 tracks and folders'));
+      for (final l in [en, de]) {
+        for (final t in [
+          l.heldTitle,
+          l.heldDecide,
+          l.heldExplain,
+          l.heldKeep,
+          l.heldRemove,
+          l.heldLater,
+        ]) {
+          expect(t, isNotEmpty);
+        }
+      }
+    });
   });
 }

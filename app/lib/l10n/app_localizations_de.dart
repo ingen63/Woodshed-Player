@@ -672,4 +672,58 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get close => 'Schliessen';
+
+  @override
+  String heldHint(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Abgleich: $count Titel und Ordner, die nur auf diesem Gerät waren, behalten?',
+      one: 'Abgleich: 1 Titel oder Ordner, der nur auf diesem Gerät war, behalten?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heldDecide => 'Entscheiden …';
+
+  @override
+  String get heldTitle => 'Titel und Ordner behalten?';
+
+  @override
+  String heldText(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Dieses Gerät war lange offline. Diese $count Titel und Ordner wurden nie abgeglichen und sind inzwischen vielleicht auf einem anderen Gerät gelöscht worden:',
+      one: 'Dieses Gerät war lange offline. Dieser Titel oder Ordner wurde nie abgeglichen und ist inzwischen vielleicht auf einem anderen Gerät gelöscht worden:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String heldMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'und $count weitere',
+      one: 'und 1 weiterer',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heldExplain =>
+      'Behalten: Sie bleiben hier und kommen auf Deine anderen Geräte. Entfernen: Sie werden auf diesem Gerät gelöscht, samt Audiodatei; die Titel eines entfernten Ordners bleiben.';
+
+  @override
+  String get heldKeep => 'Behalten';
+
+  @override
+  String get heldRemove => 'Entfernen';
+
+  @override
+  String get heldLater => 'Später';
 }

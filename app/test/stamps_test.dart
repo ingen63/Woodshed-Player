@@ -309,5 +309,50 @@ void main() {
       expect(first.purged, isNull);
       expect(first.merge(c).tracks['v']!.alive, isTrue);
     });
+
+    test('#107 lostTo: alive own records the horizon would kill; restamp keeps them', () {
+      final later = StampedRecord.create({'title': 'L'}, at(purgedOn, 'b'));
+      final atHorizon = StampedRecord.create({'title': 'H'}, cloud.purged!);
+      final known = StampedRecord.create({'title': 'K'}, old);
+      final gone = y.delete(at(DateTime.utc(2025, 12, 2), 'b'));
+      final mine = SharedState(
+        tracks: {
+          'y': y,
+          'later': later,
+          'h': atHorizon,
+          'known': known,
+          'gone': gone,
+        },
+        folders: {'g': y, 'gl': later},
+      );
+      final theirs = cloud.copyWith(tracks: {...cloud.tracks, 'known': known});
+      final lost = mine.lostTo(theirs);
+      expect(lost.tracks, {'y', 'h'});
+      expect(lost.folders, {'g'});
+      // exactly what the merge would kill
+      final merged = mine.merge(theirs);
+      for (final id in mine.tracks.keys) {
+        expect(
+          merged.tracks[id]!.alive,
+          mine.tracks[id]!.alive && !lost.tracks.contains(id),
+          reason: id,
+        );
+      }
+      expect(mine.lostTo(SharedState.empty).tracks, isEmpty);
+      expect(mine.lostTo(SharedState.empty).folders, isEmpty);
+      // «Keep»: stamped anew, they survive the merge; the others stay as they are
+      final kept = mine.restamp(lost.tracks, lost.folders, now);
+      expect(kept.tracks['y']!.stamps.values, everyElement(now));
+      expect(kept.tracks['y']!.values, y.values);
+      expect(kept.folders['g']!.stamps.values, everyElement(now));
+      expect(identical(kept.tracks['later'], later), isTrue);
+      expect(identical(kept.folders['gl'], later), isTrue);
+      expect(kept.purged, mine.purged);
+      expect(kept.lostTo(theirs).tracks, isEmpty);
+      for (final m in [kept.merge(theirs), theirs.merge(kept)]) {
+        expect(m.tracks['y']!.alive, isTrue);
+        expect(m.folders['g']!.alive, isTrue);
+      }
+    });
   });
 }

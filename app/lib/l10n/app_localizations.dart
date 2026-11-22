@@ -1129,6 +1129,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get close;
+
+  /// #107: banner in the library while own tracks or folders are held back from the sync
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Sync: keep 1 track or folder that was only on this device?} other{Sync: keep {count} tracks and folders that were only on this device?}}'**
+  String heldHint(int count);
+
+  /// #107: button of the banner that opens the question
+  ///
+  /// In en, this message translates to:
+  /// **'Decide …'**
+  String get heldDecide;
+
+  /// No description provided for @heldTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep tracks and folders?'**
+  String get heldTitle;
+
+  /// #107: start of the question, followed by the first names
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{This device was offline for a long time. This track or folder was never synced and may have been deleted on another device meanwhile:} other{This device was offline for a long time. These {count} tracks and folders were never synced and may have been deleted on another device meanwhile:}}'**
+  String heldText(int count);
+
+  /// #107: after the first 10 names
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{and 1 more} other{and {count} more}}'**
+  String heldMore(int count);
+
+  /// No description provided for @heldExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep: they stay here and go to your other devices. Remove: they are deleted on this device, with their audio files; the tracks of a removed folder stay.'**
+  String get heldExplain;
+
+  /// No description provided for @heldKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get heldKeep;
+
+  /// No description provided for @heldRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get heldRemove;
+
+  /// No description provided for @heldLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get heldLater;
 }
 
 class _AppLocalizationsDelegate

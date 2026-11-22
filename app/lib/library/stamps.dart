@@ -326,28 +326,51 @@ class SharedState {
   /// horizon of [remote]. Records [remote] knows, even as tombstones, are left as they are. [merge] itself
   /// stays unchanged (commutative, associative, idempotent).
   SharedState beforeFirstSync(SharedState remote, Hlc stamp) {
-    final h = remote.purged;
-    Map<String, StampedRecord> keep(
-      Map<String, StampedRecord> mine,
-      Map<String, StampedRecord> theirs,
-    ) => {
-      for (final e in mine.entries)
-        e.key: switch (e.value.latest) {
-          final l?
-              when h != null &&
-                  e.value.alive &&
-                  !theirs.containsKey(e.key) &&
-                  !(l > h) =>
-            e.value.restamp(stamp),
-          _ => e.value,
-        },
-    };
+    final lost = lostTo(remote);
     return SharedState(
-      tracks: keep(tracks, remote.tracks),
-      folders: keep(folders, remote.folders),
+      tracks: _restamped(tracks, lost.tracks, stamp),
+      folders: _restamped(folders, lost.folders, stamp),
       settings: settings,
     );
   }
+
+  /// #104, #107: keys of the alive tracks and folders of this state that a [merge] with [remote] would kill
+  /// by the purge horizon of [remote]: [remote] does not know them and they were last changed before the
+  /// horizon.
+  ({Set<String> tracks, Set<String> folders}) lostTo(SharedState remote) {
+    final h = remote.purged;
+    Set<String> lost(
+      Map<String, StampedRecord> mine,
+      Map<String, StampedRecord> theirs,
+    ) => {
+      if (h != null)
+        for (final e in mine.entries)
+          if (e.value.latest case final l?
+              when e.value.alive && !theirs.containsKey(e.key) && !(l > h))
+            e.key,
+    };
+    return (
+      tracks: lost(tracks, remote.tracks),
+      folders: lost(folders, remote.folders),
+    );
+  }
+
+  /// #107 «Keep»: the tracks and folders [tracks] and [folders] stamped anew with [stamp], so the purge
+  /// horizon no longer applies to them and they reach the other devices.
+  SharedState restamp(Set<String> tracks, Set<String> folders, Hlc stamp) =>
+      copyWith(
+        tracks: _restamped(this.tracks, tracks, stamp),
+        folders: _restamped(this.folders, folders, stamp),
+      );
+
+  static Map<String, StampedRecord> _restamped(
+    Map<String, StampedRecord> records,
+    Set<String> keys,
+    Hlc stamp,
+  ) => {
+    for (final e in records.entries)
+      e.key: keys.contains(e.key) ? e.value.restamp(stamp) : e.value,
+  };
 
   /// Some stamp, deletion or the horizon comes from a device other than [device]: this state has been
   /// merged with another one (#104, for `device.json` files written before the flag existed).

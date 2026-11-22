@@ -6,6 +6,7 @@
 // removed to stay below the limit (they stay in the library, their file is in the cloud) and when each
 // track was last used here (the oldest go first).
 // #110: whether the hint «Add to Home Screen» (#39/AK6) was closed in this browser on this device.
+// #107: own tracks and folders held back from the sync until the user keeps or removes them.
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -22,6 +23,8 @@ class DeviceSettings {
     this.lastUsed = const {},
     this.libraryId,
     this.installHintClosed = false,
+    this.heldTracks = const {},
+    this.heldFolders = const {},
   });
 
   static const fileName = 'device.json';
@@ -55,6 +58,12 @@ class DeviceSettings {
   /// The hint «Add to Home Screen» was closed here and stays away (#110). Written only once true.
   final bool installHintClosed;
 
+  /// #107: own tracks and folders, never synced, that a merge would remove because they were last changed
+  /// before the purge horizon of the other devices. They stay here and are not synced until the user
+  /// keeps or removes them.
+  final Set<String> heldTracks;
+  final Set<String> heldFolders;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -63,6 +72,8 @@ class DeviceSettings {
     Map<String, int>? lastUsed,
     String? libraryId,
     bool? installHintClosed,
+    Set<String>? heldTracks,
+    Set<String>? heldFolders,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -72,6 +83,8 @@ class DeviceSettings {
     lastUsed: lastUsed ?? this.lastUsed,
     libraryId: libraryId ?? this.libraryId,
     installHintClosed: installHintClosed ?? this.installHintClosed,
+    heldTracks: heldTracks ?? this.heldTracks,
+    heldFolders: heldFolders ?? this.heldFolders,
   );
 
   Map<String, Object?> toJson() => {
@@ -83,6 +96,8 @@ class DeviceSettings {
     if (lastUsed.isNotEmpty) 'lastUsed': lastUsed,
     if (libraryId != null) 'libraryId': libraryId,
     if (installHintClosed) 'installHintClosed': true,
+    if (heldTracks.isNotEmpty) 'heldTracks': [...heldTracks]..sort(),
+    if (heldFolders.isNotEmpty) 'heldFolders': [...heldFolders]..sort(),
   };
 
   static String newDeviceId([Random? random]) {
@@ -122,6 +137,8 @@ class DeviceSettings {
               _ => null,
             },
             installHintClosed: j['installHintClosed'] == true,
+            heldTracks: _ids(j['heldTracks']),
+            heldFolders: _ids(j['heldFolders']),
           );
         }
       }

@@ -151,8 +151,45 @@ class Library extends ChangeNotifier {
   /// Beim letzten Laden entfernte Einträge, deren Datei fehlte.
   int get droppedMissing => _droppedMissing;
 
-  /// Shared state as last saved (with stamps and tombstones), for the sync engine (#37).
-  SharedState get state => _state;
+  /// Shared state as last saved (with stamps and tombstones), for the sync engine (#37). Tracks and folders
+  /// held back ([heldNames], #107) are left out: they stay on this device until the user decides.
+  SharedState get state {
+    final d = _device;
+    if (d.heldTracks.isEmpty && d.heldFolders.isEmpty) return _state;
+    final cached = _shared;
+    if (cached != null && identical(cached.$1, _state)) return cached.$2;
+    final shared = _state.copyWith(
+      tracks: {
+        for (final e in _state.tracks.entries)
+          if (!d.heldTracks.contains(e.key)) e.key: e.value,
+      },
+      folders: {
+        for (final e in _state.folders.entries)
+          if (!d.heldFolders.contains(e.key)) e.key: e.value,
+      },
+    );
+    _shared = (_state, shared);
+    return shared;
+  }
+
+  /// [state] computed for this [_state]; cleared whenever the held records change.
+  (SharedState, SharedState)? _shared;
+
+  /// #107: names of the own tracks and folders held back from the sync, folders first, each sorted; empty
+  /// if there is nothing to decide.
+  List<String> get heldNames {
+    final d = _device;
+    return [
+      ...[
+        for (final f in _folders)
+          if (d.heldFolders.contains(f.id)) f.name,
+      ]..sort(naturalCompare),
+      ...[
+        for (final t in _tracks)
+          if (d.heldTracks.contains(t.id)) t.title,
+      ]..sort(naturalCompare),
+    ];
+  }
 
   /// Device-local settings (#36/AK5).
   DeviceSettings get device => _device;
@@ -199,6 +236,7 @@ class Library extends ChangeNotifier {
     _absent.clear();
     final raw = await store.read(indexName);
     if (raw == null) {
+      await _setHeld(const {}, const {});
       await _readLegacyPrefs();
       notifyListeners();
       return _afterLoad();
@@ -221,6 +259,7 @@ class Library extends ChangeNotifier {
       if (version == SharedState.formatVersion) {
         _state = SharedState.fromJson((json as Map).cast());
         _clock.observe(_state.latest);
+        _clock.observe(_state.purged);
         // #104: a `device.json` from before the flag; foreign stamps show that this device has synced
         if (!_device.synced && _state.stampedByOthers(_device.deviceId)) {
           await markSynced();
@@ -238,6 +277,7 @@ class Library extends ChangeNotifier {
       } catch (_) {}
       lastError = LibraryCorrupt('$indexName.defekt-$stamp');
       _state = SharedState.empty;
+      await _setHeld(const {}, const {});
       _tracks = [];
       _folders = [];
       notifyListeners();
@@ -269,6 +309,11 @@ class Library extends ChangeNotifier {
         },
       );
     }
+    // #107/AK5: the held records survive a restart, as far as they are still there and alive
+    await _setHeld(
+      _device.heldTracks.where((id) => _state.tracks[id]?.alive ?? false),
+      _device.heldFolders.where((id) => _state.folders[id]?.alive ?? false),
+    );
     notifyListeners();
     return _afterLoad();
   }
@@ -430,7 +475,22 @@ class Library extends ChangeNotifier {
       _state = _state.beforeFirstSync(remote, _clock.tick());
     }
     final before = {for (final t in _tracks) t.id: t};
-    _state = _state.merge(remote).purge(_now());
+    // #107: own records the horizon of [remote] would kill are held back as they are until the user keeps
+    // or removes them; everything else is merged
+    final lost = _state.lostTo(remote);
+    final mine = _state;
+    final merged = _state.merge(remote).purge(_now());
+    _state = merged.copyWith(
+      tracks: {
+        ...merged.tracks,
+        for (final id in lost.tracks) id: mine.tracks[id]!,
+      },
+      folders: {
+        ...merged.folders,
+        for (final id in lost.folders) id: mine.folders[id]!,
+      },
+    );
+    await _setHeld(lost.tracks, lost.folders);
     _materialize();
     final alive = {for (final t in _tracks) t.id};
     for (final t in before.values) {
@@ -456,6 +516,87 @@ class Library extends ChangeNotifier {
       lastError = LibrarySaveFailed('$e');
     }
     notifyListeners();
+  }
+
+  /// #107 «Keep»: the held tracks and folders are stamped anew, so the purge horizon no longer applies to
+  /// them, and go to the other devices with the next sync.
+  Future<void> keepHeld() async {
+    final d = _device;
+    if (_readOnly || (d.heldTracks.isEmpty && d.heldFolders.isEmpty)) return;
+    // changes not yet saved are stamped by _write afterwards, with a higher stamp
+    final (tracks, folders) = _aliveHeld();
+    _state = _state.restamp(tracks, folders, _clock.tick());
+    await _setHeld(const {}, const {});
+    try {
+      await _write();
+    } catch (e) {
+      lastError = LibrarySaveFailed('$e');
+    }
+    onLocalChange?.call();
+    notifyListeners();
+  }
+
+  /// #107 «Remove»: the held tracks (with their audio files) and folders are removed from this device, as
+  /// the merge would have done; tracks in a removed folder stay, without a folder.
+  Future<void> removeHeld() async {
+    final d = _device;
+    if (_readOnly || (d.heldTracks.isEmpty && d.heldFolders.isEmpty)) return;
+    _commit();
+    final (tracks, folders) = _aliveHeld();
+    for (final t in _tracks.where((t) => tracks.contains(t.id))) {
+      await store.delete(trackName(t.fileName)).catchError((_) {});
+      await store.delete(_artworkName(t.id)).catchError((_) {});
+    }
+    // gone without a tombstone, as after the merge and purge: no other device knows them
+    _state = _state.copyWith(
+      tracks: {
+        for (final e in _state.tracks.entries)
+          if (!tracks.contains(e.key)) e.key: e.value,
+      },
+      folders: {
+        for (final e in _state.folders.entries)
+          if (!folders.contains(e.key)) e.key: e.value,
+      },
+    );
+    _materialize();
+    _absent.removeAll(tracks);
+    await _setHeld(const {}, const {});
+    _forgetOnDevice(tracks);
+    try {
+      await _write();
+    } catch (e) {
+      lastError = LibrarySaveFailed('$e');
+    }
+    notifyListeners();
+    await refreshStorage();
+  }
+
+  /// The held tracks and folders still alive: one deleted here meanwhile stays deleted (a tombstone like any
+  /// other) and is neither revived by «Keep» nor removed without its tombstone by «Remove».
+  (Set<String>, Set<String>) _aliveHeld() => (
+    {
+      for (final id in _device.heldTracks)
+        if (_state.tracks[id]?.alive ?? false) id,
+    },
+    {
+      for (final id in _device.heldFolders)
+        if (_state.folders[id]?.alive ?? false) id,
+    },
+  );
+
+  /// Remembers the held records in `device.json`, so the question survives a restart (#107/AK5).
+  Future<void> _setHeld(Iterable<String> tracks, Iterable<String> folders) {
+    final t = {...tracks};
+    final f = {...folders};
+    final d = _device;
+    if (t.length == d.heldTracks.length &&
+        d.heldTracks.containsAll(t) &&
+        f.length == d.heldFolders.length &&
+        d.heldFolders.containsAll(f)) {
+      return Future.value();
+    }
+    _shared = null;
+    return _updateDevice(d.copyWith(heldTracks: t, heldFolders: f));
   }
 
   /// This device has shared its state (#104): from now on the purge horizon applies to its records. Called
@@ -491,7 +632,7 @@ class Library extends ChangeNotifier {
 
   /// The audio file of [t] may go to the cloud: not «don't upload» and its folder is synced (#37/AK5).
   bool uploadable(Track t) {
-    if (t.noUpload) return false;
+    if (t.noUpload || _device.heldTracks.contains(t.id)) return false;
     final f = t.folderId;
     if (f == null) return true;
     return _folders.where((x) => x.id == f).firstOrNull?.sync ?? true;

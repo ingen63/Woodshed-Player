@@ -958,4 +958,425 @@ void main() {
       expect(b.library.device.synced, isTrue);
     });
   });
+  group(
+    '#107 ask before own tracks and folders are lost to the purge horizon',
+    () {
+      // Example of the issue: A and B have synced. B stays offline for 91 days and imports Y meanwhile (and
+      // creates folder G); A deletes X in that time and purges the tombstone. Y and G were last changed before
+      // the horizon.
+      Future<(Device, Device, InMemoryProvider, Track, Track)> offline91({
+        bool folder = false,
+      }) async {
+        final cloud = InMemoryProvider();
+        final a = await device(cloud, 1);
+        final b = await device(cloud, 2);
+        final x = await a.add('x.mp3');
+        final t = await a.add('t.mp3');
+        await a.sync.sync();
+        await b.sync.sync();
+        expect(b.library.device.synced, isTrue);
+        tick();
+        final y = await b.add('y.mp3');
+        if (folder) {
+          // G holds T, a track the other devices know: it stays in any case
+          final g = b.library.createFolder('G');
+          b.library.moveTracks({t.id}, g.id);
+        }
+        tick();
+        a.library.delete({x.id});
+        await a.sync.sync();
+        clock = clock.add(const Duration(days: 91));
+        await a.sync.sync();
+        final horizon = cloudState(cloud).purged!;
+        expect(b.library.state.tracks[y.id]!.latest! < horizon, isTrue);
+        return (a, b, cloud, x, y);
+      }
+
+      void expectHeld(Device b, InMemoryProvider cloud, Track y) {
+        expect(b.library.heldNames, contains(y.title));
+        expect(b.library.track(y.id), isNotNull);
+        expect(b.store.files['Tracks/${y.id}.mp3'], sources['y.mp3']);
+        // held back: neither the record nor the audio file goes to the cloud
+        expect(cloudState(cloud).tracks[y.id], isNull);
+        expect(cloud.files.keys, isNot(contains('audio/${y.id}.mp3')));
+      }
+
+      test('#107/AK1 the sync asks before Y is lost; until the answer Y and its file stay unchanged', () async {
+        final (a, b, cloud, x, y) = await offline91();
+        final before = b.library.state.tracks[y.id]!.toJson();
+        await b.sync.sync();
+        expect(b.library.heldNames, [y.title]);
+        expectHeld(b, cloud, y);
+        expect(b.library.device.heldTracks, {y.id});
+        // the rest is synced: X's deletion has reached b
+        expect(b.library.track(x.id), isNull);
+        expect(b.sync.status, SyncStatus.idle);
+        // the record is the same as before the sync (no new stamp, no deletion)
+        await b.sync.sync();
+        expect(
+          (await _reload(b)).state.tracks[y.id],
+          isNull,
+          reason: 'held records are not part of the shared state',
+        );
+        expect(b.library.heldNames, [y.title]);
+        final again = await _reload(b);
+        expect(again.track(y.id), isNotNull);
+        expect(again.heldNames, [y.title]);
+        // the record in library.json is unchanged
+        final saved =
+            (jsonDecode(utf8.decode(b.store.files['library.json']!))
+                    as Map)['tracks']
+                as Map;
+        expect(saved[y.id], before);
+        await a.sync.sync();
+        expect(a.library.track(y.id), isNull);
+      });
+
+      test('#107/AK2 «Keep»: Y stays on B with its file and reaches A and the cloud; X does not come back', () async {
+        final (a, b, cloud, x, y) = await offline91();
+        await b.sync.sync();
+        await b.library.keepHeld();
+        expect(b.library.heldNames, isEmpty);
+        expect(b.library.device.heldTracks, isEmpty);
+        await b.sync.sync();
+        await a.sync.sync();
+        for (final d in [a, b]) {
+          expect(d.library.track(y.id), isNotNull, reason: 'Y on $d');
+          expect(d.library.hasFile(y.id), isTrue);
+          expect(d.library.track(x.id), isNull, reason: 'X came back');
+          expect(d.library.heldNames, isEmpty);
+        }
+        expect(await a.library.readAudio(a.t(y.id)), sources['y.mp3']);
+        expect(cloudState(cloud).tracks[y.id]!.alive, isTrue);
+        expect(cloudState(cloud).tracks[x.id], isNull);
+        expect(cloud.files.keys, contains('audio/${y.id}.mp3'));
+        // a further sync asks nothing
+        await b.sync.sync();
+        expect(b.library.heldNames, isEmpty);
+      });
+
+      test(
+        '#107/AK3 «Remove»: Y is deleted on B with its audio file, as before',
+        () async {
+          final (a, b, cloud, x, y) = await offline91();
+          await b.sync.sync();
+          await b.library.removeHeld();
+          expect(b.library.track(y.id), isNull);
+          expect(b.store.files.keys, isNot(contains('Tracks/${y.id}.mp3')));
+          expect(b.library.state.tracks[y.id], isNull);
+          expect(b.library.heldNames, isEmpty);
+          await b.sync.sync();
+          await a.sync.sync();
+          for (final d in [a, b]) {
+            expect(d.library.track(y.id), isNull);
+            expect(d.library.track(x.id), isNull);
+            expect(d.library.heldNames, isEmpty);
+          }
+          expect(cloud.files.keys, isNot(contains('audio/${y.id}.mp3')));
+          expect((await _reload(b)).track(y.id), isNull);
+        },
+      );
+
+      test('#107/AK4 a folder: held, then kept with its tracks', () async {
+        final (a, b, _, _, y) = await offline91(folder: true);
+        final g = b.library.folders.single;
+        await b.sync.sync();
+        expect(b.library.heldNames, ['G', y.title]);
+        expect(b.library.device.heldFolders, {g.id});
+        expect(b.library.state.folders[g.id], isNull);
+        await b.library.keepHeld();
+        await b.sync.sync();
+        await a.sync.sync();
+        for (final d in [a, b]) {
+          expect(d.library.folders.map((f) => f.id), [g.id]);
+          expect(
+            d.t(d.library.tracks.firstWhere((t) => t.title == 't').id).folderId,
+            g.id,
+          );
+        }
+      });
+
+      test('#107/AK4 a folder: removed, its tracks stay', () async {
+        final (a, b, _, _, _) = await offline91(folder: true);
+        final t = b.library.tracks.firstWhere((t) => t.title == 't');
+        await b.sync.sync();
+        await b.library.removeHeld();
+        expect(b.library.folders, isEmpty);
+        await b.sync.sync();
+        await a.sync.sync();
+        for (final d in [a, b]) {
+          expect(d.library.folders, isEmpty);
+          expect(d.library.track(t.id), isNotNull);
+          expect(d.t(t.id).folderId, isNull);
+          expect(d.library.hasFile(t.id), isTrue);
+        }
+      });
+
+      test('#107/AK5 unanswered: nothing lost, asked again on the next sync, also after a restart or offline', () async {
+        final (a, b, cloud, _, y) = await offline91();
+        await b.sync.sync();
+        expectHeld(b, cloud, y);
+        // offline again
+        cloud.offline = true;
+        await b.sync.sync();
+        cloud.offline = false;
+        expectHeld(b, cloud, y);
+        // restart: a new library and sync on the same store
+        final lib = await _reload(b);
+        expect(lib.heldNames, [y.title]);
+        expect(lib.track(y.id), isNotNull);
+        expect(lib.uploadable(lib.track(y.id)!), isFalse);
+        final sync = CloudSync(cloud, lib, now: () => clock);
+        addTearDown(sync.dispose);
+        tick();
+        await sync.sync();
+        expect(lib.heldNames, [y.title]);
+        expect(lib.track(y.id), isNotNull);
+        expect(b.store.files['Tracks/${y.id}.mp3'], sources['y.mp3']);
+        expect(cloudState(cloud).tracks[y.id], isNull);
+        await a.sync.sync();
+        expect(a.library.track(y.id), isNull);
+        // answered after the restart
+        await lib.keepHeld();
+        await sync.sync();
+        await a.sync.sync();
+        expect(a.library.track(y.id), isNotNull);
+      });
+
+      test('#107/AK5 a held track changed here is no longer at risk and syncs without a question', () async {
+        final (a, b, _, _, y) = await offline91();
+        await b.sync.sync();
+        tick();
+        b.library.editMetadata(y.id, title: 'Y2');
+        await b.sync.sync();
+        await a.sync.sync();
+        expect(b.library.heldNames, isEmpty);
+        expect(a.t(y.id).title, 'Y2');
+      });
+
+      test('#107/AK5 a held track deleted here before the answer stays deleted with «Keep» and keeps its tombstone with «Remove»', () async {
+        for (final keep in [true, false]) {
+          final (a, b, _, _, y) = await offline91();
+          await b.sync.sync();
+          tick();
+          b.library.delete({y.id});
+          expect(
+            b.library.state.tracks[y.id],
+            isNull,
+            reason: 'held until the next sync',
+          );
+          keep ? await b.library.keepHeld() : await b.library.removeHeld();
+          expect(b.library.track(y.id), isNull);
+          await b.sync.sync();
+          await a.sync.sync();
+          expect(b.library.state.tracks[y.id]!.alive, isFalse, reason: '$keep');
+          expect(a.library.track(y.id), isNull);
+          expect(b.library.heldNames, isEmpty);
+        }
+      });
+
+      test(
+        '#107/AK6 an ordinary sync and a first sync (#104) ask nothing',
+        () async {
+          final cloud = InMemoryProvider();
+          final a = await device(cloud, 1);
+          final b = await device(cloud, 2);
+          await a.add('a.mp3');
+          await a.sync.sync();
+          await b.add('b.mp3');
+          await b.sync.sync();
+          await a.sync.sync();
+          for (final d in [a, b]) {
+            expect(d.library.heldNames, isEmpty);
+          }
+          // a horizon in the cloud; c syncs for the first time with an own track from before it
+          final c = await device(cloud, 3);
+          final z = await c.add('z.mp3');
+          tick();
+          a.library.delete({a.library.tracks.first.id});
+          await a.sync.sync();
+          clock = clock.add(const Duration(days: 91));
+          await a.sync.sync();
+          expect(
+            cloudState(cloud).purged!,
+            greaterThan(c.library.state.tracks[z.id]!.latest!),
+          );
+          await c.sync.sync();
+          expect(c.library.heldNames, isEmpty);
+          expect(c.library.device.heldTracks, isEmpty);
+          expect(c.library.track(z.id), isNotNull);
+          await b.sync.sync();
+          expect(b.library.heldNames, isEmpty);
+        },
+      );
+    },
+  );
+
+  group('#107 held records in the library itself', () {
+    /// A library that has synced, with Y and folder G held back and T known to the other side, whose horizon
+    /// lies a day ahead of the clock.
+    Future<(Library, MemoryFileStore, Track, Track, String, Hlc)> held({
+      Duration saveDelay = Duration.zero,
+      MemoryFileStore? store,
+    }) async {
+      final s = store ?? MemoryFileStore();
+      final lib = open(s, saveDelay: saveDelay);
+      await lib.load();
+      sources['y.mp3'] = bytes('audio y');
+      sources['t.mp3'] = bytes('audio t');
+      final r = await lib.importFiles(['y.mp3', 't.mp3']);
+      final y = r.imported.firstWhere((t) => t.title == 'y');
+      final t = r.imported.firstWhere((t) => t.title == 't');
+      final g = lib.createFolder('G').id;
+      lib.flush();
+      await lib.markSynced();
+      final horizon = Hlc(
+        clock.add(const Duration(days: 1)).millisecondsSinceEpoch,
+        0,
+        'ffffffffffffffff',
+      );
+      await lib.mergeRemote(
+        SharedState(tracks: {t.id: lib.state.tracks[t.id]!}, purged: horizon),
+      );
+      expect(lib.device.heldTracks, {y.id});
+      expect(lib.device.heldFolders, {g});
+      return (lib, s, y, t, g, horizon);
+    }
+
+    test('#107 nothing held: «Keep» and «Remove» do nothing', () async {
+      final lib = open(MemoryFileStore());
+      await lib.load();
+      var changes = 0;
+      var notes = 0;
+      lib.onLocalChange = () => changes++;
+      lib.addListener(() => notes++);
+      await lib.keepHeld();
+      await lib.removeHeld();
+      expect((changes, notes), (0, 0));
+    });
+
+    test('#107 «Keep» after a restart: stamped after the horizon, saved, a sync is requested', () async {
+      final (_, store, y, _, g, horizon) = await held();
+      final lib = open(store);
+      await lib.load();
+      expect(lib.device.heldTracks, {y.id});
+      var changes = 0;
+      lib.onLocalChange = () => changes++;
+      await lib.keepHeld();
+      expect(changes, 1);
+      for (final l in [lib, open(store)]) {
+        if (!identical(l, lib)) await l.load();
+        expect(l.state.tracks[y.id]!.latest! > horizon, isTrue);
+        expect(l.state.folders[g]!.latest! > horizon, isTrue);
+        expect(l.device.heldTracks, isEmpty);
+        expect(l.device.heldFolders, isEmpty);
+      }
+    });
+
+    test('#107 «Remove»: files, cache lists and held lists cleaned up, saved at once, other changes kept', () async {
+      final (lib, store, y, t, g, _) = await held(
+        saveDelay: const Duration(hours: 1),
+      );
+      store.files['Tracks/${y.id}.artwork'] = bytes('art');
+      await lib.setKeepOffline({y.id}, true);
+      // a change of another track not yet saved
+      lib.updateSettings(t.id, const PlaybackSettings(speed: 0.5));
+      await lib.removeHeld();
+      expect(store.files.keys.where((k) => k.contains(y.id)), isEmpty);
+      expect(lib.device.keepOffline, isNot(contains(y.id)));
+      expect(lib.device.heldTracks, isEmpty);
+      expect(lib.device.heldFolders, isEmpty);
+      expect(lib.track(t.id)!.settings.speed, 0.5);
+      expect(lib.storage!.used, (await store.storageInfo()).used);
+      final again = open(store);
+      await again.load();
+      expect(again.track(y.id), isNull);
+      expect(again.state.folders[g], isNull);
+      expect(again.device.heldTracks, isEmpty);
+      lib.dispose();
+    });
+
+    test(
+      '#107 «Remove» tells the UI even when the storage cannot be measured',
+      () async {
+        final (lib, _, y, _, _, _) = await held(store: _NoStorageInfo());
+        var notes = 0;
+        lib.addListener(() => notes++);
+        await lib.removeHeld();
+        expect(lib.track(y.id), isNull);
+        expect(notes, greaterThan(0));
+      },
+    );
+
+    test(
+      '#107 after a restart only held records still there and alive stay held',
+      () async {
+        final (lib, store, y, _, g, _) = await held();
+        lib.deleteFolder(g);
+        final again = open(store);
+        await again.load();
+        expect(again.device.heldTracks, {y.id});
+        expect(again.device.heldFolders, isEmpty);
+        // ids without a record (device.json from elsewhere) are dropped
+        final d = (jsonDecode(
+          utf8.decode(store.files[DeviceSettings.fileName]!),
+        ) as Map).cast<String, Object?>();
+        d['heldTracks'] = [y.id, 'nope'];
+        d['heldFolders'] = ['nope'];
+        store.files[DeviceSettings.fileName] = bytes(jsonEncode(d));
+        final third = open(store);
+        await third.load();
+        expect(third.device.heldTracks, {y.id});
+        expect(third.device.heldFolders, isEmpty);
+      },
+    );
+
+    test(
+      '#107 a missing or unreadable library.json leaves nothing held',
+      () async {
+        for (final contents in [null, bytes('{damaged')]) {
+          final (_, store, y, _, _, _) = await held();
+          if (contents == null) {
+            store.files.remove(Library.indexName);
+          } else {
+            store.files[Library.indexName] = contents;
+          }
+          final again = open(store);
+          await again.load();
+          expect(again.device.heldTracks, isEmpty, reason: '$contents');
+          expect(again.device.heldFolders, isEmpty);
+          expect(again.state.tracks[y.id], isNull);
+        }
+      },
+    );
+  });
+}
+
+/// A store whose used storage cannot be measured.
+class _NoStorageInfo extends MemoryFileStore {
+  @override
+  Future<StorageInfo> storageInfo() => Future.error(StateError('no info'));
+}
+
+/// A library on [store] with the test clock.
+Library open(MemoryFileStore store, {Duration saveDelay = Duration.zero}) =>
+    Library(
+      store,
+      probe: (_) => 2.5,
+      readSource: (s) async => sources[s],
+      now: () => clock,
+      saveDelay: saveDelay,
+    );
+
+/// The library of [d] opened again on its store, as after a restart.
+Future<Library> _reload(Device d) async {
+  final lib = Library(
+    d.store,
+    probe: (_) => 2.5,
+    readSource: (s) async => sources[s],
+    now: () => clock,
+    saveDelay: Duration.zero,
+  );
+  await lib.load();
+  return lib;
 }

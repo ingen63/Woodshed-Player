@@ -505,5 +505,41 @@
     "description": "#39/AK6: banner on iPhone/iPad in the browser while the app is not installed"
   },
   "close": "Close",
-  "@close": {}
+  "@close": {},
+  "heldHint": "{count, plural, =1{Sync: keep 1 track or folder that was only on this device?} other{Sync: keep {count} tracks and folders that were only on this device?}}",
+  "@heldHint": {
+    "description": "#107: banner in the library while own tracks or folders are held back from the sync",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heldDecide": "Decide …",
+  "@heldDecide": {
+    "description": "#107: button of the banner that opens the question"
+  },
+  "heldTitle": "Keep tracks and folders?",
+  "heldText": "{count, plural, =1{This device was offline for a long time. This track or folder was never synced and may have been deleted on another device meanwhile:} other{This device was offline for a long time. These {count} tracks and folders were never synced and may have been deleted on another device meanwhile:}}",
+  "@heldText": {
+    "description": "#107: start of the question, followed by the first names",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heldMore": "{count, plural, =1{and 1 more} other{and {count} more}}",
+  "@heldMore": {
+    "description": "#107: after the first 10 names",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heldExplain": "Keep: they stay here and go to your other devices. Remove: they are deleted on this device, with their audio files; the tracks of a removed folder stay.",
+  "heldKeep": "Keep",
+  "heldRemove": "Remove",
+  "heldLater": "Later"
 }
