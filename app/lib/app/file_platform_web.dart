@@ -62,6 +62,10 @@ class WebFilePlatform implements FilePlatform {
   @override
   Future<String?> recordingsDir() async => null;
 
+  /// #113/AK6: no microphone recording in the browser.
+  @override
+  Future<bool> microphoneAccess() async => false;
+
   @override
   void keepAwake(bool on) {} // im Browser erst mit W7 (#39)
 

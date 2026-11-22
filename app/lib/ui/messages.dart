@@ -102,10 +102,17 @@ String recordingErrorMessage(AppLocalizations l, WpRecordingException e) {
     WpRecCode.file => l.recordingErrorFile,
     WpRecCode.ioProc => l.recordingErrorIoProc,
     WpRecCode.start => l.recordingErrorStart,
+    WpRecCode.noInput => l.recordingErrorNoInput,
     _ => l.recordingErrorUnknown(e.code),
   };
   return e.osStatus == 0 ? text : '$text (OSStatus ${e.osStatus})';
 }
+
+/// #113/AK1: name of a recording source in the source menu.
+String recordingSourceLabel(AppLocalizations l, WpRecSource s) => switch (s) {
+  WpRecSource.system => l.recordingSourceSystem,
+  WpRecSource.microphone => l.recordingSourceMicrophone,
+};
 
 String libraryMessageText(AppLocalizations l, LibraryMessage m) => switch (m) {
   LibraryCorrupt(:final backupName) => l.libraryCorrupt(backupName),

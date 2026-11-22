@@ -92,11 +92,14 @@ void WavFile::close() {
 
 Capture::~Capture() { close(); }
 
-int Capture::open(const char *path, double sampleRate) {
+int Capture::open(const char *path, double sampleRate, FileFormat format) {
   close();
   if (!ring_.init(static_cast<uint32_t>(sampleRate * kRingSeconds)))
     return WP_REC_ERR_OUT_OF_MEMORY;
-  if (!wav_.open(path, static_cast<uint32_t>(sampleRate)))
+  const auto rate = static_cast<uint32_t>(sampleRate);
+  const bool opened =
+      format == FileFormat::Flac ? flac_.open(path, rate, kChannels) : wav_.open(path, rate);
+  if (!opened)
     return WP_REC_ERR_FILE;
   writerRun_.store(true);
   writer_ = std::thread([this] { writerLoop(); });
@@ -108,14 +111,22 @@ void Capture::close() {
   if (writer_.joinable())
     writer_.join();
   wav_.close();
+  flac_.close();
   ring_.uninit();
+}
+
+void Capture::writeFrames(const float *frames, uint32_t count) {
+  if (flac_.isOpen())
+    flac_.write(frames, count);
+  else
+    wav_.write(frames, count);
 }
 
 void Capture::writerLoop() {
   while (writerRun_.load() || ring_.availableRead() > 0) {
     uint32_t n = kWriteFrames;
     if (const float *buf = ring_.acquireRead(n)) {
-      wav_.write(buf, n);
+      writeFrames(buf, n);
       ring_.commitRead(n);
     } else {
       // Waiting for the audio thread; without the pause the writer only spins (same output).
@@ -153,6 +164,49 @@ void Capture::push(const TapBuffer *buffers, uint32_t count, const TapFormat &fo
     done += n;
   }
   meter_.add(peak, total);
+}
+
+MicInput::~MicInput() { close(); }
+
+bool MicInput::open(ma_context *context) {
+  close();
+  ma_device_config config = ma_device_config_init(ma_device_type_capture);
+  config.capture.pDeviceID = nullptr; // default input device of the system
+  config.capture.format = ma_format_f32;
+  config.capture.channels = kChannels;
+  config.sampleRate = 0; // the device's own rate, no resampling
+  config.dataCallback = onData;
+  config.pUserData = this;
+  open_ = ma_device_init(context, &config, &device_) == MA_SUCCESS;
+  return open_;
+}
+
+double MicInput::sampleRate() const { return open_ ? device_.sampleRate : 0.0; }
+
+bool MicInput::start(Capture &capture) {
+  if (!open_)
+    return false;
+  capture_ = &capture;
+  return ma_device_start(&device_) == MA_SUCCESS;
+}
+
+void MicInput::close() {
+  // Stops the device and waits for the last callback; afterwards none reaches the capture.
+  if (open_)
+    ma_device_uninit(&device_);
+  open_ = false;
+}
+
+void MicInput::deliver(Capture &capture, const float *input, uint32_t frames) {
+  const TapBuffer buffer{kChannels, frames * kChannels * static_cast<uint32_t>(sizeof(float)),
+                         input};
+  capture.push(&buffer, 1, {kChannels, false});
+}
+
+void MicInput::onData(ma_device *device, void * /*output*/, const void *input, ma_uint32 frames) {
+  auto *self = static_cast<MicInput *>(device->pUserData);
+  if (self->capture_ && input)
+    deliver(*self->capture_, static_cast<const float *>(input), frames);
 }
 
 } // namespace wp::rec

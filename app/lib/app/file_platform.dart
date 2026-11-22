@@ -79,6 +79,10 @@ abstract class FilePlatform {
   /// Ablage für Aufnahmen (nur macOS).
   Future<String?> recordingsDir();
 
+  /// #113/AK4: whether the app may use the microphone. Asks the user the first time (system dialog);
+  /// false if access was refused before or there is no microphone recording here.
+  Future<bool> microphoneAccess();
+
   /// Bildschirm wach halten (iPhone/iPad, solange das Metronom läuft).
   void keepAwake(bool on);
 
@@ -129,6 +133,15 @@ class ChannelFilePlatform implements FilePlatform {
   @override
   Future<String?> recordingsDir() =>
       _channel.invokeMethod<String>('recordingsDir');
+
+  @override
+  Future<bool> microphoneAccess() async {
+    try {
+      return await _channel.invokeMethod<bool>('microphoneAccess') ?? false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
 
   @override
   void keepAwake(bool on) =>

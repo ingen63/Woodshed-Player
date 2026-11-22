@@ -828,6 +828,11 @@ void recordingUnavailableOffline() {
   // start reports WP_REC_ERR_UNSUPPORTED, idle values, an English error text.
   CHECK(wp_rec_available() == 0);
   CHECK(wp_rec_start("unused.wav") == WP_REC_ERR_UNSUPPORTED);
+  // #113: neither source, so no microphone in the browser either.
+  CHECK(wp_rec_source_available(WP_REC_SOURCE_SYSTEM) == 0);
+  CHECK(wp_rec_source_available(WP_REC_SOURCE_MIC) == 0);
+  CHECK(wp_rec_start_source("unused.flac", WP_REC_SOURCE_MIC) == WP_REC_ERR_UNSUPPORTED);
+  CHECK(wp_rec_start_source("unused.wav", WP_REC_SOURCE_SYSTEM) == WP_REC_ERR_UNSUPPORTED);
   wp_rec_stop();
   CHECK(wp_rec_is_recording() == 0);
   CHECK(wp_rec_seconds() == 0.0);

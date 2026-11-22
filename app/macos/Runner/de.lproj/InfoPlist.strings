@@ -1,2 +1,5 @@
 /* Permission dialog for system audio recording (#49). English text: Info.plist. */
 "NSAudioCaptureUsageDescription" = "Woodshed Player nimmt Musik, die gerade auf Deinem Mac läuft, als Übungsmitschnitt auf, damit Du sie langsamer abspielen und loopen kannst. Die Aufnahme bleibt auf Deinem Mac.";
+
+/* Permission dialog for microphone recording (#113). English text: Info.plist. */
+"NSMicrophoneUsageDescription" = "Woodshed Player nimmt Dein eigenes Spiel über das Mikrofon als Übungsmitschnitt auf, damit Du es anhören, langsamer abspielen und loopen kannst. Die Aufnahme bleibt auf Deinem Mac.";

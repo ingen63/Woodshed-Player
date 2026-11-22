@@ -1,4 +1,5 @@
-// Aufnahme des Systemtons auf macOS 14.2+ über einen Core Audio Process Tap (ohne Mikrofon).
+// Recording on macOS: the system audio (macOS 14.2+) through a Core Audio process tap, or the
+// microphone (#113, default input device through miniaudio, MicInput in recorder_core.cpp) as FLAC.
 // Ablauf: Tap auf alle Prozesse ausser Woodshed Player -> private Aggregate-Device -> IOProc ->
 // Ringpuffer
 // -> Schreib-Thread -> WAV (float32). Ohne Berechtigung liefert macOS nur Stille
@@ -35,7 +36,8 @@ struct Recorder {
   AudioDeviceIOProcID ioProc = nullptr;
   dispatch_queue_t queue = nullptr;
 
-  wp::rec::Capture capture; // ring buffer, writer thread, WAV file, level
+  wp::rec::Capture capture; // ring buffer, writer thread, file, level
+  wp::rec::MicInput mic;    // #113: only open while recording from the microphone
 };
 
 Recorder &rec() {
@@ -80,7 +82,7 @@ void onInput(Recorder *r, const AudioBufferList *in) {
   r->capture.push(buffers, count, {r->tapChannels, r->tapNonInterleaved});
 }
 
-void teardown(Recorder &r) API_AVAILABLE(macos(14.2)) {
+void teardownTap(Recorder &r) API_AVAILABLE(macos(14.2)) {
   if (r.aggregate != kAudioObjectUnknown && r.ioProc) {
     AudioDeviceStop(r.aggregate, r.ioProc);
     AudioDeviceDestroyIOProcID(r.aggregate, r.ioProc);
@@ -92,9 +94,30 @@ void teardown(Recorder &r) API_AVAILABLE(macos(14.2)) {
   if (r.tap != kAudioObjectUnknown)
     AudioHardwareDestroyProcessTap(r.tap);
   r.tap = kAudioObjectUnknown;
+}
 
+void teardown(Recorder &r) {
+  if (@available(macOS 14.2, *))
+    teardownTap(r);
+  r.mic.close();
   r.capture.close();
   r.recording.store(false);
+}
+
+// #113: the default input device into a FLAC file. Without the microphone permission macOS
+// delivers silence; the app asks for the permission before it starts.
+int startMic(Recorder &r, const char *path) {
+  if (!r.mic.open())
+    return fail(r, WP_REC_ERR_NO_INPUT, "No input device could be opened");
+  r.sampleRate = r.mic.sampleRate();
+  const int opened = r.capture.open(path, r.sampleRate, wp::rec::FileFormat::Flac);
+  if (opened == WP_REC_ERR_OUT_OF_MEMORY)
+    return fail(r, WP_REC_ERR_OUT_OF_MEMORY, "No memory for the ring buffer");
+  if (opened != 0)
+    return fail(r, WP_REC_ERR_FILE, "FLAC file could not be created");
+  if (!r.mic.start(r.capture))
+    return fail(r, WP_REC_ERR_START, "Microphone could not be started");
+  return 0;
 }
 
 int startTap(Recorder &r, const char *path) API_AVAILABLE(macos(14.2)) {
@@ -197,39 +220,55 @@ int startTap(Recorder &r, const char *path) API_AVAILABLE(macos(14.2)) {
 
 extern "C" {
 
-int wp_rec_available(void) {
-  if (@available(macOS 14.2, *))
+int wp_rec_source_available(int source) {
+  if (source == WP_REC_SOURCE_MIC)
     return 1;
+  if (source == WP_REC_SOURCE_SYSTEM) {
+    if (@available(macOS 14.2, *))
+      return 1;
+  }
   return 0;
 }
 
-int wp_rec_start(const char *wav_path) {
+// The microphone records on every supported macOS.
+int wp_rec_available(void) { return wp_rec_source_available(WP_REC_SOURCE_MIC); }
+
+int wp_rec_start_source(const char *path, int source) {
   auto &r = rec();
   std::lock_guard<std::mutex> lock(r.mutex);
   if (r.recording.load())
     return 0;
   r.error.clear();
   r.osStatus = noErr;
-  if (!wav_path)
+  if (!path)
     return fail(r, WP_REC_ERR_INVALID_PATH, "No file path");
-  if (@available(macOS 14.2, *)) {
-    r.capture.meter().reset();
-    int res = startTap(r, wav_path);
-    if (res != 0) {
-      teardown(r);
-      return res;
-    }
-    r.recording.store(true);
-    return 0;
+  if (!wp_rec_source_available(source))
+    return fail(r, WP_REC_ERR_UNSUPPORTED,
+                source == WP_REC_SOURCE_SYSTEM ? "Recording requires macOS 14.2 or later"
+                                               : "Unknown recording source");
+  r.capture.meter().reset();
+  int res = 0;
+  if (source == WP_REC_SOURCE_MIC) {
+    res = startMic(r, path);
+  } else if (@available(macOS 14.2, *)) {
+    res = startTap(r, path);
   }
-  return fail(r, WP_REC_ERR_UNSUPPORTED, "Recording requires macOS 14.2 or later");
+  if (res != 0) {
+    teardown(r);
+    return res;
+  }
+  r.recording.store(true);
+  return 0;
+}
+
+int wp_rec_start(const char *wav_path) {
+  return wp_rec_start_source(wav_path, WP_REC_SOURCE_SYSTEM);
 }
 
 void wp_rec_stop(void) {
   auto &r = rec();
   std::lock_guard<std::mutex> lock(r.mutex);
-  if (@available(macOS 14.2, *))
-    teardown(r);
+  teardown(r);
 }
 
 int wp_rec_is_recording(void) { return rec().recording.load() ? 1 : 0; }

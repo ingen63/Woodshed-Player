@@ -387,3 +387,15 @@ app/lib/player/player_service.dart | dart_remove_negation | } else if (next.loop
 # bricht die Schleife darunter mit derselben Bedingung «total <= cacheLimit» sofort ab, nichts wird
 # entfernt und removed ist leer; das Ergebnis ist dasselbe.
 app/lib/library/library.dart | dart_le_to_lt | if (total <= cacheLimit) return const [];
+
+# ---- core/src/flac_writer.cpp (#113) ----
+# Speicherfreigabe: Gibt nur das Encoder-Objekt frei (ein Leck, Lecks zählen im Mutationslauf nicht).
+# Die Datei ist zu diesem Zeitpunkt schon fertig geschrieben (finish), die Ausgabe ist dieselbe.
+core/src/flac_writer.cpp | cxx_remove_void_call | FLAC__stream_encoder_delete(encoder_);
+
+# ---- core/src/recorder_core.cpp (#113) ----
+# Grenzfall: Ohne close() im Destruktor läuft das miniaudio-Gerät auf
+# dem freigegebenen Speicher des MicInput weiter. Was dann geschieht (Absturz, weitere Frames oder
+# nichts), hängt vom Speicher ab; ein Test darauf wäre nicht verlässlich. Das Schliessen selbst prüft
+# micStopsOnReopenAndDestruction über close() bzw. ein zweites open().
+core/src/recorder_core.cpp | cxx_remove_void_call | MicInput::~MicInput() { close(); }

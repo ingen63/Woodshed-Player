@@ -4,7 +4,7 @@ Pod::Spec.new do |s|
   s.name             = 'wp_core'
   s.version          = '0.0.1'
   s.summary          = 'Woodshed Player audio core'
-  s.description      = 'Playback with tempo change without pitch change, loop and system audio recording.'
+  s.description      = 'Playback with tempo change without pitch change, loop, system audio and microphone recording.'
   s.homepage         = 'https://github.com/ingen63/Woodshed-Player'
   s.license          = { :type => 'MIT' }
   s.author           = { 'Woodshed Player' => 'noreply@github.com' }
@@ -23,7 +23,10 @@ Pod::Spec.new do |s|
     'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -ffp-contract=off',
     'HEADER_SEARCH_PATHS' => [
       "\"#{core}/include\"", "\"#{core}/src\"", "\"#{core}/third_party/miniaudio\"",
-      "\"#{core}/third_party/signalsmith-stretch/include\"", "\"#{core}/third_party/signalsmith-linear/include\""
+      "\"#{core}/third_party/signalsmith-stretch/include\"", "\"#{core}/third_party/signalsmith-linear/include\"",
+      # #113: libFLAC (FLAC file of the microphone recording) and its config.h
+      "\"#{core}/third_party/flac/include\"", "\"#{core}/third_party/flac/src/libFLAC/include\"",
+      "\"#{core}/src/flac_config\""
     ].join(' '),
   }
 end

@@ -1,18 +1,20 @@
-// Platform-independent part of the recording (#68): level meter, ring buffer, WAV file and the
-// copy of the tap data into the ring. recorder_mac.mm only drives Core Audio (process tap,
-// aggregate device, IOProc) and hands each input buffer list to Capture::push. Everything here
-// runs without an audio device and is tested by core/tests/recorder_tests.cpp.
+// Platform-independent part of the recording (#68): level meter, ring buffer, WAV or FLAC file and
+// the copy of the tap data into the ring. recorder_mac.mm only drives Core Audio (process tap,
+// aggregate device, IOProc) and hands each input buffer list to Capture::push. The microphone
+// (#113) is miniaudio's capture device (MicInput). Everything here runs without an audio device
+// (MicInput on miniaudio's null backend) and is tested by core/tests/recorder_tests.cpp.
 #pragma once
 
 #include <atomic>
 #include <cstdint>
 #include <thread>
 
+#include "flac_writer.hpp"
 #include "miniaudio_impl.hpp"
 
 namespace wp::rec {
 
-// The WAV file is always stereo float32 at the device rate.
+// The file is always stereo at the device rate: WAV as float32, FLAC as 24-bit integers.
 constexpr int kChannels = 2;
 // A block whose peak stays at or below this counts as silence (macOS delivers digital silence
 // without the permission for system audio).
@@ -100,7 +102,10 @@ private:
   bool open_ = false;
 };
 
-// Ring buffer, WAV file and writer thread of one recording, plus the level meter.
+// Format of the recorded file: system audio as WAV (#4), microphone as FLAC (#113).
+enum class FileFormat { Wav, Flac };
+
+// Ring buffer, file and writer thread of one recording, plus the level meter.
 class Capture {
 public:
   Capture() = default;
@@ -108,9 +113,9 @@ public:
   Capture &operator=(const Capture &) = delete;
   ~Capture();
 
-  // Allocates the ring (kRingSeconds), creates the WAV file and starts the writer thread.
+  // Allocates the ring (kRingSeconds), creates the file and starts the writer thread.
   // 0, WP_REC_ERR_OUT_OF_MEMORY or WP_REC_ERR_FILE. After an error close() cleans up.
-  int open(const char *path, double sampleRate);
+  int open(const char *path, double sampleRate, FileFormat format = FileFormat::Wav);
   // Stops the writer after it has written everything in the ring, closes the file and frees the
   // ring. The level meter keeps its values (length of the finished recording).
   void close();
@@ -126,12 +131,45 @@ public:
 
 private:
   void writerLoop();
+  void writeFrames(const float *frames, uint32_t count);
 
   LevelMeter meter_;
   FrameRing ring_;
   WavFile wav_;
+  FlacWriter flac_;
   std::thread writer_;
   std::atomic<bool> writerRun_{false};
+};
+
+// Microphone (#113): the default input device of the system through miniaudio, handed to a Capture
+// as stereo float (mono inputs on both channels). Without the permission macOS delivers silence.
+class MicInput {
+public:
+  MicInput() = default;
+  MicInput(const MicInput &) = delete;
+  MicInput &operator=(const MicInput &) = delete;
+  ~MicInput();
+
+  // Opens the default input device on `context` (nullptr: miniaudio picks the backend) at its own
+  // rate. false if there is no input device or it cannot be opened.
+  bool open(ma_context *context = nullptr);
+  // Rate of the opened device in Hz, 0 if none is open.
+  [[nodiscard]] double sampleRate() const;
+  // Starts delivering to `capture`, which must already be open. false if the device does not start.
+  bool start(Capture &capture);
+  // Stops and closes the device; afterwards nothing reaches the capture any more.
+  void close();
+
+  // Audio thread: hands `frames` interleaved stereo float frames of the device to `capture`.
+  static void deliver(Capture &capture, const float *input, uint32_t frames);
+
+private:
+  static void onData(ma_device *device, void *output, const void *input, ma_uint32 frames);
+
+  ma_device
+      device_{}; // NOLINT(bugprone-invalid-enum-default-initialization): zeroed miniaudio struct
+  bool open_ = false;
+  Capture *capture_ = nullptr;
 };
 
 } // namespace wp::rec

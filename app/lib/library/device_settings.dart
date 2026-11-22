@@ -7,6 +7,7 @@
 // track was last used here (the oldest go first).
 // #110: whether the hint «Add to Home Screen» (#39/AK6) was closed in this browser on this device.
 // #115: the area (Player, Practice, Metronome) last chosen on this device, opened again after a restart.
+// #113: the recording source (system audio or microphone) last chosen on this device.
 // #107: own tracks and folders (#114: and playlists) held back from the sync until the user keeps or removes
 // them.
 import 'dart:convert';
@@ -29,6 +30,7 @@ class DeviceSettings {
     this.heldFolders = const {},
     this.heldPlaylists = const {},
     this.area,
+    this.recordingSource,
   });
 
   static const fileName = 'device.json';
@@ -74,6 +76,10 @@ class DeviceSettings {
   /// #115/AK7: name of the area last chosen here (`player`, `practice`, `metronome`); null until one is chosen.
   final String? area;
 
+  /// #113/AK1: name of the recording source last chosen here (`system`, `microphone`); null until one is
+  /// chosen.
+  final String? recordingSource;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -86,6 +92,7 @@ class DeviceSettings {
     Set<String>? heldFolders,
     Set<String>? heldPlaylists,
     String? area,
+    String? recordingSource,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -99,6 +106,7 @@ class DeviceSettings {
     heldFolders: heldFolders ?? this.heldFolders,
     heldPlaylists: heldPlaylists ?? this.heldPlaylists,
     area: area ?? this.area,
+    recordingSource: recordingSource ?? this.recordingSource,
   );
 
   Map<String, Object?> toJson() => {
@@ -114,6 +122,7 @@ class DeviceSettings {
     if (heldFolders.isNotEmpty) 'heldFolders': [...heldFolders]..sort(),
     if (heldPlaylists.isNotEmpty) 'heldPlaylists': [...heldPlaylists]..sort(),
     if (area != null) 'area': area,
+    if (recordingSource != null) 'recordingSource': recordingSource,
   };
 
   static String newDeviceId([Random? random]) {
@@ -157,6 +166,10 @@ class DeviceSettings {
             heldFolders: _ids(j['heldFolders']),
             heldPlaylists: _ids(j['heldPlaylists']),
             area: switch (j['area']) {
+              final String v when v.isNotEmpty => v,
+              _ => null,
+            },
+            recordingSource: switch (j['recordingSource']) {
               final String v when v.isNotEmpty => v,
               _ => null,
             },

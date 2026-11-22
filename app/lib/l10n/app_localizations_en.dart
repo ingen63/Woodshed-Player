@@ -220,6 +220,31 @@ class AppLocalizationsEn extends AppLocalizations {
       'Records the system audio (without microphone). The recording is only stored locally and then added to the library.';
 
   @override
+  String get recordingErrorNoInput =>
+      'No microphone found, or it could not be opened.';
+
+  @override
+  String get recordingSource => 'Recording source';
+
+  @override
+  String get recordingSourceSystem => 'System audio';
+
+  @override
+  String get recordingSourceMicrophone => 'Microphone';
+
+  @override
+  String get recordingTooltipMicrophone =>
+      'Records through the microphone (the default input device). The recording is only stored locally and then added to the library.';
+
+  @override
+  String get recordingMicrophoneDenied =>
+      'Woodshed Player may not use the microphone. Grant access in System Settings › Privacy & Security › Microphone, then start the recording again.';
+
+  @override
+  String get recordingMicrophoneSilent =>
+      'Only silence is coming from the microphone. Check the input device in System Settings › Sound › Input.';
+
+  @override
   String get noTrackSelected => 'No track selected';
 
   @override

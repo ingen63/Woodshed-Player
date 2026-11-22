@@ -29,6 +29,8 @@ abstract final class WsIcons {
   static const folder = IconData(0xf434, fontFamily: _f, fontPackage: _p);
   static const stop = IconData(0xf82b, fontFamily: _f, fontPackage: _p);
   static const record = IconData(0xf400, fontFamily: _f, fontPackage: _p);
+  static const mic = IconData(0xf460, fontFamily: _f, fontPackage: _p);
+  static const desktop = IconData(0xf625, fontFamily: _f, fontPackage: _p);
   static const warning = IconData(0xf661, fontFamily: _f, fontPackage: _p);
   static const tray = IconData(0xf871, fontFamily: _f, fontPackage: _p);
   static const add = IconData(0xf489, fontFamily: _f, fontPackage: _p);

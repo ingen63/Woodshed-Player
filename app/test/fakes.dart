@@ -210,6 +210,16 @@ class FakeFiles implements FilePlatform {
 
   /// Folder for recordings (#4); null: none, as without a support folder.
   String? recordings;
+
+  /// #113/AK4: answer of the microphone permission; [microphoneAsked] counts the questions.
+  bool microphoneGranted = true;
+  int microphoneAsked = 0;
+  @override
+  Future<bool> microphoneAccess() async {
+    microphoneAsked++;
+    return microphoneGranted;
+  }
+
   @override
   void keepAwake(bool on) {}
   @override

@@ -1,4 +1,5 @@
 // #4: recording of the system audio on the Mac, with a fake recorder and a temporary library.
+// #113: microphone as a second source, recorded as FLAC, with the permission of the fake platform.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,12 +9,17 @@ import 'package:woodshed_player/ui/messages.dart';
 import 'package:woodshed_player/ui/recording_button.dart';
 import 'package:woodshed_player/ui/style.dart';
 import 'package:wp_core/wp_types.dart';
+import 'package:woodshed_player/library/device_settings.dart';
 
 import 'fakes.dart';
 
 /// Recorder without the core: writes a file on start, values are set by the test.
 class FakeRecorder implements Recorder {
   String? path;
+  WpRecSource? source;
+
+  /// Sources this fake platform records (#113); both, as on macOS 14.2+.
+  Set<WpRecSource> sources = {...WpRecSource.values};
   bool recording = false;
   WpRecordingException? failWith;
   @override
@@ -24,11 +30,15 @@ class FakeRecorder implements Recorder {
   bool onlySilence = false;
 
   @override
-  void start(String wavPath) {
+  bool sourceAvailable(WpRecSource source) => sources.contains(source);
+
+  @override
+  void start(String path, WpRecSource source) {
     final e = failWith;
     if (e != null) throw e;
-    path = wavPath;
-    File(wavPath).writeAsStringSync('recorded audio');
+    this.path = path;
+    this.source = source;
+    File(path).writeAsStringSync('recorded audio');
     recording = true;
   }
 
@@ -48,11 +58,17 @@ void main() {
   Future<(TestApp, FakeRecorder)> pump(
     WidgetTester tester, {
     Locale locale = testLocale,
+    Set<WpRecSource>? sources,
+    WpRecSource? chosen,
   }) async {
     final app = TestApp(Directory('${tmp.path}/lib'));
     final rec = FakeRecorder();
+    if (sources != null) rec.sources = sources;
     app.files.recordings = (Directory('${tmp.path}/rec')..createSync()).path;
     await tester.runAsync(app.library.load);
+    if (chosen != null) {
+      await tester.runAsync(() => app.library.setRecordingSource(chosen.name));
+    }
     await tester.pumpWidget(
       MaterialApp(
         locale: locale,
@@ -74,7 +90,13 @@ void main() {
   }
 
   Future<void> tapRecord(WidgetTester tester) async {
-    await tester.tap(find.byKey(const Key('recordingButton')).last);
+    // The record button itself: the row also holds the source menu and hints (#113).
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('recordingButton')).last,
+        matching: find.byType(TextButton),
+      ),
+    );
     await tester.pump();
     await tester.pump();
   }
@@ -226,6 +248,236 @@ void main() {
         ..setLoopEnabled(true);
       expect(app.core.rateValue, closeTo(0.5, 1e-9));
       expect(app.core.loop, (2.0, 6.0));
+    },
+  );
+
+  // ---- #113: microphone ----
+
+  Future<void> chooseSource(WidgetTester tester, WpRecSource s) async {
+    await tester.tap(find.byKey(const Key('recordingSource')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('recordingSource:${s.name}')).last);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    '#113/AK1: microphone or system audio can be chosen; the choice stays on this device',
+    (tester) async {
+      final (app, rec) = await pump(tester);
+      // System audio until something is chosen, as before #113.
+      expect(app.library.recordingSource, isNull);
+      await tester.tap(find.byKey(const Key('recordingSource')));
+      await tester.pumpAndSettle();
+      final items = tester
+          .widgetList<CheckedPopupMenuItem<WpRecSource>>(
+            find.byType(CheckedPopupMenuItem<WpRecSource>),
+          )
+          .toList();
+      expect(items.map((i) => i.value), [
+        WpRecSource.system,
+        WpRecSource.microphone,
+      ]);
+      expect(items.map((i) => i.checked), [true, false]);
+      expect(find.text(de.recordingSourceMicrophone), findsOneWidget);
+      expect(find.text(de.recordingSourceSystem), findsOneWidget);
+      await tester.tap(find.byKey(const Key('recordingSource:microphone')));
+      await tester.pumpAndSettle();
+      expect(app.library.recordingSource, 'microphone');
+      expect(
+        app.library.device.toJson()['recordingSource'],
+        'microphone',
+      ); // device-local, never synced
+      await tapRecord(tester);
+      expect(rec.source, WpRecSource.microphone);
+      // The menu is hidden while recording, so the source cannot change mid-take.
+      expect(find.byKey(const Key('recordingSource')), findsNothing);
+      await tester.runAsync(() => tapRecord(tester));
+      await chooseSource(tester, WpRecSource.system);
+      await tester.runAsync(() => tapRecord(tester));
+      expect(rec.source, WpRecSource.system);
+      expect(rec.path, endsWith('.wav'));
+      await tester.runAsync(() => tapRecord(tester));
+    },
+  );
+
+  testWidgets(
+    '#113/AK1: without the system audio (macOS before 14.2) only the microphone, no menu',
+    (tester) async {
+      final (_, rec) = await pump(
+        tester,
+        sources: {WpRecSource.microphone},
+        chosen: WpRecSource.system,
+      );
+      expect(find.byKey(const Key('recordingSource')), findsNothing);
+      await tapRecord(tester);
+      expect(rec.source, WpRecSource.microphone);
+      await tester.runAsync(() => tapRecord(tester));
+    },
+  );
+
+  testWidgets(
+    '#113/AK2: a microphone recording starts and stops by the same button, with duration and level',
+    (tester) async {
+      final (app, rec) = await pump(tester, chosen: WpRecSource.microphone);
+      final tooltip = tester.widget<Tooltip>(
+        find.ancestor(
+          of: find.text(de.recording),
+          matching: find.byType(Tooltip),
+        ),
+      );
+      expect(tooltip.message, de.recordingTooltipMicrophone);
+      await tapRecord(tester);
+      expect(rec.recording, isTrue);
+      expect(app.files.microphoneAsked, 1);
+      rec
+        ..seconds = 12
+        ..level = 0.3;
+      await pumpUntil(
+        tester,
+        () => find.text('00:12').evaluate().isNotEmpty,
+        'duration shown',
+      );
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byKey(const Key('recordingLevel')),
+      );
+      expect(bar.value, closeTo(0.3, 1e-9));
+      await tester.runAsync(() async => tapRecord(tester));
+      expect(rec.recording, isFalse);
+      expect(find.byKey(const Key('recordingDuration')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    '#113/AK3: after stopping the microphone take is a FLAC title named after date and time',
+    (tester) async {
+      final (app, rec) = await pump(tester, chosen: WpRecSource.microphone);
+      await tapRecord(tester);
+      expect(rec.path, endsWith('Aufnahme 2026-11-19 14.05.09.flac'));
+      await tester.runAsync(() => tapRecord(tester));
+      await waitUntil(
+        tester,
+        () => app.library.tracks.isNotEmpty,
+        'recording in the library',
+      );
+      final t = app.library.tracks.single;
+      expect(t.title, 'Aufnahme 19.11.2026 14:05:09');
+      expect(t.fileName, endsWith('.flac'));
+      expect(app.library.editMetadata(t.id, title: 'Etüde'), isTrue);
+      expect(app.library.track(t.id)!.title, 'Etüde');
+    },
+  );
+
+  testWidgets(
+    '#113/AK4: refused microphone permission explains where to grant it, no recording, no title',
+    (tester) async {
+      final (app, rec) = await pump(tester, chosen: WpRecSource.microphone);
+      app.files.microphoneGranted = false;
+      await tester.runAsync(() => tapRecord(tester));
+      await tester.pump();
+      expect(app.files.microphoneAsked, 1);
+      expect(rec.recording, isFalse);
+      expect(rec.path, isNull);
+      expect(Directory(app.files.recordings!).listSync(), isEmpty);
+      expect(app.library.tracks, isEmpty);
+      expect(find.byKey(const Key('recordingDuration')), findsNothing);
+      final problem = find.byKey(const Key('recordingProblem'));
+      expect(
+        tester.widget<IconButton>(problem).tooltip,
+        de.recordingMicrophoneDenied,
+      );
+      await tester.tap(problem);
+      await tester.pumpAndSettle();
+      expect(find.text(de.recordingMicrophoneDenied), findsOneWidget);
+      expect(
+        de.recordingMicrophoneDenied,
+        contains('Datenschutz & Sicherheit › Mikrofon'),
+      );
+      final en = lookupAppLocalizations(const Locale('en'));
+      expect(
+        en.recordingMicrophoneDenied,
+        contains('Privacy & Security › Microphone'),
+      );
+      await tester.tap(find.text(de.ok));
+      await tester.pumpAndSettle();
+      // Granted later: the hint goes away and the take starts.
+      app.files.microphoneGranted = true;
+      await tester.runAsync(() => tapRecord(tester));
+      await tester.pump();
+      expect(rec.recording, isTrue);
+      expect(find.byKey(const Key('recordingProblem')), findsNothing);
+      await tester.runAsync(() => tapRecord(tester));
+    },
+  );
+
+  testWidgets('#113/AK4: the system audio does not ask for the microphone', (
+    tester,
+  ) async {
+    final (app, rec) = await pump(tester, chosen: WpRecSource.system);
+    app.files.microphoneGranted = false;
+    await tapRecord(tester);
+    expect(app.files.microphoneAsked, 0);
+    expect(rec.recording, isTrue);
+    await tester.runAsync(() => tapRecord(tester));
+  });
+
+  testWidgets(
+    '#113/AK4: only silence from the microphone points to the input device',
+    (tester) async {
+      final (_, rec) = await pump(tester, chosen: WpRecSource.microphone);
+      await tapRecord(tester);
+      rec
+        ..seconds = 4
+        ..onlySilence = true;
+      final problem = find.byKey(const Key('recordingProblem'));
+      await pumpUntil(
+        tester,
+        () => problem.evaluate().isNotEmpty,
+        'silence reported',
+      );
+      expect(
+        tester.widget<IconButton>(problem).tooltip,
+        de.recordingMicrophoneSilent,
+      );
+      expect(de.recordingMicrophoneSilent, contains('Ton › Eingang'));
+      await tester.runAsync(() => tapRecord(tester));
+      // Choosing a source clears the hint of the last take.
+      await chooseSource(tester, WpRecSource.system);
+      expect(find.byKey(const Key('recordingProblem')), findsNothing);
+    },
+  );
+
+  test('#113/AK1: the recording source is stored in device.json', () {
+    const d = DeviceSettings(deviceId: '0123456789abcdef');
+    expect(d.toJson(), isNot(contains('recordingSource')));
+    final m = d.copyWith(recordingSource: 'microphone');
+    expect(m.toJson()['recordingSource'], 'microphone');
+    expect(m.copyWith(area: 'player').recordingSource, 'microphone');
+    expect(WpRecSource.named('microphone'), WpRecSource.microphone);
+    expect(WpRecSource.named('system'), WpRecSource.system);
+    expect(WpRecSource.named('tape'), isNull);
+    expect(WpRecSource.named(null), isNull);
+    expect(WpRecSource.microphone.extension, 'flac');
+    expect(WpRecSource.system.extension, 'wav');
+  });
+
+  test(
+    '#113/AK6: no microphone recording on iPhone/iPad and in the browser',
+    () async {
+      final stub = File('../core/src/recorder_stub.cpp').readAsStringSync();
+      expect(stub, contains('int wp_rec_source_available(int) { return 0; }'));
+      expect(
+        stub,
+        contains(
+          'int wp_rec_start_source(const char *, int) { return WP_REC_ERR_UNSUPPORTED; }',
+        ),
+      );
+      final ios = File('packages/wp_core/ios/Classes/wp_recorder.cpp')
+          .readAsStringSync();
+      expect(ios, contains('recorder_stub.cpp'));
+      final web = File('lib/app/file_platform_web.dart').readAsStringSync();
+      expect(web, contains('Future<bool> microphoneAccess() async => false;'));
+      final iosPlist = File('ios/Runner/Info.plist').readAsStringSync();
+      expect(iosPlist, isNot(contains('NSMicrophoneUsageDescription')));
     },
   );
 

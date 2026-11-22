@@ -3,7 +3,9 @@
 
 extern "C" {
 int wp_rec_available(void) { return 0; }
+int wp_rec_source_available(int) { return 0; }
 int wp_rec_start(const char *) { return WP_REC_ERR_UNSUPPORTED; }
+int wp_rec_start_source(const char *, int) { return WP_REC_ERR_UNSUPPORTED; }
 void wp_rec_stop(void) {}
 int wp_rec_is_recording(void) { return 0; }
 double wp_rec_seconds(void) { return 0.0; }

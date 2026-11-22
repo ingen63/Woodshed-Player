@@ -106,7 +106,7 @@ WP_API void wp_metro_set_ramp(wp_player *p, int enabled, int start_bpm, int targ
 WP_API void wp_metro_set_ramp_timed(wp_player *p, int enabled, int start_bpm, int target_bpm,
                                     int duration_seconds);
 
-/* ---- Aufnahme des Systemtons (nur macOS 14.2+, sonst Rückgabe < 0) ---- */
+/* ---- Recording: system audio (macOS 14.2+) or microphone (macOS, #113); elsewhere < 0 ---- */
 /* Error codes of wp_rec_start (#44); the UI maps each one to its own localized text. */
 #define WP_REC_ERR_INVALID_PATH -1  /* no file path */
 #define WP_REC_ERR_UNSUPPORTED -2   /* platform without recording or macOS older than 14.2 */
@@ -118,10 +118,20 @@ WP_API void wp_metro_set_ramp_timed(wp_player *p, int enabled, int start_bpm, in
 #define WP_REC_ERR_FILE -8          /* WAV file could not be created */
 #define WP_REC_ERR_IO_PROC -9       /* IOProc could not be created */
 #define WP_REC_ERR_START -10        /* device could not be started */
-/* 1 = auf dieser Plattform verfügbar, 0 = nicht verfügbar. */
+#define WP_REC_ERR_NO_INPUT -11     /* no input device (microphone) or it could not be opened */
+/* Sources of wp_rec_start_source (#113). */
+#define WP_REC_SOURCE_SYSTEM 0 /* system audio without Woodshed Player's own sound, as WAV */
+#define WP_REC_SOURCE_MIC 1    /* default input device of the system, as FLAC */
+/* 1 = at least one source can record on this platform, 0 = none. */
 WP_API int wp_rec_available(void);
-/* Startet die Aufnahme als WAV-Datei. Der eigene Ton von Woodshed Player wird nicht mit
- * aufgenommen. 0 = ok, < 0 = WP_REC_ERR_*. */
+/* 1 = this source can record on this platform, 0 = not (unknown source: 0). */
+WP_API int wp_rec_source_available(int source);
+/* Starts recording from source into path (WAV for the system audio, FLAC for the microphone).
+ * macOS asks for the microphone permission itself; without it the microphone delivers silence
+ * (wp_rec_only_silence). 0 = ok, < 0 = WP_REC_ERR_* (unknown source: WP_REC_ERR_UNSUPPORTED). */
+WP_API int wp_rec_start_source(const char *path, int source);
+/* Same as wp_rec_start_source(wav_path, WP_REC_SOURCE_SYSTEM): the system audio as WAV, without
+ * Woodshed Player's own sound. 0 = ok, < 0 = WP_REC_ERR_*. */
 WP_API int wp_rec_start(const char *wav_path);
 WP_API void wp_rec_stop(void);
 WP_API int wp_rec_is_recording(void);

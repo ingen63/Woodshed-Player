@@ -150,11 +150,34 @@ target_link_libraries(wp_playercore PUBLIC wp_engine wp_miniaudio Threads::Threa
 wp_strict_warnings(wp_playercore)
 wp_mutate(wp_playercore)
 
-# #68: platform-independent part of the recording (ring buffer, writer thread, WAV file, level),
-# tested without an audio device; recorder_mac.mm only drives Core Audio.
-add_library(wp_reccore STATIC src/recorder_core.cpp)
+# #113: libFLAC (third_party/flac, BSD-3-Clause), only native FLAC: no Ogg, no threads, no SIMD.
+# Its config.h is ours (src/flac_config). Third-party code: no strict warnings, headers as SYSTEM.
+set(WP_FLAC ${WP_THIRD_PARTY}/flac)
+add_library(wp_flac STATIC
+  ${WP_FLAC}/src/libFLAC/bitmath.c ${WP_FLAC}/src/libFLAC/bitreader.c
+  ${WP_FLAC}/src/libFLAC/bitwriter.c ${WP_FLAC}/src/libFLAC/cpu.c ${WP_FLAC}/src/libFLAC/crc.c
+  ${WP_FLAC}/src/libFLAC/fixed.c ${WP_FLAC}/src/libFLAC/float.c ${WP_FLAC}/src/libFLAC/format.c
+  ${WP_FLAC}/src/libFLAC/lpc.c ${WP_FLAC}/src/libFLAC/md5.c ${WP_FLAC}/src/libFLAC/memory.c
+  ${WP_FLAC}/src/libFLAC/stream_decoder.c ${WP_FLAC}/src/libFLAC/stream_encoder.c
+  ${WP_FLAC}/src/libFLAC/stream_encoder_framing.c ${WP_FLAC}/src/libFLAC/window.c)
+if(WIN32)
+  target_sources(wp_flac PRIVATE ${WP_FLAC}/src/share/win_utf8_io/win_utf8_io.c)
+endif()
+target_compile_definitions(wp_flac PUBLIC FLAC__NO_DLL PRIVATE HAVE_CONFIG_H)
+target_include_directories(wp_flac SYSTEM PUBLIC ${WP_FLAC}/include)
+target_include_directories(wp_flac SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/flac_config
+  ${WP_FLAC}/src/libFLAC/include)
+set_target_properties(wp_flac PROPERTIES C_VISIBILITY_PRESET hidden)
+if(UNIX)
+  target_link_libraries(wp_flac PRIVATE m)
+endif()
+
+# #68: platform-independent part of the recording (ring buffer, writer thread, WAV or FLAC file,
+# level, #113: microphone through miniaudio), tested without an audio device; recorder_mac.mm only
+# drives Core Audio.
+add_library(wp_reccore STATIC src/recorder_core.cpp src/flac_writer.cpp)
 target_include_directories(wp_reccore PUBLIC include)
-target_link_libraries(wp_reccore PUBLIC wp_miniaudio Threads::Threads)
+target_link_libraries(wp_reccore PUBLIC wp_miniaudio wp_flac Threads::Threads)
 wp_strict_warnings(wp_reccore)
 wp_mutate(wp_reccore)
 
@@ -212,9 +235,10 @@ target_compile_definitions(player_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRE
 wp_strict_warnings(player_tests)
 add_test(NAME player_tests COMMAND player_tests)
 
-# #68: recording without an audio device (ring buffer, WAV file, level, tap layouts)
+# #68: recording without an audio device (ring buffer, WAV file, level, tap layouts); #113: FLAC
+# file loaded again by the core (wp_playercore), microphone on the null backend
 add_executable(recorder_tests tests/recorder_tests.cpp)
-target_link_libraries(recorder_tests PRIVATE wp_reccore)
+target_link_libraries(recorder_tests PRIVATE wp_reccore wp_playercore)
 wp_strict_warnings(recorder_tests)
 add_test(NAME recorder_tests COMMAND recorder_tests)
 

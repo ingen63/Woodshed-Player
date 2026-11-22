@@ -798,6 +798,15 @@ class Library extends ChangeNotifier {
     await _updateDevice(_device.copyWith(area: name));
   }
 
+  /// #113/AK1: name of the recording source last chosen on this device; null until one is chosen.
+  String? get recordingSource => _device.recordingSource;
+
+  /// Remembers the recording source chosen on this device (device-local, never synced).
+  Future<void> setRecordingSource(String name) async {
+    if (_device.recordingSource == name) return;
+    await _updateDevice(_device.copyWith(recordingSource: name));
+  }
+
   /// The file of track [id] is never removed to keep the limit («Keep offline»).
   bool keptOffline(String id) => _device.keepOffline.contains(id);
 

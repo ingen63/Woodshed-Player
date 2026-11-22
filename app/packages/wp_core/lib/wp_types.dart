@@ -46,6 +46,9 @@ abstract final class WpRecCode {
   static const ioProc = -9;
   static const start = -10;
 
+  /// #113: no input device (microphone) or it could not be opened.
+  static const noInput = -11;
+
   static const all = [
     invalidPath,
     unsupported,
@@ -56,8 +59,32 @@ abstract final class WpRecCode {
     outOfMemory,
     file,
     ioProc,
-    start, //
+    start,
+    noInput, //
   ];
+}
+
+/// Source of a recording (#113), the values of `WP_REC_SOURCE_*` in wp_core.h.
+enum WpRecSource {
+  /// System audio without Woodshed Player's own sound, recorded as WAV (#4).
+  system(0, 'wav'),
+
+  /// Default input device of the system, recorded as FLAC.
+  microphone(1, 'flac');
+
+  const WpRecSource(this.code, this.extension);
+  final int code;
+
+  /// File extension of the recording, without the dot.
+  final String extension;
+
+  /// The source stored under [name]; null if none or unknown.
+  static WpRecSource? named(String? name) {
+    for (final s in values) {
+      if (s.name == name) return s;
+    }
+    return null;
+  }
 }
 
 /// Recording could not start (#44): [code] is a [WpRecCode], [osStatus] the OSStatus or 0,

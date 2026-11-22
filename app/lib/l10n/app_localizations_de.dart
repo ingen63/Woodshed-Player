@@ -223,6 +223,31 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nimmt den Systemton auf (ohne Mikrofon). Die Aufnahme wird nur lokal gespeichert und danach in die Bibliothek übernommen.';
 
   @override
+  String get recordingErrorNoInput =>
+      'Kein Mikrofon gefunden, oder es liess sich nicht öffnen.';
+
+  @override
+  String get recordingSource => 'Aufnahmequelle';
+
+  @override
+  String get recordingSourceSystem => 'Systemton';
+
+  @override
+  String get recordingSourceMicrophone => 'Mikrofon';
+
+  @override
+  String get recordingTooltipMicrophone =>
+      'Nimmt über das Mikrofon auf (das Standard-Eingabegerät). Die Aufnahme wird nur lokal gespeichert und danach in die Bibliothek übernommen.';
+
+  @override
+  String get recordingMicrophoneDenied =>
+      'Woodshed Player darf das Mikrofon nicht verwenden. Erteile den Zugriff unter Systemeinstellungen › Datenschutz & Sicherheit › Mikrofon und starte die Aufnahme dann neu.';
+
+  @override
+  String get recordingMicrophoneSilent =>
+      'Vom Mikrofon kommt nur Stille. Prüfe das Eingabegerät unter Systemeinstellungen › Ton › Eingang.';
+
+  @override
   String get noTrackSelected => 'Kein Titel ausgewählt';
 
   @override

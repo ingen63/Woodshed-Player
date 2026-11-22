@@ -1,5 +1,6 @@
-// Recording of the system audio (#4, macOS 14.2+ only) as a button in the header (#30). Finished
-// recordings go to the library (#17), titled with date and time in the user's locale.
+// Recording as a button in the header (#30): the system audio (#4, macOS 14.2+) as WAV or the
+// microphone (#113, macOS) as FLAC, chosen in the menu next to the button and remembered on this
+// device. Finished recordings go to the library (#17), titled with date and time in the user's locale.
 import 'dart:async';
 import 'dart:io';
 
@@ -13,8 +14,11 @@ import 'style.dart';
 
 /// The recorder behind the button; tests replace the core with a fake (#4).
 abstract class Recorder {
-  /// Throws [WpRecordingException] if recording cannot start.
-  void start(String wavPath);
+  /// [source] records on this platform (#113).
+  bool sourceAvailable(WpRecSource source);
+
+  /// Records [source] into [path]. Throws [WpRecordingException] if recording cannot start.
+  void start(String path, WpRecSource source);
   void stop();
   bool get isRecording;
   double get seconds;
@@ -30,7 +34,11 @@ abstract class Recorder {
 class CoreRecorder implements Recorder {
   const CoreRecorder();
   @override
-  void start(String wavPath) => WpRecorder.start(wavPath);
+  bool sourceAvailable(WpRecSource source) =>
+      WpRecorder.sourceAvailable(source);
+  @override
+  void start(String path, WpRecSource source) =>
+      WpRecorder.startSource(path, source);
   @override
   void stop() => WpRecorder.stop();
   @override
@@ -71,6 +79,36 @@ class _RecordingButtonState extends State<RecordingButton> {
   /// Error of the core when recording could not start (#44).
   WpRecordingException? _error;
 
+  /// #113/AK4: the microphone permission was refused; nothing was recorded.
+  bool _micDenied = false;
+
+  /// Source of the running recording.
+  WpRecSource? _recordingSource;
+
+  /// #113/AK1: the sources this platform records, in menu order.
+  List<WpRecSource> get _sources => [
+    for (final s in WpRecSource.values)
+      if (widget.recorder.sourceAvailable(s)) s,
+  ];
+
+  /// The source last chosen on this device; the system audio until one is chosen (as before #113).
+  WpRecSource get _source {
+    final sources = _sources;
+    final chosen = WpRecSource.named(widget.controller.library.recordingSource);
+    if (chosen != null && sources.contains(chosen)) return chosen;
+    return sources.isEmpty ? WpRecSource.system : sources.first;
+  }
+
+  void _choose(WpRecSource source) {
+    // The library takes the new source at once and saves it in the background.
+    unawaited(widget.controller.library.setRecordingSource(source.name));
+    setState(() {
+      _micDenied = false;
+      _error = null;
+      _silent = false;
+    });
+  }
+
   @override
   void dispose() {
     _ticker?.cancel();
@@ -91,21 +129,30 @@ class _RecordingButtonState extends State<RecordingButton> {
       return;
     }
     final l = context.l10n;
+    final source = _source;
     final now = widget.now();
     final name = l.recordingFileName(fileStamp(now));
     final title = recordingTitle(l, now);
-    final dir = await widget.controller.files.recordingsDir();
+    final files = widget.controller.files;
+    // #113/AK4: macOS asks the first time; refused, there is a hint and no file, so no empty title.
+    if (source == WpRecSource.microphone && !await files.microphoneAccess()) {
+      if (mounted) setState(() => _micDenied = true);
+      return;
+    }
+    final dir = await files.recordingsDir();
     if (dir == null || !mounted) return;
-    final path = '$dir/$name.wav';
+    final path = '$dir/$name.${source.extension}';
     try {
-      widget.recorder.start(path);
+      widget.recorder.start(path, source);
       setState(() {
         _recording = true;
+        _recordingSource = source;
         _path = path;
         _title = title;
         _seconds = 0;
         _silent = false;
         _error = null;
+        _micDenied = false;
       });
       _ticker = Timer.periodic(const Duration(milliseconds: 33), (_) {
         setState(() {
@@ -139,9 +186,16 @@ class _RecordingButtonState extends State<RecordingButton> {
     final m = WsLayout.of(context);
     final l = context.l10n;
     final error = _error;
+    final source = _recording ? (_recordingSource ?? _source) : _source;
+    final mic = source == WpRecSource.microphone;
+    final sources = _sources;
     final problem = error != null
         ? l.recordingFailed(recordingErrorMessage(l, error))
-        : (_silent ? l.recordingSilent : null);
+        : _micDenied
+        ? l.recordingMicrophoneDenied
+        : _silent
+        ? (mic ? l.recordingMicrophoneSilent : l.recordingSilent)
+        : null;
     return ExcludeFocus(
       child: Row(
         key: const Key('recordingButton'),
@@ -166,8 +220,25 @@ class _RecordingButtonState extends State<RecordingButton> {
                 minHeight: 4,
               ),
             ),
+          // #113/AK1: the source, chosen before recording; hidden while one runs.
+          if (!_recording && sources.length > 1)
+            PopupMenuButton<WpRecSource>(
+              key: const Key('recordingSource'),
+              tooltip: l.recordingSource,
+              icon: Icon(mic ? WsIcons.mic : WsIcons.desktop, size: 18),
+              onSelected: _choose,
+              itemBuilder: (_) => [
+                for (final s in sources)
+                  CheckedPopupMenuItem(
+                    key: Key('recordingSource:${s.name}'),
+                    value: s,
+                    checked: s == source,
+                    child: Text(recordingSourceLabel(l, s)),
+                  ),
+              ],
+            ),
           Tooltip(
-            message: l.recordingTooltip,
+            message: mic ? l.recordingTooltipMicrophone : l.recordingTooltip,
             child: TextButton(
               onPressed: _toggle,
               style: TextButton.styleFrom(

@@ -25,7 +25,7 @@ Die App speichert auf Deinem Gerät:
 - **Bibliothek:** Titel, Künstler, Album, Cover, Tempo, Loops, Ordner, Sortierung und Darstellung in der Datei `library.json`.
 - **Audiodateien:** Die MP3-, WAV-, FLAC- oder anderen Dateien, die Du importierst, werden in den privaten Speicher der App kopiert.
 - **Gerätekennung:** Eine zufällig erzeugte Gerät-ID in `device.json`. Sie ist keine Hardware-Kennung. Sie steht in den Änderungsstempeln und verlässt das Gerät nur mit dem Abgleich.
-- **Aufnahmen (nur Mac):** Mitschnitte des Systemtons, die Du selbst startest. Sie bleiben im App-Ordner.
+- **Aufnahmen (nur Mac):** Mitschnitte des Systemtons oder des Mikrofons, die Du selbst startest. Sie bleiben im App-Ordner.
 
 Dateipfade speichert die App nicht. Die App liest nur Dateien, die Du selbst auswählst.
 
@@ -33,7 +33,7 @@ Dateipfade speichert die App nicht. Die App liest nur Dateien, die Du selbst aus
 
 ## 4. Berechtigungen
 
-- **Mikrofon:** nicht erforderlich. Aufnahmen nutzen nur den Systemton.
+- **Mikrofon (nur Mac):** Nur für Mikrofon-Aufnahmen, die Du startest, und nur während der Aufnahme. macOS fragt dafür beim ersten Mal nach der Erlaubnis. Ohne sie startet keine Mikrofon-Aufnahme; alles andere funktioniert weiter.
 - **Bildschirm- und Systemaudioaufnahme (nur Mac):** Nur für Aufnahmen, die Du startest. macOS fragt dafür beim ersten Mal nach der Erlaubnis.
 - **Netzwerk:** Nur für den Abgleich und nur nach Deiner ausdrücklichen Wahl: zum gewählten Cloud-Anbieter nach Anmeldung (Abschnitt 5) oder zu gekoppelten Geräten (Abschnitt 6). Dazu das Laden der Web-App selbst (Abschnitt 7).
 

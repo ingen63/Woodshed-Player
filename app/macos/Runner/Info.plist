@@ -24,6 +24,8 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Woodshed Player records the music currently playing on your Mac as a practice take, so you can play it back slower and loop it. The recording stays on your Mac.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Woodshed Player records your own playing through the microphone as a practice take, so you can listen back, play it slower and loop it. The recording stays on your Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>

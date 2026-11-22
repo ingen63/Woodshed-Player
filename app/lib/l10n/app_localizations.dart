@@ -464,6 +464,48 @@ abstract class AppLocalizations {
   /// **'Records the system audio (without microphone). The recording is only stored locally and then added to the library.'**
   String get recordingTooltip;
 
+  /// No description provided for @recordingErrorNoInput.
+  ///
+  /// In en, this message translates to:
+  /// **'No microphone found, or it could not be opened.'**
+  String get recordingErrorNoInput;
+
+  /// No description provided for @recordingSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording source'**
+  String get recordingSource;
+
+  /// No description provided for @recordingSourceSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System audio'**
+  String get recordingSourceSystem;
+
+  /// No description provided for @recordingSourceMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone'**
+  String get recordingSourceMicrophone;
+
+  /// No description provided for @recordingTooltipMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Records through the microphone (the default input device). The recording is only stored locally and then added to the library.'**
+  String get recordingTooltipMicrophone;
+
+  /// No description provided for @recordingMicrophoneDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Woodshed Player may not use the microphone. Grant access in System Settings › Privacy & Security › Microphone, then start the recording again.'**
+  String get recordingMicrophoneDenied;
+
+  /// No description provided for @recordingMicrophoneSilent.
+  ///
+  /// In en, this message translates to:
+  /// **'Only silence is coming from the microphone. Check the input device in System Settings › Sound › Input.'**
+  String get recordingMicrophoneSilent;
+
   /// No description provided for @noTrackSelected.
   ///
   /// In en, this message translates to:

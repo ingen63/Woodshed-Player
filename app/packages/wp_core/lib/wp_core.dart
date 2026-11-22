@@ -200,10 +200,19 @@ final _mSetRampTimed = _lib
 final _recAvailable = _lib.lookupFunction<Int32 Function(), int Function()>(
   'wp_rec_available',
 );
+final _recSourceAvailable = _lib
+    .lookupFunction<Int32 Function(Int32), int Function(int)>(
+      'wp_rec_source_available',
+    );
 final _recStart = _lib
     .lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>(
       'wp_rec_start',
     );
+final _recStartSource = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<Utf8>, Int32),
+      int Function(Pointer<Utf8>, int)
+    >('wp_rec_start_source');
 final _recStop = _lib.lookupFunction<Void Function(), void Function()>(
   'wp_rec_stop',
 );
@@ -355,15 +364,28 @@ double wpFileDuration(String path) {
   }
 }
 
-/// Aufnahme des Systemtons (nur macOS 14.2+).
+/// Recording of the system audio (macOS 14.2+) or the microphone (#113, macOS).
 abstract final class WpRecorder {
+  /// At least one source records on this platform.
   static bool get available => _recAvailable() != 0;
 
-  /// Starts recording as WAV. Throws [WpRecordingException] with the error code if it fails.
-  static void start(String wavPath) {
-    final c = wavPath.toNativeUtf8();
+  /// [source] records on this platform.
+  static bool sourceAvailable(WpRecSource source) =>
+      _recSourceAvailable(source.code) != 0;
+
+  /// Starts recording the system audio as WAV. Throws [WpRecordingException] with the error code
+  /// if it fails.
+  static void start(String wavPath) => _check(wavPath, _recStart);
+
+  /// Starts recording [source] into [path] (WAV or FLAC, [WpRecSource.extension]). Throws
+  /// [WpRecordingException] with the error code if it fails.
+  static void startSource(String path, WpRecSource source) =>
+      _check(path, (c) => _recStartSource(c, source.code));
+
+  static void _check(String path, int Function(Pointer<Utf8>) start) {
+    final c = path.toNativeUtf8();
     try {
-      final code = _recStart(c);
+      final code = start(c);
       if (code != 0) {
         throw WpRecordingException(
           code,

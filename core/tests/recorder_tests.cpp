@@ -1,6 +1,7 @@
 // Tests of the platform-independent part of the recording (#68) without an audio device: level
 // meter, ring buffer, WAV file (header and samples) and the copy of the tap layouts into the ring.
-// The Core Audio part (recorder_mac.mm) needs real system audio (#51).
+// #113: FLAC file (libFLAC), the 10 s recording the core loads again, and the microphone input on
+// miniaudio's null backend. The Core Audio part (recorder_mac.mm) needs real system audio (#51).
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -11,6 +12,7 @@
 #include <fstream>
 #include <functional>
 #include <string>
+#include <thread>
 #include <vector>
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -18,6 +20,8 @@
 #define WP_HAVE_RLIMIT 1
 #endif
 
+#include "flac_writer.hpp"
+#include "player_core.hpp"
 #include "recorder_core.hpp"
 #include "wp_core.h"
 
@@ -35,9 +39,12 @@ int checks = 0;
     }                                                                                              \
   } while (0)
 
+using wp::FlacWriter;
 using wp::rec::Capture;
+using wp::rec::FileFormat;
 using wp::rec::FrameRing;
 using wp::rec::LevelMeter;
+using wp::rec::MicInput;
 using wp::rec::TapBuffer;
 using wp::rec::TapFormat;
 using wp::rec::WavFile;
@@ -47,11 +54,11 @@ namespace fs = std::filesystem;
 // A fresh path in the temp folder; the file is removed when the object goes away.
 struct TempWav {
   fs::path path;
-  TempWav() {
+  explicit TempWav(const char *extension = ".wav") {
     static int counter = 0;
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    path = fs::temp_directory_path() /
-           ("wp_recorder_test_" + std::to_string(stamp) + "_" + std::to_string(++counter) + ".wav");
+    path = fs::temp_directory_path() / ("wp_recorder_test_" + std::to_string(stamp) + "_" +
+                                        std::to_string(++counter) + extension);
   }
   TempWav(const TempWav &) = delete;
   TempWav &operator=(const TempWav &) = delete;
@@ -556,6 +563,278 @@ void silentCaptureStaysSilent() { // #68/AK2: no permission -> digital silence
   CHECK(c.meter().takeLevel() == 0.0f);
 }
 
+// ---- FLAC (#113) ----
+
+// Largest difference between two equally long sample vectors (infinity if the lengths differ).
+float maxDiff(const std::vector<float> &a, const std::vector<float> &b) {
+  if (a.size() != b.size())
+    return INFINITY;
+  float m = 0;
+  for (size_t i = 0; i < a.size(); ++i)
+    m = std::max(m, std::fabs(a[i] - b[i]));
+  return m;
+}
+
+constexpr double kPi = 3.14159265358979323846;
+
+// Interleaved stereo sine: left at `hz`, right at half the amplitude, starting at frame `offset`.
+std::vector<float> sine(uint32_t frames, double hz, uint32_t rate, uint32_t offset = 0) {
+  std::vector<float> v(static_cast<size_t>(frames) * 2);
+  for (uint32_t i = 0; i < frames; ++i) {
+    const double t = static_cast<double>(offset + i) / rate;
+    const auto x = static_cast<float>(0.5 * std::sin(2.0 * kPi * hz * t));
+    v[2 * i] = x;
+    v[2 * i + 1] = 0.5f * x;
+  }
+  return v;
+}
+
+void flacToIntScalesClipsAndRounds() { // #113/AK3
+  CHECK(FlacWriter::toInt(0.0f, 24) == 0);
+  CHECK(FlacWriter::toInt(1.0f, 24) == 8388607);
+  CHECK(FlacWriter::toInt(-1.0f, 24) == -8388607);
+  CHECK(FlacWriter::toInt(1.5f, 24) == 8388607);   // clipped
+  CHECK(FlacWriter::toInt(-7.0f, 24) == -8388607); // clipped
+  CHECK(FlacWriter::toInt(1.0f, 16) == 32767);
+  CHECK(FlacWriter::toInt(2.0f, 16) == 32767);
+  CHECK(FlacWriter::toInt(-2.0f, 16) == -32767);
+  CHECK(FlacWriter::toInt(0.5f, 16) == 16384);   // 16383.5 rounds away from zero
+  CHECK(FlacWriter::toInt(-0.5f, 16) == -16384); // symmetric
+  CHECK(FlacWriter::toInt(0.25f, 16) == 8192);   // 8191.75 rounds up
+  CHECK(FlacWriter::toInt(0.2f / 32767.0f, 16) == 0);
+}
+
+void flacRejectsWhatFlacCannotStore() { // #113/AK3
+  TempWav f(".flac");
+  FlacWriter w;
+  CHECK(!w.open(nullptr, 48000, 2));
+  CHECK(!w.open(f.str().c_str(), 48000, 0));
+  CHECK(!w.open(f.str().c_str(), 48000, 9));
+  CHECK(!w.open(f.str().c_str(), 0, 2));
+  CHECK(!w.open(f.str().c_str(), 655351, 2));
+  CHECK(!w.open(f.str().c_str(), 48000, 2, 8));
+  CHECK(!w.open(f.str().c_str(), 48000, 2, 20));
+  CHECK(!w.open(f.str().c_str(), 48000, 2, 32));
+  CHECK(!w.isOpen());
+  CHECK(!fs::exists(f.path));
+  const auto missing = fs::temp_directory_path() / "wp_recorder_missing_dir" / "x" / "out.flac";
+  CHECK(!w.open(missing.string().c_str(), 48000, 2));
+  CHECK(!w.isOpen());
+  const float frame[2] = {0.1f, 0.2f};
+  CHECK(!w.write(frame, 1)); // nothing open
+  CHECK(w.close());          // closing nothing is fine
+  // The limits themselves are valid.
+  CHECK(w.open(f.str().c_str(), 655350, 8, 16));
+  CHECK(w.close());
+  CHECK(w.open(f.str().c_str(), 1, 1, 24));
+  CHECK(w.close());
+}
+
+void flacRoundTrip24And16Bit() { // #113/AK3: lossless within the integer step
+  for (const uint32_t bits : {24u, 16u}) {
+    TempWav f(".flac");
+    FlacWriter w;
+    CHECK(w.open(f.str().c_str(), 44100, 2, bits));
+    CHECK(w.isOpen());
+    const auto in = sine(5000, 440, 44100);
+    CHECK(w.write(in.data(), 2000));
+    CHECK(w.write(in.data() + 4000, 3000));
+    CHECK(w.close());
+    CHECK(!w.isOpen());
+    const auto d = decode(f.str());
+    CHECK(d.ok);
+    CHECK(d.sampleRate == 44100);
+    CHECK(d.channels == 2);
+    CHECK(d.frames() == 5000);
+    const float step = 1.0f / static_cast<float>((1u << (bits - 1)) - 1);
+    CHECK(maxDiff(d.samples, in) <= step);
+  }
+}
+
+void flacMonoFile() { // #113/AK3: the writer is not tied to stereo (reused for trimming, #116)
+  TempWav f(".flac");
+  FlacWriter w;
+  CHECK(w.open(f.str().c_str(), 22050, 1, 16));
+  const std::vector<float> in = {0.0f, 0.5f, -0.5f, 1.0f, -1.0f};
+  CHECK(w.write(in.data(), 5));
+  CHECK(w.close());
+  ma_decoder dec;
+  const ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 0, 0);
+  CHECK(ma_decoder_init_file(f.str().c_str(), &cfg, &dec) == MA_SUCCESS);
+  CHECK(dec.outputChannels == 1);
+  ma_decoder_uninit(&dec);
+}
+
+void flacOpenFinishesThePreviousFile() { // #113/AK3
+  TempWav a(".flac"), b(".flac");
+  FlacWriter w;
+  const auto in = sine(1000, 220, 48000);
+  CHECK(w.open(a.str().c_str(), 48000, 2));
+  CHECK(w.write(in.data(), 1000));
+  CHECK(w.open(b.str().c_str(), 48000, 2));
+  CHECK(decode(a.str()).frames() == 1000);
+  CHECK(w.close());
+  CHECK(decode(b.str()).frames() == 0);
+}
+
+void flacDestructorFinishesFile() { // #113/AK3
+  TempWav f(".flac");
+  const auto in = sine(700, 330, 48000);
+  {
+    FlacWriter w;
+    CHECK(w.open(f.str().c_str(), 48000, 2));
+    CHECK(w.write(in.data(), 700));
+  }
+  const auto d = decode(f.str());
+  CHECK(d.frames() == 700);
+  CHECK(maxDiff(d.samples, in) <= 1.0f / 8388607.0f);
+}
+
+void captureFlacTenSecondsLoadsInTheCore() { // #113/AK5
+  constexpr uint32_t kRate = 48000;
+  constexpr uint32_t kFrames = 10 * kRate;
+  TempWav f(".flac");
+  Capture c;
+  CHECK(c.open(f.str().c_str(), kRate, FileFormat::Flac) == 0);
+  const auto in = sine(kFrames, 440, kRate);
+  // In blocks like the audio thread; wait while the ring is nearly full so nothing is dropped.
+  for (uint32_t done = 0; done < kFrames;) {
+    const uint32_t n = std::min<uint32_t>(512, kFrames - done);
+    while (c.ring().capacity() - c.ring().availableRead() < n)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    const TapBuffer b{2, n * 2 * static_cast<uint32_t>(sizeof(float)), in.data() + 2 * done};
+    c.push(&b, 1, {2, false});
+    done += n;
+  }
+  c.close();
+  CHECK(c.meter().frames() == kFrames);
+  // A valid FLAC file: magic, then the decoded samples.
+  const auto bytes = readBytes(f.str());
+  CHECK(bytes.size() > 4 && std::memcmp(bytes.data(), "fLaC", 4) == 0);
+  CHECK(bytes.size() < in.size() * sizeof(float)); // compressed, smaller than the float data
+  const auto d = decode(f.str());
+  CHECK(d.sampleRate == kRate);
+  CHECK(maxDiff(d.samples, in) <= 1.0f / 8388607.0f);
+  // The core reads its length for the library and loads it for playback: 10 s ± 0.1 s.
+  CHECK(std::fabs(wp::fileDuration(f.str()) - 10.0) <= 0.1);
+  wp::Player p(kRate);
+  CHECK(p.load(f.str()) == wp::kOk);
+  CHECK(std::fabs(p.engine().duration() - 10.0) <= 0.1);
+}
+
+void captureFlacFailsInMissingFolder() { // #113/AK4: no file, no empty title
+  Capture c;
+  const auto missing = fs::temp_directory_path() / "wp_recorder_missing_dir" / "x" / "out.flac";
+  CHECK(c.open(missing.string().c_str(), 48000, FileFormat::Flac) == WP_REC_ERR_FILE);
+  c.close();
+  CHECK(!fs::exists(missing));
+}
+
+void captureWavStaysDefault() { // #113: the system audio keeps its WAV file
+  Capture c;
+  TempWav f;
+  CHECK(c.open(f.str().c_str(), 48000) == 0);
+  c.close();
+  CHECK(finishedWav(f.str(), 0));
+}
+
+void micDeliversStereoFramesToTheCapture() { // #113/AK2, AK3: every device frame lands in the file
+  TempWav f(".flac");
+  Capture c;
+  CHECK(c.open(f.str().c_str(), 48000, FileFormat::Flac) == 0);
+  const auto in = sine(1000, 440, 48000);
+  MicInput::deliver(c, in.data(), 600);
+  MicInput::deliver(c, in.data() + 1200, 400);
+  CHECK(c.meter().frames() == 1000);
+  CHECK(!c.meter().onlySilence());
+  c.close();
+  const auto d = decode(f.str());
+  CHECK(d.frames() == 1000);
+  CHECK(maxDiff(d.samples, in) <= 1.0f / 8388607.0f);
+}
+
+// Waits until the capture counted at least `frames` (at most 5 s); false if it did not.
+bool waitForFrames(Capture &c, long long frames) {
+  const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (c.meter().frames() < frames) {
+    if (std::chrono::steady_clock::now() > until)
+      return false;
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+  return true;
+}
+
+// miniaudio context on the null backend: a capture device without hardware or permission.
+struct NullContext {
+  ma_context ctx{};
+  bool ok = false;
+  NullContext() {
+    const ma_backend backends[] = {ma_backend_null};
+    ok = ma_context_init(backends, 1, nullptr, &ctx) == MA_SUCCESS;
+  }
+  NullContext(const NullContext &) = delete;
+  NullContext &operator=(const NullContext &) = delete;
+  ~NullContext() {
+    if (ok)
+      ma_context_uninit(&ctx);
+  }
+};
+
+void micRecordsTheDefaultInputIntoFlac() { // #113/AK1, AK2: default input, duration and level
+  NullContext null;
+  CHECK(null.ok);
+  MicInput mic;
+  CHECK(mic.sampleRate() == 0.0);
+  Capture c;
+  CHECK(!mic.start(c)); // not open
+  CHECK(mic.open(&null.ctx));
+  CHECK(mic.sampleRate() > 0.0);
+  TempWav f(".flac");
+  CHECK(c.open(f.str().c_str(), mic.sampleRate(), FileFormat::Flac) == 0);
+  c.meter().reset();
+  CHECK(mic.start(c));
+  const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (c.meter().frames() < static_cast<long long>(mic.sampleRate() / 10) &&
+         std::chrono::steady_clock::now() < until)
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  const double rate = mic.sampleRate();
+  mic.close();
+  CHECK(mic.sampleRate() == 0.0);
+  const long long frames = c.meter().frames();
+  CHECK(frames >= static_cast<long long>(rate / 10));
+  std::this_thread::sleep_for(std::chrono::milliseconds(30));
+  CHECK(c.meter().frames() == frames); // closed: nothing arrives any more
+  c.close();
+  CHECK(c.meter().onlySilence()); // the null device delivers silence, like a denied permission
+  const auto d = decode(f.str());
+  CHECK(d.ok);
+  CHECK(static_cast<long long>(d.frames()) == frames);
+}
+
+void micStopsOnReopenAndDestruction() { // #113/AK2: stop means nothing arrives any more
+  NullContext null;
+  CHECK(null.ok);
+  TempWav f(".flac");
+  Capture c;
+  {
+    MicInput mic;
+    CHECK(mic.open(&null.ctx));
+    CHECK(c.open(f.str().c_str(), mic.sampleRate(), FileFormat::Flac) == 0);
+    CHECK(mic.start(c));
+    CHECK(waitForFrames(c, 1));
+    CHECK(mic.open(&null.ctx)); // a second open closes the running device first
+    const long long afterReopen = c.meter().frames();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    CHECK(c.meter().frames() == afterReopen);
+    CHECK(mic.start(c));
+    CHECK(waitForFrames(c, afterReopen + 1));
+  } // the destructor stops the device
+  const long long afterDestruction = c.meter().frames();
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  CHECK(c.meter().frames() == afterDestruction);
+  c.close();
+}
+
 } // namespace
 
 int main() {
@@ -587,6 +866,18 @@ int main() {
       {"captureDestructorFinishesRecording", captureDestructorFinishesRecording},
       {"captureWritesEverythingOnClose", captureWritesEverythingOnClose},
       {"silentCaptureStaysSilent", silentCaptureStaysSilent},
+      {"flacToIntScalesClipsAndRounds", flacToIntScalesClipsAndRounds},
+      {"flacRejectsWhatFlacCannotStore", flacRejectsWhatFlacCannotStore},
+      {"flacRoundTrip24And16Bit", flacRoundTrip24And16Bit},
+      {"flacMonoFile", flacMonoFile},
+      {"flacOpenFinishesThePreviousFile", flacOpenFinishesThePreviousFile},
+      {"flacDestructorFinishesFile", flacDestructorFinishesFile},
+      {"captureFlacTenSecondsLoadsInTheCore", captureFlacTenSecondsLoadsInTheCore},
+      {"captureFlacFailsInMissingFolder", captureFlacFailsInMissingFolder},
+      {"captureWavStaysDefault", captureWavStaysDefault},
+      {"micRecordsTheDefaultInputIntoFlac", micRecordsTheDefaultInputIntoFlac},
+      {"micDeliversStereoFramesToTheCapture", micDeliversStereoFramesToTheCapture},
+      {"micStopsOnReopenAndDestruction", micStopsOnReopenAndDestruction},
   };
   for (auto &[name, fn] : tests) {
     const int before = failures;

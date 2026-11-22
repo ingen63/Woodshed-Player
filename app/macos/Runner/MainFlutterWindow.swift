@@ -1,3 +1,4 @@
+import AVFoundation
 import Cocoa
 import FlutterMacOS
 import UniformTypeIdentifiers
@@ -77,6 +78,19 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
           .appendingPathComponent("Recordings", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         result(dir.path)
+      case "microphoneAccess":
+        // #113/AK4: macOS asks once (NSMicrophoneUsageDescription); afterwards the answer stands until
+        // the user changes it in System Settings › Privacy & Security › Microphone.
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+          result(true)
+        case .notDetermined:
+          AVCaptureDevice.requestAccess(for: .audio) { granted in
+            DispatchQueue.main.async { result(granted) }
+          }
+        default:
+          result(false)
+        }
       case "openUrl":
         // #50/AK6: links of the About dialog open in the default browser.
         if let text = call.arguments as? String, let url = URL(string: text),
