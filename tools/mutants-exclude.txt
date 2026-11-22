@@ -353,9 +353,6 @@ app/lib/sync/sync_engine.dart | dart_false_to_true | bool foreign = false;
 app/lib/sync/cloud_provider.dart | dart_false_to_true | bool ifAbsent = false,
 
 # ---- übrige Dart-Dateien (#61) ----
-# gleichwertig: Schlägt das Laden fehl (ok false) und ist derselbe Titel noch geladen, hat select()
-# seine Dauer schon beim ersten Laden eingetragen; fillDuration ändert eine bekannte Dauer nicht.
-app/lib/app/app_controller.dart | dart_and_to_or | if (ok && player.trackId == t.id) {
 # gleichwertig: flush betrifft nur, ob die Daten bei einem Absturz des Rechners schon auf dem Datenträger
 # stehen; was geschrieben und gelesen wird, bleibt gleich.
 app/lib/app/file_store_io.dart | dart_true_to_false | tmp.writeAsBytesSync(bytes, flush: true);

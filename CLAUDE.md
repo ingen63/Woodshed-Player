@@ -34,6 +34,7 @@ Jede Änderung hat ein Issue mit **Abnahmekriterien als Häkchen-Liste**; jedes 
 3. **Umsetzen**, klein und gezielt, nur was im Issue steht. Nebenbaustellen als neues Issue vorschlagen.
 4. **Testen**, jedes Abnahmekriterium prüfen und im Bericht nennen, was geprüft ist und was nicht.
    Bei Änderungen an `core/src`, `core/web` oder der Dart-Logik (`app/lib`) läuft vor der Abnahme `make mutants-diff` (Basis `origin/main`, auf die geänderten Dateien beschränkt, siehe «Testumfang»). Jeder nicht erkannte Mutant wird durch einen Test erkannt oder mit Begründung in `tools/mutants-exclude.txt` ausgeschlossen; sonst wird das Issue nicht geschlossen.
+   Danach nicht mehr alles neu mutieren: Nach neuen Tests läuft `make mutants-diff` mit `--rerun` (nur die bisher nicht erkannten und neuen Mutanten), nach einem neuen Ausschluss mit `--exclusions-only` (kein Mutant läuft, nur die Ausschlüsse werden neu angewandt).
 5. **Commit** im Imperativ oder als Substantiv, ohne Punkt, mit Issue am Ende: `Ziehbare Loop-Marker (#22)`. Kein `Fixes #22`.
    Nach dem Commit, der die Anforderung vollständig umsetzt: `gh issue edit <Nr> --add-label implemented` und Kommentar «Umgesetzt in <Commit>. Abnahme ausstehend.». Teilschritte bekommen das Label nicht. Wird das Issue wieder geöffnet, kommt das Label weg, bis die Nacharbeit committet ist.
 6. **Abnahme** machst Du. Claude hakt nichts ab und schliesst nichts.
@@ -67,7 +68,7 @@ tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitT
     | Geändert | Zusätzlich |
     |---|---|
     | `core/` | `make sanitize`, `make test-wasm`; bei Dekodieren, C-API oder Web-API auch `make fuzz` (60 s je Ziel) |
-    | `core/src`, `core/web`, `app/lib` ausser `app/lib/ui` | `make mutants-diff MUTANTS_ARGS="--file '<regex der geänderten Dateien>'"` (Zwischenspeicher bleibt an, kein `--fresh`) |
+    | `core/src`, `core/web`, `app/lib` ausser `app/lib/ui` | `make mutants-diff MUTANTS_ARGS="--file '<regex der geänderten Dateien>'"` (Zwischenspeicher bleibt an, kein `--fresh`); Wiederholung mit `--rerun` bzw. `--exclusions-only` im selben `MUTANTS_ARGS` |
     | `app/lib/ui`, `app/integration_test` | `make test-ui`, bei Bezug zu iPhone/iPad auch `make test-ios` |
     | `app/web`, `*_web.dart`, `core/web` | `make test-web` |
     | nur `docs/`, `README.md`, `.github/` | nur `make format-check` und `make lint` (actionlint) |

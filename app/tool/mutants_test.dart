@@ -1,5 +1,6 @@
 // #11: tests of the mutation tools (tool/mutants.dart, tool/mutants_run.dart): Dart mutations only
-// in code, test selection by imports, exclusions only with a reason, Mull reports, limits.
+// in code, test selection by imports, exclusions only with a reason, Mull reports, limits, reusing
+// the previous run (--rerun, --exclusions-only).
 //
 // Run: cd app && flutter test tool/mutants_test.dart   (or `make test-tools`)
 import 'dart:convert';
@@ -106,6 +107,10 @@ void main() {
         contains('web'),
       );
       expect(dartScopeExclusion('app/lib/main.dart', ''), isNotNull);
+      expect(
+        dartScopeExclusion('app/lib/app/app_controller.dart', ''),
+        contains('wiring'),
+      );
       expect(
         dartScopeExclusion('app/lib/l10n/app_localizations.dart', ''),
         isNotNull,
@@ -517,6 +522,109 @@ void main() {
       );
       expect(exitCodeFor(ms), 3);
       expect(exitCodeFor(ms.sublist(1)), 0);
+    });
+  });
+
+  group('reusing the previous run', () {
+    Mutant dart(int line, String code, Outcome o, {String? note}) => Mutant(
+      part: 'dart',
+      file: 'app/lib/library/library.dart',
+      line: line,
+      column: 9,
+      mutator: 'dart_lt_to_le',
+      replacement: '<=',
+      code: code,
+      outcome: o,
+      note: note,
+    );
+
+    test('results.json round trip keeps every field', () {
+      final ms = [
+        dart(3, 'if (a < b) {', Outcome.excluded, note: 'gleichwertig: x'),
+        dart(4, 'if (c < d) {', Outcome.unviable),
+      ];
+      final json = jsonEncode({
+        'mutants': [for (final m in ms) m.toJson()],
+      });
+      final back = parseResults(json);
+      expect(back.map((m) => m.toJson()), ms.map((m) => m.toJson()));
+    });
+
+    test('--rerun keeps detected mutants at their new line', () {
+      final reuse = Reuse([
+        dart(10, 'if (a < b) {', Outcome.killed, note: 'memory limit'),
+        dart(11, 'if (c < d) {', Outcome.timeout),
+      ]);
+      final kept = reuse.take(dart(14, '  if (a <  b) {', Outcome.survived))!;
+      expect(kept.line, 14);
+      expect(kept.outcome, Outcome.killed);
+      expect(kept.note, 'memory limit');
+      expect(
+        reuse.take(dart(15, 'if (c < d) {', Outcome.survived))!.outcome,
+        Outcome.timeout,
+      );
+      expect(reuse.reused, 2);
+      // each previous mutant is used once
+      expect(reuse.take(dart(16, 'if (a < b) {', Outcome.survived)), isNull);
+    });
+
+    test('--rerun runs not detected, changed and unknown mutants again', () {
+      final reuse = Reuse([
+        dart(10, 'if (a < b) {', Outcome.survived),
+        dart(11, 'if (c < d) {', Outcome.killed),
+      ]);
+      expect(reuse.take(dart(10, 'if (a < b) {', Outcome.survived)), isNull);
+      expect(reuse.take(dart(11, 'if (c < e) {', Outcome.survived)), isNull);
+      expect(reuse.take(dart(12, 'if (x < y) {', Outcome.survived)), isNull);
+      expect(reuse.reused, 0);
+    });
+
+    test(
+      '--rerun gives an excluded mutant to the current exclusions again',
+      () {
+        final reuse = Reuse([
+          dart(10, 'if (a < b) {', Outcome.excluded, note: 'gleichwertig: x'),
+        ]);
+        final kept = reuse.take(dart(10, 'if (a < b) {', Outcome.survived))!;
+        expect(kept.outcome, Outcome.survived);
+        expect(kept.note, isNull);
+        // the exclusion was removed from the file: the mutant counts as not detected
+        expect(applyExclusions([kept], const []), 0);
+        expect(exitCodeFor([kept]), 3);
+      },
+    );
+
+    test('--exclusions-only applies the current exclusion file again', () {
+      final previous = [
+        dart(10, 'if (a < b) {', Outcome.excluded, note: 'gleichwertig: old'),
+        dart(11, 'if (c < d) {', Outcome.survived),
+        dart(12, 'if (e < f) {', Outcome.killed),
+      ];
+      final all = withoutExclusions(previous);
+      // the previous list stays as it was
+      expect(previous.first.outcome, Outcome.excluded);
+      final exclusions = parseExclusions(
+        '# gleichwertig: new reason\n'
+        'app/lib/library/library.dart | dart_lt_to_le | if (c < d) {\n',
+      );
+      expect(applyExclusions(all, exclusions), 1);
+      expect(all.map((m) => m.outcome), [
+        Outcome.survived,
+        Outcome.excluded,
+        Outcome.killed,
+      ]);
+      expect(all[1].note, 'gleichwertig: new reason');
+      expect(exitCodeFor(all), 3);
+    });
+
+    test('--rerun and --exclusions-only together is a usage error', () async {
+      final r = await Process.run('dart', [
+        'tool/mutants_run.dart',
+        '--rerun',
+        '--exclusions-only',
+      ]);
+      expect(r.exitCode, 2);
+      expect('${r.stderr}', contains('not both'));
     });
   });
 }

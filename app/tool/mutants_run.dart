@@ -3,6 +3,7 @@
 //
 // Usage: dart app/tool/mutants_run.dart [--part all|core|dart] [--base <commit>] [--jobs <n>]
 //                                       [--memory-mib <n>] [--file <regex>] [--fresh]
+//                                       [--rerun | --exclusions-only]
 //
 // - Without --base: every mutant (make mutants), results in local/mutants/full/.
 //   With --base: only mutants on lines changed since the base (`git diff base...HEAD` and the
@@ -15,6 +16,11 @@
 //   --jobs copies of app/ (local/mutants/<mode>/dart/ws<n>).
 // - --fresh forgets the Mull cache (local/mutants/core-cache.db): by default a killed mutant of an
 //   unchanged test program stays killed, the others run again.
+// - --rerun (after new tests): the Dart mutants the previous run of the same mode detected or
+//   excluded keep their result (results.json); only the not detected and new ones run. The core
+//   needs no flag: the Mull cache already keeps detected mutants.
+// - --exclusions-only (after a change to tools/mutants-exclude.txt): runs no mutant, applies the
+//   current exclusions to the previous run again and writes the results anew.
 //
 // Writes summary.txt, missed.txt and results.json. Exit code 3 if a mutant is not detected (and
 // not excluded with a reason in tools/mutants-exclude.txt), 2 on a usage or tool error, else 0.
@@ -65,12 +71,15 @@ late int memoryMiB;
 String? base;
 RegExp? fileFilter;
 var fresh = false;
+var rerun = false;
+var exclusionsOnly = false;
 
 Never usage(String message) {
   stderr.writeln('mutants: $message');
   stderr.writeln(
     'usage: dart app/tool/mutants_run.dart [--part all|core|dart] [--base <commit>] '
-    '[--jobs <n>] [--memory-mib <n>] [--file <regex>] [--fresh]',
+    '[--jobs <n>] [--memory-mib <n>] [--file <regex>] [--fresh] '
+    '[--rerun | --exclusions-only]',
   );
   exit(2);
 }
@@ -104,6 +113,10 @@ Future<void> main(List<String> args) async {
         fileFilter = RegExp(value());
       case '--fresh':
         fresh = true;
+      case '--rerun':
+        rerun = true;
+      case '--exclusions-only':
+        exclusionsOnly = true;
       default:
         usage('unknown argument $a');
     }
@@ -111,6 +124,7 @@ Future<void> main(List<String> args) async {
   if (!['all', 'core', 'dart'].contains(part) || jobs < 1) {
     usage('bad --part or --jobs');
   }
+  if (rerun && exclusionsOnly) usage('--rerun or --exclusions-only, not both');
   root = Directory.current.path;
   try {
     root = git(['rev-parse', '--show-toplevel']).trim();
@@ -147,14 +161,39 @@ Future<void> main(List<String> args) async {
   final all = <Mutant>[];
   final durations = <String, Duration>{};
   final notes = <String>[];
-  if (part != 'dart') {
+  final previousFile = File('$out/results.json');
+  List<Mutant>? previous;
+  if ((rerun || exclusionsOnly) && previousFile.existsSync()) {
+    previous = parseResults(previousFile.readAsStringSync());
+  }
+  if (exclusionsOnly) {
+    if (previous == null) {
+      usage('--exclusions-only needs a previous run (${previousFile.path})');
+    }
+    all.addAll(
+      withoutExclusions(previous).where(
+        (m) =>
+            (part == 'all' || m.part == part) &&
+            (fileFilter == null || fileFilter!.hasMatch(m.file)),
+      ),
+    );
+    notes.add(
+      'exclusions only: the previous run applied to tools/mutants-exclude.txt again, '
+      'no mutant ran',
+    );
+  }
+  final reuse = rerun && previous != null ? Reuse(previous) : null;
+  if (rerun && previous == null) {
+    notes.add('rerun: no previous run, every mutant ran');
+  }
+  if (!exclusionsOnly && part != 'dart') {
     final w = Stopwatch()..start();
     all.addAll(await runCore(changed, notes));
     durations['core'] = w.elapsed;
   }
-  if (part != 'core') {
+  if (!exclusionsOnly && part != 'core') {
     final w = Stopwatch()..start();
-    all.addAll(await runDart(changed, notes));
+    all.addAll(await runDart(changed, notes, reuse));
     durations['dart'] = w.elapsed;
   }
   final excluded = applyExclusions(all, exclusions);
@@ -510,6 +549,7 @@ Future<void> prepareWorkspace(String ws) async {
 Future<List<Mutant>> runDart(
   Map<String, Set<int>>? changed,
   List<String> notes,
+  Reuse? reuse,
 ) async {
   final app = '$root/app';
   final sources = <String, String>{};
@@ -608,6 +648,17 @@ Future<List<Mutant>> runDart(
       }
       continue;
     }
+    // --rerun: what the previous run decided stays; only the rest needs the baseline and a run
+    final toRun = <DartSite>[];
+    for (final s in sites) {
+      final old = reuse?.take(mutantOf(s));
+      if (old == null) {
+        toRun.add(s);
+      } else {
+        result.add(old);
+      }
+    }
+    if (toRun.isEmpty) continue;
     final base = await flutterTest(
       workspaces.first,
       selected,
@@ -625,14 +676,19 @@ Future<List<Mutant>> runDart(
       ),
     );
     stdout.writeln(
-      'dart: $rel ${sites.length} mutants, ${selected.length} test files, '
+      'dart: $rel ${toRun.length} mutants, ${selected.length} test files, '
       'baseline ${base.elapsed.inSeconds} s, ${base.peakMiB} MiB',
     );
-    for (final s in sites) {
+    for (final s in toRun) {
       queue.add((path, s, selected, limitTime));
     }
   }
 
+  if (reuse != null) {
+    notes.add(
+      'rerun: ${reuse.reused} Dart mutants kept from the previous run, ${queue.length} ran',
+    );
+  }
   var next = 0;
   var doneCount = 0;
   final progress = Stopwatch()..start();

@@ -56,6 +56,18 @@ class Mutant {
 
   String get key => '$file:$line:$column:$mutator';
 
+  factory Mutant.fromJson(Map<String, Object?> j) => Mutant(
+    part: j['part']! as String,
+    file: j['file']! as String,
+    line: j['line']! as int,
+    column: j['column']! as int,
+    mutator: j['mutator']! as String,
+    replacement: (j['replacement'] as String?) ?? '',
+    code: (j['code'] as String?) ?? '',
+    outcome: Outcome.values.byName(j['outcome']! as String),
+    note: j['note'] as String?,
+  );
+
   Map<String, Object?> toJson() => {
     'part': part,
     'file': file,
@@ -349,6 +361,10 @@ String? dartScopeExclusion(String path, String source) {
   if (path.startsWith('app/lib/l10n/')) return 'generated (gen-l10n)';
   if (path == 'app/lib/main.dart' || path == 'app/lib/app/smoke.dart') {
     return 'app start (smoke test, UI tests)';
+  }
+  if (path == 'app/lib/app/app_controller.dart') {
+    // its nearest tests are mostly widget tests: each mutant took minutes (#115: 80 mutants)
+    return 'wiring of the UI (widget tests, UI tests)';
   }
   if (path.endsWith('_web.dart') ||
       RegExp(r'''import 'dart:js_interop|import 'package:web/''')
@@ -926,3 +942,70 @@ String _minutes(Duration d) {
 /// Exit code of a run: 3 with not detected mutants (like cargo-mutants), else 0.
 int exitCodeFor(List<Mutant> mutants) =>
     mutants.any((m) => m.outcome == Outcome.survived) ? 3 : 0;
+
+// ---------------------------------------------------------------------------------------------
+// Reusing the previous run: --rerun and --exclusions-only
+// ---------------------------------------------------------------------------------------------
+
+/// The mutants of a `results.json`.
+List<Mutant> parseResults(String json) {
+  final data = jsonDecode(json) as Map<String, Object?>;
+  return [
+    for (final m in (data['mutants'] as List? ?? const []))
+      Mutant.fromJson((m as Map).cast<String, Object?>()),
+  ];
+}
+
+/// Identity of a mutant across runs: without the line number, so a line that only moved keeps its
+/// result, and with the source line, so a changed line is a new mutant.
+String reuseKey(Mutant m) =>
+    '${m.file}|${m.column}|${m.mutator}|${m.replacement}|${_squash(m.code)}';
+
+/// The previous run for `--rerun`: a mutant it detected (killed, timeout, not compilable) keeps its
+/// outcome, one it excluded stays not detected and gets the current exclusions again, one it did
+/// not detect runs again (new tests may detect it now). Mutants it does not know run as well.
+class Reuse {
+  Reuse(Iterable<Mutant> previous) {
+    for (final m in previous) {
+      _byKey.putIfAbsent(reuseKey(m), () => []).add(m);
+    }
+  }
+
+  final _byKey = <String, List<Mutant>>{};
+
+  /// How many mutants [take] returned.
+  var reused = 0;
+
+  /// The previous result for [current] (at its current line), or null if it has to run.
+  Mutant? take(Mutant current) {
+    final list = _byKey[reuseKey(current)];
+    if (list == null || list.isEmpty) return null;
+    final old = list.first;
+    if (old.outcome == Outcome.survived) return null;
+    list.removeAt(0);
+    reused++;
+    final excluded = old.outcome == Outcome.excluded;
+    return Mutant(
+      part: current.part,
+      file: current.file,
+      line: current.line,
+      column: current.column,
+      mutator: current.mutator,
+      replacement: current.replacement,
+      code: current.code,
+      outcome: excluded ? Outcome.survived : old.outcome,
+      note: excluded ? null : old.note,
+    );
+  }
+}
+
+/// `--exclusions-only`: the mutants of the previous run as they were before the exclusions, so the
+/// current tools/mutants-exclude.txt can be applied again without running a mutant.
+List<Mutant> withoutExclusions(Iterable<Mutant> previous) => [
+  for (final m in previous)
+    m.outcome == Outcome.excluded
+        ? (Mutant.fromJson(m.toJson())
+            ..outcome = Outcome.survived
+            ..note = null)
+        : m,
+];
