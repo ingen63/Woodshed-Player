@@ -1,6 +1,7 @@
 // App services in the browser: WASM core in the AudioWorklet (#34), library in the Origin Private File
 // System (#35), import through the file picker. No recording. Media Session for the lock screen and
-// headphone buttons (#39/AK2). Desktop and mobile: platform_native.dart.
+// headphone buttons (#39/AK2). The screen stays on while a track plays (#109). Desktop and mobile:
+// platform_native.dart.
 import 'dart:js_interop';
 
 import 'package:material_ui/material_ui.dart';
@@ -18,6 +19,8 @@ import 'install_hint.dart';
 import 'library_settings_store.dart';
 import 'media_session.dart';
 import 'media_session_web.dart';
+import 'wake_lock.dart';
+import 'wake_lock_web.dart';
 
 /// Library folder in the page's OPFS.
 const libraryDir = 'WoodshedPlayer';
@@ -50,6 +53,9 @@ Future<AppController> createAppController({
   );
   if (WebMediaSession.create() case final api?) {
     MediaSessionLink(api, controller); // lives as long as the page
+  }
+  if (WebWakeLock.create() case final api?) {
+    WakeLockLink(api, controller.player); // lives as long as the page
   }
   await controller.start();
   return controller;
