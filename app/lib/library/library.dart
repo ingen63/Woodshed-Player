@@ -4,6 +4,8 @@
 // `library.json` holds the shared state with stamps and tombstones in format 2 (stamps.dart). The former
 // Swift-compatible format 1 is migrated on the first start (migration.dart); device-local settings live
 // in `device.json` (device_settings.dart).
+// #114: playlists (named lists of track IDs in their own order) are records of the shared state too; one
+// «only on this device» never leaves the device.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -118,6 +120,9 @@ class Library extends ChangeNotifier {
 
   List<Track> _tracks = [];
   List<TrackFolder> _folders = [];
+
+  /// #114: playlists shown on this device (the alive ones).
+  List<Playlist> _playlists = [];
   TrackSortOrder _sortOrder = TrackSortOrder.dateAdded;
   Appearance _appearance = Appearance.system;
   Map<String, Object?>? _metronome;
@@ -146,16 +151,24 @@ class Library extends ChangeNotifier {
 
   List<Track> get tracks => List.unmodifiable(_tracks);
   List<TrackFolder> get folders => List.unmodifiable(_folders);
+  List<Playlist> get playlists => List.unmodifiable(_playlists);
   bool get isImporting => _importing;
 
   /// Beim letzten Laden entfernte Einträge, deren Datei fehlte.
   int get droppedMissing => _droppedMissing;
 
-  /// Shared state as last saved (with stamps and tombstones), for the sync engine (#37). Tracks and folders
-  /// held back ([heldNames], #107) are left out: they stay on this device until the user decides.
+  /// Shared state as last saved (with stamps and tombstones), for the sync engine (#37). Tracks, folders and
+  /// playlists held back ([heldNames], #107) are left out: they stay on this device until the user decides.
+  /// #114/AK10: playlists «only on this device» are left out too; they never leave this device.
   SharedState get state {
     final d = _device;
-    if (d.heldTracks.isEmpty && d.heldFolders.isEmpty) return _state;
+    final private = _state.playlists.values.any(_isPrivate);
+    if (d.heldTracks.isEmpty &&
+        d.heldFolders.isEmpty &&
+        d.heldPlaylists.isEmpty &&
+        !private) {
+      return _state;
+    }
     final cached = _shared;
     if (cached != null && identical(cached.$1, _state)) return cached.$2;
     final shared = _state.copyWith(
@@ -167,22 +180,45 @@ class Library extends ChangeNotifier {
         for (final e in _state.folders.entries)
           if (!d.heldFolders.contains(e.key)) e.key: e.value,
       },
+      playlists: {
+        for (final e in _state.playlists.entries)
+          if (!d.heldPlaylists.contains(e.key) && !_isPrivate(e.value))
+            e.key: e.value,
+      },
     );
     _shared = (_state, shared);
     return shared;
   }
 
+  /// #114/AK10: a deleted playlist without its name and tracks; one only on this device stays so.
+  static StampedRecord _bareTombstone(StampedRecord r, Hlc stamp) =>
+      _isPrivate(r)
+      ? StampedRecord(
+          const {'shared': false},
+          {'shared': r.stamps['shared']!},
+          stamp,
+        )
+      : StampedRecord(const {}, const {}, stamp);
+
+  /// #114/AK10: the playlist is «only on this device». Its record is never synced, so no other device knows
+  /// its ID ([setPlaylistShared] gives it a new one) and the purge horizon of others never applies to it.
+  static bool _isPrivate(StampedRecord r) => r.values['shared'] == false;
+
   /// [state] computed for this [_state]; cleared whenever the held records change.
   (SharedState, SharedState)? _shared;
 
-  /// #107: names of the own tracks and folders held back from the sync, folders first, each sorted; empty
-  /// if there is nothing to decide.
+  /// #107: names of the own tracks and folders (#114: and playlists) held back from the sync, folders first,
+  /// then playlists, then tracks, each sorted; empty if there is nothing to decide.
   List<String> get heldNames {
     final d = _device;
     return [
       ...[
         for (final f in _folders)
           if (d.heldFolders.contains(f.id)) f.name,
+      ]..sort(naturalCompare),
+      ...[
+        for (final p in _playlists)
+          if (d.heldPlaylists.contains(p.id)) p.name,
       ]..sort(naturalCompare),
       ...[
         for (final t in _tracks)
@@ -236,7 +272,7 @@ class Library extends ChangeNotifier {
     _absent.clear();
     final raw = await store.read(indexName);
     if (raw == null) {
-      await _setHeld(const {}, const {});
+      await _setHeld(const {}, const {}, const {});
       await _readLegacyPrefs();
       notifyListeners();
       return _afterLoad();
@@ -277,9 +313,10 @@ class Library extends ChangeNotifier {
       } catch (_) {}
       lastError = LibraryCorrupt('$indexName.defekt-$stamp');
       _state = SharedState.empty;
-      await _setHeld(const {}, const {});
+      await _setHeld(const {}, const {}, const {});
       _tracks = [];
       _folders = [];
+      _playlists = [];
       notifyListeners();
       return _afterLoad();
     }
@@ -313,6 +350,7 @@ class Library extends ChangeNotifier {
     await _setHeld(
       _device.heldTracks.where((id) => _state.tracks[id]?.alive ?? false),
       _device.heldFolders.where((id) => _state.folders[id]?.alive ?? false),
+      _device.heldPlaylists.where((id) => _state.playlists[id]?.alive ?? false),
     );
     notifyListeners();
     return _afterLoad();
@@ -355,6 +393,10 @@ class Library extends ChangeNotifier {
             final t => t,
           },
     ];
+    _playlists = [
+      for (final e in _state.playlists.entries)
+        if (e.value.alive) Playlist.fromShared(e.key, e.value.values),
+    ];
     final s = _state.settings.values;
     _sortOrder = TrackSortOrder.parse(s['sortOrder'] as String?);
     _appearance = Appearance.parse(s['appearance']);
@@ -381,11 +423,16 @@ class Library extends ChangeNotifier {
     final stamp = _clock.tick();
     Map<String, StampedRecord> records(
       Map<String, StampedRecord> old,
-      Map<String, Map<String, Object?>> live,
-    ) => {
+      Map<String, Map<String, Object?>> live, {
+      bool bare = false,
+    }) => {
       for (final e in old.entries)
         if (!live.containsKey(e.key))
-          e.key: e.value.alive ? e.value.delete(stamp) : e.value,
+          e.key: !e.value.alive
+              ? e.value
+              : bare
+              ? _bareTombstone(e.value, stamp)
+              : e.value.delete(stamp),
       for (final e in live.entries)
         e.key:
             old[e.key]?.update(e.value, stamp) ??
@@ -398,6 +445,11 @@ class Library extends ChangeNotifier {
       folders: records(_state.folders, {
         for (final f in _folders) f.id: f.toShared(),
       }),
+      // #114/AK10: a deleted playlist goes out without its name and tracks: a playlist made «only on this
+      // device» before it was ever synced leaves nothing of itself behind
+      playlists: records(_state.playlists, {
+        for (final p in _playlists) p.id: p.toShared(),
+      }, bare: true),
       settings: _state.settings.update(_chosenSettings(), stamp),
       purged: _state.purged,
     );
@@ -470,6 +522,19 @@ class Library extends ChangeNotifier {
     _commit();
     _clock.observe(remote.latest);
     _clock.observe(remote.purged);
+    // #114/AK10: playlists only on this device stay out of the merge, as out of [state]
+    final private = {
+      for (final e in _state.playlists.entries)
+        if (_isPrivate(e.value)) e.key: e.value,
+    };
+    if (private.isNotEmpty) {
+      _state = _state.copyWith(
+        playlists: {
+          for (final e in _state.playlists.entries)
+            if (!private.containsKey(e.key)) e.key: e.value,
+        },
+      );
+    }
     if (!_device.synced) {
       // #104: the purge horizon applies only between devices that have synced before
       _state = _state.beforeFirstSync(remote, _clock.tick());
@@ -489,8 +554,13 @@ class Library extends ChangeNotifier {
         ...merged.folders,
         for (final id in lost.folders) id: mine.folders[id]!,
       },
+      playlists: {
+        ...merged.playlists,
+        for (final id in lost.playlists) id: mine.playlists[id]!,
+        ...private,
+      },
     );
-    await _setHeld(lost.tracks, lost.folders);
+    await _setHeld(lost.tracks, lost.folders, lost.playlists);
     _materialize();
     final alive = {for (final t in _tracks) t.id};
     for (final t in before.values) {
@@ -518,15 +588,19 @@ class Library extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// #107 «Keep»: the held tracks and folders are stamped anew, so the purge horizon no longer applies to
-  /// them, and go to the other devices with the next sync.
+  /// #107 «Keep»: the held tracks, folders and playlists are stamped anew, so the purge horizon no longer
+  /// applies to them, and go to the other devices with the next sync.
   Future<void> keepHeld() async {
-    final d = _device;
-    if (_readOnly || (d.heldTracks.isEmpty && d.heldFolders.isEmpty)) return;
+    if (_readOnly || !_anyHeld) return;
     // changes not yet saved are stamped by _write afterwards, with a higher stamp
-    final (tracks, folders) = _aliveHeld();
-    _state = _state.restamp(tracks, folders, _clock.tick());
-    await _setHeld(const {}, const {});
+    final (tracks, folders, playlists) = _aliveHeld();
+    _state = _state.restamp(
+      tracks,
+      folders,
+      _clock.tick(),
+      playlists: playlists,
+    );
+    await _setHeld(const {}, const {}, const {});
     try {
       await _write();
     } catch (e) {
@@ -536,13 +610,12 @@ class Library extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// #107 «Remove»: the held tracks (with their audio files) and folders are removed from this device, as
-  /// the merge would have done; tracks in a removed folder stay, without a folder.
+  /// #107 «Remove»: the held tracks (with their audio files), folders and playlists are removed from this
+  /// device, as the merge would have done; tracks in a removed folder or playlist stay.
   Future<void> removeHeld() async {
-    final d = _device;
-    if (_readOnly || (d.heldTracks.isEmpty && d.heldFolders.isEmpty)) return;
+    if (_readOnly || !_anyHeld) return;
     _commit();
-    final (tracks, folders) = _aliveHeld();
+    final (tracks, folders, playlists) = _aliveHeld();
     for (final t in _tracks.where((t) => tracks.contains(t.id))) {
       await store.delete(trackName(t.fileName)).catchError((_) {});
       await store.delete(_artworkName(t.id)).catchError((_) {});
@@ -557,10 +630,14 @@ class Library extends ChangeNotifier {
         for (final e in _state.folders.entries)
           if (!folders.contains(e.key)) e.key: e.value,
       },
+      playlists: {
+        for (final e in _state.playlists.entries)
+          if (!playlists.contains(e.key)) e.key: e.value,
+      },
     );
     _materialize();
     _absent.removeAll(tracks);
-    await _setHeld(const {}, const {});
+    await _setHeld(const {}, const {}, const {});
     _forgetOnDevice(tracks);
     try {
       await _write();
@@ -573,7 +650,7 @@ class Library extends ChangeNotifier {
 
   /// The held tracks and folders still alive: one deleted here meanwhile stays deleted (a tombstone like any
   /// other) and is neither revived by «Keep» nor removed without its tombstone by «Remove».
-  (Set<String>, Set<String>) _aliveHeld() => (
+  (Set<String>, Set<String>, Set<String>) _aliveHeld() => (
     {
       for (final id in _device.heldTracks)
         if (_state.tracks[id]?.alive ?? false) id,
@@ -582,21 +659,38 @@ class Library extends ChangeNotifier {
       for (final id in _device.heldFolders)
         if (_state.folders[id]?.alive ?? false) id,
     },
+    {
+      for (final id in _device.heldPlaylists)
+        if (_state.playlists[id]?.alive ?? false) id,
+    },
   );
 
+  bool get _anyHeld =>
+      _device.heldTracks.isNotEmpty ||
+      _device.heldFolders.isNotEmpty ||
+      _device.heldPlaylists.isNotEmpty;
+
   /// Remembers the held records in `device.json`, so the question survives a restart (#107/AK5).
-  Future<void> _setHeld(Iterable<String> tracks, Iterable<String> folders) {
+  Future<void> _setHeld(
+    Iterable<String> tracks,
+    Iterable<String> folders,
+    Iterable<String> playlists,
+  ) {
     final t = {...tracks};
     final f = {...folders};
+    final p = {...playlists};
     final d = _device;
-    if (t.length == d.heldTracks.length &&
-        d.heldTracks.containsAll(t) &&
-        f.length == d.heldFolders.length &&
-        d.heldFolders.containsAll(f)) {
+    bool same(Set<String> a, Set<String> b) =>
+        a.length == b.length && a.containsAll(b);
+    if (same(t, d.heldTracks) &&
+        same(f, d.heldFolders) &&
+        same(p, d.heldPlaylists)) {
       return Future.value();
     }
     _shared = null;
-    return _updateDevice(d.copyWith(heldTracks: t, heldFolders: f));
+    return _updateDevice(
+      d.copyWith(heldTracks: t, heldFolders: f, heldPlaylists: p),
+    );
   }
 
   /// This device has shared its state (#104): from now on the purge horizon applies to its records. Called
@@ -1000,6 +1094,18 @@ class Library extends ChangeNotifier {
       store.delete(_artworkName(t.id)).catchError((_) {});
     }
     _tracks.removeWhere((t) => ids.contains(t.id));
+    // #114/AK7: a deleted track leaves every playlist (on other devices [playlistTracks] leaves it out)
+    _playlists = [
+      for (final p in _playlists)
+        p.entries.any(ids.contains)
+            ? p.copyWith(
+                entries: [
+                  for (final e in p.entries)
+                    if (!ids.contains(e)) e,
+                ],
+              )
+            : p,
+    ];
     _absent.removeAll(ids);
     _forgetOnDevice(ids);
     save();
@@ -1120,6 +1226,117 @@ class Library extends ChangeNotifier {
     final at = others.indexWhere((t) => t.id == beforeId);
     moveTracks({id}, folderId, at: at < 0 ? others.length : at);
     sortOrder = TrackSortOrder.custom;
+  }
+
+  // ---- Playlists (#114) ----
+
+  /// Playlists by name, like folders.
+  List<Playlist> get sortedPlaylists =>
+      sortedNaturally(_playlists, (p) => p.name);
+
+  Playlist? playlist(String id) =>
+      _playlists.where((p) => p.id == id).firstOrNull;
+
+  /// Tracks of the playlist in its order, repeats included; entries of tracks no longer in the library
+  /// (deleted on another device) are left out (#114/AK7).
+  List<Track> playlistTracks(String id) {
+    final p = playlist(id);
+    if (p == null) return const [];
+    final byId = {for (final t in _tracks) t.id: t};
+    return [for (final e in p.entries) ?byId[e]];
+  }
+
+  /// New playlist, shared on all devices (#114/AK9); a blank [name] becomes [fallback].
+  Playlist createPlaylist(String name, {String fallback = ''}) {
+    final t = name.trim();
+    final p = Playlist(id: newUuid(_random), name: t.isEmpty ? fallback : t);
+    _playlists.add(p);
+    save();
+    notifyListeners();
+    return p;
+  }
+
+  /// Renames the playlist; a blank [name] keeps the old one.
+  void renamePlaylist(String id, String name) {
+    final t = name.trim();
+    if (t.isEmpty) return;
+    _changePlaylist(id, (p) => p.copyWith(name: t));
+  }
+
+  /// Removes the playlist; its tracks stay in the library (#114/AK1).
+  void deletePlaylist(String id) {
+    final n = _playlists.length;
+    _playlists.removeWhere((p) => p.id == id);
+    if (_playlists.length == n) return;
+    save();
+    notifyListeners();
+  }
+
+  /// «On all devices» or «Only on this device» (#114/AK9). Returns the playlist's ID from now on: a playlist
+  /// kept on this device gets a new one, and the old one is deleted for the other devices, so it disappears
+  /// there and nothing of it leaves this device any more (#114/AK10). Shared again, it reaches them with the
+  /// next sync.
+  String setPlaylistShared(String id, bool shared) {
+    final i = _playlists.indexWhere((p) => p.id == id);
+    if (_readOnly || i < 0 || _playlists[i].shared == shared) return id;
+    final p = _playlists[i];
+    _playlists[i] = shared
+        ? p.copyWith(shared: true)
+        : Playlist(
+            id: newUuid(_random),
+            name: p.name,
+            shared: false,
+            entries: p.entries,
+          );
+    save();
+    notifyListeners();
+    return _playlists[i].id;
+  }
+
+  /// Adds the tracks [trackIds] in this order before row [at] of [playlistTracks], or at the end; a track
+  /// already in the playlist is added once more (#114/AK3).
+  void addToPlaylist(String id, List<String> trackIds, {int? at}) {
+    final add = [
+      for (final t in trackIds)
+        if (track(t) != null) t,
+    ];
+    if (add.isEmpty) return;
+    _changeEntries(id, (rows) {
+      rows.insertAll((at ?? rows.length).clamp(0, rows.length), add);
+    });
+  }
+
+  /// Removes row [index] of [playlistTracks]; the track stays in the library (#114/AK2).
+  void removeFromPlaylist(String id, int index) => _changeEntries(id, (rows) {
+    if (index >= 0 && index < rows.length) rows.removeAt(index);
+  });
+
+  /// Moves row [from] of [playlistTracks] before row [to], [to] counted before removing, as in [move]
+  /// (#114/AK4).
+  void movePlaylistEntry(String id, int from, int to) =>
+      _changeEntries(id, (rows) {
+        if (from < 0 || from >= rows.length) return;
+        final moving = rows.removeAt(from);
+        rows.insert((to > from ? to - 1 : to).clamp(0, rows.length), moving);
+      });
+
+  /// Changes the rows as shown; entries of tracks no longer in the library drop out with it.
+  void _changeEntries(String id, void Function(List<String> rows) change) =>
+      _changePlaylist(id, (p) {
+        final rows = [for (final t in playlistTracks(id)) t.id];
+        change(rows);
+        return p.copyWith(entries: List.unmodifiable(rows));
+      });
+
+  void _changePlaylist(String id, Playlist Function(Playlist p) change) {
+    if (_readOnly) return;
+    final i = _playlists.indexWhere((p) => p.id == id);
+    if (i < 0) return;
+    final next = change(_playlists[i]);
+    if (sameJson(next.toShared(), _playlists[i].toShared())) return;
+    _playlists[i] = next;
+    save();
+    notifyListeners();
   }
 
   // ---- Title and artist (#24) ----

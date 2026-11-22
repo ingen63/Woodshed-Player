@@ -3,6 +3,8 @@
 // - Sorting and moving into folders neither lose nor duplicate a track, and every track lies in exactly one
 //   existing folder (or none).
 // - Saving and loading gives the same state.
+// - #114: playlists take part (created, filled, reordered, switched to «only on this device», deleted); they
+//   list only tracks of the library, and saving and loading keeps them with their order.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -83,7 +85,7 @@ Future<String> randomOperation(TestLibrary t) async {
   final realFolders = lib.folders.map((f) => f.id).toList();
   final folders = [null, ...realFolders];
   String? anyId() => ids.isEmpty ? null : pick(r, ids);
-  switch (r.nextInt(12)) {
+  switch (r.nextInt(13)) {
     case 0:
       await t.importSome(1 + r.nextInt(3), folderId: pick(r, folders));
       return 'import';
@@ -146,9 +148,47 @@ Future<String> randomOperation(TestLibrary t) async {
     case 10:
       if (ids.isNotEmpty && r.nextInt(3) == 0) lib.delete({anyId()!});
       return 'delete';
+    case 11:
+      return playlistStep(r, lib);
     default:
       lib.appearance = pick(r, Appearance.values);
       return 'appearance';
+  }
+}
+
+/// #114: one random change to the playlists of [lib]; returns its name for the log.
+String playlistStep(Random r, Library lib) {
+  final ids = lib.tracks.map((t) => t.id).toList();
+  final lists = lib.playlists;
+  if (lists.isEmpty || r.nextInt(5) == 0) {
+    lib.createPlaylist(randomText(r), fallback: 'P');
+    return 'playlist create';
+  }
+  final p = pick(r, lists).id;
+  final rows = lib.playlistTracks(p).length;
+  switch (r.nextInt(7)) {
+    case 0:
+      lib.deletePlaylist(p);
+      return 'playlist delete';
+    case 1:
+      lib.renamePlaylist(p, randomText(r));
+      return 'playlist rename';
+    case 2 || 3:
+      if (ids.isEmpty) return 'playlist nothing to add';
+      lib.addToPlaylist(p, [
+        for (var i = r.nextInt(3); i >= 0; i--) pick(r, ids),
+      ], at: r.nextBool() ? null : r.nextInt(rows + 1));
+      return 'playlist add';
+    case 4:
+      lib.removeFromPlaylist(p, r.nextInt(rows + 1));
+      return 'playlist remove';
+    case 5:
+      lib.movePlaylistEntry(p, r.nextInt(rows + 1), r.nextInt(rows + 1));
+      return 'playlist move';
+    default:
+      final shared = !lib.playlist(p)!.shared;
+      lib.setPlaylistShared(p, shared);
+      return 'playlist ${shared ? 'share' : 'local'}';
   }
 }
 
@@ -166,6 +206,14 @@ void checkTracks(Library lib, Set<String> expected, String after) {
   ].map((t) => t.id).toList();
   expect(perFolder.length, ids.length, reason: 'folders after $after');
   expect(perFolder.toSet(), expected, reason: 'folders after $after');
+  // #114/AK7: playlists list only tracks of the library
+  for (final p in lib.playlists) {
+    expect(
+      expected.containsAll(lib.playlistTracks(p.id).map((t) => t.id)),
+      isTrue,
+      reason: 'playlist with a missing track after $after',
+    );
+  }
   for (final t in lib.tracks) {
     expect(
       t.folderId == null || folderIds.contains(t.folderId),
@@ -184,6 +232,14 @@ Map<String, Object?> snapshot(Library lib) => {
   'sortOrder': lib.sortOrder.name,
   'appearance': lib.appearance.name,
   'order': lib.sortedTracks.map((t) => t.id).toList(),
+  'playlists': {
+    for (final p in lib.playlists)
+      p.id: {
+        'name': p.name,
+        'shared': p.shared,
+        'rows': [for (final t in lib.playlistTracks(p.id)) t.id],
+      },
+  },
 };
 
 void main() {

@@ -391,6 +391,32 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get heldRemove => pseudo(super.heldRemove);
   @override
   String get heldLater => pseudo(super.heldLater);
+  @override
+  String get playlists => pseudo(super.playlists);
+  @override
+  String get newPlaylist => pseudo(super.newPlaylist);
+  @override
+  String get newPlaylistEllipsis => pseudo(super.newPlaylistEllipsis);
+  @override
+  String get renamePlaylist => pseudo(super.renamePlaylist);
+  @override
+  String get deletePlaylist => pseudo(super.deletePlaylist);
+  @override
+  String get deletePlaylistText => pseudo(super.deletePlaylistText);
+  @override
+  String get playPlaylist => pseudo(super.playPlaylist);
+  @override
+  String get playlistActions => pseudo(super.playlistActions);
+  @override
+  String get addToPlaylist => pseudo(super.addToPlaylist);
+  @override
+  String get removeFromPlaylist => pseudo(super.removeFromPlaylist);
+  @override
+  String get emptyPlaylist => pseudo(super.emptyPlaylist);
+  @override
+  String get playlistOnAllDevices => pseudo(super.playlistOnAllDevices);
+  @override
+  String get playlistOnThisDevice => pseudo(super.playlistOnThisDevice);
 }
 
 /// Loads [PseudoLocalizations] for any locale.

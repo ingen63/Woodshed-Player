@@ -1,5 +1,6 @@
 // Bibliotheksliste (#17), Vorlage TrackListView.swift: Ordner als Abschnitte, Ziehen zum Sortieren und
 // in Ordner, Kontextmenüs (Rechtsklick bzw. «⋯»), Bestätigung vor dem Löschen.
+// #114: playlists below the folders, each with its tracks in its own order, shared or only on this device.
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../app/app_controller.dart';
 import '../library/library.dart';
+import '../player/play_queue.dart';
 import '../time_format.dart';
 import 'about_dialog.dart';
 import 'messages.dart';
@@ -44,6 +46,9 @@ class LibraryView extends StatefulWidget {
 class _LibraryViewState extends State<LibraryView> {
   final _collapsed = <String>{};
 
+  /// #114: playlists are collapsed until opened (a library may have many).
+  final _openPlaylists = <String>{};
+
   AppController get c => widget.controller;
   Library get lib => c.library;
 
@@ -59,7 +64,8 @@ class _LibraryViewState extends State<LibraryView> {
       builder: (context, _) {
         final folders = lib.sortedFolders;
         final loose = lib.sortedTracksIn(null);
-        final empty = lib.tracks.isEmpty && folders.isEmpty;
+        final empty =
+            lib.tracks.isEmpty && folders.isEmpty && lib.playlists.isEmpty;
         return Column(
           children: [
             _Header(controller: c),
@@ -82,7 +88,7 @@ class _LibraryViewState extends State<LibraryView> {
                             key: const Key('section:none'),
                             label: context.l10n.noFolder,
                             icon: WsIcons.tray,
-                            onDrop: (id) => lib.placeTrack(id, null),
+                            onDrop: (id) => lib.placeTrack(id as String, null),
                           ),
                         for (final t in loose) _row(t),
                         if (loose.isEmpty && folders.isNotEmpty)
@@ -91,6 +97,10 @@ class _LibraryViewState extends State<LibraryView> {
                             onDrop: (id) => lib.placeTrack(id, null),
                           ),
                         for (final f in folders) ..._folder(f),
+                        _PlaylistsHeader(
+                          onAdd: () => newPlaylist(context, lib),
+                        ),
+                        for (final p in lib.sortedPlaylists) ..._playlist(p),
                       ],
                     ),
             ),
@@ -126,7 +136,7 @@ class _LibraryViewState extends State<LibraryView> {
         onToggle: () => setState(
           () => open ? _collapsed.add(f.id) : _collapsed.remove(f.id),
         ),
-        onDrop: (id) => lib.placeTrack(id, f.id),
+        onDrop: (id) => lib.placeTrack(id as String, f.id),
         menu: (context) => [
           MenuItemButton(
             leadingIcon: const Icon(WsIcons.add, size: 16),
@@ -175,6 +185,156 @@ class _LibraryViewState extends State<LibraryView> {
     ];
   }
 
+  /// #114/AK9: a playlist kept on this device gets a new ID; it stays open if it was.
+  void _setShared(String id, bool shared) {
+    final next = c.setPlaylistShared(id, shared);
+    if (_openPlaylists.remove(id)) setState(() => _openPlaylists.add(next));
+  }
+
+  /// #114: a playlist as a section: its tracks in its order, repeats included.
+  List<Widget> _playlist(Playlist p) {
+    final l = context.l10n;
+    final ws = WsTheme.of(context);
+    final open = _openPlaylists.contains(p.id);
+    final tracks = lib.playlistTracks(p.id);
+    final q = c.queue;
+    void drop(Object d, int at) => switch (d) {
+      final String id => lib.addToPlaylist(p.id, [id], at: at),
+      _EntryDrag(:final playlistId, :final index) when playlistId == p.id =>
+        lib.movePlaylistEntry(p.id, index, at),
+      _EntryDrag(:final trackId) => lib.addToPlaylist(p.id, [trackId], at: at),
+      _ => null,
+    };
+    return [
+      _SectionHeader(
+        key: Key('playlist:${p.name}'),
+        label: p.name,
+        icon: WsIcons.musicNoteList,
+        expanded: open,
+        onToggle: () => setState(
+          () => open ? _openPlaylists.remove(p.id) : _openPlaylists.add(p.id),
+        ),
+        accepts: (d) => d is String || d is _EntryDrag,
+        onDrop: (d) => drop(d, tracks.length),
+        menuTooltip: l.playlistActions,
+        trailing: [
+          // #114/AK11: cloud = on all devices, device = only here
+          Tooltip(
+            message: p.shared ? l.playlistOnAllDevices : l.playlistOnThisDevice,
+            child: Icon(
+              p.shared
+                  ? WsIcons.cloud
+                  : (widget.touch ? WsIcons.phone : WsIcons.laptop),
+              key: Key('${p.shared ? 'shared' : 'local'}:${p.name}'),
+              size: 14,
+              color: ws.muted,
+              semanticLabel: p.shared
+                  ? l.playlistOnAllDevices
+                  : l.playlistOnThisDevice,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text('${tracks.length}', style: ws.number(12, color: ws.muted)),
+          IconButton(
+            key: Key('playPlaylist:${p.name}'),
+            tooltip: l.playPlaylist,
+            visualDensity: VisualDensity.compact,
+            iconSize: 16,
+            icon: const Icon(WsIcons.play),
+            onPressed: tracks.isEmpty ? null : () => c.playPlaylist(p.id),
+          ),
+        ],
+        menu: (context) => [
+          MenuItemButton(
+            leadingIcon: const Icon(WsIcons.play, size: 16),
+            onPressed: tracks.isEmpty ? null : () => c.playPlaylist(p.id),
+            child: Text(l.playPlaylist),
+          ),
+          MenuItemButton(
+            leadingIcon: const Icon(WsIcons.pencil, size: 16),
+            onPressed: () async {
+              final name = await askName(
+                context,
+                l.renamePlaylist,
+                initial: p.name,
+              );
+              if (name != null) lib.renamePlaylist(p.id, name);
+            },
+            child: Text(l.renameEllipsis),
+          ),
+          CheckboxMenuButton(
+            key: Key('shareAll:${p.name}'),
+            value: p.shared,
+            onChanged: (_) => _setShared(p.id, true),
+            child: Text(l.playlistOnAllDevices),
+          ),
+          CheckboxMenuButton(
+            key: Key('shareLocal:${p.name}'),
+            value: !p.shared,
+            onChanged: (_) => _setShared(p.id, false),
+            child: Text(l.playlistOnThisDevice),
+          ),
+          MenuItemButton(
+            key: Key('deletePlaylist:${p.name}'),
+            leadingIcon: const Icon(WsIcons.trash, size: 16),
+            onPressed: () async {
+              if (await confirm(
+                context,
+                title: l.deleteNamedTitle(p.name),
+                text: l.deletePlaylistText,
+                action: l.deletePlaylist,
+              )) {
+                lib.deletePlaylist(p.id);
+              }
+            },
+            child: Text(l.deletePlaylist),
+          ),
+        ],
+      ),
+      if (open) ...[
+        for (final (i, t) in tracks.indexed)
+          _TrackRow(
+            key: Key('entry:${p.name}:$i'),
+            track: t,
+            artwork: lib.artworkPath(t),
+            selected: q == PlayQueue(p.id, i) && c.player.trackId == t.id,
+            onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
+            onlyInCloud: !lib.hasFile(t.id) && c.sync.inCloud(t.id),
+            fetching: c.fetching == t.id,
+            indent: true,
+            touch: widget.touch,
+            onTap: () {
+              c.playPlaylist(p.id, index: i, play: false);
+              widget.onSelected?.call();
+            },
+            dragData: _EntryDrag(p.id, i, t.id),
+            accepts: (d) =>
+                d is String ||
+                (d is _EntryDrag && (d.playlistId != p.id || d.index != i)),
+            onDrop: (d) => drop(d, i),
+            menu: (context) => [
+              MenuItemButton(
+                key: const Key('removeFromPlaylist'),
+                leadingIcon: const Icon(WsIcons.close, size: 16),
+                onPressed: () => lib.removeFromPlaylist(p.id, i),
+                child: Text(l.removeFromPlaylist),
+              ),
+              MenuItemButton(
+                leadingIcon: const Icon(WsIcons.pencil, size: 16),
+                onPressed: () => editTrack(context, lib, t),
+                child: Text(l.editTrackEllipsis),
+              ),
+            ],
+          ),
+        if (tracks.isEmpty)
+          _Placeholder(
+            l.emptyPlaylist,
+            onDrop: (id) => lib.addToPlaylist(p.id, [id]),
+          ),
+      ],
+    ];
+  }
+
   Widget _row(Track t, {bool indent = false}) {
     final l = context.l10n;
     return _TrackRow(
@@ -188,7 +348,7 @@ class _LibraryViewState extends State<LibraryView> {
       indent: indent,
       touch: widget.touch,
       onTap: () => _select(t),
-      onDrop: (id) => lib.placeTrack(id, t.folderId, beforeId: t.id),
+      onDrop: (id) => lib.placeTrack(id as String, t.folderId, beforeId: t.id),
       menu: (context) => [
         MenuItemButton(
           key: const Key('editTrack'),
@@ -226,6 +386,34 @@ class _LibraryViewState extends State<LibraryView> {
             ),
           ],
           child: Text(l.moveToFolder),
+        ),
+        // #114/AK2: add to a playlist; the same track may go in several times (AK3)
+        SubmenuButton(
+          key: const Key('addToPlaylist'),
+          leadingIcon: const Icon(WsIcons.musicNoteList, size: 16),
+          menuChildren: [
+            for (final p in lib.sortedPlaylists)
+              MenuItemButton(
+                key: Key('addTo:${p.name}'),
+                onPressed: () => lib.addToPlaylist(p.id, [t.id]),
+                child: Text(p.name),
+              ),
+            if (lib.playlists.isNotEmpty) const Divider(height: 1),
+            MenuItemButton(
+              key: const Key('addToNewPlaylist'),
+              onPressed: () async {
+                final name = await askName(context, l.newPlaylist);
+                if (name != null) {
+                  lib.addToPlaylist(
+                    lib.createPlaylist(name, fallback: l.newPlaylist).id,
+                    [t.id],
+                  );
+                }
+              },
+              child: Text(l.newPlaylistEllipsis),
+            ),
+          ],
+          child: Text(l.addToPlaylist),
         ),
         CheckboxMenuButton(
           key: const Key('dontUpload'),
@@ -500,6 +688,58 @@ Future<void> newFolder(BuildContext context, Library lib) async {
   if (name != null) lib.createFolder(name, fallback: l.newFolder);
 }
 
+/// #114/AK1: a new playlist, shared on all devices (AK9).
+Future<void> newPlaylist(BuildContext context, Library lib) async {
+  final l = context.l10n;
+  final name = await askName(context, l.newPlaylist);
+  if (name != null) lib.createPlaylist(name, fallback: l.newPlaylist);
+}
+
+/// #114: a row of a playlist being dragged: moved within its playlist, copied into another one. Library
+/// rows drag the track ID (a String) instead, which folders accept.
+class _EntryDrag {
+  const _EntryDrag(this.playlistId, this.index, this.trackId);
+  final String playlistId;
+  final int index;
+  final String trackId;
+}
+
+/// #114: heading of the playlists with «New playlist».
+class _PlaylistsHeader extends StatelessWidget {
+  const _PlaylistsHeader({required this.onAdd});
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 4, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              context.l10n.playlists.toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+          IconButton(
+            key: const Key('newPlaylist'),
+            tooltip: context.l10n.newPlaylist,
+            visualDensity: VisualDensity.compact,
+            iconSize: 16,
+            icon: const Icon(WsIcons.add),
+            onPressed: onAdd,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EmptyLibrary extends StatelessWidget {
   const _EmptyLibrary({required this.onAdd});
   final VoidCallback onAdd;
@@ -543,22 +783,37 @@ class _SectionHeader extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onDrop,
+    this.accepts = _isTrackId,
     this.expanded,
     this.onToggle,
     this.menu,
+    this.menuTooltip,
+    this.trailing = const [],
   });
 
   final String label;
   final IconData icon;
-  final void Function(String trackId) onDrop;
+
+  /// Called with the dragged data: a track ID (String), or a playlist row (#114) where [accepts] allows it.
+  final void Function(Object data) onDrop;
+  final bool Function(Object data) accepts;
   final bool? expanded;
   final VoidCallback? onToggle;
   final List<Widget> Function(BuildContext context)? menu;
 
+  /// Tooltip of the «⋯» button; folder actions unless given.
+  final String? menuTooltip;
+
+  /// Shown before the «⋯» button (#114: sharing, count, play).
+  final List<Widget> trailing;
+
+  static bool _isTrackId(Object d) => d is String;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return DragTarget<String>(
+    return DragTarget<Object>(
+      onWillAcceptWithDetails: (d) => accepts(d.data),
       onAcceptWithDetails: (d) => onDrop(d.data),
       builder: (context, candidates, _) => _WithMenu(
         menu: menu,
@@ -592,9 +847,10 @@ class _SectionHeader extends StatelessWidget {
                       ),
                     ),
                   ),
+                  ...trailing,
                   if (openMenu != null)
                     IconButton(
-                      tooltip: context.l10n.folderActions,
+                      tooltip: menuTooltip ?? context.l10n.folderActions,
                       visualDensity: VisualDensity.compact,
                       iconSize: 16,
                       icon: const Icon(WsIcons.ellipsis),
@@ -850,6 +1106,8 @@ class _TrackRow extends StatelessWidget {
     required this.onTap,
     required this.onDrop,
     required this.menu,
+    this.dragData,
+    this.accepts,
   });
 
   final Track track;
@@ -862,8 +1120,16 @@ class _TrackRow extends StatelessWidget {
   /// The audio file is in the cloud only and loads when played (#39/AK4); [fetching] while it does.
   final bool onlyInCloud, fetching;
   final VoidCallback onTap;
-  final void Function(String trackId) onDrop;
+
+  /// Called with the dragged data: a track ID (String) or a playlist row (#114).
+  final void Function(Object data) onDrop;
   final List<Widget> Function(BuildContext context) menu;
+
+  /// What a drag of this row carries; the track ID unless given (#114: a playlist row).
+  final Object? dragData;
+
+  /// Which drops this row takes; by default another track of the library.
+  final bool Function(Object data)? accepts;
 
   @override
   Widget build(BuildContext context) {
@@ -1008,8 +1274,10 @@ class _TrackRow extends StatelessWidget {
       ),
     );
 
-    return DragTarget<String>(
-      onWillAcceptWithDetails: (d) => d.data != track.id,
+    final data = dragData ?? track.id;
+    return DragTarget<Object>(
+      onWillAcceptWithDetails: (d) =>
+          accepts?.call(d.data) ?? (d.data is String && d.data != track.id),
       onAcceptWithDetails: (d) => onDrop(d.data),
       builder: (context, candidates, _) => _WithMenu(
         menu: menu,
@@ -1025,14 +1293,14 @@ class _TrackRow extends StatelessWidget {
           final child = tile(null, openMenu, dropHint: candidates.isNotEmpty);
           final dimmed = Opacity(opacity: 0.4, child: tile(null, null));
           return touch
-              ? LongPressDraggable<String>(
-                  data: track.id,
+              ? LongPressDraggable<Object>(
+                  data: data,
                   feedback: feedback,
                   childWhenDragging: dimmed,
                   child: child,
                 )
-              : Draggable<String>(
-                  data: track.id,
+              : Draggable<Object>(
+                  data: data,
                   feedback: feedback,
                   childWhenDragging: dimmed,
                   child: child,

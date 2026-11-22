@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../library/library.dart';
 import '../metronome/metronome_controller.dart';
 import '../metronome/practice_session.dart';
+import '../player/play_queue.dart';
 import '../player/player_service.dart';
 import '../sync/sync_service.dart';
 import 'file_platform.dart';
@@ -21,6 +22,7 @@ class AppController extends ChangeNotifier {
   }) : session = PracticeSession(player, metronome),
        sync = sync ?? NoSync() {
     player.onSettingsChanged = library.updateSettings;
+    player.onEnded = _trackEnded;
     library.onLocalChange = this.sync.localChanged;
     files.onDropFiles = (paths) => importFiles(paths);
     library.addListener(_libraryChanged);
@@ -79,9 +81,61 @@ class AppController extends ChangeNotifier {
     return t == null ? null : library.artworkPath(t);
   }
 
-  /// Titel in den Player laden (ohne abzuspielen, wie in der Swift-App). A track without a known
-  /// duration (imported in the browser) gets the one the core found (#42/AK5).
-  Future<bool> select(Track t) async {
+  /// #114: the playlist being played and the row loaded; null when a track was chosen on its own.
+  PlayQueue? get queue => _queue;
+  PlayQueue? _queue;
+
+  /// Loads row [index] of playlist [playlistId]; at the end of each track the next row follows (#114/AK5).
+  /// With [play] it starts at once («Play»); a tap on a row only loads, like a tap on a track.
+  Future<bool> playPlaylist(
+    String playlistId, {
+    int index = 0,
+    bool play = true,
+  }) async {
+    final tracks = library.playlistTracks(playlistId);
+    if (index < 0 || index >= tracks.length) return false;
+    final q = PlayQueue(playlistId, index);
+    _queue = q;
+    notifyListeners();
+    final ok = await _load(tracks[index]);
+    if (ok && play && _queue == q) session.playTitle();
+    return ok;
+  }
+
+  /// #114/AK5: the next row of the playlist follows; after the last one playback ends. An active loop never
+  /// ends a track, so it repeats instead (#114/AK6, [PlayerService.onEnded]).
+  void _trackEnded() {
+    final q = _queue;
+    if (q == null) return;
+    final next = q.next(library.playlistTracks(q.playlistId).length);
+    if (next == null) return;
+    unawaited(playPlaylist(next.playlistId, index: next.index));
+  }
+
+  /// «On all devices» or «Only on this device» (#114/AK9); a playlist being played goes on under the new ID
+  /// the library gives a playlist kept on this device. Returns that ID.
+  String setPlaylistShared(String id, bool shared) {
+    final next = library.setPlaylistShared(id, shared);
+    final q = _queue;
+    if (next != id && q != null && q.playlistId == id) {
+      _queue = PlayQueue(next, q.index);
+      notifyListeners();
+    }
+    return next;
+  }
+
+  /// Titel in den Player laden (ohne abzuspielen, wie in der Swift-App). A track chosen on its own ends
+  /// playing a playlist (#114).
+  Future<bool> select(Track t) {
+    if (_queue != null) {
+      _queue = null;
+      notifyListeners();
+    }
+    return _load(t);
+  }
+
+  /// A track without a known duration (imported in the browser) gets the one the core found (#42/AK5).
+  Future<bool> _load(Track t) async {
     // #39/AK3: the loaded track is the newest in the cache and never removed while loaded.
     library.inUse = t.id;
     unawaited(library.markUsed(t.id));
@@ -130,6 +184,7 @@ class AppController extends ChangeNotifier {
     if (ids.contains(player.trackId)) {
       player.unload();
       library.inUse = null;
+      _queue = null;
     }
     library.delete(ids);
   }

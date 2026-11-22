@@ -241,12 +241,14 @@ class StampedRecord {
   }
 }
 
-/// Contents of `library.json` from format version 2 on: tracks (key = SHA-256 of the audio file), folders and
-/// the shared settings, each with stamps. Device-local data never goes in here (see DeviceSettings).
+/// Contents of `library.json` from format version 2 on: tracks (key = SHA-256 of the audio file), folders,
+/// playlists (#114, optional, so older apps of format 2 read the file and ignore them) and the shared
+/// settings, each with stamps. Device-local data never goes in here (see DeviceSettings).
 class SharedState {
   const SharedState({
     this.tracks = const {},
     this.folders = const {},
+    this.playlists = const {},
     this.settings = const StampedRecord({}, {}),
     this.purged,
   });
@@ -261,6 +263,9 @@ class SharedState {
 
   final Map<String, StampedRecord> tracks;
   final Map<String, StampedRecord> folders;
+
+  /// #114: playlists by ID (UUID); merged like folders.
+  final Map<String, StampedRecord> playlists;
   final StampedRecord settings;
 
   /// Purge horizon (#98): the newest deletion whose tombstone [purge] removed; null if none was removed
@@ -271,20 +276,24 @@ class SharedState {
   final Hlc? purged;
 
   Hlc? get latest => Hlc.maxOf([
-    for (final r in [...tracks.values, ...folders.values, settings]) ...[
-      r.latest,
-      r.deleted,
-    ],
+    for (final r in [
+      ...tracks.values,
+      ...folders.values,
+      ...playlists.values,
+      settings,
+    ]) ...[r.latest, r.deleted],
   ]);
 
   SharedState copyWith({
     Map<String, StampedRecord>? tracks,
     Map<String, StampedRecord>? folders,
+    Map<String, StampedRecord>? playlists,
     StampedRecord? settings,
     Hlc? purged,
   }) => SharedState(
     tracks: tracks ?? this.tracks,
     folders: folders ?? this.folders,
+    playlists: playlists ?? this.playlists,
     settings: settings ?? this.settings,
     purged: purged ?? this.purged,
   );
@@ -314,6 +323,7 @@ class SharedState {
     return SharedState(
       tracks: both(tracks, o.tracks),
       folders: both(folders, o.folders),
+      playlists: both(playlists, o.playlists),
       settings: settings.merge(o.settings),
       purged: Hlc.maxOf([purged, o.purged]),
     );
@@ -330,14 +340,17 @@ class SharedState {
     return SharedState(
       tracks: _restamped(tracks, lost.tracks, stamp),
       folders: _restamped(folders, lost.folders, stamp),
+      playlists: _restamped(playlists, lost.playlists, stamp),
       settings: settings,
     );
   }
 
-  /// #104, #107: keys of the alive tracks and folders of this state that a [merge] with [remote] would kill
-  /// by the purge horizon of [remote]: [remote] does not know them and they were last changed before the
-  /// horizon.
-  ({Set<String> tracks, Set<String> folders}) lostTo(SharedState remote) {
+  /// #104, #107: keys of the alive tracks, folders and playlists (#114) of this state that a [merge] with
+  /// [remote] would kill by the purge horizon of [remote]: [remote] does not know them and they were last
+  /// changed before the horizon.
+  ({Set<String> tracks, Set<String> folders, Set<String> playlists}) lostTo(
+    SharedState remote,
+  ) {
     final h = remote.purged;
     Set<String> lost(
       Map<String, StampedRecord> mine,
@@ -352,16 +365,22 @@ class SharedState {
     return (
       tracks: lost(tracks, remote.tracks),
       folders: lost(folders, remote.folders),
+      playlists: lost(playlists, remote.playlists),
     );
   }
 
-  /// #107 «Keep»: the tracks and folders [tracks] and [folders] stamped anew with [stamp], so the purge
-  /// horizon no longer applies to them and they reach the other devices.
-  SharedState restamp(Set<String> tracks, Set<String> folders, Hlc stamp) =>
-      copyWith(
-        tracks: _restamped(this.tracks, tracks, stamp),
-        folders: _restamped(this.folders, folders, stamp),
-      );
+  /// #107 «Keep»: the tracks [tracks], folders [folders] and playlists [playlists] stamped anew with
+  /// [stamp], so the purge horizon no longer applies to them and they reach the other devices.
+  SharedState restamp(
+    Set<String> tracks,
+    Set<String> folders,
+    Hlc stamp, {
+    Set<String> playlists = const {},
+  }) => copyWith(
+    tracks: _restamped(this.tracks, tracks, stamp),
+    folders: _restamped(this.folders, folders, stamp),
+    playlists: _restamped(this.playlists, playlists, stamp),
+  );
 
   static Map<String, StampedRecord> _restamped(
     Map<String, StampedRecord> records,
@@ -376,10 +395,12 @@ class SharedState {
   /// merged with another one (#104, for `device.json` files written before the flag existed).
   bool stampedByOthers(String device) => [
     purged,
-    for (final r in [...tracks.values, ...folders.values, settings]) ...[
-      ...r.stamps.values,
-      r.deleted,
-    ],
+    for (final r in [
+      ...tracks.values,
+      ...folders.values,
+      ...playlists.values,
+      settings,
+    ]) ...[...r.stamps.values, r.deleted],
   ].any((h) => h != null && h.device != device);
 
   /// Removes tombstones whose deletion is older than [tombstoneLifetime] and moves the purge horizon up to
@@ -396,10 +417,18 @@ class SharedState {
         for (final e in folders.entries)
           if (keep(e.value)) e.key: e.value,
       },
+      playlists: {
+        for (final e in playlists.entries)
+          if (keep(e.value)) e.key: e.value,
+      },
       settings: settings,
       purged: Hlc.maxOf([
         purged,
-        for (final r in [...tracks.values, ...folders.values])
+        for (final r in [
+          ...tracks.values,
+          ...folders.values,
+          ...playlists.values,
+        ])
           if (!keep(r)) r.deleted,
       ]),
     );
@@ -410,6 +439,8 @@ class SharedState {
     if (purged != null) 'purged': '$purged',
     'settings': settings.toJson(),
     'folders': {for (final e in folders.entries) e.key: e.value.toJson()},
+    if (playlists.isNotEmpty)
+      'playlists': {for (final e in playlists.entries) e.key: e.value.toJson()},
     'tracks': {for (final e in tracks.entries) e.key: e.value.toJson()},
   };
 
@@ -424,6 +455,7 @@ class SharedState {
     return SharedState(
       tracks: records(j['tracks']),
       folders: records(j['folders']),
+      playlists: records(j['playlists']),
       settings: j['settings'] is Map
           ? StampedRecord.fromJson((j['settings'] as Map).cast())
           : const StampedRecord({}, {}),

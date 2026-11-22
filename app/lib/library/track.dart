@@ -319,6 +319,53 @@ class TrackFolder {
       );
 }
 
+/// Playlist (#114): a named list of tracks in its own order. A track may stand in several playlists and
+/// several times in one; [entries] hold track IDs, the audio file exists once. Shared playlists are synced
+/// like folders; one «only on this device» ([shared] false) stays on the device that chose it.
+class Playlist {
+  const Playlist({
+    required this.id,
+    required this.name,
+    this.shared = true,
+    this.entries = const [],
+  });
+
+  final String id;
+  final String name;
+
+  /// «On all devices» (#114/AK9); new playlists are shared.
+  final bool shared;
+
+  /// Track IDs in playing order, possibly repeated; may name tracks deleted on another device, which the
+  /// library leaves out ([Library.playlistTracks]).
+  final List<String> entries;
+
+  Playlist copyWith({String? name, bool? shared, List<String>? entries}) =>
+      Playlist(
+        id: id,
+        name: name ?? this.name,
+        shared: shared ?? this.shared,
+        entries: entries ?? this.entries,
+      );
+
+  /// Shared fields; [entries] is one field, so a sync takes the newer order as a whole.
+  Map<String, Object?> toShared() => {
+    'name': name,
+    'shared': shared,
+    'entries': List<String>.unmodifiable(entries),
+  };
+
+  /// Throws on values of the wrong type (a damaged file), like the other records.
+  factory Playlist.fromShared(String id, Map<String, Object?> v) => Playlist(
+    id: id,
+    name: v['name'] as String? ?? '',
+    shared: v['shared'] as bool? ?? true,
+    entries: List.unmodifiable(
+      (v['entries'] as List? ?? const []).cast<String>().toList(),
+    ),
+  );
+}
+
 /// Sort order of the library; the UI names it in the user's language (#43).
 enum TrackSortOrder {
   alphabetical,

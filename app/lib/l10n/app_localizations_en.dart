@@ -710,7 +710,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get heldExplain =>
-      'Keep: they stay here and go to your other devices. Remove: they are deleted on this device, with their audio files; the tracks of a removed folder stay.';
+      'Keep: they stay here and go to your other devices. Remove: they are deleted on this device, with their audio files; the tracks of a removed folder or playlist stay.';
 
   @override
   String get heldKeep => 'Keep';
@@ -720,4 +720,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get heldLater => 'Later';
+
+  @override
+  String get playlists => 'Playlists';
+
+  @override
+  String get newPlaylist => 'New playlist';
+
+  @override
+  String get newPlaylistEllipsis => 'New playlist …';
+
+  @override
+  String get renamePlaylist => 'Rename playlist';
+
+  @override
+  String get deletePlaylist => 'Delete playlist';
+
+  @override
+  String get deletePlaylistText => 'The tracks stay in the library.';
+
+  @override
+  String get playPlaylist => 'Play';
+
+  @override
+  String get playlistActions => 'Playlist actions';
+
+  @override
+  String get addToPlaylist => 'Add to playlist';
+
+  @override
+  String get removeFromPlaylist => 'Remove from playlist';
+
+  @override
+  String get emptyPlaylist => 'Empty – drag tracks here';
+
+  @override
+  String get playlistOnAllDevices => 'On all devices';
+
+  @override
+  String get playlistOnThisDevice => 'Only on this device';
 }

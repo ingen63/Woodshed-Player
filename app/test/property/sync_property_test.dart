@@ -11,6 +11,9 @@
 // - #107/AK8: a device that would lose own tracks or folders to the purge horizon asks first; the test
 //   answers at random («Keep», «Remove» or not yet). Without «Remove» no track that was never deleted is
 //   lost; the exception «last changed before the horizon» (#98/AK5) holds only after «Remove».
+// - #114: playlists are created, renamed, filled, reordered, emptied, deleted and switched between «on all
+//   devices» and «only on this device» at random; the merge stays commutative and associative, the devices
+//   converge, and a playlist only on one device never reaches another device or the cloud (#114/AK10).
 // - AK7, #53/AK5: a damaged device file in the cloud (foreign version number, missing stamps, changed
 //   types, extreme values, truncated) never crashes the sync and never loses local data; it is skipped
 //   without an error (a newer format gets an understandable message in every language) and read again
@@ -31,7 +34,8 @@ import 'package:woodshed_player/ui/messages.dart';
 
 import '../fakes.dart';
 import 'corrupt.dart';
-import 'library_property_test.dart' show randomSettings, randomText;
+import 'library_property_test.dart'
+    show playlistStep, randomSettings, randomText;
 import 'property.dart';
 
 final en = lookupAppLocalizations(const Locale('en'));
@@ -137,7 +141,7 @@ void main() {
           clock = clock.add(Duration(days: 85 + r.nextInt(20)));
           log.add('+days');
         }
-        switch (r.nextInt(9)) {
+        switch (r.nextInt(10)) {
           case 0 || 1:
             final names = [
               for (final s in sources.keys)
@@ -181,6 +185,8 @@ void main() {
               lib.updateSettings(pick(r, ids), randomSettings(r));
               log.add('${d.name} settings');
             }
+          case 7:
+            log.add('${d.name} ${playlistStep(r, lib)}');
           default:
             if (step < joinAt[d]!) {
               log.add('${d.name} not yet');
@@ -293,6 +299,28 @@ void main() {
           isTrue,
           reason: 'audio not in the cloud: $reason',
         );
+      }
+
+      // #114/AK10: a playlist only on one device is known to no other device and to no file in the cloud.
+      final cloudText = [for (final b in cloud.files.values) latin1.decode(b)]
+          .join();
+      for (final d in devices) {
+        for (final p in d.library.playlists.where((p) => !p.shared)) {
+          expect(cloudText, isNot(contains(p.id)), reason: reason);
+          for (final e in devices.where((e) => e != d)) {
+            expect(
+              e.library.state.playlists.containsKey(p.id),
+              isFalse,
+              reason: '${p.name} reached ${e.name}: $reason',
+            );
+          }
+        }
+        // #114/AK7: a playlist lists only tracks of the library
+        for (final p in d.library.playlists) {
+          for (final t in d.library.playlistTracks(p.id)) {
+            expect(d.library.track(t.id), isNotNull, reason: reason);
+          }
+        }
       }
 
       // What each device saved loads again as the same state.

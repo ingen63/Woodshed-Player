@@ -1163,7 +1163,7 @@ abstract class AppLocalizations {
   /// No description provided for @heldExplain.
   ///
   /// In en, this message translates to:
-  /// **'Keep: they stay here and go to your other devices. Remove: they are deleted on this device, with their audio files; the tracks of a removed folder stay.'**
+  /// **'Keep: they stay here and go to your other devices. Remove: they are deleted on this device, with their audio files; the tracks of a removed folder or playlist stay.'**
   String get heldExplain;
 
   /// No description provided for @heldKeep.
@@ -1183,6 +1183,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Later'**
   String get heldLater;
+
+  /// #114: section of the library
+  ///
+  /// In en, this message translates to:
+  /// **'Playlists'**
+  String get playlists;
+
+  /// #114: title of the name dialog and default name
+  ///
+  /// In en, this message translates to:
+  /// **'New playlist'**
+  String get newPlaylist;
+
+  /// #114: menu item
+  ///
+  /// In en, this message translates to:
+  /// **'New playlist …'**
+  String get newPlaylistEllipsis;
+
+  /// #114: title of the name dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Rename playlist'**
+  String get renamePlaylist;
+
+  /// #114
+  ///
+  /// In en, this message translates to:
+  /// **'Delete playlist'**
+  String get deletePlaylist;
+
+  /// #114: question before deleting a playlist
+  ///
+  /// In en, this message translates to:
+  /// **'The tracks stay in the library.'**
+  String get deletePlaylistText;
+
+  /// #114: plays the playlist from its first track
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get playPlaylist;
+
+  /// #114: tooltip of the «⋯» button
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist actions'**
+  String get playlistActions;
+
+  /// #114: submenu of a track
+  ///
+  /// In en, this message translates to:
+  /// **'Add to playlist'**
+  String get addToPlaylist;
+
+  /// #114: the track stays in the library
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from playlist'**
+  String get removeFromPlaylist;
+
+  /// #114
+  ///
+  /// In en, this message translates to:
+  /// **'Empty – drag tracks here'**
+  String get emptyPlaylist;
+
+  /// #114/AK9: synced with the paired devices
+  ///
+  /// In en, this message translates to:
+  /// **'On all devices'**
+  String get playlistOnAllDevices;
+
+  /// #114/AK9: never leaves this device
+  ///
+  /// In en, this message translates to:
+  /// **'Only on this device'**
+  String get playlistOnThisDevice;
 }
 
 class _AppLocalizationsDelegate

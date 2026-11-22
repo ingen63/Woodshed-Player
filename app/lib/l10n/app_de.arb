@@ -177,8 +177,21 @@
   "heldTitle": "Titel und Ordner behalten?",
   "heldText": "{count, plural, =1{Dieses Gerät war lange offline. Dieser Titel oder Ordner wurde nie abgeglichen und ist inzwischen vielleicht auf einem anderen Gerät gelöscht worden:} other{Dieses Gerät war lange offline. Diese {count} Titel und Ordner wurden nie abgeglichen und sind inzwischen vielleicht auf einem anderen Gerät gelöscht worden:}}",
   "heldMore": "{count, plural, =1{und 1 weiterer} other{und {count} weitere}}",
-  "heldExplain": "Behalten: Sie bleiben hier und kommen auf Deine anderen Geräte. Entfernen: Sie werden auf diesem Gerät gelöscht, samt Audiodatei; die Titel eines entfernten Ordners bleiben.",
+  "heldExplain": "Behalten: Sie bleiben hier und kommen auf Deine anderen Geräte. Entfernen: Sie werden auf diesem Gerät gelöscht, samt Audiodatei; die Titel eines entfernten Ordners oder einer entfernten Playlist bleiben.",
   "heldKeep": "Behalten",
   "heldRemove": "Entfernen",
-  "heldLater": "Später"
+  "heldLater": "Später",
+  "playlists": "Playlists",
+  "newPlaylist": "Neue Playlist",
+  "newPlaylistEllipsis": "Neue Playlist …",
+  "renamePlaylist": "Playlist umbenennen",
+  "deletePlaylist": "Playlist löschen",
+  "deletePlaylistText": "Die Titel bleiben in der Bibliothek.",
+  "playPlaylist": "Abspielen",
+  "playlistActions": "Playlist-Aktionen",
+  "addToPlaylist": "Zu Playlist hinzufügen",
+  "removeFromPlaylist": "Aus Playlist entfernen",
+  "emptyPlaylist": "Leer – Titel hierher ziehen",
+  "playlistOnAllDevices": "Auf allen Geräten",
+  "playlistOnThisDevice": "Nur auf diesem Gerät"
 }

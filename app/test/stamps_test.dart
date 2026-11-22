@@ -199,44 +199,50 @@ void main() {
       },
     );
 
-    test(
-      '#98 merging with horizons stays commutative, associative and idempotent',
-      () {
-        final r = Random(98);
-        Hlc h() => Hlc(r.nextInt(6), r.nextInt(2), 'abc'[r.nextInt(3)]);
-        StampedRecord one() {
-          final values = <String, Object?>{
-            for (final k in ['title', 'speed'])
-              if (r.nextBool()) k: r.nextInt(3),
-          };
-          return StampedRecord(values, {
-            for (final k in values.keys) k: h(),
-          }, r.nextInt(3) == 0 ? h() : null);
-        }
+    test('#98, #114 merging with horizons stays commutative, associative and idempotent', () {
+      final r = Random(98);
+      Hlc h() => Hlc(r.nextInt(6), r.nextInt(2), 'abc'[r.nextInt(3)]);
+      StampedRecord one() {
+        final values = <String, Object?>{
+          for (final k in ['title', 'speed'])
+            if (r.nextBool()) k: r.nextInt(3),
+          // #114: the rows of a playlist, one list value; equal stamps with other rows are possible
+          if (r.nextBool())
+            'entries': [
+              for (var i = r.nextInt(3); i > 0; i--) 't${r.nextInt(3)}',
+            ],
+        };
+        return StampedRecord(values, {
+          for (final k in values.keys) k: h(),
+        }, r.nextInt(3) == 0 ? h() : null);
+      }
 
-        SharedState state() => SharedState(
-          tracks: {
-            for (final id in ['t1', 't2', 't3'])
-              if (r.nextBool()) id: one(),
-          },
-          folders: {
-            for (final id in ['f1', 'f2'])
-              if (r.nextBool()) id: one(),
-          },
-          purged: r.nextBool() ? h() : null,
-        );
-        void same(SharedState a, SharedState b) =>
-            expect(sameJson(a.toJson(), b.toJson()), isTrue);
-        for (var i = 0; i < 500; i++) {
-          final s = [state(), state(), state()];
-          same(s[0].merge(s[1]), s[1].merge(s[0]));
-          same(s[0].merge(s[1]).merge(s[2]), s[0].merge(s[1].merge(s[2])));
-          final m = s[0].merge(s[1]);
-          same(m.merge(m), m);
-          same(m.merge(s[1]), m);
-        }
-      },
-    );
+      SharedState state() => SharedState(
+        tracks: {
+          for (final id in ['t1', 't2', 't3'])
+            if (r.nextBool()) id: one(),
+        },
+        folders: {
+          for (final id in ['f1', 'f2'])
+            if (r.nextBool()) id: one(),
+        },
+        playlists: {
+          for (final id in ['p1', 'p2'])
+            if (r.nextBool()) id: one(),
+        },
+        purged: r.nextBool() ? h() : null,
+      );
+      void same(SharedState a, SharedState b) =>
+          expect(sameJson(a.toJson(), b.toJson()), isTrue);
+      for (var i = 0; i < 500; i++) {
+        final s = [state(), state(), state()];
+        same(s[0].merge(s[1]), s[1].merge(s[0]));
+        same(s[0].merge(s[1]).merge(s[2]), s[0].merge(s[1].merge(s[2])));
+        final m = s[0].merge(s[1]);
+        same(m.merge(m), m);
+        same(m.merge(s[1]), m);
+      }
+    });
   });
 
   group('#104 the purge horizon only after the first sync', () {

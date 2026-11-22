@@ -538,8 +538,60 @@
       }
     }
   },
-  "heldExplain": "Keep: they stay here and go to your other devices. Remove: they are deleted on this device, with their audio files; the tracks of a removed folder stay.",
+  "heldExplain": "Keep: they stay here and go to your other devices. Remove: they are deleted on this device, with their audio files; the tracks of a removed folder or playlist stay.",
   "heldKeep": "Keep",
   "heldRemove": "Remove",
-  "heldLater": "Later"
+  "heldLater": "Later",
+  "playlists": "Playlists",
+  "@playlists": {
+    "description": "#114: section of the library"
+  },
+  "newPlaylist": "New playlist",
+  "@newPlaylist": {
+    "description": "#114: title of the name dialog and default name"
+  },
+  "newPlaylistEllipsis": "New playlist …",
+  "@newPlaylistEllipsis": {
+    "description": "#114: menu item"
+  },
+  "renamePlaylist": "Rename playlist",
+  "@renamePlaylist": {
+    "description": "#114: title of the name dialog"
+  },
+  "deletePlaylist": "Delete playlist",
+  "@deletePlaylist": {
+    "description": "#114"
+  },
+  "deletePlaylistText": "The tracks stay in the library.",
+  "@deletePlaylistText": {
+    "description": "#114: question before deleting a playlist"
+  },
+  "playPlaylist": "Play",
+  "@playPlaylist": {
+    "description": "#114: plays the playlist from its first track"
+  },
+  "playlistActions": "Playlist actions",
+  "@playlistActions": {
+    "description": "#114: tooltip of the «⋯» button"
+  },
+  "addToPlaylist": "Add to playlist",
+  "@addToPlaylist": {
+    "description": "#114: submenu of a track"
+  },
+  "removeFromPlaylist": "Remove from playlist",
+  "@removeFromPlaylist": {
+    "description": "#114: the track stays in the library"
+  },
+  "emptyPlaylist": "Empty – drag tracks here",
+  "@emptyPlaylist": {
+    "description": "#114"
+  },
+  "playlistOnAllDevices": "On all devices",
+  "@playlistOnAllDevices": {
+    "description": "#114/AK9: synced with the paired devices"
+  },
+  "playlistOnThisDevice": "Only on this device",
+  "@playlistOnThisDevice": {
+    "description": "#114/AK9: never leaves this device"
+  }
 }

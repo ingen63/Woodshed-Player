@@ -38,6 +38,13 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
   /// Wird bei jeder Änderung der Einstellungen des geladenen Titels gerufen (zum Speichern in der Bibliothek).
   void Function(String trackId, PlaybackSettings settings)? onSettingsChanged;
 
+  /// #114/AK5: the loaded track played to its end by itself (not paused, not stopped in a loop). An active
+  /// loop never ends, so a playlist repeats it instead of going on (#114/AK6).
+  void Function()? onEnded;
+
+  /// #114: within this distance of the end (seconds) a stop of the core counts as the end of the track.
+  static const endTolerance = 0.25;
+
   // ---- Zustand ----
   String? _title, _path, _trackId;
   double _position = 0, _duration = 0, _volume = 1.0, _loadProgress = 0;
@@ -120,8 +127,17 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
   @visibleForTesting
   void tick() {
     if (_pending != null) _pollLoad();
+    var ended = false;
     if (hasTrack) {
       final corePlaying = core.isPlaying;
+      // #114/AK5: the core stops by itself at the end of the track; a pause sets _playing at once
+      ended =
+          _playing &&
+          !corePlaying &&
+          _playGrace <= 0 &&
+          _seekTarget == null &&
+          activeLoop == null &&
+          core.position >= _duration - endTolerance;
       if (corePlaying || _playGrace <= 0) _playing = corePlaying;
       if (_playGrace > 0) _playGrace--;
       _updatePosition(
@@ -135,6 +151,7 @@ class PlayerService extends ChangeNotifier implements TitleTransport {
       _timer = null;
     }
     notifyListeners();
+    if (ended) onEnded?.call();
   }
 
   /// Takes the core's position, unless a seek is still on its way to the core (#73).

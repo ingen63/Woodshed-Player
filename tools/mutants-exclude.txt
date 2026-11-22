@@ -319,6 +319,9 @@ app/lib/library/library.dart | dart_gt_to_ge | final id = bytes.length > _hashIn
 # dabei die Mengen. Den Fall «kein Eintrag» gibt es hier also nicht.
 app/lib/library/library.dart | dart_false_to_true | if (_state.tracks[id]?.alive ?? false) id,
 app/lib/library/library.dart | dart_false_to_true | if (_state.folders[id]?.alive ?? false) id,
+# gleichwertig: (#114) Dasselbe für heldPlaylists; load() filtert auf vorhandene, mergeRemote hält nur
+# vorhandene zurück.
+app/lib/library/library.dart | dart_false_to_true | if (_state.playlists[id]?.alive ?? false) id,
 # gleichwertig: Ein zurückgehaltener Titel ist nie «ohne Datei hier»: Er wurde nie abgeglichen, also
 # hier importiert und nie hochgeladen, und aus dem Zwischenspeicher fällt nur, was in der Cloud liegt.
 app/lib/library/library.dart | dart_remove_void_call | _absent.removeAll(tracks);

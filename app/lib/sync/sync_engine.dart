@@ -576,6 +576,9 @@ class CloudSync extends SyncService {
       for (final e in state.folders.entries) {
         TrackFolder.fromShared(e.key, e.value.values);
       }
+      for (final e in state.playlists.entries) {
+        Playlist.fromShared(e.key, e.value.values);
+      }
       TrackSortOrder.parse(state.settings.values['sortOrder'] as String?);
       final g = j['generation'];
       final w = j['written'];

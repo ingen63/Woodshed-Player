@@ -43,6 +43,8 @@ abstract final class WsIcons {
   );
   static const close = IconData(0xf404, fontFamily: _f, fontPackage: _p);
   static const cloud = IconData(0xf5f4, fontFamily: _f, fontPackage: _p);
+  static const laptop = IconData(0xf8cd, fontFamily: _f, fontPackage: _p);
+  static const phone = IconData(0xf8cf, fontFamily: _f, fontPackage: _p);
   static const share = IconData(0xf4ca, fontFamily: _f, fontPackage: _p);
   static const folderBadgePlus = IconData(
     0xf678,

@@ -716,7 +716,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get heldExplain =>
-      'Behalten: Sie bleiben hier und kommen auf Deine anderen Geräte. Entfernen: Sie werden auf diesem Gerät gelöscht, samt Audiodatei; die Titel eines entfernten Ordners bleiben.';
+      'Behalten: Sie bleiben hier und kommen auf Deine anderen Geräte. Entfernen: Sie werden auf diesem Gerät gelöscht, samt Audiodatei; die Titel eines entfernten Ordners oder einer entfernten Playlist bleiben.';
 
   @override
   String get heldKeep => 'Behalten';
@@ -726,4 +726,43 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get heldLater => 'Später';
+
+  @override
+  String get playlists => 'Playlists';
+
+  @override
+  String get newPlaylist => 'Neue Playlist';
+
+  @override
+  String get newPlaylistEllipsis => 'Neue Playlist …';
+
+  @override
+  String get renamePlaylist => 'Playlist umbenennen';
+
+  @override
+  String get deletePlaylist => 'Playlist löschen';
+
+  @override
+  String get deletePlaylistText => 'Die Titel bleiben in der Bibliothek.';
+
+  @override
+  String get playPlaylist => 'Abspielen';
+
+  @override
+  String get playlistActions => 'Playlist-Aktionen';
+
+  @override
+  String get addToPlaylist => 'Zu Playlist hinzufügen';
+
+  @override
+  String get removeFromPlaylist => 'Aus Playlist entfernen';
+
+  @override
+  String get emptyPlaylist => 'Leer – Titel hierher ziehen';
+
+  @override
+  String get playlistOnAllDevices => 'Auf allen Geräten';
+
+  @override
+  String get playlistOnThisDevice => 'Nur auf diesem Gerät';
 }
