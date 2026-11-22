@@ -443,18 +443,33 @@ void main() {
       expect(
         makefile,
         contains(
-          '\nmutants:\n\tdart app/tool/mutants_run.dart --jobs \$(MUTANTS_JOBS)',
+          '\nmutants: clean-tmp\n\tdart app/tool/mutants_run.dart --jobs \$(MUTANTS_JOBS)',
         ),
       );
       expect(
         makefile,
         contains(
-          '\nmutants-diff:\n\tdart app/tool/mutants_run.dart --base \$(BASE) --jobs',
+          '\nmutants-diff: clean-tmp\n\tdart app/tool/mutants_run.dart --base \$(BASE) --jobs',
         ),
       );
       expect(makefile, contains('BASE ?= origin/main'));
       expect(makefile, contains('tool/mutants_test.dart'));
     });
+
+    test(
+      'test runs first remove what aborted runs left in the temp directory',
+      () {
+        expect(makefile, contains('\nclean-tmp:\n\t@tools/clean-tmp.sh\n'));
+        for (final target in [
+          'test:',
+          'test-ui:',
+          'mutants:',
+          'mutants-diff:',
+        ]) {
+          expect(makefile, contains('\n$target clean-tmp'), reason: target);
+        }
+      },
+    );
 
     test('the mutants-diff job runs nightly against the last nightly run and reports the missed', () {
       final j = job(workflow, 'mutants-diff');

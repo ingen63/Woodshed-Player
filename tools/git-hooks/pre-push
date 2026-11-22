@@ -26,6 +26,9 @@ if [ -z "$min" ]; then
   exit 1
 fi
 
+# what aborted test runs left in $TMPDIR (flutter_tools.*, wp_*)
+[ -x tools/clean-tmp.sh ] && tools/clean-tmp.sh || true
+
 log="${TMPDIR:-/tmp}/woodshed-pre-push.log"
 echo "pre-push: running all tests with coverage (make coverage-run), log: $log"
 if ! make coverage-run >"$log" 2>&1; then

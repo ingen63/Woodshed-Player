@@ -43,6 +43,9 @@ test_re='(Tests?/|/tests?/|_tests?\.(dart|cpp)$)'
 code="$(printf '%s\n' "$changed" | grep -E "$code_re" || true)"
 non_test="$(printf '%s\n' "$code" | grep -vE "$test_re" || true)"
 
+# what aborted test runs left in $TMPDIR (flutter_tools.*, wp_*)
+[ -x tools/clean-tmp.sh ] && tools/clean-tmp.sh >/dev/null 2>&1 || true
+
 steps=()   # «Name|Befehl»
 if [ -n "$non_test" ] || [ -n "$code" ]; then
   if has '^core/'; then

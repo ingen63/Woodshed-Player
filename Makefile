@@ -4,7 +4,7 @@
 .PHONY: help test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools format format-check lint lint-dart \
         lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
         mutants-diff fuzz fuzz-wasm fuzz-wasm-build fuzz-wasm-findings report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
-        test-ui test-ios test-web test-web-start smoke-app pseudo-l10n bench
+        test-ui test-ios test-web test-web-start smoke-app pseudo-l10n bench clean-tmp
 
 SHELL := /bin/bash
 # A failing build must not be hidden by `| tail` (GNU Make 3.81 on macOS has no .SHELLFLAGS).
@@ -34,6 +34,7 @@ CPP_FILES  = $(LS_FILES) -- core | grep -v '^core/third_party/' | grep -E '\.(c|
 
 help:
 	@echo "make test           core (ctest), app (flutter test) and the hook tests"
+	@echo "make clean-tmp      remove what aborted test runs left in the temp directory (unchanged for 60 min)"
 	@echo "make test-wasm      core tests under Node.js (Emscripten)"
 	@echo "make test-core-debug core tests in a Debug build (same cases and tolerances as Release)"
 	@echo "make sanitize       core tests with AddressSanitizer and UndefinedBehaviorSanitizer"
@@ -60,7 +61,12 @@ help:
 	@echo "make report         overview page of the test quality: local/test-quality/report/index.html"
 
 # ---- Tests ----
-test: test-core test-app test-tools
+test: clean-tmp test-core test-app test-tools
+
+# Removes what aborted runs left in $TMPDIR (flutter_tools.* of about 240 MB each, wp_* test
+# directories), unchanged for 60 minutes; see tools/clean-tmp.sh.
+clean-tmp:
+	@tools/clean-tmp.sh
 
 test-core:
 	cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release >/dev/null
@@ -100,7 +106,7 @@ test-app:
 # coverage check and diff, pre-push hook (#8/AK6)
 TOOL_TESTS = tool/after_commit_hook_test.dart tool/coverage_test.dart tool/pre_push_hook_test.dart \
              tool/network_free_test.dart tool/mutants_test.dart tool/report/report_test.dart \
-             tool/web_start_check_test.dart
+             tool/web_start_check_test.dart tool/clean_tmp_test.dart
 test-tools:
 	@$(QA_DIRS)
 	cd app && flutter test --reporter failures-only $(call FLUTTER_JSON,tools) $(TOOL_TESTS)
@@ -294,7 +300,7 @@ network-free:
 # ---- UI tests, web tests and the app smoke test (#13), docs/TESTS.md ----
 # UI tests with the real core: start, import, play/pause, loop, tempo, shortcuts, pseudo language.
 # Without an audio device: make test-ui WP_AUDIO_BACKEND=null (the core's null device).
-test-ui:
+test-ui: clean-tmp
 	cd app && $(if $(WP_AUDIO_BACKEND),WP_AUDIO_BACKEND=$(WP_AUDIO_BACKEND) )flutter test integration_test -d macos
 
 # #99/AK2: the smoke test with the real core on an iOS simulator (tools/ios_sim_test.sh). WP_IOS_DEVICE
@@ -362,10 +368,10 @@ bench:
 # MUTANTS_ARGS e.g. "--part core", "--file engine", "--fresh" (forget the Mull cache).
 MUTANTS_JOBS ?= 4
 MUTANTS_ARGS ?=
-mutants:
+mutants: clean-tmp
 	dart app/tool/mutants_run.dart --jobs $(MUTANTS_JOBS) $(MUTANTS_ARGS)
 
-mutants-diff:
+mutants-diff: clean-tmp
 	dart app/tool/mutants_run.dart --base $(BASE) --jobs $(MUTANTS_JOBS) $(MUTANTS_ARGS)
 
 # ---- Overview page of the test quality (#12), docs/TESTS.md ----

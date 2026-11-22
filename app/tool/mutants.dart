@@ -708,6 +708,10 @@ List<int> _tree(int root, Map<int, List<int>> children) {
 /// Runs [executable] and ends it with its whole process tree when it takes longer than
 /// [timeout] or the tree holds more than [memoryMiB] of resident memory (checked every
 /// [poll]). macOS has no address space limit for processes, so the tree is watched from outside.
+///
+/// The run gets its own temporary directory (TMPDIR) that is removed afterwards, however it ended:
+/// a killed `flutter test` leaves its flutter_tools.* directory (about 240 MB) and the test
+/// directories behind, and those would pile up in the system's temporary directory.
 Future<RunResult> runLimited(
   String executable,
   List<String> args, {
@@ -718,6 +722,37 @@ Future<RunResult> runLimited(
   Duration poll = const Duration(milliseconds: 250),
 }) async {
   final watch = Stopwatch()..start();
+  final tmp = Directory.systemTemp.createTempSync('wp-run-');
+  try {
+    return await _runLimited(
+      executable,
+      args,
+      watch,
+      workingDirectory: workingDirectory,
+      timeout: timeout,
+      memoryMiB: memoryMiB,
+      environment: {...?environment, 'TMPDIR': tmp.path},
+      poll: poll,
+    );
+  } finally {
+    try {
+      tmp.deleteSync(recursive: true);
+    } on FileSystemException {
+      // a process outside the tree may still write there; make clean-tmp removes it later
+    }
+  }
+}
+
+Future<RunResult> _runLimited(
+  String executable,
+  List<String> args,
+  Stopwatch watch, {
+  required String workingDirectory,
+  required Duration timeout,
+  required int memoryMiB,
+  required Map<String, String> environment,
+  required Duration poll,
+}) async {
   final p = await Process.start(
     executable,
     args,

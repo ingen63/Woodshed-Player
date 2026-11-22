@@ -386,6 +386,40 @@ void main() {
     });
   });
 
+  group('a limited run leaves nothing in the temporary directory', () {
+    // like flutter test: a directory with a file in TMPDIR, removed only on a normal end
+    const leave =
+        r'd="$TMPDIR/flutter_tools.x"; mkdir -p "$d"; echo x > "$d/f"; echo "TMP=$TMPDIR"';
+    String tmpOf(RunResult r) =>
+        RegExp(r'TMP=(\S+)').firstMatch(r.output)!.group(1)!;
+
+    test('a run killed at the time limit', () async {
+      final r = await runLimited(
+        'sh',
+        ['-c', '$leave; while :; do :; done'],
+        workingDirectory: Directory.systemTemp.path,
+        timeout: const Duration(seconds: 1),
+        memoryMiB: 1024,
+      );
+      expect(r.end, RunEnd.timeout);
+      final tmp = tmpOf(r);
+      expect(tmp, isNot(Directory.systemTemp.path));
+      expect(Directory(tmp).existsSync(), isFalse);
+    });
+
+    test('a run that ends normally', () async {
+      final r = await runLimited(
+        'sh',
+        ['-c', leave],
+        workingDirectory: Directory.systemTemp.path,
+        timeout: const Duration(seconds: 10),
+        memoryMiB: 1024,
+      );
+      expect(r.end, RunEnd.passed);
+      expect(Directory(tmpOf(r)).existsSync(), isFalse);
+    });
+  });
+
   group('#103/AK1: output of a failed original test', () {
     test('only a failed original test is recognised', () {
       expect(
