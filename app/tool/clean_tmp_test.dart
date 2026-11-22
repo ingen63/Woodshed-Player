@@ -58,5 +58,5 @@ void main() {
 }
 
 String _touch(DateTime t) =>
-    '${t.year}${_2(t.month)}${_2(t.day)}${_2(t.hour)}${_2(t.minute)}';
-String _2(int v) => v.toString().padLeft(2, '0');
+    '${t.year}${_pad(t.month)}${_pad(t.day)}${_pad(t.hour)}${_pad(t.minute)}';
+String _pad(int v) => v.toString().padLeft(2, '0');
