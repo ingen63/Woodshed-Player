@@ -104,6 +104,11 @@ void main() {
       expect(index, contains('href="app/"'));
       expect(index, isNot(contains('<!--app-->')));
       expect(File('${tmp.path}/out/w0/index.html').existsSync(), isTrue);
+      expect(
+        File('${tmp.path}/out/m0/index.html').existsSync(),
+        isTrue,
+        reason: '#52',
+      );
       expect(File('${tmp.path}/out/datenschutz.html').existsSync(), isTrue);
     }, skip: !python);
 

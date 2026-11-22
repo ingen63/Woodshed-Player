@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Builds the public GitHub Pages site (#50): start page, privacy policy and terms as HTML, W0 test page under w0/,
-and with --app the built web app under app/ (#41).
+M0 sign-in test page under m0/ (#52) and with --app the built web app under app/ (#41).
 
 Usage: python3 site/build_site.py <output dir> [--app <flutter build web output>]
 
@@ -159,9 +159,10 @@ def main(argv: list[str], env: dict[str, str]) -> int:
 
     shutil.copy(SITE / "style.css", out / "style.css")
     shutil.copytree(ROOT / "web" / "w0", out / "w0")
+    shutil.copytree(ROOT / "web" / "m0", out / "m0")
     if app_dir is not None:
         shutil.copytree(app_dir, out / "app")
-    print(f"site built in {out}: {', '.join(sorted(pages))}, style.css, w0/" + (", app/" if app_dir else ""))
+    print(f"site built in {out}: {', '.join(sorted(pages))}, style.css, w0/, m0/" + (", app/" if app_dir else ""))
     return 0
 
 
