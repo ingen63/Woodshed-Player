@@ -66,10 +66,10 @@ abstract final class WpRecCode {
 
 /// Source of a recording (#113), the values of `WP_REC_SOURCE_*` in wp_core.h.
 enum WpRecSource {
-  /// System audio without Woodshed Player's own sound, recorded as WAV (#4).
-  system(0, 'wav'),
+  /// System audio without Woodshed Player's own sound, recorded as FLAC (#4, #118).
+  system(0, 'flac'),
 
-  /// Default input device of the system, recorded as FLAC.
+  /// Default input device of the system, recorded as FLAC (#113).
   microphone(1, 'flac');
 
   const WpRecSource(this.code, this.extension);

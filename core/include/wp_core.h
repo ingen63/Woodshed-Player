@@ -139,24 +139,24 @@ WP_API void wp_trim_free(wp_trim_result *r);
 #define WP_REC_ERR_NO_OUTPUT -5     /* no output device found */
 #define WP_REC_ERR_AGGREGATE -6     /* aggregate device could not be created */
 #define WP_REC_ERR_OUT_OF_MEMORY -7 /* no memory for the ring buffer */
-#define WP_REC_ERR_FILE -8          /* WAV file could not be created */
+#define WP_REC_ERR_FILE -8          /* recording file could not be created */
 #define WP_REC_ERR_IO_PROC -9       /* IOProc could not be created */
 #define WP_REC_ERR_START -10        /* device could not be started */
 #define WP_REC_ERR_NO_INPUT -11     /* no input device (microphone) or it could not be opened */
 /* Sources of wp_rec_start_source (#113). */
-#define WP_REC_SOURCE_SYSTEM 0 /* system audio without Woodshed Player's own sound, as WAV */
+#define WP_REC_SOURCE_SYSTEM 0 /* system audio without Woodshed Player's own sound, as FLAC */
 #define WP_REC_SOURCE_MIC 1    /* default input device of the system, as FLAC */
 /* 1 = at least one source can record on this platform, 0 = none. */
 WP_API int wp_rec_available(void);
 /* 1 = this source can record on this platform, 0 = not (unknown source: 0). */
 WP_API int wp_rec_source_available(int source);
-/* Starts recording from source into path (WAV for the system audio, FLAC for the microphone).
+/* Starts recording from source into path, as FLAC with 24 bit (#113, #118).
  * macOS asks for the microphone permission itself; without it the microphone delivers silence
  * (wp_rec_only_silence). 0 = ok, < 0 = WP_REC_ERR_* (unknown source: WP_REC_ERR_UNSUPPORTED). */
 WP_API int wp_rec_start_source(const char *path, int source);
-/* Same as wp_rec_start_source(wav_path, WP_REC_SOURCE_SYSTEM): the system audio as WAV, without
+/* Same as wp_rec_start_source(path, WP_REC_SOURCE_SYSTEM): the system audio as FLAC, without
  * Woodshed Player's own sound. 0 = ok, < 0 = WP_REC_ERR_*. */
-WP_API int wp_rec_start(const char *wav_path);
+WP_API int wp_rec_start(const char *path);
 WP_API void wp_rec_stop(void);
 WP_API int wp_rec_is_recording(void);
 WP_API double wp_rec_seconds(void);

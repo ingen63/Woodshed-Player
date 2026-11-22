@@ -14,7 +14,8 @@
 
 namespace wp::rec {
 
-// The file is always stereo at the device rate: WAV as float32, FLAC as 24-bit integers.
+// The file is always stereo at the device rate: FLAC as 24-bit integers (every recording since
+// #118), WAV as float32 (older recordings, kept for tests).
 constexpr int kChannels = 2;
 // A block whose peak stays at or below this counts as silence (macOS delivers digital silence
 // without the permission for system audio).
@@ -102,7 +103,8 @@ private:
   bool open_ = false;
 };
 
-// Format of the recorded file: system audio as WAV (#4), microphone as FLAC (#113).
+// Format of the recorded file: system audio (#118) and microphone (#113) as FLAC; WAV was the
+// format of the system audio before #118.
 enum class FileFormat { Wav, Flac };
 
 // Ring buffer, file and writer thread of one recording, plus the level meter.
@@ -115,7 +117,7 @@ public:
 
   // Allocates the ring (kRingSeconds), creates the file and starts the writer thread.
   // 0, WP_REC_ERR_OUT_OF_MEMORY or WP_REC_ERR_FILE. After an error close() cleans up.
-  int open(const char *path, double sampleRate, FileFormat format = FileFormat::Wav);
+  int open(const char *path, double sampleRate, FileFormat format);
   // Stops the writer after it has written everything in the ring, closes the file and frees the
   // ring. The level meter keeps its values (length of the finished recording).
   void close();

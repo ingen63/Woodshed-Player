@@ -192,25 +192,25 @@ void main() {
     },
   );
 
-  testWidgets(
-    '#4/AK4: after stopping the recording is a new title named after date and time',
-    (tester) async {
-      final (app, rec) = await pump(tester);
-      await tapRecord(tester);
-      expect(rec.path, endsWith('Aufnahme 2026-11-19 14.05.09.wav'));
-      await tester.runAsync(() => tapRecord(tester));
-      await waitUntil(
-        tester,
-        () => app.library.tracks.isNotEmpty,
-        'recording in the library',
-      );
-      final t = app.library.tracks.single;
-      expect(t.title, 'Aufnahme 19.11.2026 14:05:09');
-      // Renamable like any title (#24).
-      expect(app.library.editMetadata(t.id, title: 'Etüde'), isTrue);
-      expect(app.library.track(t.id)!.title, 'Etüde');
-    },
-  );
+  testWidgets('#4/AK4, #118/AK1: after stopping the system audio is a new FLAC title named after date and '
+      'time', (tester) async {
+    final (app, rec) = await pump(tester);
+    await tapRecord(tester);
+    expect(rec.source, WpRecSource.system);
+    expect(rec.path, endsWith('Aufnahme 2026-11-19 14.05.09.flac'));
+    await tester.runAsync(() => tapRecord(tester));
+    await waitUntil(
+      tester,
+      () => app.library.tracks.isNotEmpty,
+      'recording in the library',
+    );
+    final t = app.library.tracks.single;
+    expect(t.title, 'Aufnahme 19.11.2026 14:05:09');
+    expect(t.fileName, endsWith('.flac'));
+    // Renamable like any title (#24).
+    expect(app.library.editMetadata(t.id, title: 'Etüde'), isTrue);
+    expect(app.library.track(t.id)!.title, 'Etüde');
+  });
 
   test('#4/AK4: the title follows the locale', () async {
     await initializeDateFormatting();
@@ -219,37 +219,41 @@ void main() {
     expect(recordingTitle(en, stamp), 'Recording 11/19/2026 2:05:09 PM');
   });
 
-  test(
-    '#4/AK4: a recording plays with tempo and loop like any title',
-    () async {
-      final app = TestApp(Directory('${tmp.path}/lib'));
-      await app.library.load();
-      final wav = File('${tmp.path}/Recording.wav')..writeAsStringSync('wav');
-      var finished = false;
-      final added = app.controller
-          .addRecording(wav.path, title: 'Aufnahme 1')
-          .whenComplete(() => finished = true);
-      // #78/AK1: wait for states, a time limit only against a hang
-      await eventually(
-        () => app.core.loadState == WpCode.loadRunning,
-        'recording is loading',
-      );
-      await eventually(() {
-        app.finishLoads(30);
-        return finished;
-      }, 'recording added');
-      await added;
-      expect(app.player.title, 'Aufnahme 1');
-      app.player
-        ..setSpeedEnabled(true)
-        ..setSpeed(0.5)
-        ..setLoopStart(2)
-        ..setLoopEnd(6)
-        ..setLoopEnabled(true);
-      expect(app.core.rateValue, closeTo(0.5, 1e-9));
-      expect(app.core.loop, (2.0, 6.0));
-    },
-  );
+  // #118: new recordings are FLAC (AK1); older WAV recordings keep playing (AK5).
+  for (final (ext, criterion) in [('flac', '#118/AK1'), ('wav', '#118/AK5')]) {
+    test(
+      '#4/AK4, $criterion: a $ext recording plays with tempo and loop like any title',
+      () async {
+        final app = TestApp(Directory('${tmp.path}/lib'));
+        await app.library.load();
+        final file = File('${tmp.path}/Recording.$ext')..writeAsStringSync(ext);
+        var finished = false;
+        final added = app.controller
+            .addRecording(file.path, title: 'Aufnahme 1')
+            .whenComplete(() => finished = true);
+        // #78/AK1: wait for states, a time limit only against a hang
+        await eventually(
+          () => app.core.loadState == WpCode.loadRunning,
+          'recording is loading',
+        );
+        await eventually(() {
+          app.finishLoads(30);
+          return finished;
+        }, 'recording added');
+        await added;
+        expect(app.player.title, 'Aufnahme 1');
+        app.player
+          ..setSpeedEnabled(true)
+          ..setSpeed(0.5)
+          ..setLoopStart(2)
+          ..setLoopEnd(6)
+          ..setLoopEnabled(true);
+        expect(app.core.rateValue, closeTo(0.5, 1e-9));
+        expect(app.core.loop, (2.0, 6.0));
+        expect(app.library.tracks.single.fileName, endsWith('.$ext'));
+      },
+    );
+  }
 
   // ---- #113: microphone ----
 
@@ -295,7 +299,7 @@ void main() {
       await chooseSource(tester, WpRecSource.system);
       await tester.runAsync(() => tapRecord(tester));
       expect(rec.source, WpRecSource.system);
-      expect(rec.path, endsWith('.wav'));
+      expect(rec.path, endsWith('.flac')); // #118/AK1
       await tester.runAsync(() => tapRecord(tester));
     },
   );
@@ -457,7 +461,7 @@ void main() {
     expect(WpRecSource.named('tape'), isNull);
     expect(WpRecSource.named(null), isNull);
     expect(WpRecSource.microphone.extension, 'flac');
-    expect(WpRecSource.system.extension, 'wav');
+    expect(WpRecSource.system.extension, 'flac'); // #118/AK1
   });
 
   test(

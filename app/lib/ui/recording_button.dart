@@ -1,6 +1,6 @@
-// Recording as a button in the header (#30): the system audio (#4, macOS 14.2+) as WAV or the
-// microphone (#113, macOS) as FLAC, chosen in the menu next to the button and remembered on this
-// device. Finished recordings go to the library (#17), titled with date and time in the user's locale.
+// Recording as a button in the header (#30): the system audio (#4, macOS 14.2+) or the
+// microphone (#113, macOS), both as FLAC (#118), chosen in the menu next to the button and
+// remembered on this device. Finished recordings go to the library (#17), titled with date and time in the user's locale.
 import 'dart:async';
 import 'dart:io';
 

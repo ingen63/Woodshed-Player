@@ -1,9 +1,9 @@
 // Recording on macOS: the system audio (macOS 14.2+) through a Core Audio process tap, or the
-// microphone (#113, default input device through miniaudio, MicInput in recorder_core.cpp) as FLAC.
-// Ablauf: Tap auf alle Prozesse ausser Woodshed Player -> private Aggregate-Device -> IOProc ->
-// Ringpuffer
-// -> Schreib-Thread -> WAV (float32). Ohne Berechtigung liefert macOS nur Stille
-// (wp_rec_only_silence). Ring buffer, writer thread, WAV file and level are platform-independent
+// microphone (#113, default input device through miniaudio, MicInput in recorder_core.cpp), both
+// as FLAC with 24 bit (#118).
+// System audio: tap on all processes except Woodshed Player -> private aggregate device -> IOProc
+// -> ring buffer -> writer thread -> FLAC. Without the permission macOS delivers only silence
+// (wp_rec_only_silence). Ring buffer, writer thread, file and level are platform-independent
 // and tested without an audio device (recorder_core.cpp, #68); this file only drives Core Audio.
 #import <AudioToolbox/AudioToolbox.h>
 #import <CoreAudio/AudioHardwareTapping.h>
@@ -190,12 +190,12 @@ int startTap(Recorder &r, const char *path) API_AVAILABLE(macos(14.2)) {
     r.sampleRate = deviceRate;
   }
 
-  // 3. Ziel: Ringpuffer (2 s), WAV-Datei und Schreib-Thread.
-  const int opened = r.capture.open(path, r.sampleRate);
+  // 3. Target: ring buffer (2 s), FLAC file (#118) and writer thread.
+  const int opened = r.capture.open(path, r.sampleRate, wp::rec::FileFormat::Flac);
   if (opened == WP_REC_ERR_OUT_OF_MEMORY)
     return fail(r, WP_REC_ERR_OUT_OF_MEMORY, "No memory for the ring buffer");
   if (opened != 0)
-    return fail(r, WP_REC_ERR_FILE, "WAV file could not be created");
+    return fail(r, WP_REC_ERR_FILE, "FLAC file could not be created");
 
   // 4. Starten. Beim ersten Mal fragt macOS hier nach der Berechtigung für Systemaudio.
   if (!r.queue)
@@ -261,9 +261,7 @@ int wp_rec_start_source(const char *path, int source) {
   return 0;
 }
 
-int wp_rec_start(const char *wav_path) {
-  return wp_rec_start_source(wav_path, WP_REC_SOURCE_SYSTEM);
-}
+int wp_rec_start(const char *path) { return wp_rec_start_source(path, WP_REC_SOURCE_SYSTEM); }
 
 void wp_rec_stop(void) {
   auto &r = rec();

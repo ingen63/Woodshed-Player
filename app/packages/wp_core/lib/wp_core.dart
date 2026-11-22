@@ -445,11 +445,11 @@ abstract final class WpRecorder {
   static bool sourceAvailable(WpRecSource source) =>
       _recSourceAvailable(source.code) != 0;
 
-  /// Starts recording the system audio as WAV. Throws [WpRecordingException] with the error code
-  /// if it fails.
-  static void start(String wavPath) => _check(wavPath, _recStart);
+  /// Starts recording the system audio as FLAC (#118). Throws [WpRecordingException] with the
+  /// error code if it fails.
+  static void start(String path) => _check(path, _recStart);
 
-  /// Starts recording [source] into [path] (WAV or FLAC, [WpRecSource.extension]). Throws
+  /// Starts recording [source] into [path] (FLAC, [WpRecSource.extension]). Throws
   /// [WpRecordingException] with the error code if it fails.
   static void startSource(String path, WpRecSource source) =>
       _check(path, (c) => _recStartSource(c, source.code));

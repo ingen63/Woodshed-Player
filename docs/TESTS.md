@@ -118,6 +118,7 @@ zugeordnet.
 | Start, Stopp, Fehler des Kerns statt Aufnahme, Titel nach Gebietsschema, nie auf iPhone/iPad und im Browser | vorhanden: `recording_test.dart` (#4) | – |
 | Fehlermeldungen und Berechtigungsdialog mehrsprachig | vorhanden: `recording_messages_test.dart` (#44), `permission_texts_test.dart` (#49) | – |
 | Ringpuffer, Schreib-Thread, WAV-Kopf (Stereo, float32, Abtastrate des Geräts), Pegel und Stille, Übernahme der Tap-Daten (interleaved, je Kanal ein Puffer, Mono, Geräteeingänge vor dem Tap) | vorhanden: `recorder_tests.cpp` (#68, `recorder_core.cpp` ohne Audiogerät) | – |
+| Systemton als FLAC (#118): 10 s über den Tap-Weg als gültiges FLAC (Stereo, 24 bit, alle Frames), höchstens eine 24-bit-Stufe vom Signal, vom Kern geladen; 60 s FLAC höchstens halb so gross wie WAV (float32); ältere WAV-Aufnahmen laden weiter | vorhanden: `recorder_tests.cpp` (`systemAudioTenSecondsAsFlac`, `systemAudioFlacIsAtMostHalfOfWav`, `olderWavRecordingStillLoads`), `recording_test.dart` (#118/AK1, AK5); Process Tap mit echtem Systemton siehe nächste Zeile | #118 |
 | Systemton-Aufnahme im Kern (`recorder_mac.mm`: Core Audio Process Tap, Aggregate-Device, IOProc) | Lücke: braucht echten Systemton, kein automatischer Test | #51 |
 
 ### Web/WASM

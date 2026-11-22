@@ -1,7 +1,8 @@
 // Tests of the platform-independent part of the recording (#68) without an audio device: level
 // meter, ring buffer, WAV file (header and samples) and the copy of the tap layouts into the ring.
 // #113: FLAC file (libFLAC), the 10 s recording the core loads again, and the microphone input on
-// miniaudio's null backend. The Core Audio part (recorder_mac.mm) needs real system audio (#51).
+// miniaudio's null backend. #118: the system audio as FLAC, its size against WAV, older WAV takes.
+// The Core Audio part (recorder_mac.mm) needs real system audio (#51).
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -145,7 +146,7 @@ TapBuffer buffer(const std::vector<float> &data, uint32_t channels) {
 // Records one push into a file at 48 kHz and returns the decoded file.
 Decoded recordOnce(const std::vector<TapBuffer> &buffers, TapFormat format, Capture &c) {
   TempWav wav;
-  CHECK(c.open(wav.str().c_str(), 48000) == 0);
+  CHECK(c.open(wav.str().c_str(), 48000, FileFormat::Wav) == 0);
   c.push(buffers.data(), static_cast<uint32_t>(buffers.size()), format);
   c.close();
   return decode(wav.str());
@@ -407,10 +408,10 @@ void wavFailsInMissingFolder() { // #68/AK2: WP_REC_ERR_FILE
 void captureErrorCodes() { // #68/AK2: codes of wp_rec_start
   Capture c;
   TempWav wav;
-  CHECK(c.open(wav.str().c_str(), 0.0) == WP_REC_ERR_OUT_OF_MEMORY);
+  CHECK(c.open(wav.str().c_str(), 0.0, FileFormat::Wav) == WP_REC_ERR_OUT_OF_MEMORY);
   c.close();
   const auto missing = fs::temp_directory_path() / "wp_recorder_missing_dir" / "x" / "out.wav";
-  CHECK(c.open(missing.string().c_str(), 48000) == WP_REC_ERR_FILE);
+  CHECK(c.open(missing.string().c_str(), 48000, FileFormat::Wav) == WP_REC_ERR_FILE);
   CHECK(c.ring().ready()); // close() frees it
   c.close();
   CHECK(!c.ring().ready());
@@ -419,9 +420,10 @@ void captureErrorCodes() { // #68/AK2: codes of wp_rec_start
 void captureRingHoldsTwoSeconds() { // #68/AK2
   Capture c;
   TempWav wav;
-  CHECK(c.open(wav.str().c_str(), 44100) == 0);
+  CHECK(c.open(wav.str().c_str(), 44100, FileFormat::Wav) == 0);
   CHECK(c.ring().capacity() == 88200);
-  CHECK(c.open(wav.str().c_str(), 100) == 0); // a second open closes the first recording
+  CHECK(c.open(wav.str().c_str(), 100, FileFormat::Wav) ==
+        0); // a second open closes the first recording
   CHECK(c.ring().capacity() == 200);
   c.close();
   CHECK(c.ring().capacity() == 0);
@@ -510,7 +512,7 @@ void captureMoreTapChannelsThanBuffers() { // #68/AK2: only the buffers there ar
 void captureIgnoresEmptyInput() { // #68/AK2
   Capture c;
   TempWav wav;
-  CHECK(c.open(wav.str().c_str(), 48000) == 0);
+  CHECK(c.open(wav.str().c_str(), 48000, FileFormat::Wav) == 0);
   c.push(nullptr, 2, {});
   const std::vector<float> empty;
   const TapBuffer none = buffer(empty, 2);
@@ -529,7 +531,7 @@ void captureDestructorFinishesRecording() { // #68/AK2
   const auto in = ramp(500);
   {
     Capture c;
-    CHECK(c.open(wav.str().c_str(), 48000) == 0);
+    CHECK(c.open(wav.str().c_str(), 48000, FileFormat::Wav) == 0);
     const TapBuffer b = buffer(in, 2);
     c.push(&b, 1, {2, false});
   } // stops the writer thread and finishes the file
@@ -540,7 +542,7 @@ void captureDestructorFinishesRecording() { // #68/AK2
 void captureWritesEverythingOnClose() { // #68/AK2: the writer drains the ring before it stops
   Capture c;
   TempWav wav;
-  CHECK(c.open(wav.str().c_str(), 48000) == 0);
+  CHECK(c.open(wav.str().c_str(), 48000, FileFormat::Wav) == 0);
   std::vector<float> all;
   for (uint32_t k = 0; k < 10; ++k) {
     const auto part = ramp(3000, k * 3000);
@@ -730,12 +732,125 @@ void captureFlacFailsInMissingFolder() { // #113/AK4: no file, no empty title
   CHECK(!fs::exists(missing));
 }
 
-void captureWavStaysDefault() { // #113: the system audio keeps its WAV file
+// ---- System audio as FLAC (#118) ----
+
+// Test signal: a chord of three sines, the right channel a fifth lower and quieter.
+std::vector<float> chord(uint32_t frames, uint32_t rate) {
+  std::vector<float> v(static_cast<size_t>(frames) * 2);
+  for (uint32_t i = 0; i < frames; ++i) {
+    const double t = static_cast<double>(i) / rate;
+    const double a = std::sin(2.0 * kPi * 220.0 * t) + std::sin(2.0 * kPi * 277.18 * t) +
+                     std::sin(2.0 * kPi * 329.63 * t);
+    v[2 * i] = static_cast<float>(0.25 * a);
+    v[2 * i + 1] = static_cast<float>(0.2 * std::sin(2.0 * kPi * 146.83 * t));
+  }
+  return v;
+}
+
+// Pushes interleaved stereo `in` like the Core Audio tap of recorder_mac.mm: non-interleaved, one
+// buffer per channel, in blocks of 512 frames. Waits while the ring is nearly full so nothing is
+// dropped.
+void pushLikeTheTap(Capture &c, const std::vector<float> &in) {
+  constexpr uint32_t kBlock = 512;
+  const auto frames = static_cast<uint32_t>(in.size() / 2);
+  std::vector<float> left(kBlock), right(kBlock);
+  for (uint32_t done = 0; done < frames;) {
+    const uint32_t n = std::min(kBlock, frames - done);
+    for (uint32_t i = 0; i < n; ++i) {
+      left[i] = in[2 * (done + i)];
+      right[i] = in[2 * (done + i) + 1];
+    }
+    while (c.ring().capacity() - c.ring().availableRead() < n)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    const auto bytes = n * static_cast<uint32_t>(sizeof(float));
+    const TapBuffer b[2] = {{1, bytes, left.data()}, {1, bytes, right.data()}};
+    c.push(b, 2, {2, true});
+    done += n;
+  }
+}
+
+// Sample rate, channels, bits per sample and total frames from the STREAMINFO block of a FLAC
+// file (right after "fLaC" and the 4-byte block header).
+struct StreamInfo {
+  uint32_t rate = 0, channels = 0, bits = 0;
+  uint64_t frames = 0;
+};
+StreamInfo streamInfo(const std::vector<uint8_t> &b) {
+  StreamInfo s;
+  if (b.size() < 26 || std::memcmp(b.data(), "fLaC", 4) != 0 || (b[4] & 0x7f) != 0)
+    return s;
+  s.rate = static_cast<uint32_t>(b[18]) << 12 | static_cast<uint32_t>(b[19]) << 4 | b[20] >> 4;
+  s.channels = ((b[20] >> 1) & 7u) + 1;
+  s.bits = (static_cast<uint32_t>(b[20] & 1) << 4 | b[21] >> 4) + 1;
+  s.frames = static_cast<uint64_t>(b[21] & 0x0f) << 32 | static_cast<uint64_t>(b[22]) << 24 |
+             static_cast<uint64_t>(b[23]) << 16 | static_cast<uint64_t>(b[24]) << 8 | b[25];
+  return s;
+}
+
+void systemAudioTenSecondsAsFlac() { // #118/AK2
+  constexpr uint32_t kRate = 44100;
+  constexpr uint32_t kFrames = 10 * kRate;
+  TempWav f(".flac");
   Capture c;
-  TempWav f;
-  CHECK(c.open(f.str().c_str(), 48000) == 0);
+  CHECK(c.open(f.str().c_str(), kRate, FileFormat::Flac) == 0);
+  const auto in = chord(kFrames, kRate);
+  pushLikeTheTap(c, in);
   c.close();
-  CHECK(finishedWav(f.str(), 0));
+  CHECK(c.meter().frames() == kFrames);
+  // A valid FLAC file: stereo, 24 bit (FlacWriter::kDefaultBits), the device rate, every frame.
+  const auto info = streamInfo(readBytes(f.str()));
+  CHECK(info.rate == kRate);
+  CHECK(info.channels == 2);
+  CHECK(info.bits == 24);
+  CHECK(FlacWriter::kDefaultBits == 24);
+  CHECK(info.frames == kFrames);
+  // At most one step of 24 bit away from the signal.
+  const auto d = decode(f.str());
+  CHECK(d.sampleRate == kRate);
+  CHECK(d.channels == 2);
+  CHECK(maxDiff(d.samples, in) <= 1.0f / 8388607.0f);
+  // The core reads its length and loads it again: 10 s ± 0.1 s.
+  CHECK(std::fabs(wp::fileDuration(f.str()) - 10.0) <= 0.1);
+  wp::Player p(kRate);
+  CHECK(p.load(f.str()) == wp::kOk);
+  CHECK(std::fabs(p.engine().duration() - 10.0) <= 0.1);
+}
+
+void systemAudioFlacIsAtMostHalfOfWav() { // #118/AK3: 60 s, FLAC <= WAV (float32) / 2
+  constexpr uint32_t kRate = 48000;
+  const auto in = chord(60 * kRate, kRate);
+  TempWav wav(".wav"), flac(".flac");
+  for (const FileFormat format : {FileFormat::Wav, FileFormat::Flac}) {
+    const TempWav &file = format == FileFormat::Wav ? wav : flac;
+    Capture c;
+    CHECK(c.open(file.str().c_str(), kRate, format) == 0);
+    pushLikeTheTap(c, in);
+    c.close();
+    CHECK(c.meter().frames() == 60 * kRate);
+  }
+  CHECK(finishedWav(wav.str(), 60 * kRate));
+  const auto wavSize = fs::file_size(wav.path);
+  const auto flacSize = fs::file_size(flac.path);
+  std::printf("  60 s: WAV %llu bytes, FLAC %llu bytes\n", static_cast<unsigned long long>(wavSize),
+              static_cast<unsigned long long>(flacSize));
+  CHECK(flacSize > 0);
+  CHECK(2 * flacSize <= wavSize);
+}
+
+void olderWavRecordingStillLoads() { // #118/AK5: recordings before #118 were WAV (float32)
+  constexpr uint32_t kRate = 48000;
+  TempWav f;
+  const auto in = chord(kRate, kRate);
+  {
+    WavFile w;
+    CHECK(w.open(f.str().c_str(), kRate));
+    w.write(in.data(), kRate);
+  }
+  CHECK(std::fabs(wp::fileDuration(f.str()) - 1.0) <= 0.001);
+  wp::Player p(kRate);
+  CHECK(p.load(f.str()) == wp::kOk);
+  CHECK(std::fabs(p.engine().duration() - 1.0) <= 0.001);
+  CHECK(decode(f.str()).samples == in);
 }
 
 void micDeliversStereoFramesToTheCapture() { // #113/AK2, AK3: every device frame lands in the file
@@ -874,7 +989,9 @@ int main() {
       {"flacDestructorFinishesFile", flacDestructorFinishesFile},
       {"captureFlacTenSecondsLoadsInTheCore", captureFlacTenSecondsLoadsInTheCore},
       {"captureFlacFailsInMissingFolder", captureFlacFailsInMissingFolder},
-      {"captureWavStaysDefault", captureWavStaysDefault},
+      {"systemAudioTenSecondsAsFlac", systemAudioTenSecondsAsFlac},
+      {"systemAudioFlacIsAtMostHalfOfWav", systemAudioFlacIsAtMostHalfOfWav},
+      {"olderWavRecordingStillLoads", olderWavRecordingStillLoads},
       {"micRecordsTheDefaultInputIntoFlac", micRecordsTheDefaultInputIntoFlac},
       {"micDeliversStereoFramesToTheCapture", micDeliversStereoFramesToTheCapture},
       {"micStopsOnReopenAndDestruction", micStopsOnReopenAndDestruction},
