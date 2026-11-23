@@ -42,6 +42,7 @@ void main() {
       tapTempo: TapTempo(clock: () => now),
     );
     final p = c.player, m = c.metronome;
+    keepAppInFront(tester); // #134
     await dropFiles(tester, c, [t.wav]);
     await tester.pump();
 
@@ -54,9 +55,11 @@ void main() {
     await pumpUntil(tester, () => !p.isPlaying, 'paused');
     expect(p.position, greaterThan(0.2));
     await withKey(tester, LogicalKeyboardKey.altLeft, LogicalKeyboardKey.keyS);
-    expect(c.shuffle, isTrue);
+    expect(c.shuffle, isTrue, reason: focusInfo());
+    // #134 regression: another app comes to the front between two shortcuts
+    await sendToBack(tester);
     await withKey(tester, LogicalKeyboardKey.altLeft, LogicalKeyboardKey.keyR);
-    expect(c.repeat, Repeat.list);
+    expect(c.repeat, Repeat.list, reason: focusInfo());
     await tester.sendKeyEvent(
       LogicalKeyboardKey.keyM,
     ); // silent already: back to full
@@ -71,7 +74,7 @@ void main() {
     // ⌘2: the area Practice with the practice shortcuts
     await withKey(tester, command, LogicalKeyboardKey.digit2);
     await tester.pumpAndSettle();
-    expect(c.area, AppArea.practice);
+    expect(c.area, AppArea.practice, reason: focusInfo());
 
     // Space: play, space again: pause (#115/AK12: back to the start of the track)
     await tester.sendKeyEvent(LogicalKeyboardKey.space);

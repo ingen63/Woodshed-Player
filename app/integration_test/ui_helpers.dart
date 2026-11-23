@@ -4,6 +4,7 @@
 // pseudo language in pseudo_locale_test.dart). Test audio is generated (sineWav), each test works in
 // its own temporary folder, never in the real library.
 import 'dart:io';
+import 'dart:ui' show ViewFocusDirection, ViewFocusEvent, ViewFocusState;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,80 @@ import 'package:woodshed_player/app/smoke.dart';
 import 'package:woodshed_player/l10n/app_localizations.dart';
 import 'package:woodshed_player/main.dart';
 import 'package:woodshed_player/metronome/tap_tempo.dart';
+
+/// #134: keeps the app in front, as for a user who types, while a test sends simulated keys. When the
+/// window is not in front (another app active, «Failed to foreground app»), the engine reports the app as
+/// inactive and the view as unfocused, and Flutter parks the keyboard focus on the root scope until the
+/// app is active again: the simulated keys then reach no shortcut. The test ignores both reports and
+/// makes the app active and the view focused (Flutter gives the focus back to the node that had it).
+void keepAppInFront(WidgetTester tester) {
+  final binding = tester.binding;
+  binding.platformDispatcher.onViewFocusChange = (event) {
+    if (event.state == ViewFocusState.focused) {
+      binding.handleViewFocusChanged(event);
+    }
+  };
+  SystemChannels.lifecycle.setMessageHandler((message) async {
+    if (message == AppLifecycleState.resumed.toString()) _resume(binding);
+    return null;
+  });
+  addTearDown(() {
+    binding.platformDispatcher.onViewFocusChange =
+        binding.handleViewFocusChanged;
+    SystemChannels.lifecycle.setMessageHandler((message) async {
+      for (final state in AppLifecycleState.values) {
+        if (message == state.toString()) {
+          binding.handleAppLifecycleStateChanged(state);
+        }
+      }
+      return null;
+    });
+  });
+  _resume(binding);
+  binding.handleViewFocusChanged(
+    ViewFocusEvent(
+      viewId: tester.view.viewId,
+      state: ViewFocusState.focused,
+      direction: ViewFocusDirection.undefined,
+    ),
+  );
+}
+
+/// Steps to [AppLifecycleState.resumed] through the states between, as the engine does.
+void _resume(WidgetsBinding binding) {
+  const path = [
+    AppLifecycleState.paused,
+    AppLifecycleState.hidden,
+    AppLifecycleState.inactive,
+    AppLifecycleState.resumed,
+  ];
+  for (final state in path.skip(path.indexOf(binding.lifecycleState!) + 1)) {
+    binding.handleAppLifecycleStateChanged(state);
+  }
+}
+
+/// #134: what the engine reports when another app comes to the front (for the regression test).
+Future<void> sendToBack(WidgetTester tester) async {
+  tester.binding.platformDispatcher.onViewFocusChange?.call(
+    ViewFocusEvent(
+      viewId: tester.view.viewId,
+      state: ViewFocusState.unfocused,
+      direction: ViewFocusDirection.undefined,
+    ),
+  );
+  await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+    SystemChannels.lifecycle.name,
+    SystemChannels.lifecycle.codec.encodeMessage(
+      AppLifecycleState.inactive.toString(),
+    ),
+    (_) {},
+  );
+}
+
+/// #134: where the keyboard focus is, for the message of a failed shortcut.
+String focusInfo() =>
+    'focus: ${FocusManager.instance.primaryFocus}, '
+    'keys down: ${HardwareKeyboard.instance.logicalKeysPressed}';
 
 /// Protection against a hang only; a passing test never comes near it, whatever the machine's load.
 const hangGuard = Duration(seconds: 60);
