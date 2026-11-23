@@ -68,7 +68,11 @@ class DesktopGoogleAuth extends GoogleAuth {
     try {
       _refresh = await secrets.read(refreshKey);
     } catch (_) {
-      _refresh = null; // no keychain: not signed in
+      // The keychain refused: its password prompt was cancelled or denied (an ad-hoc signed build is a
+      // new app to the keychain). The stored sign-in is lost for this run; the user signs in again (hint,
+      // never during playback).
+      _refresh = null;
+      _needsSignIn = true;
     }
     notifyListeners();
   }

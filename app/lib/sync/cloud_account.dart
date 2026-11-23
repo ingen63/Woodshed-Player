@@ -161,7 +161,9 @@ class CloudAccount extends ChangeNotifier {
     final b = await loadGoogle!();
     await b.load();
     b.addListener(notifyListeners);
-    return _backend = b;
+    _backend = b;
+    notifyListeners(); // what load found (signed in, sign-in needed) is shown
+    return b;
   }
 
   /// AK7: chooses the storage. «None» signs out first; nothing local is removed.

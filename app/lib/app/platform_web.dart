@@ -16,6 +16,7 @@ import '../sync/cloud_account.dart';
 // #54/AK6: the provider module is loaded only once Google Drive is chosen
 import '../sync/providers/google_platform_web.dart' deferred as google;
 import 'app_controller.dart';
+import 'app_start.dart';
 import 'file_platform_web.dart';
 import 'file_store_web.dart';
 import 'install_hint.dart';
@@ -75,7 +76,8 @@ Future<AppController> createAppController({
   if (WebWakeLock.create() case final api?) {
     WakeLockLink(api, controller.player); // lives as long as the page
   }
-  await controller.start();
+  // #54/AK1: the first frame never waits on keychain, network or sync
+  startInBackground(controller);
   return controller;
 }
 

@@ -16,6 +16,7 @@ import '../sync/cloud_account.dart';
 import '../sync/providers/google_platform_io.dart' deferred as google;
 import '../ui/recording_button.dart';
 import 'app_controller.dart';
+import 'app_start.dart';
 import 'file_platform.dart';
 import 'file_store_io.dart';
 import 'keychain_store.dart';
@@ -77,7 +78,8 @@ Future<AppController> createAppController({
     trimmer: (bytes, start, end) =>
         Isolate.run(() => wpTrim(bytes, start, end)),
   );
-  await controller.start();
+  // #54/AK1: the first frame never waits on keychain, network or sync
+  startInBackground(controller);
   return controller;
 }
 
