@@ -213,6 +213,7 @@ int main() {
     fn();
     std::printf("%s %s\n", failures == before ? "ok  " : "FAIL", name.c_str());
   }
+  reportTimingChecks(failures);
   std::printf("%d checks, %d failures\n", checks, failures);
   return failures == 0 ? 0 : 1;
 }

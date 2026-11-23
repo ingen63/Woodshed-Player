@@ -1,11 +1,14 @@
 // #116/AK4: the Dart binding cuts files with the core. Runs against the library from core/build
-// (cmake --build core/build) and is skipped if it is missing; the formats themselves are tested in
+// (cmake --build core/build) and is skipped with the reason if it is missing; WP_MACOS_CORE_REQUIRED=1
+// (nightly job «macos», #125) makes that a failure. The formats themselves are tested in
 // core/tests/trim_tests.cpp.
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wp_core/wp_core.dart';
+
+import 'required_resource.dart';
 
 const _sr = 44100;
 
@@ -34,15 +37,17 @@ Uint8List _wav(int frames) {
 }
 
 void main() {
-  final lib = File('../core/build/libwp_core.dylib');
-  final skip = !Platform.isMacOS || !lib.existsSync()
-      ? 'core library missing (core/build)'
-      : null;
-
   test(
     '#116/AK4 #116/AK7 wpTrim cuts a WAV exactly and refuses less than 1 s',
     () {
-      wpCoreLibraryPath = lib.absolute.path;
+      if (!needs(
+        macosCoreRequired,
+        available: coreAvailable,
+        reason: coreMissing,
+      )) {
+        return;
+      }
+      wpCoreLibraryPath = coreLibrary.absolute.path;
       final wav = _wav(3 * _sr);
       // [0.5, 2.0] s: frames 22050 to 88200, 66150 frames of 2 bytes after the 44-byte header
       final r = wpTrim(wav, 0.5, 2.0);
@@ -60,11 +65,17 @@ void main() {
       expect(junk.code, WpCode.unsupportedFormat);
       expect(wpTrim(Uint8List(0), 0, 1).code, WpCode.unsupportedFormat);
     },
-    skip: skip,
   );
 
   test('#120/AK2 #120/AK4 wpTrim cuts an M4A at frame boundaries and stays an M4A with the same codec', () {
-    wpCoreLibraryPath = lib.absolute.path;
+    if (!needs(
+      macosCoreRequired,
+      available: coreAvailable,
+      reason: coreMissing,
+    )) {
+      return;
+    }
+    wpCoreLibraryPath = coreLibrary.absolute.path;
     for (final (name, codec) in [
       ('clicks3.m4a', 'mp4a'),
       ('clicks3_alac.m4a', 'alac'),
@@ -79,5 +90,5 @@ void main() {
       expect(String.fromCharCodes(out).contains(codec), isTrue, reason: name);
       expect(String.fromCharCodes(out).contains('Test Artist'), isTrue);
     }
-  }, skip: skip);
+  });
 }

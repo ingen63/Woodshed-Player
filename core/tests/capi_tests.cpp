@@ -2,7 +2,8 @@
 // binding uses it (#8: the C API had no test of its own). Every call is checked with a null
 // handle, and the calls are checked to reach the player core: load, seek, rate, loop, waveform,
 // metronome. wp_create opens the real audio device; without a device (e.g. a headless runner) the
-// load reports WP_ERR_DEVICE_UNAVAILABLE and the checks that need a loaded title are skipped.
+// load reports WP_ERR_DEVICE_UNAVAILABLE and the checks that need a loaded title are skipped with
+// the reason in the output; WP_AUDIO_DEVICE_REQUIRED=1 makes that a failure (#125).
 // With --null-backend (#13, second ctest case) the tests run on the core's null device
 // (WP_AUDIO_BACKEND=null), which every machine has: then the load must succeed and nothing is
 // skipped. Volumes are 0, so nothing is audible. Test audio: core/tests/audio/sine440.flac (440 Hz,
@@ -20,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "test_required.hpp"
 #include "wp_core.h"
 
 namespace fs = std::filesystem;
@@ -122,7 +124,9 @@ void pathEndingInDot() {
   wp_set_volume(p, 0.0f);
   const int r = wp_load(p, dotted.string().c_str());
   CHECK(r == WP_OK || (!nullBackend && r == WP_ERR_DEVICE_UNAVAILABLE));
-  if (r == WP_OK) {
+  if (wptest::needs(wptest::kAudioDeviceRequired, r != WP_ERR_DEVICE_UNAVAILABLE,
+                    "no audio device, folder load check skipped", failures) &&
+      r == WP_OK) {
     CHECK_NEAR(wp_duration(p), 1.0, 1e-3);
     const int folder = wp_load(p, ".");
     CHECK(folder == WP_ERR_UNSUPPORTED_FORMAT || folder == WP_ERR_FILE_UNREADABLE);
@@ -145,8 +149,8 @@ void loadAndTransport() {
 
   const int r = wp_load(p, kSine.c_str());
   CHECK(r == WP_OK || (!nullBackend && r == WP_ERR_DEVICE_UNAVAILABLE));
-  if (r == WP_ERR_DEVICE_UNAVAILABLE) {
-    std::printf("  note: no audio device, load checks skipped\n");
+  if (!wptest::needs(wptest::kAudioDeviceRequired, r != WP_ERR_DEVICE_UNAVAILABLE,
+                     "no audio device, load checks skipped", failures)) {
     wp_destroy(p);
     return;
   }
@@ -232,6 +236,48 @@ void recorderStartsIdle() {
   CHECK(wp_rec_is_recording() == 0);
 }
 
+// #125/AK2, AK3: unset or empty skips with the reason, 1 makes a missing resource a failure, any
+// other value fails with the variable's name and the allowed value. Messages go to a temp file.
+void requiredVariable() {
+  using wptest::Requirement;
+  CHECK(wptest::requirement(nullptr) == Requirement::Optional);
+  CHECK(wptest::requirement("") == Requirement::Optional);
+  CHECK(wptest::requirement("1") == Requirement::Required);
+  for (const char *bad : {"0", "yes", "true", " 1", "1 "})
+    CHECK(wptest::requirement(bad) == Requirement::Invalid);
+
+  const char *var = "WP_SELFTEST_REQUIRED";
+  std::FILE *out = std::tmpfile();
+  CHECK(out != nullptr);
+  if (!out)
+    return;
+  const auto written = [out] {
+    std::string text(512, '\0');
+    CHECK(std::fseek(out, 0, SEEK_SET) == 0);
+    text.resize(std::fread(text.data(), 1, text.size(), out));
+    CHECK(std::fseek(out, 0, SEEK_SET) == 0);
+    return text;
+  };
+  int f = 0;
+  unsetenv(var); // NOLINT(concurrency-mt-unsafe): single-threaded here
+  CHECK(wptest::needs(var, true, "selftest resource missing", f, out) && f == 0);
+  CHECK(!wptest::needs(var, false, "selftest resource missing", f, out) && f == 0);
+  CHECK(written().find("skipped: selftest resource missing") != std::string::npos);
+
+  setenv(var, "1", 1); // NOLINT(concurrency-mt-unsafe): single-threaded here
+  CHECK(wptest::needs(var, true, "selftest resource missing", f, out) && f == 0);
+  CHECK(!wptest::needs(var, false, "selftest resource missing", f, out) && f == 1);
+  CHECK(written().find("FAILED selftest resource missing, but WP_SELFTEST_REQUIRED=1") !=
+        std::string::npos);
+
+  setenv(var, "yes", 1); // NOLINT(concurrency-mt-unsafe): single-threaded here
+  CHECK(!wptest::needs(var, true, "selftest resource missing", f, out) && f == 2);
+  CHECK(written().find("FAILED WP_SELFTEST_REQUIRED=yes is not allowed: use 1") !=
+        std::string::npos);
+  unsetenv(var); // NOLINT(concurrency-mt-unsafe): single-threaded here
+  std::fclose(out);
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -247,6 +293,7 @@ int main(int argc, char **argv) {
       {"loadAndTransport", loadAndTransport},
       {"metronomeThroughCApi", metronomeThroughCApi},
       {"recorderStartsIdle", recorderStartsIdle},
+      {"requiredVariable", requiredVariable},
   };
   for (auto &[name, fn] : tests) {
     const int before = failures;

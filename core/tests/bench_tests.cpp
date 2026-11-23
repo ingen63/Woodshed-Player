@@ -483,8 +483,7 @@ int main(int argc, char **argv) {
     std::printf("usage: bench_tests stretch|long-file|memory-limit|reserve-fallback\n");
     return 2;
   }
-  if (!kTimingChecks)
-    std::printf("time limits skipped (no optimized build)\n");
+  reportTimingChecks(failures);
   std::printf(failures ? "%d failed\n" : "all passed\n", failures);
   return failures ? 1 : 0;
 }

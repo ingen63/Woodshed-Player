@@ -237,6 +237,35 @@ Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten 7.0.0 für 
 `llvm-cov` und `llvm-profdata` für `make coverage` müssen zum Compiler passen; auf macOS nimmt das Makefile die aus
 Xcode (`xcrun`), sonst die aus dem `PATH` bzw. Homebrew.
 
+## Pflicht-Variablen (#125)
+
+Manche Tests brauchen etwas Besonderes. Fehlt es, werden sie übersprungen, immer mit Grund in der Testausgabe
+(`Skip: …` bei `flutter test` mit `--reporter expanded`, `skipped: …` im Kern), nie mit stillem `return`. In dem
+CI-Job, der die Ressource hat, setzt eine Variable den Test auf Pflicht; fehlt die Ressource dann, schlägt er fehl.
+
+| Wert | Wirkung |
+|---|---|
+| leer oder nicht gesetzt | überspringen, Grund in der Ausgabe |
+| `1` | Pflicht: fehlt die Ressource, schlägt der Test fehl |
+| jeder andere Wert | Fehler mit Name der Variablen und erlaubtem Wert |
+
+| Variable | Ressource | Tests | Job (`test-quality.yml`) |
+|---|---|---|---|
+| `WP_MACOS_CORE_REQUIRED` | macOS mit gebautem Kern `core/build/libwp_core.dylib` | `app/test/wp_trim_ffi_test.dart`, `app/test/wp_waveform_ffi_test.dart` | `macos` (nächtlich): baut `wp_core` und führt beide Tests aus |
+| `WP_AUDIO_DEVICE_REQUIRED` | ein Audiogerät, auch das Null-Gerät (`WP_AUDIO_BACKEND=null`) | `app/test/wp_waveform_ffi_test.dart`; im Kern `capi_tests.cpp` (`pathEndingInDot`, `loadAndTransport`) | `macos` für die FFI-Tests (Null-Gerät). Die Linux-Runner haben kein Gerät: `capi_tests` überspringt dort die Ladefälle, `capi_null_backend_tests` prüft sie auf dem Null-Gerät |
+| `WP_PYTHON_REQUIRED` | `python3` für den Bau der Website | `app/test/about_test.dart` (#50), `app/test/web_hosting_test.dart` (#41) | `checks` |
+| `WP_ACTIONLINT_REQUIRED` | `actionlint` (`ACTIONLINT` oder im `PATH`) | `app/test/test_quality_workflow_test.dart` (#64/AK4) | `checks` |
+| `WP_OPTIMIZED_BUILD_REQUIRED` | optimierter Build ohne Sanitizer für die Zeitgrenzen (`core/tests/test_timing.hpp`) | `core/tests/bench_tests.cpp`, ebenso gemeldet von `engine_tests.cpp` und `waveform_tests.cpp` | `bench` (`make bench`, Release) |
+
+Die Hilfsfunktionen: `app/test/required_resource.dart` (`needs`, am Anfang des Testkörpers) und
+`core/tests/test_required.hpp` (`wptest::needs`). Geprüft werden sie in `app/test/required_resource_test.dart` und
+`capi_tests.cpp` (`requiredVariable`): Pflicht ohne Ressource ergibt einen Fehler, ein ungültiger Wert wird abgewiesen.
+`test_quality_workflow_test.dart` prüft, dass die Jobs die Variablen auf `1` setzen.
+
+Ohne Variable bleiben Ausnahmen, die keine fehlende Ressource sind; sie nennen nur ihren Grund in der Ausgabe: die
+Fälle ohne eigenen `operator new` unter ThreadSanitizer (#101, `player_tests.cpp`, `realtime_tests.cpp`,
+`bench_tests.cpp`) und die Dateirechte-Prüfung in `player_tests.cpp`, wenn der Test als root läuft.
+
 ## Formatierung und Warnungen (#7)
 
 - **Dart:** `dart format` mit Standardbreite 80 für alle Dart-Dateien unter `app/`, ausser den von `gen-l10n` erzeugten
@@ -258,7 +287,7 @@ Xcode (`xcrun`), sonst die aus dem `PATH` bzw. Homebrew.
   Version: lokal Homebrew `actionlint` (Stand 1.7.12), im Workflow fest `ACTIONLINT_VERSION` 1.7.12 mit Prüfsumme
   `ACTIONLINT_SHA256` des Linux-Archivs; beim Aktualisieren beide Werte und diese Zeile nachführen. Gegenprobe:
   `test_quality_workflow_test.dart` lässt actionlint auf einen absichtlich fehlerhaften Workflow los und erwartet
-  einen Fund (übersprungen, wenn actionlint fehlt).
+  einen Fund (übersprungen mit Grund, wenn actionlint fehlt; im Job `checks` Pflicht, #125).
 
 ## Abdeckung (#8)
 
@@ -395,7 +424,7 @@ braucht darüber einen Kommentar mit Meldung, Grund und Issue und steht in der f
 | UBSan, nur Mutationsbau | `-fno-sanitize=pointer-overflow` für `wp_miniaudio` (`core/CMakeLists.txt`), keine Datei in `*.supp` | miniaudio rechnet `ma_offset_ptr(NULL, 0)`, wenn ein Wandler keinen Heap braucht (`miniaudio.h:56323`). In C17 ist `NULL + 0` undefiniert, ab C2y definiert; clang-18 meldet es, neueres clang (Apple clang 21, clang 23, das Standard-clang von Ubuntu 26.04) nicht mehr. Die Prüfung entfällt nur für diese fremde Übersetzungseinheit; der eigene Code bleibt voll geprüft. Eine Unterdrückungsdatei wirkt nicht, weil alle Prüfungen mit `-fno-sanitize-recover=all` abbrechen. | #103 |
 
 **Grenzen.** LeakSanitizer gibt es mit ASan auf macOS nicht; Lecks prüft nur der Linux-Lauf. `capi_tests` öffnet ein
-echtes Audiogerät; ohne Gerät (Linux-Runner) überspringt er die Ladefälle, der Callback des Geräts läuft dann nicht
+echtes Audiogerät; ohne Gerät (Linux-Runner) überspringt er die Ladefälle mit Grund (#125), der Callback des Geräts läuft dann nicht
 unter den Sanitizern. Unter TSan ersetzen die Testprogramme `operator new`/`delete` nicht (#101,
 `core/tests/replace_new.hpp`): Die TSan-Laufzeit bringt eigene mit, unter Linux statisch gelinkt. Dort entfallen die
 Prüfungen, die eigene Operatoren brauchen: Zählen der Reservierungen im Audio-Thread (`engine_tests`,

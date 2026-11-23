@@ -5,6 +5,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'required_resource.dart';
+
 String read(String path) => File(path).readAsStringSync();
 
 /// The block of one job: from `  <name>:` up to the next job or the end.
@@ -963,14 +965,20 @@ void main() {
 
     test('#64/AK4 a deliberate error in a workflow is reported', () {
       final actionlint = Platform.environment['ACTIONLINT'] ?? 'actionlint';
-      final ProcessResult version;
+      ProcessResult? version;
       try {
         version = Process.runSync(actionlint, ['--version']);
       } on ProcessException {
-        markTestSkipped('actionlint not installed');
+        version = null;
+      }
+      if (!needs(
+        actionlintRequired,
+        available: version != null,
+        reason: 'actionlint not installed',
+      )) {
         return;
       }
-      expect(version.exitCode, 0);
+      expect(version!.exitCode, 0);
       final dir = Directory.systemTemp.createTempSync('wp_actionlint_');
       addTearDown(() => dir.deleteSync(recursive: true));
       final good = File('${dir.path}/good.yml')
@@ -988,6 +996,73 @@ void main() {
       final found = Process.runSync(actionlint, [bad.path]);
       expect(found.exitCode, isNot(0));
       expect('${found.stdout}', contains('no_such_property'));
+    });
+  });
+
+  group('#125 jobs with a resource make its tests required', () {
+    test('#125/AK4 checks: Python and actionlint; bench: optimized build', () {
+      final checks = job(workflow, 'checks');
+      expect(checks, contains("WP_PYTHON_REQUIRED: '1'"));
+      expect(checks, contains("WP_ACTIONLINT_REQUIRED: '1'"));
+      expect(
+        job(workflow, 'bench'),
+        contains("WP_OPTIMIZED_BUILD_REQUIRED: '1'"),
+      );
+    });
+
+    test(
+      '#125/AK4 macos builds the core and runs the FFI tests as required',
+      () {
+        final macos = job(workflow, 'macos');
+        final start = macos.indexOf(
+          '- name: FFI tests against the core library',
+        );
+        expect(start, isNot(-1));
+        final step = macos.substring(
+          start,
+          macos.indexOf('- name:', start + 1),
+        );
+        expect(step, contains("WP_MACOS_CORE_REQUIRED: '1'"));
+        expect(step, contains("WP_AUDIO_DEVICE_REQUIRED: '1'"));
+        expect(macos, contains("WP_AUDIO_BACKEND: 'null'"));
+        expect(step, contains('cmake --build core/build'));
+        expect(step, contains('--target wp_core'));
+        expect(
+          step,
+          contains(
+            'flutter test --reporter expanded test/wp_trim_ffi_test.dart test/wp_waveform_ffi_test.dart',
+          ),
+        );
+      },
+    );
+
+    test('#125/AK4 only the variables of #125, each with the value 1', () {
+      final set = RegExp(r"(WP_[A-Z_]+_REQUIRED): *'?([^'\s]*)'?")
+          .allMatches(workflow)
+          .toList();
+      expect(set, isNotEmpty);
+      for (final m in set) {
+        expect(requiredVariables, contains(m.group(1)));
+        expect(m.group(2), '1', reason: m.group(1));
+      }
+    });
+
+    test('#125/AK5 docs/TESTS.md lists every variable with its tests', () {
+      final tests = read('../docs/TESTS.md');
+      for (final v in requiredVariables) {
+        expect(tests, contains('`$v`'), reason: v);
+      }
+      for (final file in [
+        'wp_trim_ffi_test.dart',
+        'wp_waveform_ffi_test.dart',
+        'about_test.dart',
+        'web_hosting_test.dart',
+        'test_quality_workflow_test.dart',
+        'capi_tests.cpp',
+        'bench_tests.cpp',
+      ]) {
+        expect(tests, contains(file), reason: file);
+      }
     });
   });
 }

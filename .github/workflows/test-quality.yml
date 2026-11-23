@@ -22,6 +22,9 @@
 # By hand (workflow_dispatch): the push jobs; with nightly=true also every nightly job, gate or not.
 # Nightly runs have their own concurrency group: a push never cancels them (#13/AK8).
 # The checks for changed paths live in the job «changes».
+# #125: a job that provides a resource sets its WP_<RESOURCE>_REQUIRED to 1, so a test that needs it
+# fails instead of being skipped (checks: Python, actionlint; macos: core library, audio device on the
+# null device; bench: optimized build). docs/TESTS.md «Pflicht-Variablen (#125)».
 name: Test quality
 
 on:
@@ -102,6 +105,8 @@ jobs:
       CXX: clang++-18
       LLVM_COV: llvm-cov-18
       LLVM_PROFDATA: llvm-profdata-18
+      WP_PYTHON_REQUIRED: '1'  # #125: site build tests (about_test, web_hosting_test)
+      WP_ACTIONLINT_REQUIRED: '1'  # #125: installed below, test_quality_workflow_test #64/AK4
     steps:
       - uses: actions/checkout@v7
         with:
@@ -361,6 +366,15 @@ jobs:
       - name: Packages
         working-directory: app
         run: flutter pub get >/dev/null
+      - name: FFI tests against the core library (#125/AK4, #116/AK4, #28/AK6)
+        # the push runs flutter test on Linux, where these tests are skipped; here they must run
+        env:
+          WP_MACOS_CORE_REQUIRED: '1'
+          WP_AUDIO_DEVICE_REQUIRED: '1'  # the null device above
+        run: |
+          cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release >/dev/null
+          cmake --build core/build -j 4 --target wp_core 2>&1 | tail -20
+          cd app && flutter test --reporter expanded test/wp_trim_ffi_test.dart test/wp_waveform_ffi_test.dart
       - name: macOS build (debug)
         working-directory: app
         run: flutter build macos --debug
@@ -491,6 +505,7 @@ jobs:
     env:
       CC: clang
       CXX: clang++
+      WP_OPTIMIZED_BUILD_REQUIRED: '1'  # #125: make bench builds Release, the time limits must run
     steps:
       - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2

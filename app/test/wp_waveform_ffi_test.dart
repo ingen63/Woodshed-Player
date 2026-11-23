@@ -1,11 +1,15 @@
-// #28/AK6: Die Dart-Anbindung liefert die Wellenform des Kerns. Läuft gegen die Bibliothek aus core/build
-// (cmake --build core/build) und wird übersprungen, wenn sie fehlt oder kein Audiogerät da ist.
+// #28/AK6: the Dart binding returns the core's waveform. Runs against the library from core/build
+// (cmake --build core/build) and is skipped with the reason if it is missing or there is no audio
+// device; WP_MACOS_CORE_REQUIRED=1 and WP_AUDIO_DEVICE_REQUIRED=1 (nightly job «macos» on the null
+// device, #125) make that a failure.
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wp_core/wp_core.dart';
+
+import 'required_resource.dart';
 
 const _sr = 48000;
 
@@ -37,20 +41,25 @@ File _sineWav(Directory dir, double seconds, double amp) {
 }
 
 void main() {
-  final lib = File('../core/build/libwp_core.dylib');
-  final skip = !Platform.isMacOS || !lib.existsSync()
-      ? 'Kern-Bibliothek fehlt (core/build)'
-      : null;
-
   test('Wellenform eines Sinus mit Amplitude 0,5 und Fehlerfälle', () {
-    wpCoreLibraryPath = lib.absolute.path;
+    if (!needs(
+      macosCoreRequired,
+      available: coreAvailable,
+      reason: coreMissing,
+    )) {
+      return;
+    }
+    wpCoreLibraryPath = coreLibrary.absolute.path;
     final dir = Directory.systemTemp.createTempSync('wp_waveform_');
     final player = WpPlayer();
     try {
       expect(player.waveform(0, 1, 10), isNull, reason: 'no title yet');
       final r = player.loadAsync(_sineWav(dir, 2, 0.5).path);
-      if (r == WpCode.deviceUnavailable) {
-        markTestSkipped('kein Audiogerät');
+      if (!needs(
+        audioDeviceRequired,
+        available: r != WpCode.deviceUnavailable,
+        reason: 'no audio device',
+      )) {
         return;
       }
       expect(player.loadWait(), WpCode.ok);
@@ -66,5 +75,5 @@ void main() {
       player.dispose();
       dir.deleteSync(recursive: true);
     }
-  }, skip: skip);
+  });
 }

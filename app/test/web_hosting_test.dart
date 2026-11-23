@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'required_resource.dart';
+
 String read(String path) => File(path).readAsStringSync();
 
 void main() {
@@ -74,7 +76,7 @@ void main() {
   });
 
   group('#41/AK1 site build with the app', () {
-    final python = Process.runSync('which', ['python3']).exitCode == 0;
+    final python = hasPython;
     late Directory tmp;
     setUp(() => tmp = Directory.systemTemp.createTempSync('wp_site_app'));
     tearDown(() => tmp.deleteSync(recursive: true));
@@ -93,6 +95,13 @@ void main() {
     );
 
     test('puts the app under app/ and links it from the start page', () {
+      if (!needs(
+        pythonRequired,
+        available: python,
+        reason: 'python3 not installed',
+      )) {
+        return;
+      }
       final app = Directory('${tmp.path}/web')..createSync();
       File('${app.path}/index.html').writeAsStringSync('<!doctype html>');
       File('${app.path}/sw.js').writeAsStringSync('// sw');
@@ -110,9 +119,16 @@ void main() {
         reason: '#52',
       );
       expect(File('${tmp.path}/out/datenschutz.html').existsSync(), isTrue);
-    }, skip: !python);
+    });
 
     test('without a tag the app and its button are left out', () {
+      if (!needs(
+        pythonRequired,
+        available: python,
+        reason: 'python3 not installed',
+      )) {
+        return;
+      }
       final r = build([]);
       expect(r.exitCode, 0, reason: '${r.stderr}');
       expect(Directory('${tmp.path}/out/app').existsSync(), isFalse);
@@ -120,12 +136,19 @@ void main() {
         read('${tmp.path}/out/index.html'),
         isNot(contains('href="app/"')),
       );
-    }, skip: !python);
+    });
 
     test('fails when the app folder has no index.html', () {
+      if (!needs(
+        pythonRequired,
+        available: python,
+        reason: 'python3 not installed',
+      )) {
+        return;
+      }
       final r = build(['--app', '${tmp.path}/missing']);
       expect(r.exitCode, isNot(0));
-    }, skip: !python);
+    });
   });
 
   group('#41 documents', () {

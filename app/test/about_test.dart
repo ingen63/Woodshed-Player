@@ -8,6 +8,7 @@ import 'package:woodshed_player/app/file_platform.dart';
 import 'package:woodshed_player/main.dart';
 
 import 'fakes.dart';
+import 'required_resource.dart';
 
 final docs = ['../docs/DATENSCHUTZ.md', '../docs/NUTZUNGSBEDINGUNGEN.md'];
 const personPlaceholders = {
@@ -58,7 +59,7 @@ void main() {
   });
 
   group('#50 site build', () {
-    final python = Process.runSync('which', ['python3']).exitCode == 0;
+    final python = hasPython;
     late Directory tmp;
     setUp(() => tmp = Directory.systemTemp.createTempSync('wp_site'));
     tearDown(() => tmp.deleteSync(recursive: true));
@@ -77,6 +78,13 @@ void main() {
     };
 
     test('#50/AK1 builds start page, both texts and the W0 page', () {
+      if (!needs(
+        pythonRequired,
+        available: python,
+        reason: 'python3 not installed',
+      )) {
+        return;
+      }
       final r = build(secrets);
       expect(r.exitCode, 0, reason: '${r.stderr}');
       final out = '${tmp.path}/out';
@@ -96,14 +104,21 @@ void main() {
       expect(privacy, contains('Test Person'));
       expect(privacy, contains('test@example.org'));
       expect(privacy, isNot(contains('{{')));
-    }, skip: !python);
+    });
 
     test('#50/AK3 build fails when a secret is missing', () {
+      if (!needs(
+        pythonRequired,
+        available: python,
+        reason: 'python3 not installed',
+      )) {
+        return;
+      }
       final r = build({...secrets}..remove('CONTACT_EMAIL'));
       expect(r.exitCode, isNot(0));
       expect('${r.stderr}', contains('CONTACT_EMAIL'));
       expect(File('${tmp.path}/out/datenschutz.html').existsSync(), isFalse);
-    }, skip: !python);
+    });
   });
 
   group('#50 About dialog', () {
