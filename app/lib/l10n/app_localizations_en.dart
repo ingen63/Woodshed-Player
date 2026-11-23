@@ -1065,4 +1065,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String syncLine(String status) {
     return 'Sync: $status';
   }
+
+  @override
+  String get selectTracks => 'Select';
+
+  @override
+  String selectionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count selected',
+      one: '1 selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get selectionActions => 'Actions for the selected tracks';
+
+  @override
+  String get selectionDone => 'Done';
+
+  @override
+  String deleteTracksTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delete $count tracks?',
+      one: 'Delete 1 track?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteTracksText =>
+      'The tracks are removed from the app. The original files stay unchanged.';
 }

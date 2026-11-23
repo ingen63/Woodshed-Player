@@ -278,5 +278,11 @@
   "syncFreeUnknown": "Freier Platz in Google Drive unbekannt",
   "syncNoFolders": "Keine Ordner: Alle Titel werden abgeglichen.",
   "syncStart": "Abgleich starten",
-  "syncLine": "Abgleich: {status}"
+  "syncLine": "Abgleich: {status}",
+  "selectTracks": "Auswählen",
+  "selectionCount": "{count, plural, =1{1 ausgewählt} other{{count} ausgewählt}}",
+  "selectionActions": "Aktionen für die ausgewählten Titel",
+  "selectionDone": "Fertig",
+  "deleteTracksTitle": "{count, plural, =1{1 Titel löschen?} other{{count} Titel löschen?}}",
+  "deleteTracksText": "Die Titel werden aus der App entfernt. Die Originaldateien bleiben unverändert."
 }

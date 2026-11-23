@@ -1771,6 +1771,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sync: {status}'**
   String syncLine(String status);
+
+  /// #122/AK2: starts the selection mode with check marks (track menu on touch devices)
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get selectTracks;
+
+  /// #122: bar above the library while tracks are selected
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 selected} other{{count} selected}}'**
+  String selectionCount(int count);
+
+  /// #122: tooltip of the «⋯» button in the selection bar
+  ///
+  /// In en, this message translates to:
+  /// **'Actions for the selected tracks'**
+  String get selectionActions;
+
+  /// #122/AK6: ends the selection
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get selectionDone;
+
+  /// #122/AK5: one question for several tracks
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Delete 1 track?} other{Delete {count} tracks?}}'**
+  String deleteTracksTitle(int count);
+
+  /// #122/AK5
+  ///
+  /// In en, this message translates to:
+  /// **'The tracks are removed from the app. The original files stay unchanged.'**
+  String get deleteTracksText;
 }
 
 class _AppLocalizationsDelegate

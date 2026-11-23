@@ -597,6 +597,18 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get syncStart => pseudo(super.syncStart);
   @override
   String syncLine(String status) => pseudo(super.syncLine(status));
+  @override
+  String get selectTracks => pseudo(super.selectTracks);
+  @override
+  String selectionCount(int count) => pseudo(super.selectionCount(count));
+  @override
+  String get selectionActions => pseudo(super.selectionActions);
+  @override
+  String get selectionDone => pseudo(super.selectionDone);
+  @override
+  String deleteTracksTitle(int count) => pseudo(super.deleteTracksTitle(count));
+  @override
+  String get deleteTracksText => pseudo(super.deleteTracksText);
 }
 
 /// Loads [PseudoLocalizations] for any locale.

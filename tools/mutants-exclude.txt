@@ -634,3 +634,5 @@ app/lib/sync/providers/http_transport_io.dart | dart_false_to_true | final bytes
 # dann höchstens eine ruhende Keep-alive-Verbindung, die close() auch ohne force sofort beendet (Test
 # «a browser that keeps its connection open» in google_drive_details_test.dart).
 app/lib/sync/providers/google_auth_desktop.dart | dart_true_to_false | await server?.close(force: true);
+# gleichwertig: Bei from == to ergeben beide Zweige dasselbe Paar (#122).
+app/lib/app/track_selection.dart | dart_le_to_lt | final (a, b) = from <= to ? (from, to) : (to, from);

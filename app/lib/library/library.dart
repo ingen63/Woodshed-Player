@@ -1181,6 +1181,18 @@ class Library extends ChangeNotifier {
   List<TrackFolder> get sortedFolders =>
       sortedNaturally(_folders, (f) => f.name);
 
+  /// #122/AK3: the tracks as the library lists them: without a folder first, then folder by folder.
+  List<Track> get listedTracks {
+    final byFolder = <String?, List<Track>>{};
+    for (final t in sortedTracks) {
+      (byFolder[t.folderId] ??= []).add(t);
+    }
+    return [
+      ...?byFolder[null],
+      for (final f in sortedFolders) ...?byFolder[f.id],
+    ];
+  }
+
   /// Titel eines Ordners (null = ohne Ordner) in der aktuellen Sortierung.
   List<Track> sortedTracksIn(String? folderId) =>
       sortedTracks.where((t) => t.folderId == folderId).toList();
@@ -1429,15 +1441,22 @@ class Library extends ChangeNotifier {
 
   /// Ziehen und Ablegen in der Liste: vor [beforeId] (eigene Reihenfolge) oder ohne [beforeId]
   /// ans Ende des Ordners [folderId] (Position bleibt, wie beim Ablegen auf einen Ordner in Swift).
-  void placeTrack(String id, String? folderId, {String? beforeId}) {
-    if (beforeId == id) return;
+  void placeTrack(String id, String? folderId, {String? beforeId}) =>
+      placeTracks({id}, folderId, beforeId: beforeId);
+
+  /// #122/AK4: [placeTrack] for several tracks dragged together; they keep their order among themselves.
+  /// Dropped on one of themselves, nothing moves.
+  void placeTracks(Set<String> ids, String? folderId, {String? beforeId}) {
+    if (ids.isEmpty || ids.contains(beforeId)) return;
     if (beforeId == null) {
-      moveTracks({id}, folderId);
+      moveTracks(ids, folderId);
       return;
     }
-    final others = sortedTracksIn(folderId).where((t) => t.id != id).toList();
+    final others = sortedTracksIn(folderId)
+        .where((t) => !ids.contains(t.id))
+        .toList();
     final at = others.indexWhere((t) => t.id == beforeId);
-    moveTracks({id}, folderId, at: at < 0 ? others.length : at);
+    moveTracks(ids, folderId, at: at < 0 ? others.length : at);
     sortOrder = TrackSortOrder.custom;
   }
 

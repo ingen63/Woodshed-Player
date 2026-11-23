@@ -902,5 +902,39 @@
         "type": "String"
       }
     }
+  },
+  "selectTracks": "Select",
+  "@selectTracks": {
+    "description": "#122/AK2: starts the selection mode with check marks (track menu on touch devices)"
+  },
+  "selectionCount": "{count, plural, =1{1 selected} other{{count} selected}}",
+  "@selectionCount": {
+    "description": "#122: bar above the library while tracks are selected",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectionActions": "Actions for the selected tracks",
+  "@selectionActions": {
+    "description": "#122: tooltip of the «⋯» button in the selection bar"
+  },
+  "selectionDone": "Done",
+  "@selectionDone": {
+    "description": "#122/AK6: ends the selection"
+  },
+  "deleteTracksTitle": "{count, plural, =1{Delete 1 track?} other{Delete {count} tracks?}}",
+  "@deleteTracksTitle": {
+    "description": "#122/AK5: one question for several tracks",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteTracksText": "The tracks are removed from the app. The original files stay unchanged.",
+  "@deleteTracksText": {
+    "description": "#122/AK5"
   }
 }

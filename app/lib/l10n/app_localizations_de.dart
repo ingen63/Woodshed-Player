@@ -1073,4 +1073,39 @@ class AppLocalizationsDe extends AppLocalizations {
   String syncLine(String status) {
     return 'Abgleich: $status';
   }
+
+  @override
+  String get selectTracks => 'Auswählen';
+
+  @override
+  String selectionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ausgewählt',
+      one: '1 ausgewählt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get selectionActions => 'Aktionen für die ausgewählten Titel';
+
+  @override
+  String get selectionDone => 'Fertig';
+
+  @override
+  String deleteTracksTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Titel löschen?',
+      one: '1 Titel löschen?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteTracksText =>
+      'Die Titel werden aus der App entfernt. Die Originaldateien bleiben unverändert.';
 }

@@ -49,6 +49,8 @@ abstract final class WsIcons {
     fontPackage: _p,
   );
   static const close = IconData(0xf404, fontFamily: _f, fontPackage: _p);
+  static const circle = IconData(0xf401, fontFamily: _f, fontPackage: _p);
+  static const checkCircle = IconData(0xf3ff, fontFamily: _f, fontPackage: _p);
   static const cloud = IconData(0xf5f4, fontFamily: _f, fontPackage: _p);
   static const laptop = IconData(0xf8cd, fontFamily: _f, fontPackage: _p);
   static const phone = IconData(0xf8cf, fontFamily: _f, fontPackage: _p);

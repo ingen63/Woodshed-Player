@@ -1,14 +1,18 @@
 // Bibliotheksliste (#17), Vorlage TrackListView.swift: Ordner als Abschnitte, Ziehen zum Sortieren und
 // in Ordner, Kontextmenüs (Rechtsklick bzw. «⋯»), Bestätigung vor dem Löschen.
 // #114: playlists below the folders, each with its tracks in its own order, shared or only on this device.
+// #122: several tracks selected together (⌘/Ctrl-click, ⇧-click; on touch devices a selection mode) go to a
+// playlist or folder or are deleted at once.
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app/app_controller.dart';
 import '../app/file_drop.dart';
+import '../app/track_selection.dart';
 import '../library/library.dart';
 import '../player/play_queue.dart';
 import '../time_format.dart';
@@ -67,11 +71,88 @@ class _LibraryViewState extends State<LibraryView> {
   FocusNode get _searchFocus =>
       widget.searchFocus ?? (_ownSearchFocus ??= FocusNode());
 
+  /// #122: tracks selected together; [_focus] takes Escape while there are any (AK6).
+  final _selection = TrackSelection();
+  final _focus = FocusNode(debugLabel: 'library');
+
+  /// #122: the library rows as shown (for ⇧-click), and all tracks in the order of the list (AK3).
+  var _shown = const <String>[];
+  var _order = const <String>[];
+  var _picked = const <String>[];
+
+  late final Library _lib = lib;
+
+  @override
+  void initState() {
+    super.initState();
+    _lib.addListener(_prune);
+  }
+
+  void _prune() => _selection.retain((id) => _lib.track(id) != null);
+
   @override
   void dispose() {
+    _lib.removeListener(_prune);
+    _selection.dispose();
+    _focus.dispose();
     _search.dispose();
     _ownSearchFocus?.dispose();
     super.dispose();
+  }
+
+  /// #122/AK1: ⌘- or Ctrl-click toggles a track, ⇧-click selects a range; a plain click plays the
+  /// track and ends the selection. AK2: in the selection mode a tap toggles the check mark.
+  void _tap(Track t) {
+    final keys = HardwareKeyboard.instance;
+    if (_selection.mode) {
+      _selection.toggle(t.id);
+    } else if (keys.isShiftPressed) {
+      _selection.extend(t.id, _shown);
+      _focus.requestFocus();
+    } else if (keys.isMetaPressed || keys.isControlPressed) {
+      _selection.toggle(t.id);
+      _focus.requestFocus();
+    } else {
+      _selection.click(t.id);
+      _select(t);
+    }
+  }
+
+  /// #122/AK2: the selection mode, with the focus here so that Escape (AK6) reaches it.
+  void _startSelection(String id) {
+    _selection.start(id);
+    _focus.requestFocus();
+  }
+
+  /// #122/AK6: Escape ends the selection.
+  KeyEventResult _key(FocusNode _, KeyEvent e) {
+    if (e is KeyDownEvent &&
+        e.logicalKey == LogicalKeyboardKey.escape &&
+        (!_selection.isEmpty || _selection.mode)) {
+      _selection.clear();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// The visible rows of the library and the order of all its tracks (#122); [_picked]: the selected
+  /// tracks in that order (what the selection bar acts on, and a drag of one of several carries).
+  void _orderRows(String query) {
+    final listed = lib.listedTracks;
+    _shown = [
+      if (query.isNotEmpty)
+        for (final t in _matches(query)) t.id
+      else if (lib.libraryOpen)
+        for (final t in listed)
+          if (t.folderId == null || !_collapsed.contains(t.folderId)) t.id,
+    ];
+    final shown = _shown.toSet();
+    _order = [
+      ..._shown,
+      for (final t in listed)
+        if (!shown.contains(t.id)) t.id,
+    ];
+    _picked = _selection.isEmpty ? const [] : _selection.inOrder(_order);
   }
 
   /// #115/AK9: a track chosen in the library plays within its folder.
@@ -93,14 +174,22 @@ class _LibraryViewState extends State<LibraryView> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([c, lib, c.player, c.sync, c.fileDropHover]),
+      listenable: Listenable.merge([
+        c,
+        lib,
+        c.player,
+        c.sync,
+        c.fileDropHover,
+        _selection,
+      ]),
       builder: (context, _) {
         final folders = lib.sortedFolders;
         final loose = lib.sortedTracksIn(null);
         final empty =
             lib.tracks.isEmpty && folders.isEmpty && lib.playlists.isEmpty;
         final query = _search.text.trim();
-        return Column(
+        _orderRows(query);
+        final column = Column(
           children: [
             _Header(controller: c),
             if (!empty)
@@ -110,6 +199,14 @@ class _LibraryViewState extends State<LibraryView> {
                 onChanged: () => setState(() {}),
               ),
             if (lib.isImporting) const LinearProgressIndicator(minHeight: 2),
+            if (!_selection.isEmpty || _selection.mode)
+              _SelectionBar(
+                count: _selection.length,
+                menu: _selection.isEmpty
+                    ? null
+                    : (context) => _tracksMenu(_picked),
+                onDone: _selection.clear,
+              ),
             const Divider(height: 1),
             if (lib.heldNames case final names when names.isNotEmpty)
               _HeldHint(
@@ -119,39 +216,52 @@ class _LibraryViewState extends State<LibraryView> {
             Expanded(
               child: empty
                   ? _EmptyLibrary(onAdd: () => c.pickAndImport())
-                  : query.isNotEmpty
-                  ? _searchResults(query)
-                  : ListView(
-                      key: const Key('libraryList'),
-                      padding: const EdgeInsets.only(bottom: 24),
-                      children: [
-                        // #123: all tracks in one section, closed by default
-                        _SectionHeader(
-                          key: const Key('section:library'),
-                          label: context.l10n.library,
-                          icon: WsIcons.musicNote,
-                          expanded: lib.libraryOpen,
-                          onToggle: () => lib.setLibraryOpen(!lib.libraryOpen),
-                          // #123/AK5: files from outside go in without a folder
-                          accepts: (_) => false,
-                          onDrop: (_) {},
-                          fileTarget: const FolderDropTarget(null),
-                          fileHover: _hovered(const FolderDropTarget(null)),
-                          trailing: [
-                            Text(
-                              '${lib.tracks.length}',
-                              style: WsTheme.of(context)
-                                  .number(12, color: WsTheme.of(context).muted),
+                  // #122/AK6: a click on an empty area ends the selection; rows take their own taps
+                  : GestureDetector(
+                      key: const Key('libraryBackground'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _selection.clear,
+                      child: query.isNotEmpty
+                          ? _searchResults(query)
+                          : ListView(
+                              key: const Key('libraryList'),
+                              padding: const EdgeInsets.only(bottom: 24),
+                              children: [
+                                // #123: all tracks in one section, closed by default
+                                _SectionHeader(
+                                  key: const Key('section:library'),
+                                  label: context.l10n.library,
+                                  icon: WsIcons.musicNote,
+                                  expanded: lib.libraryOpen,
+                                  onToggle: () =>
+                                      lib.setLibraryOpen(!lib.libraryOpen),
+                                  // #123/AK5: files from outside go in without a folder
+                                  accepts: (_) => false,
+                                  onDrop: (_) {},
+                                  fileTarget: const FolderDropTarget(null),
+                                  fileHover: _hovered(
+                                    const FolderDropTarget(null),
+                                  ),
+                                  trailing: [
+                                    Text(
+                                      '${lib.tracks.length}',
+                                      style: WsTheme.of(context).number(
+                                        12,
+                                        color: WsTheme.of(context).muted,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                  ],
+                                ),
+                                if (lib.libraryOpen)
+                                  ..._allTracks(folders, loose),
+                                _PlaylistsHeader(
+                                  onAdd: () => newPlaylist(context, lib),
+                                ),
+                                for (final p in lib.sortedPlaylists)
+                                  ..._playlist(p),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                          ],
-                        ),
-                        if (lib.libraryOpen) ..._allTracks(folders, loose),
-                        _PlaylistsHeader(
-                          onAdd: () => newPlaylist(context, lib),
-                        ),
-                        for (final p in lib.sortedPlaylists) ..._playlist(p),
-                      ],
                     ),
             ),
             // #54/AK7, AK8: the sync status; a tap opens the settings
@@ -171,6 +281,7 @@ class _LibraryViewState extends State<LibraryView> {
               ),
           ],
         );
+        return Focus(focusNode: _focus, onKeyEvent: _key, child: column);
       },
     );
   }
@@ -194,7 +305,7 @@ class _LibraryViewState extends State<LibraryView> {
         key: const Key('section:none'),
         label: context.l10n.noFolder,
         icon: WsIcons.tray,
-        onDrop: (id) => lib.placeTrack(id as String, null),
+        onDrop: (d) => lib.placeTracks({...?trackIds(d)}, null),
         fileTarget: const FolderDropTarget(null),
         fileHover: _hovered(const FolderDropTarget(null)),
       ),
@@ -202,7 +313,7 @@ class _LibraryViewState extends State<LibraryView> {
     if (loose.isEmpty && folders.isNotEmpty)
       _Placeholder(
         context.l10n.noTracksWithoutFolder,
-        onDrop: (id) => lib.placeTrack(id, null),
+        onDrop: (ids) => lib.placeTracks(ids.toSet(), null),
         fileTarget: const FolderDropTarget(null),
         fileHover: _hovered(const FolderDropTarget(null)),
       ),
@@ -226,7 +337,7 @@ class _LibraryViewState extends State<LibraryView> {
         onToggle: () => setState(
           () => open ? _collapsed.add(f.id) : _collapsed.remove(f.id),
         ),
-        onDrop: (id) => lib.placeTrack(id as String, f.id),
+        onDrop: (d) => lib.placeTracks({...?trackIds(d)}, f.id),
         fileTarget: files,
         fileHover: _hovered(files),
         menu: (context) => [
@@ -274,7 +385,7 @@ class _LibraryViewState extends State<LibraryView> {
         if (tracks.isEmpty)
           _Placeholder(
             l.emptyFolder,
-            onDrop: (id) => lib.placeTrack(id, f.id),
+            onDrop: (ids) => lib.placeTracks(ids.toSet(), f.id),
             fileTarget: files,
             fileHover: _hovered(files),
           ),
@@ -296,12 +407,12 @@ class _LibraryViewState extends State<LibraryView> {
     final tracks = lib.playlistTracks(p.id);
     final q = c.queue;
     final files = PlaylistDropTarget(p.id);
+    // #122/AK3: several library tracks go in together, in the order of the list
     void drop(Object d, int at) => switch (d) {
-      final String id => lib.addToPlaylist(p.id, [id], at: at),
       _EntryDrag(:final playlistId, :final index) when playlistId == p.id =>
         lib.movePlaylistEntry(p.id, index, at),
       _EntryDrag(:final trackId) => lib.addToPlaylist(p.id, [trackId], at: at),
-      _ => null,
+      _ => lib.addToPlaylist(p.id, trackIds(d) ?? const [], at: at),
     };
     return [
       _SectionHeader(
@@ -312,7 +423,7 @@ class _LibraryViewState extends State<LibraryView> {
         onToggle: () => setState(
           () => open ? _openPlaylists.remove(p.id) : _openPlaylists.add(p.id),
         ),
-        accepts: (d) => d is String || d is _EntryDrag,
+        accepts: (d) => trackIds(d) != null || d is _EntryDrag,
         onDrop: (d) => drop(d, tracks.length),
         fileTarget: files,
         fileHover: _hovered(files),
@@ -409,7 +520,7 @@ class _LibraryViewState extends State<LibraryView> {
             },
             dragData: _EntryDrag(p.id, i, t.id),
             accepts: (d) =>
-                d is String ||
+                trackIds(d) != null ||
                 (d is _EntryDrag && (d.playlistId != p.id || d.index != i)),
             onDrop: (d) => drop(d, i),
             fileTarget: PlaylistDropTarget(p.id, i),
@@ -432,7 +543,7 @@ class _LibraryViewState extends State<LibraryView> {
         if (tracks.isEmpty)
           _Placeholder(
             l.emptyPlaylist,
-            onDrop: (id) => lib.addToPlaylist(p.id, [id]),
+            onDrop: (ids) => lib.addToPlaylist(p.id, ids),
             fileTarget: files,
             fileHover: _hovered(files),
           ),
@@ -443,108 +554,176 @@ class _LibraryViewState extends State<LibraryView> {
   /// [fileTarget]: where files dropped on the row go (#121), the row's folder; none in the search.
   Widget _row(Track t, {bool indent = false, FileDropTarget? fileTarget}) {
     final l = context.l10n;
+    final marked = _selection.contains(t.id);
+    // #122/AK3, AK4: the context menu of one of several selected tracks acts on all of them
+    final several = marked && _selection.length > 1;
     return _TrackRow(
       key: Key('track:${t.title}'),
       track: t,
       artwork: lib.artworkPath(t),
       selected: c.player.trackId == t.id,
+      marked: marked,
+      checked: _selection.mode ? marked : null,
       onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
       onlyInCloud: !lib.hasFile(t.id) && c.sync.inCloud(t.id),
       fetching: c.fetching == t.id,
       indent: indent,
       touch: widget.touch,
-      onTap: () => _select(t),
-      onDrop: (id) => lib.placeTrack(id as String, t.folderId, beforeId: t.id),
+      onTap: () => _tap(t),
+      // #122/AK2: a long press released without dragging starts the selection mode
+      onLongPress: widget.touch ? () => _startSelection(t.id) : null,
+      dragData: several ? _picked : t.id,
+      accepts: (d) => trackIds(d)?.contains(t.id) == false,
+      onDrop: (d) =>
+          lib.placeTracks({...?trackIds(d)}, t.folderId, beforeId: t.id),
       fileTarget: fileTarget,
-      menu: (context) => [
+      menu: (context) => several
+          ? _tracksMenu(_picked)
+          : [
+              if (widget.touch && !_selection.mode)
+                MenuItemButton(
+                  key: const Key('selectTracks'),
+                  leadingIcon: const Icon(WsIcons.checkCircle, size: 16),
+                  onPressed: () => _startSelection(t.id),
+                  child: Text(l.selectTracks),
+                ),
+              MenuItemButton(
+                key: const Key('editTrack'),
+                leadingIcon: const Icon(WsIcons.pencil, size: 16),
+                onPressed: () => editTrack(context, lib, t),
+                child: Text(l.editTrackEllipsis),
+              ),
+              trimMenuItem(context, c, t),
+              _folderMenu([t.id]),
+              _playlistMenu([t.id]),
+              CheckboxMenuButton(
+                key: const Key('dontUpload'),
+                value: t.noUpload,
+                onChanged: (v) => lib.setNoUpload({t.id}, v ?? false),
+                child: Text(l.dontUpload),
+              ),
+              if (widget.cacheControls)
+                CheckboxMenuButton(
+                  key: const Key('keepOffline'),
+                  value: lib.keptOffline(t.id),
+                  onChanged: (v) => lib.setKeepOffline({t.id}, v ?? false),
+                  child: Text(l.keepOffline),
+                ),
+              MenuItemButton(
+                leadingIcon: const Icon(WsIcons.trash, size: 16),
+                onPressed: () => confirmDeleteTrack(context, c, t),
+                child: Text(l.delete),
+              ),
+            ],
+    );
+  }
+
+  /// #122: what can be done with several selected tracks [ids], in the order of the list.
+  List<Widget> _tracksMenu(List<String> ids) => [
+    _playlistMenu(ids),
+    _folderMenu(ids),
+    MenuItemButton(
+      key: const Key('deleteSelected'),
+      leadingIcon: const Icon(WsIcons.trash, size: 16),
+      onPressed: () => _deleteSelected(ids),
+      child: Text(context.l10n.delete),
+    ),
+  ];
+
+  /// #122/AK5: one question for all selected tracks, naming how many.
+  Future<void> _deleteSelected(List<String> ids) async {
+    final l = context.l10n;
+    if (await confirm(
+      context,
+      title: l.deleteTracksTitle(ids.length),
+      text: l.deleteTracksText,
+      action: l.delete,
+    )) {
+      c.deleteTracks(ids.toSet());
+      _selection.clear();
+    }
+  }
+
+  /// «Move to folder»: greyed out where all [ids] are already (#122/AK4: several at once).
+  Widget _folderMenu(List<String> ids) {
+    final l = context.l10n;
+    final folders = {for (final id in ids) lib.track(id)?.folderId};
+    void move(String? folderId) => lib.moveTracks(ids.toSet(), folderId);
+    return SubmenuButton(
+      key: const Key('moveToFolder'),
+      leadingIcon: const Icon(WsIcons.folder, size: 16),
+      menuChildren: [
         MenuItemButton(
-          key: const Key('editTrack'),
-          leadingIcon: const Icon(WsIcons.pencil, size: 16),
-          onPressed: () => editTrack(context, lib, t),
-          child: Text(l.editTrackEllipsis),
+          key: const Key('moveToNoFolder'),
+          onPressed: folders.length == 1 && folders.first == null
+              ? null
+              : () => move(null),
+          child: Text(l.noFolder),
         ),
-        trimMenuItem(context, c, t),
-        SubmenuButton(
-          leadingIcon: const Icon(WsIcons.folder, size: 16),
-          menuChildren: [
-            MenuItemButton(
-              onPressed: t.folderId == null
-                  ? null
-                  : () => lib.moveTracks({t.id}, null),
-              child: Text(l.noFolder),
-            ),
-            for (final f in lib.sortedFolders)
-              MenuItemButton(
-                onPressed: t.folderId == f.id
-                    ? null
-                    : () => lib.moveTracks({t.id}, f.id),
-                child: Text(f.name),
-              ),
-            const Divider(height: 1),
-            MenuItemButton(
-              onPressed: () async {
-                final name = await askName(context, l.newFolder);
-                if (name != null) {
-                  lib.moveTracks({
-                    t.id,
-                  }, lib.createFolder(name, fallback: l.newFolder).id);
-                }
-              },
-              child: Text(l.newFolderEllipsis),
-            ),
-          ],
-          child: Text(l.moveToFolder),
-        ),
-        // #114/AK2: add to a playlist; the same track may go in several times (AK3)
-        SubmenuButton(
-          key: const Key('addToPlaylist'),
-          leadingIcon: const Icon(WsIcons.musicNoteList, size: 16),
-          menuChildren: [
-            for (final p in lib.sortedPlaylists)
-              MenuItemButton(
-                key: Key('addTo:${p.name}'),
-                onPressed: () => lib.addToPlaylist(p.id, [t.id]),
-                child: Text(p.name),
-              ),
-            if (lib.playlists.isNotEmpty) const Divider(height: 1),
-            MenuItemButton(
-              key: const Key('addToNewPlaylist'),
-              onPressed: () async {
-                final name = await askName(context, l.newPlaylist);
-                if (name != null) {
-                  lib.addToPlaylist(
-                    lib.createPlaylist(name, fallback: l.newPlaylist).id,
-                    [t.id],
-                  );
-                }
-              },
-              child: Text(l.newPlaylistEllipsis),
-            ),
-          ],
-          child: Text(l.addToPlaylist),
-        ),
-        CheckboxMenuButton(
-          key: const Key('dontUpload'),
-          value: t.noUpload,
-          onChanged: (v) => lib.setNoUpload({t.id}, v ?? false),
-          child: Text(l.dontUpload),
-        ),
-        if (widget.cacheControls)
-          CheckboxMenuButton(
-            key: const Key('keepOffline'),
-            value: lib.keptOffline(t.id),
-            onChanged: (v) => lib.setKeepOffline({t.id}, v ?? false),
-            child: Text(l.keepOffline),
+        for (final f in lib.sortedFolders)
+          MenuItemButton(
+            key: Key('moveTo:${f.name}'),
+            onPressed: folders.length == 1 && folders.first == f.id
+                ? null
+                : () => move(f.id),
+            child: Text(f.name),
           ),
+        const Divider(height: 1),
         MenuItemButton(
-          leadingIcon: const Icon(WsIcons.trash, size: 16),
-          onPressed: () => confirmDeleteTrack(context, c, t),
-          child: Text(l.delete),
+          onPressed: () async {
+            final name = await askName(context, l.newFolder);
+            if (name != null) {
+              move(lib.createFolder(name, fallback: l.newFolder).id);
+            }
+          },
+          child: Text(l.newFolderEllipsis),
         ),
       ],
+      child: Text(l.moveToFolder),
+    );
+  }
+
+  /// #114/AK2: add to a playlist; the same track may go in several times (AK3). #122/AK3: several tracks
+  /// in the order of [ids].
+  Widget _playlistMenu(List<String> ids) {
+    final l = context.l10n;
+    return SubmenuButton(
+      key: const Key('addToPlaylist'),
+      leadingIcon: const Icon(WsIcons.musicNoteList, size: 16),
+      menuChildren: [
+        for (final p in lib.sortedPlaylists)
+          MenuItemButton(
+            key: Key('addTo:${p.name}'),
+            onPressed: () => lib.addToPlaylist(p.id, ids),
+            child: Text(p.name),
+          ),
+        if (lib.playlists.isNotEmpty) const Divider(height: 1),
+        MenuItemButton(
+          key: const Key('addToNewPlaylist'),
+          onPressed: () async {
+            final name = await askName(context, l.newPlaylist);
+            if (name != null) {
+              lib.addToPlaylist(
+                lib.createPlaylist(name, fallback: l.newPlaylist).id,
+                ids,
+              );
+            }
+          },
+          child: Text(l.newPlaylistEllipsis),
+        ),
+      ],
+      child: Text(l.addToPlaylist),
     );
   }
 }
+
+/// #122: the tracks a drag carries: one track ID (String) or several selected tracks (a list of IDs);
+/// null for other data (a playlist row).
+List<String>? trackIds(Object? d) => switch (d) {
+  final String id => [id],
+  final List<String> ids => ids,
+  _ => null,
+};
 
 /// Edits title and artist of an imported or recorded track (#24); the audio file stays unchanged.
 /// #116/AK1: «Trim start and end …»; greyed out for file types the core cannot trim, with the reason below it
@@ -883,8 +1062,59 @@ class _SearchField extends StatelessWidget {
   }
 }
 
+/// #122: above the library while tracks are selected: how many, their actions, «Done».
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    required this.count,
+    required this.menu,
+    required this.onDone,
+  });
+  final int count;
+  final List<Widget> Function(BuildContext context)? menu;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final ws = WsTheme.of(context);
+    return Container(
+      key: const Key('selectionBar'),
+      color: ws.amberSoft,
+      padding: const EdgeInsets.fromLTRB(16, 2, 4, 2),
+      child: _WithMenu(
+        menu: menu,
+        builder: (context, openMenu) => Row(
+          children: [
+            Expanded(
+              child: Text(
+                l.selectionCount(count),
+                key: const Key('selectionCount'),
+                style: ws.number(13, weight: FontWeight.w500),
+              ),
+            ),
+            if (openMenu != null)
+              IconButton(
+                key: const Key('selectionMenu'),
+                tooltip: l.selectionActions,
+                visualDensity: VisualDensity.compact,
+                iconSize: 16,
+                icon: const Icon(WsIcons.ellipsis),
+                onPressed: () => openMenu(null),
+              ),
+            TextButton(
+              key: const Key('selectionDone'),
+              onPressed: onDone,
+              child: Text(l.selectionDone),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// #114: a row of a playlist being dragged: moved within its playlist, copied into another one. Library
-/// rows drag the track ID (a String) instead, which folders accept.
+/// rows drag the track ID (a String) or several selected IDs (#122) instead, which folders accept.
 class _EntryDrag {
   const _EntryDrag(this.playlistId, this.index, this.trackId);
   final String playlistId;
@@ -1001,7 +1231,7 @@ class _SectionHeader extends StatelessWidget {
   final FileDropTarget? fileTarget;
   final bool fileHover;
 
-  static bool _isTrackId(Object d) => d is String;
+  static bool _isTrackId(Object d) => trackIds(d) != null;
 
   @override
   Widget build(BuildContext context) {
@@ -1314,7 +1544,9 @@ class _Placeholder extends StatelessWidget {
     this.fileHover = false,
   });
   final String text;
-  final void Function(String trackId) onDrop;
+
+  /// Called with the dragged tracks (#122: several selected ones together).
+  final void Function(List<String> trackIds) onDrop;
 
   /// #121: where files dropped from outside go; [fileHover] while they are over it.
   final FileDropTarget? fileTarget;
@@ -1324,8 +1556,9 @@ class _Placeholder extends StatelessWidget {
   Widget build(BuildContext context) =>
       FileDropRegion(target: fileTarget, child: _target(context));
 
-  Widget _target(BuildContext context) => DragTarget<String>(
-    onAcceptWithDetails: (d) => onDrop(d.data),
+  Widget _target(BuildContext context) => DragTarget<Object>(
+    onWillAcceptWithDetails: (d) => trackIds(d.data) != null,
+    onAcceptWithDetails: (d) => onDrop(trackIds(d.data)!),
     builder: (context, candidates, _) => Container(
       color: candidates.isNotEmpty || fileHover
           ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
@@ -1348,6 +1581,9 @@ class _TrackRow extends StatelessWidget {
     required this.track,
     required this.artwork,
     required this.selected,
+    this.marked = false,
+    this.checked,
+    this.onLongPress,
     this.onlyElsewhere = false,
     this.onlyInCloud = false,
     this.fetching = false,
@@ -1366,6 +1602,15 @@ class _TrackRow extends StatelessWidget {
   final String? artwork;
   final bool selected, indent, touch;
 
+  /// #122/AK1: one of the tracks selected together.
+  final bool marked;
+
+  /// #122/AK2: the check mark of the selection mode; null outside it.
+  final bool? checked;
+
+  /// #122/AK2: touch: a long press released without dragging.
+  final VoidCallback? onLongPress;
+
   /// The audio file is on another device only (#37/AK5).
   final bool onlyElsewhere;
 
@@ -1377,7 +1622,8 @@ class _TrackRow extends StatelessWidget {
   final void Function(Object data) onDrop;
   final List<Widget> Function(BuildContext context) menu;
 
-  /// What a drag of this row carries; the track ID unless given (#114: a playlist row).
+  /// What a drag of this row carries; the track ID unless given (#114: a playlist row; #122: the
+  /// selected tracks).
   final Object? dragData;
 
   /// Which drops this row takes; by default another track of the library.
@@ -1402,8 +1648,11 @@ class _TrackRow extends StatelessWidget {
       void Function(Offset?)? openMenu, {
       bool dropHint = false,
     }) => Material(
-      type: selected ? MaterialType.canvas : MaterialType.transparency,
-      color: ws.panel2,
+      key: marked ? Key('marked:${track.title}') : null,
+      type: selected || marked
+          ? MaterialType.canvas
+          : MaterialType.transparency,
+      color: marked ? ws.amberSoft : ws.panel2,
       child: InkWell(
         onTap: onTap,
         onSecondaryTapUp: openMenu == null
@@ -1421,6 +1670,15 @@ class _TrackRow extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(indent ? 28 : 12, 6, 4, 6),
           child: Row(
             children: [
+              if (checked case final on?) ...[
+                Icon(
+                  on ? WsIcons.checkCircle : WsIcons.circle,
+                  key: Key('${on ? 'checked' : 'unchecked'}:${track.title}'),
+                  size: 20,
+                  color: on ? ws.amber : ws.muted,
+                ),
+                const SizedBox(width: 10),
+              ],
               TrackArtwork(path: artwork, size: 36),
               const SizedBox(width: 10),
               Expanded(
@@ -1533,7 +1791,8 @@ class _TrackRow extends StatelessWidget {
     final data = dragData ?? track.id;
     final target = DragTarget<Object>(
       onWillAcceptWithDetails: (d) =>
-          accepts?.call(d.data) ?? (d.data is String && d.data != track.id),
+          accepts?.call(d.data) ??
+          trackIds(d.data)?.contains(track.id) == false,
       onAcceptWithDetails: (d) => onDrop(d.data),
       builder: (context, candidates, _) => _WithMenu(
         menu: menu,
@@ -1543,7 +1802,11 @@ class _TrackRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Text(track.title),
+              child: Text(
+                data is List<String> && data.length > 1
+                    ? context.l10n.selectionCount(data.length)
+                    : track.title,
+              ),
             ),
           );
           final child = tile(
@@ -1557,6 +1820,15 @@ class _TrackRow extends StatelessWidget {
                   data: data,
                   feedback: feedback,
                   childWhenDragging: dimmed,
+                  // #122/AK2: released where it started: no drag, but the selection mode
+                  onDraggableCanceled: (_, offset) {
+                    final box = context.findRenderObject() as RenderBox?;
+                    if (box != null &&
+                        (offset - box.localToGlobal(Offset.zero)).distance <
+                            kTouchSlop) {
+                      onLongPress?.call();
+                    }
+                  },
                   child: child,
                 )
               : Draggable<Object>(
