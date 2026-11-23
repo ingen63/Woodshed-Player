@@ -372,6 +372,14 @@ void main() {
       expect(titles().first, 'Zebra');
     });
 
+    test('#10 regression (found bug 10): moveTracks with a negative row moves to the first row', () {
+      // regressions.json, seed 1819084227: this call threw a RangeError (slots[-1]).
+      l.sortOrder = TrackSortOrder.custom;
+      final rest = titles().where((t) => t != 'Zebra');
+      l.moveTracks({ids['Zebra']!}, null, at: -1);
+      expect(titles(), ['Zebra', ...rest]);
+    });
+
     test('Ordner alphabetisch', () {
       l.createFolder('b');
       l.createFolder('Ä');

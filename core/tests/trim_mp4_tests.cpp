@@ -959,6 +959,18 @@ void run(const char *name, void (*test)()) {
 
 } // namespace
 
+// #120 regression (found bug 44, fuzz regression trim/m4a_empty_mvhd_at_end): an mvhd box without
+// a body at the very end of the file. The check of its length read the version byte first, one byte
+// past the end of the file (AddressSanitizer under make sanitize). Expected: refused as damaged.
+void emptyMvhdAtTheEnd() {
+  const Bytes m4a = {
+      0x00, 0x00, 0x00, 0x10, 'f', 't', 'y', 'p', 'M', '4', 'A', ' ', 0, 0, 0, 0, // ftyp M4A
+      0x00, 0x00, 0x00, 0x10, 'm', 'o', 'o', 'v',                                 // moov
+      0x00, 0x00, 0x00, 0x08, 'm', 'v', 'h', 'd', // mvhd without a body, the last byte of the file
+  };
+  CHECK(wp::trim::trim(m4a.data(), m4a.size(), 0.5, 2.0).code == WP_ERR_UNSUPPORTED_FORMAT);
+}
+
 int main() {
   std::setvbuf(stdout, nullptr, _IONBF, 0);
 #ifdef WP_SYSTEM_DECODER
@@ -974,6 +986,7 @@ int main() {
   run("#120/AK2 edit list of version 1 for long durations", wideEditList);
   run("#120/AK5 several audio tracks, fragmented, damaged", refused);
   run("#120/AK4 C API", capi);
+  run("#120 regression (found bug 44): empty mvhd at the end of the file", emptyMvhdAtTheEnd);
   std::printf("%s\n", failures == 0 ? "all MP4 trim tests passed" : "MP4 trim tests FAILED");
   return failures == 0 ? 0 : 1;
 }

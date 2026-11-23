@@ -751,9 +751,11 @@ void longTitleFromFileReservesOnce() {
   CHECK(gLargestAlloc.load() <= static_cast<size_t>(kLongFrames + 8192) * 2 * sizeof(float));
 }
 
-// #75, #61: the header length is reserved only once the decoder has really delivered the first
-// 5 minutes. A title of 1 minute whose header claims 6 minutes (plausible for the file size, made
-// large with padding) keeps the reservation of 5 minutes.
+// #10 regression (found bug 8, fuzz regression decoder/huge_length_header): a damaged MP3 header
+// claimed billions of frames and a few bytes reserved 24 GB; at most 5 minutes are reserved up
+// front. #75, #61: the header length is reserved only once the decoder has really delivered the
+// first 5 minutes. A title of 1 minute whose header claims 6 minutes (plausible for the file size,
+// made large with padding) keeps the reservation of 5 minutes.
 void shortTitleClaimingLongerReservesOnlyFiveMinutes() {
   constexpr long long kOneMinute = 118LL * 4096;
   constexpr long long kClaimed = 704LL * 4096;
@@ -776,6 +778,39 @@ void lengthImplausibleForTheFileSizeIsNotReserved() {
   CHECK(out.frames == kFrames);
   CHECK(std::all_of(out.data.begin(), out.data.end(), [](float v) { return v == 0.0f; }));
   CHECK(out.data.capacity() != static_cast<size_t>(kFrames + 8192) * 2);
+}
+
+// #10 regression (found bug 7, fuzz regression decoder/nan_float_wav): a float WAV file handed NaN,
+// infinite and huge samples through unchanged; they would have reached the device and poisoned the
+// time stretch. Expected: non-finite is silence, the rest limited to +-8.
+void floatWavWithNonFiniteSamples() {
+  const float samples[] = {std::nanf(""), INFINITY, 100.0f, -100.0f, 0.5f, -0.5f};
+  std::string wav;
+  const auto u16 = [&wav](unsigned v) {
+    wav += static_cast<char>(v & 0xff);
+    wav += static_cast<char>((v >> 8) & 0xff);
+  };
+  const auto u32 = [&u16](unsigned v) {
+    u16(v & 0xffff);
+    u16(v >> 16);
+  };
+  wav += "RIFF";
+  u32(36 + sizeof samples);
+  wav += "WAVEfmt ";
+  u32(16);
+  u16(3); // IEEE float
+  u16(2);
+  u32(8000);
+  u32(8000 * 8);
+  u16(8);
+  u16(32);
+  wav += "data";
+  u32(sizeof samples);
+  wav.append(reinterpret_cast<const char *>(samples), sizeof samples);
+  wp::Source out;
+  CHECK(wp::decodeMemory(wav.data(), wav.size(), 8000, out) == wp::kOk);
+  CHECK(out.frames == 3);
+  CHECK((out.data == std::vector<float>{0.0f, 0.0f, 8.0f, -8.0f, 0.5f, -0.5f}));
 }
 
 // #14/AK3, #61: after a load the progress is 1, also when the header claimed more frames than the
@@ -1094,6 +1129,7 @@ int main() {
        shortTitleClaimingLongerReservesOnlyFiveMinutes},
       {"lengthImplausibleForTheFileSizeIsNotReserved",
        lengthImplausibleForTheFileSizeIsNotReserved},
+      {"floatWavWithNonFiniteSamples", floatWavWithNonFiniteSamples},
       {"progressIsCompleteAfterLoad", progressIsCompleteAfterLoad},
       {"loadThreadWithoutMemory", loadThreadWithoutMemory},
       {"unsupportedRateRendersSilence", unsupportedRateRendersSilence},

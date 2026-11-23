@@ -133,6 +133,7 @@ void main() {
     test(
       'a number beyond the range of a double makes the file damaged',
       () async {
+        // #10 regression (found bug 13, regressions.json seed 1819282202).
         // 1e400 is valid JSON, Dart reads it as infinity, which could never be written again.
         final text = File('test/golden/library_v2.json').readAsStringSync();
         final bytes = Uint8List.fromList(

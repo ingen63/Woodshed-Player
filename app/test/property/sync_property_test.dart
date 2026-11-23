@@ -385,6 +385,7 @@ void main() {
   test(
     '#10/AK6 a new device does not reset the settings chosen on the others',
     () async {
+      // #10 regression (found bug 14, regressions.json seed 1819107984).
       clock = DateTime.utc(2026, 11, 1);
       final cloud = InMemoryProvider();
       final sources = pool(2);

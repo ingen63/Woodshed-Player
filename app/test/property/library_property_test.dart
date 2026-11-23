@@ -385,16 +385,17 @@ void main() {
     });
 
     test('regressions.json: every entry names an existing property', () {
+      // #127: the names come from the property definitions themselves; a fixed list kept the seed of a
+      // removed property (state.json, #53) alive although it no longer ran.
       final names = {
-        'sorting and moving into folders neither lose nor duplicate a track',
-        'saving and loading gives the same state',
-        'loop bounds are valid after every change',
-        'parse(format(x)) == x for times',
-        'random edits, deletions and syncs on 2 to 4 devices converge',
-        'damaged state.json never crashes and never loses local data',
-        'damaged library.json never crashes and is reported',
-        'migration twice changes nothing and reports nothing',
+        for (final f in Directory('test/property').listSync())
+          if (f is File && f.path.endsWith('_test.dart'))
+            for (final m in RegExp(
+              r"\bproperty\(\s*'([^']+)'",
+            ).allMatches(f.readAsStringSync()))
+              m.group(1)!,
       };
+      expect(names, contains('parse(format(x)) == x for times'));
       for (final name in names) {
         regressionSeeds(name); // readable
       }

@@ -47,8 +47,8 @@ Bericht je neuem Test die geschützte Regel und die Änderung, die ihn fehlschla
 |---|---|---|---|
 | 1 Einheiten | `app/test/*_test.dart`, `core/tests/*_tests.cpp` | Zeitformat, Bibliothek, Stempel und Zusammenführen, Metadaten, Player-Service, Metronom-Logik, Engine, Befehls-Queue, Wellenform | vorhanden |
 | 2 Audio-Referenzfälle | `core/tests/reference_tests.cpp` über die C-API, dazu `engine_tests.cpp`, `metronome_tests.cpp`, `player_tests.cpp`; im Web dieselben Fälle unter Node.js (`core/build-wasm`), Vergleich der Samples nativ ↔ Web | Offline-Rendering ohne Audiogerät: Loop-Naht, Seek und Pause, Tempo und Tonhöhe, Klickpositionen, jede Funktion von `wp_core.h` | vorhanden (#9) |
-| 3 Invarianten und Zufallstests | `app/test/property/` (`property.dart`, Regressionsfälle in `regressions.json`) | Eigenschaften über viele zufällige Fälle mit festem, ausgegebenem Startwert: Bibliothek, Loop-Grenzen, Zeitformat, Abgleich auf 2–4 Geräten | vorhanden (#10) |
-| 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler, abgeschnittene Dateien), `library_files_property_test.dart`, `sync_property_test.dart`, `core/tests/fuzz/` (`make fuzz`); alle Kerntests unter ASan/UBSan und TSan (`make sanitize`, `make sanitize-thread`) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | vorhanden (#57, #10) |
+| 3 Invarianten und Zufallstests | `app/test/property/` (`property.dart`, Regressionsfälle in `regressions.json`), je Fund ein benannter Regressionstest (#127) | Eigenschaften über viele zufällige Fälle mit festem, ausgegebenem Startwert: Bibliothek, Loop-Grenzen, Zeitformat, Abgleich auf 2–4 Geräten | vorhanden (#10) |
+| 4 Robustheit und Fuzzing | `metadata_test.dart` («Unsinn»), `player_tests.cpp` (Ladefehler, abgeschnittene Dateien), `library_files_property_test.dart`, `sync_property_test.dart`, `core/tests/fuzz/` (`make fuzz`, Funde in `regressions/`, je Fund ein benannter Regressionstest, #127); alle Kerntests unter ASan/UBSan und TSan (`make sanitize`, `make sanitize-thread`) | verfälschte Dateien, libFuzzer auf Decoder und C-API, Sanitizer | vorhanden (#57, #10) |
 | 5 Golden-Dateien | `app/test/golden/` (`library.json` jeder Version: Swift alt und neu, Format 2 von #36 und #37), `golden_files_test.dart`, `core/tests/golden/metronome_positions.txt` | jede Version liest alle alten Stände; Klickpositionen des Metronoms (#9) | vorhanden (#9, #10) |
 | 6 Oberfläche | Widget-Tests in `app/test/`, Oberflächentests mit echtem Kern in `app/integration_test/` (Rauchtest, Tastenkürzel, Pseudo-Sprache), Web-Tests im Chrome `app/test/web/`, Rauchtest der gebauten App `tools/smoke_app.sh`, Prüfseiten im Browser `app/tool/web_*_check.dart` | Layout je Grösse, Bedienung, Texte, Tastenkürzel, OPFS und WASM-Anbindung im Browser | vorhanden (#13) |
 | Werkzeuge | `app/tool/after_commit_hook_test.dart`, `coverage_test.dart`, `pre_push_hook_test.dart`, `mutants_test.dart` | Hook nach dem Commit, Abdeckung je Teil, `coverage-diff`, `pre-push`, Mutationswerkzeug | vorhanden (#7, #8, #11) |
@@ -518,7 +518,11 @@ ohne zusätzliches Paket (`dart:math` `Random`). Die Fallzahl kommt aus `WP_PROP
 `flutter test`), der Startwert aus `WP_PROPERTY_SEED` (Vorgabe 20261119); jeder Test gibt beides aus, Fall *i*
 läuft mit `caseSeed(Startwert, i)`. Scheitert ein Fall, nennt die Meldung dessen Startwert. Er wird mit Datum und
 Grund in `app/test/property/regressions.json` unter dem Namen der Eigenschaft eingetragen und läuft danach bei jedem
-Lauf **zuerst**, vor den Zufallsfällen. Nächtlich läuft `make property PROPERTY_CASES=3000` mit neuem Startwert
+Lauf **zuerst**, vor den Zufallsfällen. Der Startwert allein dokumentiert den Fund nicht: Ändert sich der
+Zufallsgenerator, prüft er etwas anderes. Deshalb bekommt jeder Fund im selben Commit einen benannten
+Regressionstest mit der verkleinerten Eingabe lesbar im Code und einen Eintrag in «Gefundene Fehler» (#127, Regel
+dort). `library_property_test.dart` prüft, dass jeder Schlüssel von `regressions.json` eine Eigenschaft nennt, die es
+in `app/test/property/` gibt; die Namen liest der Test aus den Aufrufen von `property(…)`. Nächtlich läuft `make property PROPERTY_CASES=3000` mit neuem Startwert
 (Job `property`). Langsame Eigenschaften (Abgleich) nehmen einen Bruchteil der Fallzahl.
 
 | Eigenschaft | Datei | Invariante |
@@ -575,7 +579,11 @@ eingecheckt; im Workflow über den Cache von Nacht zu Nacht). Ein Fund (Absturz,
 Zeitüberschreitung, Speicher) beendet den Lauf mit Fehler, gibt den ganzen Bericht ab seiner ersten Zeile aus
 (Sanitizer mit Stack, verletzte Invariante, Zeitgrenze; höchstens 300 Zeilen, #105) und legt die Eingabe unter
 `core/build-fuzz/artifacts/<ziel>/` ab; der Job `fuzz` lädt sie als Artefakt hoch. Nach der Behebung kommt die
-Eingabe nach `core/tests/fuzz/regressions/<ziel>/`. Stand 19.11.2026, je 60 s auf dem Mac: `fuzz_decoder` rund
+Eingabe nach `core/tests/fuzz/regressions/<ziel>/` und läuft weiter; als Dokumentation des Fundes gilt sie nicht.
+Dazu kommt im selben Commit ein benannter Test im passenden Testprogramm des Kerns mit der verkleinerten Eingabe
+lesbar im Code (#127, Regel in «Gefundene Fehler»). Verkleinert wird mit libFuzzer im Build von `make fuzz`, mit
+zurückgenommener Korrektur: `core/build-fuzz/fuzz_<ziel> -minimize_crash=1 -max_total_time=240
+-exact_artifact_path=<datei> <fund>` (Umgebung wie `FUZZ_ENV` im `Makefile`). Stand 19.11.2026, je 60 s auf dem Mac: `fuzz_decoder` rund
 35 000–90 000 Eingaben, `fuzz_capi` rund 700–1100, ohne Fund.
 
 **Dieselben Eingaben gegen den WASM-Kern (#67).** Der Emscripten-Zweig (`core/web/web.cmake`) bindet `fuzz.cmake`
@@ -1236,6 +1244,40 @@ Dokumente, Format der Nachricht, andere Befehle, `test(auto)`-Commits sowie Änd
 
 Mit dieser Strategie gefunden (Datum, was, wo, Test):
 
+**Regel (#127): neuer Fund → benannter Regressionstest im selben Commit.** Jeder Fehler, den ein Zufallstest,
+der Fuzzer oder ein anderer Test findet, bekommt hier einen Eintrag mit Nummer N und im selben Commit wie die
+Korrektur einen benannten Test, der die verkleinerte Eingabe lesbar im Code enthält (z. B. `moveTracks` mit Zeile
+−1, Geschwindigkeit `1e400` in einer Gerätedatei) und ohne die Korrektur fehlschlägt. Name oder Kommentar nennen
+`#<Issue> regression (found bug N)`, der Eintrag nennt den Test. Ein Startwert in `regressions.json` oder eine Datei
+in `core/tests/fuzz/regressions/` läuft zusätzlich weiter, dokumentiert den Fund aber nicht. Deckt ein vorhandener
+benannter Test genau diesen Fund schon ab, gibt es keinen zweiten (#126), nur den Verweis. Speicherfehler und
+undefiniertes Verhalten, die nur ein Sanitizer sieht, zeigt der Test unter `make sanitize`. Zufallsfälle, die nur
+eine falsch formulierte Invariante des Tests trafen, sind keine Funde und kommen nicht in `regressions.json`.
+
+Stand #127 (23.11.2026), je Fund belegt mit zurückgenommener Korrektur:
+
+| Fund | Regressionsfall | Benannter Test | ohne Korrektur |
+|---|---|---|---|
+| 7 | `decoder/nan_float_wav` | `floatWavWithNonFiniteSamples` (`player_tests.cpp`, neu) | rot |
+| 8 | `decoder/huge_length_header` | `shortTitleClaimingLongerReservesOnlyFiveMinutes`, `lengthImplausibleForTheFileSizeIsNotReserved` (`player_tests.cpp`) | rot |
+| 9 | `capi/nonfinite_arguments` | `nonFiniteArgumentsAreSafe` (`engine_tests.cpp`), `volumeChangeWithoutCrackle` (`metronome_tests.cpp`) | rot |
+| 10 | Startwert 1819084227 und 1819234688 | «#10 regression (found bug 10) …» (`library_test.dart`, neu) | rot (`RangeError`) |
+| 11 | Startwert 1819060470 | «a loop end beyond the duration keeps 1 s …» (`player_property_test.dart`) | rot |
+| 13 | Startwert 1819282202 (Migration) | «a number beyond the range of a double makes the file damaged» (`library_files_property_test.dart`) | rot |
+| 14 | Startwert 1819107984 | «#10/AK6 a new device does not reset the settings …» (`sync_property_test.dart`) | rot |
+| 15 | – (Startwert entfernt) | «#10 regression (found bug 15) …» (`sync_test.dart`, neu) | rot |
+| 39 | `capi/path_ending_in_dot` | `pathEndingInDot` (`capi_tests.cpp`) | rot unter `make sanitize` (#105) |
+| 43 | `trim/flac_seek_infinity` | «#116 regression (found bug 43) …» (`trim_tests.cpp`, neu) | rot unter `make sanitize` |
+| 44 | `trim/m4a_empty_mvhd_at_end` | «#120 regression (found bug 44) …» (`trim_mp4_tests.cpp`, neu) | rot unter `make sanitize` |
+
+Aus `regressions.json` entfernt (#127/AK3): der Startwert 1819282202 unter «damaged state.json never crashes and never
+loses local data», denn diese Eigenschaft gibt es seit #53 nicht mehr (`state.json` wurde durch Gerätedateien
+ersetzt), der Startwert lief also nicht mehr; der Fund (15) hat jetzt einen benannten Test gegen die Gerätedatei.
+Ebenso die drei Startwerte von #116 (1819139660, 1819266364, 1820850164): Sie trafen keinen Fehler im Code, sondern
+eine zu strenge Invariante in `sync_property_test.dart` (#116/AK8), die dort korrigiert wurde: nach dem Löschen des
+Grabsteins, nach dem Bereinigungs-Horizont zurückgehaltene Titel (#107) und die eigene Kopie eines spät
+hinzukommenden Geräts (#104) dürfen den alten Titel behalten.
+
 1. 19.11.2026, #7: `core_error_texts_test.dart` las die Fehlertexte der Dart-Anbindung mit einem regulären Ausdruck,
    der nach dem Umbruch durch `dart format` nichts mehr fand. Der Test erlaubt jetzt einen Zeilenumbruch nach
    `WpException(`.
@@ -1264,11 +1306,13 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
 7. 19.11.2026, #10/AK4, `fuzz_decoder`: Float-WAV-Dateien mit NaN, unendlichen oder riesigen Samples wurden
    unverändert übernommen; sie wären ans Gerät gegangen und hätten den Time-Stretch für den Rest des Titels
    vergiftet. Behoben in `player_core.cpp` (`sanitizeSamples`: nicht endlich wird Stille, sonst auf ±8 begrenzt,
-   beim Dekodieren und beim Wandeln von PCM). Regressionsfall `regressions/decoder/nan_float_wav`.
+   beim Dekodieren und beim Wandeln von PCM). Regressionsfall `regressions/decoder/nan_float_wav`, Test
+   `floatWavWithNonFiniteSamples` (`player_tests.cpp`, #127).
 8. 19.11.2026, #10/AK4, `fuzz_decoder`: Ein beschädigter MP3-Kopf (Xing-Rahmenzahl) liess wenige Bytes 24 GB
    reservieren (`readAll` reservierte die Länge aus dem Kopf). Auf iPhone/iPad hätte das «kein Speicher» statt
    «Format nicht unterstützt» gemeldet. Behoben: im Voraus höchstens 5 min, längere Titel wachsen beim Dekodieren.
-   Regressionsfall `regressions/decoder/huge_length_header`.
+   Regressionsfall `regressions/decoder/huge_length_header`, Tests `shortTitleClaimingLongerReservesOnlyFiveMinutes`
+   und `lengthImplausibleForTheFileSizeIsNotReserved` (`player_tests.cpp`, seit #75).
 9. 19.11.2026, #10/AK4, `fuzz_capi`: NaN oder unendlich als Lautstärke oder Tempo über die C-API machten jedes
    folgende Sample NaN; Seek und Loop-Ende mit riesigen Zeiten verliessen über `llround` den Bereich von `long long`
    (auf x86 ein negativer Lesezeiger). Behoben in `engine.cpp` (NaN-Seek und -Tempo ignoriert, Zeiten bis 10⁶ s,
@@ -1276,7 +1320,8 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
    `regressions/capi/nonfinite_arguments`, Tests `nonFiniteArgumentsAreSafe` (`engine_tests.cpp`) und
    `volumeChangeWithoutCrackle` (`metronome_tests.cpp`). In der App nicht erreichbar (die UI begrenzt die Werte).
 10. 19.11.2026, #10/AK1, Zufallstest: `Library.moveTracks` mit negativer Zeile warf einen `RangeError`. Die App ruft
-    es nie so auf; jetzt zählt eine negative Zeile als erste. Regressionsfälle in `regressions.json`.
+    es nie so auf; jetzt zählt eine negative Zeile als erste. Regressionsfälle in `regressions.json`, Test «#10
+    regression (found bug 10): moveTracks with a negative row …» (`library_test.dart`, #127).
 11. 19.11.2026, #10/AK1, Zufallstest: Gespeicherte Loop-Grenzen, die nach dem Begrenzen auf die Dauer weniger als
     1 s auseinander lagen (z. B. Loop 10–11 s eines anderen Geräts, hier 10,5 s Dauer), blieben «an», ohne den Kern
     zu erreichen. Behoben in `PlayerService._normalized` (wie beim Setzen des Endes: Ende auf Anfang + 1 s oder
@@ -1287,17 +1332,21 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
 13. 19.11.2026, #10/AK8, Zufallstest: Eine Zahl ausserhalb des Bereichs eines double (`1e400`) in `library.json` las
     Dart als unendlich; jedes Speichern warf danach eine Ausnahme direkt in die Oberfläche statt «konnte nicht
     gespeichert werden» zu melden. Behoben: Eine solche Datei gilt als beschädigt (`isFiniteJson`), `_write` meldet
-    Fehler über die Future. Regressionsfall und Test «a number beyond the range of a double».
+    Fehler über die Future. Regressionsfall und Test «a number beyond the range of a double»
+    (`library_files_property_test.dart`).
 14. 19.11.2026, #10/AK6, Zufallstest Abgleich: Das erste Speichern eines neuen Geräts stempelte seine
     Standardwerte (Sortierung «hinzugefügt», Darstellung «System») als jüngste Änderung; sein erster Abgleich setzte
     die auf allen anderen Geräten gewählte Sortierung und Darstellung zurück, und die Geräte waren nach zwei Runden
     nicht gleich. Behoben: nie gewählte Standardwerte werden nicht gestempelt (`Library._chosenSettings`).
-    Regressionsfall und Test «a new device does not reset the settings chosen on the others».
+    Regressionsfall und Test «a new device does not reset the settings chosen on the others»
+    (`sync_property_test.dart`).
 15. 19.11.2026, #10/AK7, Zufallstest Abgleich: Eine `state.json` mit `1e400` wurde zusammengeführt; danach scheiterte
     jedes Speichern der Bibliothek, Änderungen gingen nicht mehr auf die Platte. Ebenso wurden Typwechsel
     übernommen. Behoben: `CloudSync._readState` prüft vor dem Zusammenführen, Stempel ausserhalb des Bereichs gelten
-    als ungültig (`Hlc.parse`), Meldungen `cloudStateUnreadable` (mit #111 entfernt) und `cloudStateTooNew`. Regressionsfall und Test
-    «one message per damaged version».
+    als ungültig (`Hlc.parse`), Meldungen `cloudStateUnreadable` (mit #111 entfernt) und `cloudStateTooNew`. Der
+    Test «one message per damaged version» und die Eigenschaft der `state.json` sind mit #53 und #111 entfallen,
+    der Startwert mit #127. Seit #53 prüft `CloudSync.decodeDevice` die Gerätedateien ebenso; Test «#10 regression
+    (found bug 15): a speed of 1e400 in a device file is skipped; saving still works» (`sync_test.dart`, #127).
 16. 19.11.2026, #10: Im vollen Lauf von `flutter test` schlug `home_page_test.dart` («#17/AK1 Liste Sortierung
     umstellen») erneut einmal fehl, einzeln grün; wie Fall 3, noch nicht behoben. Geklärt in #62 wie Fall 3:
     Gescheitert war `file_store_test.dart`, der Test gab nur die Warnung von `tap()` aus. Regressionstest wie bei
@@ -1524,3 +1573,17 @@ Mit dieser Strategie gefunden (Datum, was, wo, Test):
     `player_service_test.dart` (#106/AK2, ohne Behebung rot); der Oberflächentest prüft zusätzlich, dass die Position
     nach Pause nicht kleiner ist als die beim Spielen erreichte. Hätte gefangen werden müssen von den #73-Tests, deren
     Kern-Attrappe Play sofort übernahm.
+43. 22.11.2026, #116, `fuzz_trim`: Das Kürzen einer FLAC-Datei sprang mit dem Seek von dr_flac (miniaudio) an den
+    Anfang. War die Datei kürzer als ihr Kopf angab, wandelte die Binärsuche des Seeks einen unendlichen Wert bzw.
+    NaN in eine Ganzzahl (undefiniertes Verhalten, UBSan). Behoben in `trim.cpp`: Der Teil vor dem Anfang wird
+    dekodiert und verworfen wie im Player; reicht die Datei nicht bis dorthin, gilt sie als beschädigt.
+    Regressionsfall `regressions/trim/flac_seek_infinity` (20 810 Byte, mit `-minimize_crash` auf 60 Byte
+    verkleinert), Test «#116 regression (found bug 43): FLAC shorter than its header» (`trim_tests.cpp`, #127):
+    STREAMINFO mit 98 304 Frames, ein stiller Frame mit 4096, Kürzen ab 0,5 s; ohne Behebung unter `make sanitize`
+    rot.
+44. 23.11.2026, #120, `fuzz_trim`: Ein `mvhd` ohne Inhalt als letzte Box der Datei. Die Prüfung der Länge las zuerst
+    das Versionsbyte, ein Byte hinter dem Ende der Datei (AddressSanitizer, heap-buffer-overflow). Behoben in
+    `trim_mp4.cpp` (`fits`: das Versionsbyte erst lesen, wenn der Inhalt Platz dafür hat). Regressionsfall
+    `regressions/trim/m4a_empty_mvhd_at_end`, Test «#120 regression (found bug 44): empty mvhd at the end of the
+    file» (`trim_mp4_tests.cpp`, #127): `ftyp`, `moov` mit leerem `mvhd`, 32 Byte; ohne Behebung unter
+    `make sanitize` rot.

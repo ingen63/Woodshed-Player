@@ -322,6 +322,41 @@ void main() {
         expect(a.library.lastError, isA<CloudStateTooNew>());
       },
     );
+
+    test('#10 regression (found bug 15): a speed of 1e400 in a device file is skipped; saving still works', () async {
+      // Found in the former state.json (seed 1819282202, removed from regressions.json with #127 because
+      // its property is gone since #53): 1e400 is valid JSON, Dart reads it as infinity; once merged,
+      // every later save of the library failed. Today the same holds for a device file.
+      final cloud = InMemoryProvider();
+      final a = await device(cloud, 1);
+      final t = await a.add('a.mp3');
+      a.library.updateSettings(t.id, const PlaybackSettings(speed: 0.75));
+      await a.sync.sync();
+      final name = cloud.files.keys.singleWhere(
+        (k) => k.startsWith('devices/'),
+      );
+      final text = utf8.decode(cloud.files[name]!);
+      expect(text, contains('"speed": 0.75'));
+      cloud.putDirect(
+        name,
+        bytes(text.replaceFirst('"speed": 0.75', '"speed": 1e400')),
+      );
+      final b = await device(cloud, 2);
+      final own = await b.add('b.mp3');
+      tick();
+      await b.sync.sync();
+      expect(b.library.track(t.id), isNull, reason: 'the file is skipped');
+      b.library.editMetadata(own.id, title: 'Later', artist: null);
+      await b.library.save();
+      expect(b.library.lastError, isNull);
+      final again = Library(
+        b.store,
+        probe: (_) => 2.5,
+        readSource: (_) async => null,
+      );
+      await again.load();
+      expect(again.track(own.id)!.title, 'Later');
+    });
   });
 
   group('#37/AK2 without an account nothing is sent', () {

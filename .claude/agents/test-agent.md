@@ -92,11 +92,25 @@ Lange Build-Ausgaben füllen den Kontext. Immer so aufrufen:
 
    **Ausgenommen** (wird immer geschrieben, auch wenn eine Kategorie oben zutrifft):
    - Tests zu Abnahmekriterien (`#22/AK2`).
-   - Regressionstests zu gefundenen Fehlern.
+   - Regressionstests zu gefundenen Fehlern (aber kein Duplikat, siehe unten).
    - Golden-Dateien (`app/test/golden/`, `core/tests/golden/`).
    - Speichern und Laden der Bibliothek (`library.json`, alte Formate, Migration).
 
    Bestehende Tests kürzt Du nicht wegen dieser Regel.
+
+   **Neuer Fund → benannter Regressionstest im selben Commit (#127).** Findet ein Zufallstest oder der Fuzzer
+   einen Fehler, reicht der Startwert in `app/test/property/regressions.json` bzw. die Datei in
+   `core/tests/fuzz/regressions/<ziel>/` nicht: Sie läuft weiter, dokumentiert den Fund aber nicht. Im selben
+   Commit wie die Korrektur kommen dazu:
+   - ein Eintrag in `docs/TESTS.md`, Abschnitt «Gefundene Fehler» (Nummer N), und
+   - ein benannter Test mit der verkleinerten Eingabe lesbar im Code (Dart unter `app/test/`, C++ im passenden
+     Programm unter `core/tests/`, dort in die Liste in `main()`), Name oder Kommentar `#<Issue> regression
+     (found bug N)`. Fuzzer-Eingaben verkleinert `-minimize_crash=1` im Build von `make fuzz`.
+   - Beleg im Bericht: Korrektur kurz zurücknehmen, Test rot (bei Speicherfehlern und undefiniertem Verhalten
+     unter `make sanitize`), wiederherstellen.
+   Deckt ein vorhandener benannter Test genau diesen Fund schon ab (ohne Korrektur rot), kein zweiter Test:
+   nur der Verweis `found bug N` im Kommentar und der Testname im Eintrag. War es kein Fehler im Code, sondern
+   eine falsch formulierte Invariante des Tests, wird der Startwert nicht eingetragen.
 4. **Abschluss:** Nur die Testdateien einzeln stagen (`git add <Datei>`, nie `git add -A` oder `git add .`) und committen:
    `git commit -m "test(auto): Tests für <Kurzbeschreibung> (<sha des Ausgangscommits>)"`.
 5. **Bericht:** Build-Ergebnis je Plattform, Testlauf (bestanden/fehlgeschlagen), neue Tests (Datei + Name),

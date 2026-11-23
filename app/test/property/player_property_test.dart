@@ -144,6 +144,8 @@ void main() {
     test(
       'a loop end beyond the duration keeps 1 s: start moves back',
       () async {
+        // #10 regression (found bug 11, regressions.json seed 1819060470): the loop stayed on without
+        // reaching the core.
         // Loop 10–11 s from another device, here the file is 10.5 s long: end 10.5, start 10.5 − 1 = 9.5.
         final s = await loaded(
           10.5,

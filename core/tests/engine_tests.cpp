@@ -347,10 +347,12 @@ void volumeScalesDirectOutput() {
   CHECK(e.playing());
 }
 
-// #10/AK4, found by fuzz_capi: arguments through the C API may be NaN, infinite or huge. Expected
-// from the rules of engine.cpp: NaN seek and NaN rate change nothing, a seek beyond the end lands
-// on the end (2000 frames at 1000 Hz = 2 s), a loop end beyond the file ends at the file end, the
-// volume is limited to 0–1 (5 plays like 1, NaN is silence). Every sample stays finite.
+// #10/AK4, found by fuzz_capi (regression for found bug 9, fuzz regression
+// capi/nonfinite_arguments, with volumeChangeWithoutCrackle in metronome_tests.cpp): arguments
+// through the C API may be NaN, infinite or huge. Expected from the rules of engine.cpp: NaN seek
+// and NaN rate change nothing, a seek beyond the end lands on the end (2000 frames at 1000 Hz =
+// 2 s), a loop end beyond the file ends at the file end, the volume is limited to 0–1 (5 plays
+// like 1, NaN is silence). Every sample stays finite.
 void nonFiniteArgumentsAreSafe() {
   const int sr = 1000;
   wp::Engine e;

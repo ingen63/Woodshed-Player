@@ -1,5 +1,5 @@
 {
-  "_comment": "#10/AK2: case seeds of random tests that once failed. They run first, on every run. Key: name of the property; value: list of {seed, found, note}.",
+  "_comment": "#10/AK2: case seeds of random tests that once failed. They run first, on every run. Key: name of the property; value: list of {seed, found, note}. Since #127 every entry also has a named regression test with the reduced input (docs/TESTS.md, «Gefundene Fehler»); the seed alone does not document the finding.",
   "sorting and moving into folders neither lose nor duplicate a track": [
     {
       "seed": 1819084227,
@@ -33,28 +33,6 @@
       "seed": 1819107984,
       "found": "2026-11-19",
       "note": "the first save of a new device stamped the default sort order and appearance as the newest change; the devices did not converge"
-    },
-    {
-      "seed": 1819139660,
-      "found": "2026-11-22",
-      "note": "#116: the old audio file of a trimmed track stayed in the cloud"
-    },
-    {
-      "seed": 1819266364,
-      "found": "2026-11-22",
-      "note": "#116: an old track held back after the purge horizon (#107) counted as shown"
-    },
-    {
-      "seed": 1820850164,
-      "found": "2026-11-22",
-      "note": "#116: a device joining late kept its own copy of the old file (#104), restamped after the trim"
-    }
-  ],
-  "damaged state.json never crashes and never loses local data": [
-    {
-      "seed": 1819282202,
-      "found": "2026-11-19",
-      "note": "a speed of 1e400 in state.json was merged as infinity; every later save of the library failed"
     }
   ]
 }

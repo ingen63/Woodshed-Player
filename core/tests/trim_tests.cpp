@@ -819,6 +819,26 @@ void moreLayouts() { // #116/AK4
   CHECK(m.code == WP_OK && m.bytes == plain.bytes);
 }
 
+// #116 regression (found bug 43, fuzz regression trim/flac_seek_infinity): trimming a FLAC file
+// seeked to the start with dr_flac. On a file shorter than its header says, the binary search of
+// the seek converted infinity or NaN to an integer (undefined behaviour, UBSan under make
+// sanitize). Since then the part before the start is decoded and dropped. The reduced input: a
+// valid STREAMINFO that claims 98304 frames (2.2 s) and a single silent frame of 4096 frames. Cut
+// from 0.5 s, the file ends long before the start: refused as damaged.
+void flacShorterThanItsHeader() {
+  const Bytes flac = {
+      'f',  'L',  'a',  'C',  0x80, 0x00, 0x00, 0x22, // last metadata block: STREAMINFO, 34 bytes
+      0x10, 0x00, 0x10, 0x00,                         // block size 4096 .. 4096
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // frame size unknown
+      0x0a, 0xc4, 0x42, 0xf0, 0x00, 0x01, 0x80, 0x00, // 44100 Hz, stereo, 16 bit, 98304 frames
+      0,    0,    0,    0,    0,    0,    0,    0,    0, 0, 0, 0, 0, 0, 0, 0, // MD5 unknown
+      0xff, 0xf8, 0xc9, 0x18, 0x00, 0xc2, // frame 0: 4096 frames, 44100 Hz, stereo, 16 bit, CRC-8
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // two CONSTANT subframes of value 0
+      0xb8, 0xee,                         // CRC-16
+  };
+  CHECK(wp::trim::trim(flac.data(), flac.size(), 0.5, 2.0).code == WP_ERR_UNSUPPORTED_FORMAT);
+}
+
 void run(const char *name, void (*test)()) {
   const int before = failures;
   test();
@@ -851,6 +871,7 @@ int main() {
   run("#116/AK4 FLAC blocks, ID3v2, damaged", flacVariants);
   run("#116/AK7 tolerance of the shortest range", rangeTolerance);
   run("#116/AK4 odd WAV data, ID3v2 before RIFF, junk before MP3", moreLayouts);
+  run("#116 regression (found bug 43): FLAC shorter than its header", flacShorterThanItsHeader);
   std::printf("%s\n", failures == 0 ? "all trim tests passed" : "trim tests FAILED");
   return failures == 0 ? 0 : 1;
 }

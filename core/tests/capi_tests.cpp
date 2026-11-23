@@ -100,9 +100,10 @@ void errorMessagesAndFileDuration() {
   CHECK(wp_file_duration("") == WP_ERR_INVALID_ARGUMENT);
 }
 
-// #105/AK2: a path that ends in '.' (the folder ".", a file "song.") made miniaudio read past the
-// end of the path (stack-buffer-overflow found by fuzz_capi). Such a file decodes like any other,
-// a folder is a documented error.
+// #105/AK2 (regression for found bug 39, fuzz regression capi/path_ending_in_dot): a path that ends
+// in '.' (the folder ".", a file "song.") made miniaudio read past the end of the path
+// (stack-buffer-overflow found by fuzz_capi). Such a file decodes like any other, a folder is a
+// documented error.
 void pathEndingInDot() {
   const fs::path dir = fs::temp_directory_path() / "wp_capi_tests_105";
   std::error_code ec;
