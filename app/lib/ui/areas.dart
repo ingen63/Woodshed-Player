@@ -395,7 +395,10 @@ class MetronomeScreen extends StatelessWidget {
       padding: EdgeInsets.all(m.pad),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
+          // #133: two columns on the desktop
+          constraints: BoxConstraints(
+            maxWidth: m.size == WsSize.desktop ? 1040 : 640,
+          ),
           child: MetronomePanel(controller: controller.metronome),
         ),
       ),
