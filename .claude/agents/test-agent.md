@@ -100,6 +100,6 @@ Lange Build-Ausgaben füllen den Kontext. Immer so aufrufen:
 4. **Abschluss:** Nur die Testdateien einzeln stagen (`git add <Datei>`, nie `git add -A` oder `git add .`) und committen:
    `git commit -m "test(auto): Tests für <Kurzbeschreibung> (<sha des Ausgangscommits>)"`.
 5. **Bericht:** Build-Ergebnis je Plattform, Testlauf (bestanden/fehlgeschlagen), neue Tests (Datei + Name),
-   je neuem Test die geschützte Regel und die Änderung, die ihn fehlschlagen lässt (bei Ausnahmen die Ausnahme),
+   je neuem Test die geschützte Regel und die Änderung, die ihn fehlschlagen lässt (auch bei Ausnahmen, dann zusätzlich welche),
    geänderte Logik, für die Du nach der Regel oben bewusst keinen Test geschrieben hast (mit Kategorie),
    gefundene Fehler im Produktivcode, was nicht getestet werden konnte und warum.
