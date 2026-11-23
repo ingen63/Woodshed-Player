@@ -196,7 +196,6 @@ class FakeMetronome implements MetronomeBackend {
 class FakeFiles implements FilePlatform {
   List<String> nextPick = [];
   int picks = 0;
-  void Function(List<String>)? drop;
 
   @override
   Future<List<String>> pickAudioFiles() async {
@@ -224,7 +223,17 @@ class FakeFiles implements FilePlatform {
   @override
   void keepAwake(bool on) {}
   @override
-  set onDropFiles(void Function(List<String> paths)? handler) => drop = handler;
+  set onFileDrag(void Function(FileDragEvent event)? handler) =>
+      fileDrag = handler;
+
+  /// Files dragged over or dropped on the window (#121).
+  void Function(FileDragEvent event)? fileDrag;
+
+  /// Files dropped on the window without a position (#22).
+  void Function(List<String> paths)? get drop => switch (fileDrag) {
+    final f? => (paths) => f(FileDragDrop(paths)),
+    null => null,
+  };
 
   /// Tag and build date this fake build reports (#50/AK6).
   BuildInfo build = const BuildInfo();

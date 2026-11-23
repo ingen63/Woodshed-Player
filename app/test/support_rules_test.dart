@@ -82,7 +82,9 @@ void main() {
       final p = ChannelFilePlatform();
       final dropped = <List<String>>[];
       var about = 0;
-      p.onDropFiles = dropped.add;
+      p.onFileDrag = (e) {
+        if (e is FileDragDrop) dropped.add(e.paths);
+      };
       p.onShowAbout = () => about++;
       await send(const MethodCall('dropFiles', ['a.mp3', 'b.flac']));
       await send(const MethodCall('dropFiles', 'not a list'));

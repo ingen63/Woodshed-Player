@@ -3,6 +3,57 @@
 // and mobile (file_store_io.dart), in the browser's Origin Private File System (file_store_web.dart).
 import 'package:flutter/services.dart';
 
+/// #121: files dragged from outside the app (Finder, file explorer) over the window.
+sealed class FileDragEvent {
+  const FileDragEvent();
+}
+
+/// The files are over the window at [position] (logical pixels of the view).
+final class FileDragOver extends FileDragEvent {
+  const FileDragOver(this.position);
+  final Offset position;
+}
+
+/// The drag left the window or was cancelled.
+final class FileDragLeave extends FileDragEvent {
+  const FileDragLeave();
+}
+
+/// The files were dropped at [position]; null if the platform did not say where.
+final class FileDragDrop extends FileDragEvent {
+  const FileDragDrop(this.paths, [this.position]);
+  final List<String> paths;
+  final Offset? position;
+}
+
+/// Position `{x, y}` in a message of the native part; null if missing or not numbers.
+Offset? _position(Object? args) {
+  if (args is! Map) return null;
+  final (x, y) = (args['x'], args['y']);
+  return x is num && y is num ? Offset(x.toDouble(), y.toDouble()) : null;
+}
+
+/// The event for a message of the native part, null for anything else: «dragFiles» `{x, y}`,
+/// «dragExit», «dropFiles» with the paths (#22) or `{paths, x, y}` (#121).
+FileDragEvent? fileDragEvent(MethodCall call) => switch (call.method) {
+  'dragFiles' => switch (_position(call.arguments)) {
+    final Offset p => FileDragOver(p),
+    null => null,
+  },
+  'dragExit' => const FileDragLeave(),
+  'dropFiles' => switch (call.arguments) {
+    final List<Object?> paths => FileDragDrop(
+      paths.whereType<String>().toList(),
+    ),
+    {'paths': final List<Object?> paths} => FileDragDrop(
+      paths.whereType<String>().toList(),
+      _position(call.arguments),
+    ),
+    _ => null,
+  },
+  _ => null,
+};
+
 /// Storage used by the library, shown in the library footer.
 class StorageInfo {
   const StorageInfo({required this.used, this.quota, this.persisted});
@@ -86,8 +137,8 @@ abstract class FilePlatform {
   /// Bildschirm wach halten (iPhone/iPad, solange das Metronom läuft).
   void keepAwake(bool on);
 
-  /// Dateien wurden ins Fenster gezogen (macOS).
-  set onDropFiles(void Function(List<String> paths)? handler);
+  /// Files are dragged over the window or dropped on it (macOS, web; #22, #121).
+  set onFileDrag(void Function(FileDragEvent event)? handler);
 
   /// Git tag and build date of this build (#50/AK6).
   Future<BuildInfo> buildInfo();
@@ -105,8 +156,8 @@ abstract class FilePlatform {
 class ChannelFilePlatform implements FilePlatform {
   ChannelFilePlatform() {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'dropFiles' && call.arguments is List) {
-        _onDrop?.call((call.arguments as List).cast<String>());
+      if (fileDragEvent(call) case final e?) {
+        _onDrag?.call(e);
       } else if (call.method == 'showAbout') {
         _onShowAbout?.call();
       }
@@ -114,12 +165,12 @@ class ChannelFilePlatform implements FilePlatform {
   }
 
   static const _channel = MethodChannel('woodshed/files');
-  void Function(List<String>)? _onDrop;
+  void Function(FileDragEvent)? _onDrag;
   void Function()? _onShowAbout;
 
   @override
-  set onDropFiles(void Function(List<String> paths)? handler) =>
-      _onDrop = handler;
+  set onFileDrag(void Function(FileDragEvent event)? handler) =>
+      _onDrag = handler;
 
   @override
   Future<List<String>> pickAudioFiles() async =>

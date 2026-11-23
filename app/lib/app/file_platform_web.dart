@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
+import 'dart:ui' show Offset;
 
 import 'package:web/web.dart' as web;
 
@@ -69,8 +70,74 @@ class WebFilePlatform implements FilePlatform {
   @override
   void keepAwake(bool on) {} // im Browser erst mit W7 (#39)
 
+  /// #121: files dragged from the file explorer over the page, reported with their position.
   @override
-  set onDropFiles(void Function(List<String> paths)? handler) {}
+  set onFileDrag(void Function(FileDragEvent event)? handler) {
+    _onDrag = handler;
+    if (handler != null && _listeners == null) _listen();
+  }
+
+  void Function(FileDragEvent)? _onDrag;
+  List<(String, JSFunction)>? _listeners;
+
+  /// Nested elements report enter and leave in pairs; at zero the drag has left the page.
+  int _depth = 0;
+
+  static bool _hasFiles(web.DragEvent e) =>
+      e.dataTransfer?.types.toDart.any((t) => t.toDart == 'Files') ?? false;
+
+  static Offset _at(web.DragEvent e) =>
+      Offset(e.clientX.toDouble(), e.clientY.toDouble());
+
+  void _listen() {
+    void on(String type, void Function(web.DragEvent e) f) {
+      final js = ((web.DragEvent e) {
+        if (_hasFiles(e)) f(e);
+      }).toJS;
+      web.window.addEventListener(type, js);
+      _listeners!.add((type, js));
+    }
+
+    _listeners = [];
+    on('dragenter', (e) {
+      e.preventDefault();
+      _depth++;
+    });
+    on('dragover', (e) {
+      // without this the browser opens the file instead of handing it to the page
+      e.preventDefault();
+      e.dataTransfer?.dropEffect = 'copy';
+      _onDrag?.call(FileDragOver(_at(e)));
+    });
+    on('dragleave', (e) {
+      if (--_depth > 0) return;
+      _depth = 0;
+      _onDrag?.call(const FileDragLeave());
+    });
+    on('drop', (e) async {
+      e.preventDefault();
+      _depth = 0;
+      final at = _at(e);
+      final list = e.dataTransfer?.files;
+      final files = [
+        for (var i = 0; i < (list?.length ?? 0); i++) list!.item(i)!,
+      ];
+      final paths = [
+        for (final f in files)
+          register(f.name, (await f.arrayBuffer().toDart).toDart.asUint8List()),
+      ];
+      _onDrag?.call(FileDragDrop(paths, at));
+    });
+  }
+
+  /// Removes the page listeners (tests).
+  void dispose() {
+    for (final (type, js) in _listeners ?? const <(String, JSFunction)>[]) {
+      web.window.removeEventListener(type, js);
+    }
+    _listeners = null;
+    _onDrag = null;
+  }
 
   @override
   Future<void> openUrl(String url) async {

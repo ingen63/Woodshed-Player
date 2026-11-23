@@ -124,7 +124,12 @@ typedef AudioTrimmer = Future<WpTrimmed> Function(
 );
 
 class ImportResult {
-  const ImportResult(this.imported, this.failed, [this.duplicates = const []]);
+  const ImportResult(
+    this.imported,
+    this.failed, [
+    this.duplicates = const [],
+    this.tracks = const [],
+  ]);
   final List<Track> imported;
 
   /// Ursprüngliche Dateinamen, die nicht übernommen werden konnten.
@@ -132,6 +137,9 @@ class ImportResult {
 
   /// Tracks whose contents were already in the library (no second file).
   final List<Track> duplicates;
+
+  /// #121: the imported and the already present tracks in the order of the files.
+  final List<Track> tracks;
 }
 
 String _sha256Hex(Uint8List bytes) => crypto.sha256.convert(bytes).toString();
@@ -1200,14 +1208,17 @@ class Library extends ChangeNotifier {
     final imported = <Track>[];
     final failed = <String>[];
     final duplicates = <Track>[];
+    final tracks = <Track>[];
     for (final path in paths) {
       final r = await _importFile(path, folderId);
       switch (r) {
         case (final Track t, false):
           _tracks.add(t);
           imported.add(t);
+          tracks.add(t);
         case (final Track t, true):
           duplicates.add(t);
+          tracks.add(t);
         case _:
           failed.add(_baseName(path));
       }
@@ -1220,7 +1231,7 @@ class Library extends ChangeNotifier {
     notifyListeners();
     if (imported.isNotEmpty) await _askPersistence();
     await refreshStorage();
-    return ImportResult(imported, failed, duplicates);
+    return ImportResult(imported, failed, duplicates, tracks);
   }
 
   /// (track, already present) or null on failure.

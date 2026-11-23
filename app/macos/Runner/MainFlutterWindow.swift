@@ -24,7 +24,8 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
 
   private(set) var channel: FlutterMethodChannel?
 
-  // MARK: Drag & Drop: Audiodateien ins Fenster ziehen (#17, #22), sie kommen in die Bibliothek.
+  // MARK: Drag & Drop: audio files dragged into the window (#17, #22) go into the library, onto a playlist or
+  // folder where they are dropped (#121).
 
   /// Pfade der Audiodateien auf dem Pasteboard; andere Dateien werden übergangen (#22/AK2).
   static func audioPaths(on pasteboard: NSPasteboard) -> [String] {
@@ -36,25 +37,48 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
     return urls.map(\.path)
   }
 
-  /// Übergibt die Pfade an Dart (Kanal «woodshed/files», Methode «dropFiles»). false: nichts Brauchbares.
+  /// #121: a point of the window as logical pixels from the top left corner of the Flutter view.
+  func flutterPosition(_ windowPoint: NSPoint) -> [String: Double] {
+    guard let view = contentViewController?.view else { return [:] }
+    let p = view.convert(windowPoint, from: nil)
+    return ["x": Double(p.x), "y": Double(view.isFlipped ? p.y : view.bounds.height - p.y)]
+  }
+
+  /// Hands the paths and the position to Dart (channel «woodshed/files», method «dropFiles» with
+  /// `{paths, x, y}`). false: nothing usable.
   @discardableResult
-  func deliverDrop(_ pasteboard: NSPasteboard) -> Bool {
+  func deliverDrop(_ pasteboard: NSPasteboard, at position: [String: Double] = [:]) -> Bool {
     let paths = Self.audioPaths(on: pasteboard)
     guard !paths.isEmpty else { return false }
-    channel?.invokeMethod("dropFiles", arguments: paths)
+    var args: [String: Any] = position
+    args["paths"] = paths
+    channel?.invokeMethod("dropFiles", arguments: args)
     return true
   }
 
+  /// #121: reports the position («dragFiles» `{x, y}`) while audio files are over the window, so that
+  /// the target under them lights up.
+  func dragOperation(_ pasteboard: NSPasteboard, at position: [String: Double]) -> NSDragOperation {
+    guard !Self.audioPaths(on: pasteboard).isEmpty else { return [] }
+    channel?.invokeMethod("dragFiles", arguments: position)
+    return .copy
+  }
+
   func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-    Self.audioPaths(on: sender.draggingPasteboard).isEmpty ? [] : .copy
+    dragOperation(sender.draggingPasteboard, at: flutterPosition(sender.draggingLocation))
   }
 
   func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-    Self.audioPaths(on: sender.draggingPasteboard).isEmpty ? [] : .copy
+    dragOperation(sender.draggingPasteboard, at: flutterPosition(sender.draggingLocation))
+  }
+
+  /// #121: the files left the window; no target stays lit.
+  func draggingExited(_ sender: NSDraggingInfo?) {
+    channel?.invokeMethod("dragExit", arguments: nil)
   }
 
   func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-    deliverDrop(sender.draggingPasteboard)
+    deliverDrop(sender.draggingPasteboard, at: flutterPosition(sender.draggingLocation))
   }
 
   /// Dateiauswahl und Ablageort für Aufnahmen (ohne zusätzliches Plugin).
@@ -144,45 +168,56 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
         result(FlutterError(code: "args", message: "key missing", details: nil))
         return
       }
-      let query: [String: Any] = [
-        kSecClass as String: kSecClassGenericPassword,
-        kSecAttrService as String: Bundle.main.bundleIdentifier ?? "WoodshedPlayer",
-        kSecAttrAccount as String: key,
-      ]
-      switch call.method {
-      case "read":
-        var item: CFTypeRef?
-        var q = query
-        q[kSecReturnData as String] = true
-        q[kSecMatchLimit as String] = kSecMatchLimitOne
-        let status = SecItemCopyMatching(q as CFDictionary, &item)
-        if status == errSecSuccess, let data = item as? Data {
-          result(String(data: data, encoding: .utf8))
-        } else if status == errSecItemNotFound {
-          result(nil)
-        } else {
-          result(FlutterError(code: "keychain", message: "read: \(status)", details: nil))
-        }
-      case "write":
-        let data = Data(((args["value"] as? String) ?? "").utf8)
-        var status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
-        if status == errSecItemNotFound {
-          var add = query
-          add[kSecValueData as String] = data
-          add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-          status = SecItemAdd(add as CFDictionary, nil)
-        }
-        result(
-          status == errSecSuccess
-            ? nil : FlutterError(code: "keychain", message: "write: \(status)", details: nil))
-      case "delete":
-        let status = SecItemDelete(query as CFDictionary)
-        result(
-          status == errSecSuccess || status == errSecItemNotFound
-            ? nil : FlutterError(code: "keychain", message: "delete: \(status)", details: nil))
-      default:
-        result(FlutterMethodNotImplemented)
+      // SecItem waits while macOS asks for the keychain password (an ad-hoc signed build is a new app to
+      // the keychain after every build). Off the main thread, so the window keeps drawing; one serial
+      // queue keeps writes and deletes in order. The answer goes back on the main thread.
+      MainFlutterWindow.keychainQueue.async {
+        let reply = MainFlutterWindow.keychain(call.method, key: key, value: args["value"] as? String)
+        DispatchQueue.main.async { result(reply) }
       }
+    }
+  }
+
+  private static let keychainQueue = DispatchQueue(label: "woodshed.keychain", qos: .userInitiated)
+
+  /// One keychain call; the reply for the channel. A refused or cancelled password prompt is an error
+  /// (Dart: the stored sign-in is not readable, the user signs in again).
+  private static func keychain(_ method: String, key: String, value: String?) -> Any? {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: Bundle.main.bundleIdentifier ?? "WoodshedPlayer",
+      kSecAttrAccount as String: key,
+    ]
+    switch method {
+    case "read":
+      var item: CFTypeRef?
+      var q = query
+      q[kSecReturnData as String] = true
+      q[kSecMatchLimit as String] = kSecMatchLimitOne
+      let status = SecItemCopyMatching(q as CFDictionary, &item)
+      if status == errSecSuccess, let data = item as? Data {
+        return String(data: data, encoding: .utf8)
+      } else if status == errSecItemNotFound {
+        return nil
+      }
+      return FlutterError(code: "keychain", message: "read: \(status)", details: nil)
+    case "write":
+      let data = Data((value ?? "").utf8)
+      var status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+      if status == errSecItemNotFound {
+        var add = query
+        add[kSecValueData as String] = data
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        status = SecItemAdd(add as CFDictionary, nil)
+      }
+      return status == errSecSuccess
+        ? nil : FlutterError(code: "keychain", message: "write: \(status)", details: nil)
+    case "delete":
+      let status = SecItemDelete(query as CFDictionary)
+      return status == errSecSuccess || status == errSecItemNotFound
+        ? nil : FlutterError(code: "keychain", message: "delete: \(status)", details: nil)
+    default:
+      return FlutterMethodNotImplemented
     }
   }
 }

@@ -8,10 +8,12 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app/app_controller.dart';
+import '../app/file_drop.dart';
 import '../library/library.dart';
 import '../player/play_queue.dart';
 import '../time_format.dart';
 import 'about_dialog.dart';
+import 'file_drop.dart';
 import 'sync_settings.dart';
 import 'messages.dart';
 import 'style.dart';
@@ -91,7 +93,7 @@ class _LibraryViewState extends State<LibraryView> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([c, lib, c.player, c.sync]),
+      listenable: Listenable.merge([c, lib, c.player, c.sync, c.fileDropHover]),
       builder: (context, _) {
         final folders = lib.sortedFolders;
         final loose = lib.sortedTracksIn(null);
@@ -129,12 +131,17 @@ class _LibraryViewState extends State<LibraryView> {
                             label: context.l10n.noFolder,
                             icon: WsIcons.tray,
                             onDrop: (id) => lib.placeTrack(id as String, null),
+                            fileTarget: const FolderDropTarget(null),
+                            fileHover: _hovered(const FolderDropTarget(null)),
                           ),
-                        for (final t in loose) _row(t),
+                        for (final t in loose)
+                          _row(t, fileTarget: const FolderDropTarget(null)),
                         if (loose.isEmpty && folders.isNotEmpty)
                           _Placeholder(
                             context.l10n.noTracksWithoutFolder,
                             onDrop: (id) => lib.placeTrack(id, null),
+                            fileTarget: const FolderDropTarget(null),
+                            fileHover: _hovered(const FolderDropTarget(null)),
                           ),
                         for (final f in folders) ..._folder(f),
                         _PlaylistsHeader(
@@ -177,10 +184,14 @@ class _LibraryViewState extends State<LibraryView> {
     );
   }
 
+  /// #121/AK4: files dragged in from outside are over [target].
+  bool _hovered(FileDropTarget target) => c.fileDropHover.value == target;
+
   List<Widget> _folder(TrackFolder f) {
     final l = context.l10n;
     final open = !_collapsed.contains(f.id);
     final tracks = lib.sortedTracksIn(f.id);
+    final files = FolderDropTarget(f.id);
     return [
       _SectionHeader(
         key: Key('folder:${f.name}'),
@@ -191,6 +202,8 @@ class _LibraryViewState extends State<LibraryView> {
           () => open ? _collapsed.add(f.id) : _collapsed.remove(f.id),
         ),
         onDrop: (id) => lib.placeTrack(id as String, f.id),
+        fileTarget: files,
+        fileHover: _hovered(files),
         menu: (context) => [
           MenuItemButton(
             leadingIcon: const Icon(WsIcons.add, size: 16),
@@ -232,9 +245,14 @@ class _LibraryViewState extends State<LibraryView> {
         ],
       ),
       if (open) ...[
-        for (final t in tracks) _row(t, indent: true),
+        for (final t in tracks) _row(t, indent: true, fileTarget: files),
         if (tracks.isEmpty)
-          _Placeholder(l.emptyFolder, onDrop: (id) => lib.placeTrack(id, f.id)),
+          _Placeholder(
+            l.emptyFolder,
+            onDrop: (id) => lib.placeTrack(id, f.id),
+            fileTarget: files,
+            fileHover: _hovered(files),
+          ),
       ],
     ];
   }
@@ -252,6 +270,7 @@ class _LibraryViewState extends State<LibraryView> {
     final open = _openPlaylists.contains(p.id);
     final tracks = lib.playlistTracks(p.id);
     final q = c.queue;
+    final files = PlaylistDropTarget(p.id);
     void drop(Object d, int at) => switch (d) {
       final String id => lib.addToPlaylist(p.id, [id], at: at),
       _EntryDrag(:final playlistId, :final index) when playlistId == p.id =>
@@ -270,6 +289,8 @@ class _LibraryViewState extends State<LibraryView> {
         ),
         accepts: (d) => d is String || d is _EntryDrag,
         onDrop: (d) => drop(d, tracks.length),
+        fileTarget: files,
+        fileHover: _hovered(files),
         menuTooltip: l.playlistActions,
         trailing: [
           // #114/AK11: cloud = on all devices, device = only here
@@ -366,6 +387,8 @@ class _LibraryViewState extends State<LibraryView> {
                 d is String ||
                 (d is _EntryDrag && (d.playlistId != p.id || d.index != i)),
             onDrop: (d) => drop(d, i),
+            fileTarget: PlaylistDropTarget(p.id, i),
+            fileHover: _hovered(PlaylistDropTarget(p.id, i)),
             menu: (context) => [
               MenuItemButton(
                 key: const Key('removeFromPlaylist'),
@@ -385,12 +408,15 @@ class _LibraryViewState extends State<LibraryView> {
           _Placeholder(
             l.emptyPlaylist,
             onDrop: (id) => lib.addToPlaylist(p.id, [id]),
+            fileTarget: files,
+            fileHover: _hovered(files),
           ),
       ],
     ];
   }
 
-  Widget _row(Track t, {bool indent = false}) {
+  /// [fileTarget]: where files dropped on the row go (#121), the row's folder; none in the search.
+  Widget _row(Track t, {bool indent = false, FileDropTarget? fileTarget}) {
     final l = context.l10n;
     return _TrackRow(
       key: Key('track:${t.title}'),
@@ -404,6 +430,7 @@ class _LibraryViewState extends State<LibraryView> {
       touch: widget.touch,
       onTap: () => _select(t),
       onDrop: (id) => lib.placeTrack(id as String, t.folderId, beforeId: t.id),
+      fileTarget: fileTarget,
       menu: (context) => [
         MenuItemButton(
           key: const Key('editTrack'),
@@ -925,6 +952,8 @@ class _SectionHeader extends StatelessWidget {
     this.menu,
     this.menuTooltip,
     this.trailing = const [],
+    this.fileTarget,
+    this.fileHover = false,
   });
 
   final String label;
@@ -943,18 +972,22 @@ class _SectionHeader extends StatelessWidget {
   /// Shown before the «⋯» button (#114: sharing, count, play).
   final List<Widget> trailing;
 
+  /// #121: where files dropped from outside go; [fileHover] while they are over it.
+  final FileDropTarget? fileTarget;
+  final bool fileHover;
+
   static bool _isTrackId(Object d) => d is String;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return DragTarget<Object>(
+    final target = DragTarget<Object>(
       onWillAcceptWithDetails: (d) => accepts(d.data),
       onAcceptWithDetails: (d) => onDrop(d.data),
       builder: (context, candidates, _) => _WithMenu(
         menu: menu,
         builder: (context, openMenu) => Material(
-          type: candidates.isNotEmpty
+          type: candidates.isNotEmpty || fileHover
               ? MaterialType.canvas
               : MaterialType.transparency,
           color: WsTheme.of(context).amberSoft,
@@ -999,6 +1032,7 @@ class _SectionHeader extends StatelessWidget {
         ),
       ),
     );
+    return FileDropRegion(target: fileTarget, child: target);
   }
 }
 
@@ -1248,15 +1282,27 @@ Future<void> showCacheLimitDialog(BuildContext context, Library lib) async {
 }
 
 class _Placeholder extends StatelessWidget {
-  const _Placeholder(this.text, {required this.onDrop});
+  const _Placeholder(
+    this.text, {
+    required this.onDrop,
+    this.fileTarget,
+    this.fileHover = false,
+  });
   final String text;
   final void Function(String trackId) onDrop;
 
+  /// #121: where files dropped from outside go; [fileHover] while they are over it.
+  final FileDropTarget? fileTarget;
+  final bool fileHover;
+
   @override
-  Widget build(BuildContext context) => DragTarget<String>(
+  Widget build(BuildContext context) =>
+      FileDropRegion(target: fileTarget, child: _target(context));
+
+  Widget _target(BuildContext context) => DragTarget<String>(
     onAcceptWithDetails: (d) => onDrop(d.data),
     builder: (context, candidates, _) => Container(
-      color: candidates.isNotEmpty
+      color: candidates.isNotEmpty || fileHover
           ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
           : null,
       padding: const EdgeInsets.fromLTRB(44, 8, 16, 8),
@@ -1287,6 +1333,8 @@ class _TrackRow extends StatelessWidget {
     required this.menu,
     this.dragData,
     this.accepts,
+    this.fileTarget,
+    this.fileHover = false,
   });
 
   final Track track;
@@ -1309,6 +1357,10 @@ class _TrackRow extends StatelessWidget {
 
   /// Which drops this row takes; by default another track of the library.
   final bool Function(Object data)? accepts;
+
+  /// #121: where files dropped from outside go; [fileHover] while they are over this row.
+  final FileDropTarget? fileTarget;
+  final bool fileHover;
 
   @override
   Widget build(BuildContext context) {
@@ -1454,7 +1506,7 @@ class _TrackRow extends StatelessWidget {
     );
 
     final data = dragData ?? track.id;
-    return DragTarget<Object>(
+    final target = DragTarget<Object>(
       onWillAcceptWithDetails: (d) =>
           accepts?.call(d.data) ?? (d.data is String && d.data != track.id),
       onAcceptWithDetails: (d) => onDrop(d.data),
@@ -1469,7 +1521,11 @@ class _TrackRow extends StatelessWidget {
               child: Text(track.title),
             ),
           );
-          final child = tile(null, openMenu, dropHint: candidates.isNotEmpty);
+          final child = tile(
+            null,
+            openMenu,
+            dropHint: candidates.isNotEmpty || fileHover,
+          );
           final dimmed = Opacity(opacity: 0.4, child: tile(null, null));
           return touch
               ? LongPressDraggable<Object>(
@@ -1487,6 +1543,7 @@ class _TrackRow extends StatelessWidget {
         },
       ),
     );
+    return FileDropRegion(target: fileTarget, child: target);
   }
 }
 

@@ -2,6 +2,7 @@
 // Ohne Widgets, damit es sich in Tests prüfen lässt.
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui' show Offset;
 
 import 'package:flutter/foundation.dart';
 
@@ -12,6 +13,7 @@ import '../player/play_queue.dart';
 import '../player/player_service.dart';
 import '../sync/cloud_account.dart';
 import '../sync/sync_service.dart';
+import 'file_drop.dart';
 import 'file_platform.dart';
 
 /// #115: the three areas of the app, in the order of their tabs (⌘1, ⌘2, ⌘3).
@@ -42,7 +44,7 @@ class AppController extends ChangeNotifier {
     player.onSettingsChanged = library.updateSettings;
     player.onEnded = _trackEnded;
     library.onLocalChange = this.sync.localChanged;
-    files.onDropFiles = (paths) => importFiles(paths);
+    files.onFileDrag = _fileDrag;
     library.addListener(_libraryChanged);
     player.addListener(_playerChanged);
   }
@@ -343,6 +345,52 @@ class AppController extends ChangeNotifier {
     return r;
   }
 
+  // ---- Files dragged in from outside (#121) ----
+
+  /// The target under files dragged in from outside, for its highlight; null over anything else.
+  final fileDropHover = ValueNotifier<FileDropTarget?>(null);
+
+  /// Finds the target at a position of the window; the window sets it (hit test of its widgets).
+  FileDropTarget? Function(Offset position) dropTargetAt = _noTarget;
+
+  static FileDropTarget? _noTarget(Offset _) => null;
+
+  void _fileDrag(FileDragEvent e) {
+    switch (e) {
+      case FileDragOver(:final position):
+        fileDropHover.value = dropTargetAt(position);
+      case FileDragLeave():
+        fileDropHover.value = null;
+      case FileDragDrop(:final paths, :final position):
+        fileDropHover.value = null;
+        dropFiles(paths, position == null ? null : dropTargetAt(position));
+    }
+  }
+
+  /// Imports dropped files into [target]: into a playlist at its place in the order of the files, the
+  /// track already in the library instead of a second file (AK1, AK2); into a folder, where tracks
+  /// already present move as well (AK3). Without a target they only come into the library (#22).
+  Future<ImportResult> dropFiles(
+    List<String> paths,
+    FileDropTarget? target,
+  ) async {
+    final folder = target is FolderDropTarget;
+    final r = await importFiles(
+      paths,
+      folderId: folder ? target.folderId : null,
+    );
+    switch (target) {
+      case PlaylistDropTarget(:final playlistId, :final at):
+        library.addToPlaylist(playlistId, [
+          for (final t in r.tracks) t.id,
+        ], at: at);
+      case FolderDropTarget(:final folderId):
+        library.moveTracks({for (final t in r.duplicates) t.id}, folderId);
+      case null:
+    }
+    return r;
+  }
+
   // ---- Trimming (#116) ----
 
   /// The track whose file is being trimmed; null otherwise.
@@ -405,7 +453,8 @@ class AppController extends ChangeNotifier {
     library.removeListener(_libraryChanged);
     player.removeListener(_playerChanged);
     library.onLocalChange = null;
-    files.onDropFiles = null;
+    files.onFileDrag = null;
+    fileDropHover.dispose();
     sync.dispose();
     cloud.dispose();
     super.dispose();

@@ -12,6 +12,7 @@ import '../app/app_controller.dart';
 import '../metronome/practice_shortcuts.dart';
 import 'about_dialog.dart';
 import 'areas.dart';
+import 'file_drop.dart';
 import 'library_view.dart';
 import 'messages.dart';
 import 'player_screen.dart';
@@ -65,6 +66,8 @@ class _HomePageState extends State<HomePage> {
     _lifecycle = AppLifecycleListener(onResume: () => c.resumed());
     c.cloud.addListener(_signInHint);
     c.player.addListener(_signInHint);
+    // #121: files dragged in from outside go to the playlist or folder under them
+    c.dropTargetAt = fileDropTargetAt;
     c.files.onShowAbout = () {
       if (mounted) showAbout(context, c.files);
     };

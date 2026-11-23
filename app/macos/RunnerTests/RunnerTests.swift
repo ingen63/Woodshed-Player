@@ -38,7 +38,7 @@ struct DragAndDropTests {
 
   @Test("#22 Regressionstest: Drag-Methoden sind für AppKit sichtbar (eigene Implementierung)")
   func dragMethodsReachAppKit() {
-    for name in ["draggingEntered:", "draggingUpdated:", "performDragOperation:"] {
+    for name in ["draggingEntered:", "draggingUpdated:", "draggingExited:", "performDragOperation:"] {
       let sel = NSSelectorFromString(name)
       let own = class_getInstanceMethod(MainFlutterWindow.self, sel)
       #expect(own != nil, "\(name) fehlt")
@@ -78,16 +78,57 @@ struct DragAndDropTests {
     window.registerFileChannel(messenger)
     let (pb, urls) = try pasteboard(with: ["a.mp3", "notiz.txt", "b.wav"])
 
-    #expect(window.deliverDrop(pb))
+    #expect(window.deliverDrop(pb, at: ["x": 12, "y": 34]))
     let msg = try #require(messenger.sent.last)
     #expect(msg.channel == "woodshed/files")
     let call = FlutterStandardMethodCodec.sharedInstance().decodeMethodCall(try #require(msg.message))
     #expect(call.method == "dropFiles")
-    #expect(call.arguments as? [String] == [urls[0].path, urls[2].path])
+    let args = try #require(call.arguments as? [String: Any])
+    #expect(args["paths"] as? [String] == [urls[0].path, urls[2].path])
+    #expect(args["x"] as? Double == 12)
+    #expect(args["y"] as? Double == 34)
 
     let (none, _) = try pasteboard(with: ["notiz.txt"])
     let before = messenger.sent.count
     #expect(!window.deliverDrop(none))
     #expect(messenger.sent.count == before)
+  }
+
+  @Test("#121/AK4 audio files over the window report their position as «dragFiles», leaving as «dragExit»")
+  @MainActor
+  func dragPositionDeliveredToDart() throws {
+    let window = MainFlutterWindow()
+    let messenger = RecordingMessenger()
+    window.registerFileChannel(messenger)
+    let codec = FlutterStandardMethodCodec.sharedInstance()
+    let (pb, _) = try pasteboard(with: ["a.mp3"])
+
+    #expect(window.dragOperation(pb, at: ["x": 5, "y": 7]) == .copy)
+    let over = codec.decodeMethodCall(try #require(messenger.sent.last?.message))
+    #expect(over.method == "dragFiles")
+    #expect((over.arguments as? [String: Double]) == ["x": 5, "y": 7])
+
+    let (none, _) = try pasteboard(with: ["notiz.txt"])
+    let before = messenger.sent.count
+    #expect(window.dragOperation(none, at: ["x": 5, "y": 7]) == [])
+    #expect(messenger.sent.count == before)
+
+    window.draggingExited(nil)
+    #expect(codec.decodeMethodCall(try #require(messenger.sent.last?.message)).method == "dragExit")
+  }
+
+  @Test("#121 a point of the window counts from the top left corner of the Flutter view")
+  @MainActor
+  func positionFromTopLeft() throws {
+    let window = MainFlutterWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 300, height: 200), styleMask: [.borderless],
+      backing: .buffered, defer: true)
+    #expect(window.flutterPosition(NSPoint(x: 1, y: 1)).isEmpty)
+    let controller = NSViewController()
+    controller.view = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
+    window.contentViewController = controller
+    let p = window.flutterPosition(NSPoint(x: 10, y: 150))
+    #expect(p["x"] == 10)
+    #expect(p["y"] == 50)
   }
 }
