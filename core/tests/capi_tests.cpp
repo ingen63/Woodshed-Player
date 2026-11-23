@@ -15,6 +15,7 @@
 #include <cstring>
 #include <filesystem>
 #include <functional>
+#include <random>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -105,7 +106,12 @@ void errorMessagesAndFileDuration() {
 // (stack-buffer-overflow found by fuzz_capi). Such a file decodes like any other, a folder is a
 // documented error.
 void pathEndingInDot() {
-  const fs::path dir = fs::temp_directory_path() / "wp_capi_tests_105";
+  // A folder of its own per run (#132): capi_tests and capi_null_backend_tests run in parallel, and
+  // a shared fixed folder was removed by the run that finished first.
+  const fs::path dir =
+      fs::temp_directory_path() /
+      ("wp_capi_tests_105_" + std::to_string(std::random_device{}()) + "_" +
+       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
   std::error_code ec;
   fs::create_directories(dir, ec);
   const fs::path dotted = dir / "sine440.";

@@ -1272,6 +1272,15 @@ heisst nur, dass der Test etwas ausgegeben hat. Absichtlich geben nur die Zufall
 **Nachweis (AK2):** 20 volle Läufe von `flutter test` hintereinander am 20.11.2026, davon 8 unter Last (12 CPU-Brenner
 auf 10 Kernen), alle grün; MacBook Pro M1 Pro, macOS 26.7.
 
+**Kerntest `pathEndingInDot` (#132).** Schlug bei #127 im vollen Lauf unter ASan einmal fehl, einzeln nie.
+`capi_tests` und `capi_null_backend_tests` sind dasselbe Programm und laufen in `ctest -j` parallel. Beide legten die
+Testdatei im festen Ordner `$TMPDIR/wp_capi_tests_105` an und löschten ihn am Ende; der früher fertige Lauf nahm dem
+anderen die Datei weg, `wp_load` scheiterte. Nachgestellt mit
+`ctest --test-dir core/build-asan -R "^capi_(null_backend_)?tests$" -j 2 --repeat until-fail:30` (rot), einzeln
+10 Mal grün. Behoben: Jeder Lauf nutzt einen eigenen Ordner (`wp_capi_tests_105_<Zufall>_<Zeit>`), wie
+`player_tests` und `recorder_tests`. Regel: Ein Kerntest schreibt nie in einen festen Pfad unter `$TMPDIR`, den ein
+anderer ctest-Fall auch beschreibt.
+
 ## Hook nach dem Commit
 
 `.claude/hooks/after-commit.sh` läuft nach jedem `git commit` aus Claude Code. Er prüft das Format der Nachricht
@@ -1632,3 +1641,7 @@ hinzukommenden Geräts (#104) dürfen den alten Titel behalten.
     `regressions/trim/m4a_empty_mvhd_at_end`, Test «#120 regression (found bug 44): empty mvhd at the end of the
     file» (`trim_mp4_tests.cpp`, #127): `ftyp`, `moov` mit leerem `mvhd`, 32 Byte; ohne Behebung unter
     `make sanitize` rot.
+45. 23.11.2026, #132, voller Lauf bei #127: `pathEndingInDot` (`capi_tests.cpp`) wackelte, weil die beiden
+    parallelen ctest-Fälle `capi_tests` und `capi_null_backend_tests` denselben festen Ordner anlegten und löschten
+    (Abschnitt «Wackelnde Tests»). Behoben mit einem eigenen Ordner je Lauf; Nachweis: beide Fälle parallel 30 Mal
+    grün, der volle Kernlauf unter ASan 10 Mal grün.
