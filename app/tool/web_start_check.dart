@@ -230,7 +230,7 @@ Future<void> main(List<String> args) async {
     await page.send('Page.navigate', {'url': '$origin$seedPath'});
     await _waitFor(page, "document.title === 'seed'");
     final seeded = await page.send('Runtime.evaluate', {
-      'expression': _seedScript(seedLibrary()),
+      'expression': _seedScript(seedLibrary(), seedDevice()),
       'awaitPromise': true,
       'returnByValue': true,
     });
@@ -287,15 +287,23 @@ Future<WebSocket> _pageSocket(int debugPort) async {
   }
 }
 
-/// Writes [json] as `library.json` into the library folder of the page's OPFS; resolves to true.
-String _seedScript(String json) =>
+/// `device.json` for the seeded start: the library section is open (#123 collapses it by default),
+/// so the titles of [seedLibrary] are drawn and the engine has to look for a fallback font.
+String seedDevice() =>
+    jsonEncode({'deviceId': '0123456789abcdef', 'libraryOpen': true});
+
+/// Writes [library] as `library.json` and [device] as `device.json` into the library folder of the
+/// page's OPFS; resolves to true.
+String _seedScript(String library, String device) =>
     """(async () => {
   const root = await navigator.storage.getDirectory();
   const dir = await root.getDirectoryHandle('$libraryDir', {create: true});
-  const file = await dir.getFileHandle('library.json', {create: true});
-  const out = await file.createWritable();
-  await out.write(${jsonEncode(json)});
-  await out.close();
+  for (const [name, text] of [['library.json', ${jsonEncode(library)}], ['device.json', ${jsonEncode(device)}]]) {
+    const file = await dir.getFileHandle(name, {create: true});
+    const out = await file.createWritable();
+    await out.write(text);
+    await out.close();
+  }
   return true;
 })()""";
 

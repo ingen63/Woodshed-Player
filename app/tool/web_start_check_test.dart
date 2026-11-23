@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:woodshed_player/library/device_settings.dart';
 import 'package:woodshed_player/library/stamps.dart';
 import 'package:woodshed_player/library/track.dart';
 
@@ -123,6 +124,17 @@ void main() {
   });
 
   group('fallback fonts (#82)', () {
+    test('#82/AK1 the seeded device opens the library section (#123 collapses it by default)', () {
+      // Same keys as the app writes for an open library section.
+      expect(
+        jsonDecode(seedDevice()),
+        const DeviceSettings(
+          deviceId: '0123456789abcdef',
+          libraryOpen: true,
+        ).toJson(),
+      );
+    });
+
     test(
       '#82/AK1 the seeded library is valid and holds CJK and emoji titles',
       () {
