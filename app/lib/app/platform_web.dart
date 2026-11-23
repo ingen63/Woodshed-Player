@@ -15,6 +15,7 @@ import '../player/player_service.dart';
 import '../sync/cloud_account.dart';
 // #54/AK6: the provider module is loaded only once Google Drive is chosen
 import '../sync/providers/google_platform_web.dart' deferred as google;
+import '../sync/oauth_return_web.dart';
 import 'app_controller.dart';
 import 'app_start.dart';
 import 'file_platform_web.dart';
@@ -35,6 +36,8 @@ Future<AppController> createAppController({
   Object? baseDir,
   TapTempo? tapTempo,
 }) async {
+  // #131: Google's answer before anything is awaited; the first frame replaces the address
+  final signInAnswer = takeStartAnswer();
   final files = WebFilePlatform();
   final store = await OpfsFileStore.open(libraryDir);
   final core = await WebAudioCore.create(bytesOf: store.read);
@@ -59,6 +62,7 @@ Future<AppController> createAppController({
         secrets: null,
         openUrl: files.openUrl,
         playing: () => player.isPlaying,
+        fragment: signInAnswer,
       );
     },
   );

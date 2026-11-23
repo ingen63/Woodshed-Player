@@ -11,6 +11,7 @@ import '../cloud_provider.dart';
 import '../secret_store.dart';
 import 'google_auth.dart';
 import 'http_transport.dart';
+import '../oauth_return.dart';
 
 class WebGoogleAuth extends GoogleAuth {
   WebGoogleAuth({
@@ -62,8 +63,7 @@ class WebGoogleAuth extends GoogleAuth {
   bool get needsSignIn => _needsSignIn;
 
   /// The fragment is an answer of Google (token or error).
-  static bool isAnswer(String fragment) =>
-      RegExp(r'(^|&)(state|error|access_token)=').hasMatch(fragment);
+  static bool isAnswer(String fragment) => isOAuthAnswer(fragment);
 
   @override
   Future<void> load() async {
