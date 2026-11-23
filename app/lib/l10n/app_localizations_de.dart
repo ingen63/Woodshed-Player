@@ -744,6 +744,24 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playlistActions => 'Playlist-Aktionen';
 
   @override
+  String get sortPlaylistBy => 'Sortieren nach';
+
+  @override
+  String sortPlaylistOption(String key, String direction) {
+    String _temp0 = intl.Intl.selectLogic(key, {
+      'title': 'Titel',
+      'artist': 'Artist',
+      'duration': 'Dauer',
+      'other': 'Hinzugefügt',
+    });
+    String _temp1 = intl.Intl.selectLogic(direction, {
+      'descending': 'absteigend',
+      'other': 'aufsteigend',
+    });
+    return '$_temp0, $_temp1';
+  }
+
+  @override
   String get addToPlaylist => 'Zu Playlist hinzufügen';
 
   @override

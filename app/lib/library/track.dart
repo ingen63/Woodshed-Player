@@ -425,6 +425,9 @@ class Playlist {
   );
 }
 
+/// #124: what a playlist is sorted by once, from the menu; the result becomes its own order.
+enum PlaylistSortKey { title, artist, duration, dateAdded }
+
 /// Sort order of the library; the UI names it in the user's language (#43).
 enum TrackSortOrder {
   alphabetical,

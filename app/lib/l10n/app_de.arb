@@ -189,6 +189,8 @@
   "deletePlaylistText": "Die Titel bleiben in der Bibliothek.",
   "playPlaylist": "Abspielen",
   "playlistActions": "Playlist-Aktionen",
+  "sortPlaylistBy": "Sortieren nach",
+  "sortPlaylistOption": "{key, select, title{Titel} artist{Artist} duration{Dauer} other{Hinzugefügt}}, {direction, select, descending{absteigend} other{aufsteigend}}",
   "addToPlaylist": "Zu Playlist hinzufügen",
   "removeFromPlaylist": "Aus Playlist entfernen",
   "emptyPlaylist": "Leer – Titel hierher ziehen",

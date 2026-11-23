@@ -1553,6 +1553,52 @@ class Library extends ChangeNotifier {
         rows.insert((to > from ? to - 1 : to).clamp(0, rows.length), moving);
       });
 
+  /// #124: sorts the playlist once by [key], [descending] or not; the result is its own order from now on
+  /// and is saved and synced like a moved row (#114/AK4). Tracks without an artist come last either way;
+  /// equal keys go by title, then keep their order. Returns the old row of each new row (for the queue
+  /// being played), or null if the playlist is unknown.
+  List<int>? sortPlaylist(
+    String id,
+    PlaylistSortKey key, {
+    bool descending = false,
+  }) {
+    // a library left read-only (#36/AK4) has no playlists
+    if (playlist(id) == null) return null;
+    final tracks = playlistTracks(id);
+    final titles = [for (final t in tracks) NaturalKey(t.title)];
+    final artists = [
+      for (final t in tracks)
+        if (t.artist case final a?) NaturalKey(a) else null,
+    ];
+    int primary(int a, int b) => switch (key) {
+      PlaylistSortKey.title => 0,
+      PlaylistSortKey.artist => artists[a]!.compareTo(artists[b]!),
+      PlaylistSortKey.duration => tracks[a].duration.compareTo(
+        tracks[b].duration,
+      ),
+      PlaylistSortKey.dateAdded => tracks[a].dateAdded.compareTo(
+        tracks[b].dateAdded,
+      ),
+    };
+    bool noArtist(int i) => key == PlaylistSortKey.artist && artists[i] == null;
+    int compare(int a, int b) {
+      if (noArtist(a) != noArtist(b)) return noArtist(a) ? 1 : -1;
+      var c = noArtist(a) ? 0 : primary(a, b);
+      if (c == 0) c = titles[a].compareTo(titles[b]);
+      if (descending) c = -c;
+      return c != 0 ? c : a.compareTo(b);
+    }
+
+    final order = [for (var i = 0; i < tracks.length; i++) i]..sort(compare);
+    _changeEntries(id, (rows) {
+      final old = [...rows];
+      for (final (i, from) in order.indexed) {
+        rows[i] = old[from];
+      }
+    });
+    return order;
+  }
+
   /// Changes the rows as shown; entries of tracks no longer in the library drop out with it.
   void _changeEntries(String id, void Function(List<String> rows) change) =>
       _changePlaylist(id, (p) {

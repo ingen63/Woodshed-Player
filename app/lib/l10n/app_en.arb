@@ -541,6 +541,18 @@
   "@playlistActions": {
     "description": "#114: tooltip of the «⋯» button"
   },
+  "sortPlaylistBy": "Sort by",
+  "@sortPlaylistBy": {
+    "description": "#124: submenu of a playlist; sorts it once, the result becomes its own order"
+  },
+  "sortPlaylistOption": "{key, select, title{Title} artist{Artist} duration{Duration} other{Date added}}, {direction, select, descending{descending} other{ascending}}",
+  "@sortPlaylistOption": {
+    "description": "#124: one entry of «Sort by»: the criterion and the direction",
+    "placeholders": {
+      "key": {"type": "String"},
+      "direction": {"type": "String"}
+    }
+  },
   "addToPlaylist": "Add to playlist",
   "@addToPlaylist": {
     "description": "#114: submenu of a track"

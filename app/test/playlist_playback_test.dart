@@ -286,6 +286,140 @@ void main() {
     });
   });
 
+  group('#124 sorting a playlist being played', () {
+    late Directory dir;
+    late TestApp app;
+    late List<String> ids; // A, B, C
+    late String playlist;
+
+    setUp(() async {
+      dir = Directory.systemTemp.createTempSync('wp_playlist_sort');
+      app = TestApp(Directory('${dir.path}/lib'));
+      await app.library.load();
+      final src = Directory('${dir.path}/src')..createSync();
+      final r = await app.library.importFiles([
+        for (final n in ['A', 'B', 'C'])
+          (File('${src.path}/$n.mp3')..writeAsStringSync('audio $n')).path,
+      ]);
+      ids = [for (final t in r.imported) t.id];
+      playlist = app.library.createPlaylist('Band').id;
+    });
+    tearDown(() => dir.deleteSync(recursive: true));
+
+    Future<void> load() async {
+      app.finishLoads(30);
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    Future<void> playToEnd() async {
+      app.core.pos = 30;
+      app.core.playing = false;
+      for (var i = 0; i < 4; i++) {
+        app.tick();
+      }
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    int loads() => app.core.calls.where((c) => c.startsWith('load')).length;
+
+    test('#124/AK5 the track goes on playing; then the next one of the new order follows', () async {
+      app.library.addToPlaylist(playlist, ids); // A, B, C
+      final started = app.controller.playPlaylist(playlist, index: 1);
+      await load();
+      await started;
+      expect(app.player.trackId, ids[1]);
+      final before = loads();
+      var told = 0;
+      app.controller.addListener(() => told++);
+
+      app.controller.sortPlaylist(
+        playlist,
+        PlaylistSortKey.title,
+        descending: true,
+      ); // C, B, A
+      expect(told, greaterThan(0));
+      expect(loads(), before);
+      expect(app.player.trackId, ids[1]);
+      expect(app.player.isPlaying, isTrue);
+      expect(app.controller.queue, PlayQueue(playlist, 1));
+
+      await playToEnd();
+      await load();
+      expect(app.player.trackId, ids[0]); // A, not C as before
+      expect(app.controller.queue, PlayQueue(playlist, 2));
+    });
+
+    test('#124/AK5 a track twice in the playlist: the row being played moves with it', () async {
+      app.library.addToPlaylist(playlist, [ids[0], ids[1], ids[0]]);
+      final started = app.controller.playPlaylist(playlist, index: 2);
+      await load();
+      await started;
+      app.controller.sortPlaylist(playlist, PlaylistSortKey.title); // A, A, B
+      expect(app.controller.queue, PlayQueue(playlist, 1));
+      await playToEnd();
+      await load();
+      expect(app.player.trackId, ids[1]);
+      expect(app.controller.queue, PlayQueue(playlist, 2));
+    });
+
+    test(
+      '#124/AK5 with shuffle the rows still to come keep their tracks',
+      () async {
+        app.library.addToPlaylist(playlist, ids); // A, B, C
+        app.controller.toggleShuffle();
+        final started = app.controller.playPlaylist(playlist);
+        await load();
+        await started;
+        final q = app.controller.queue!;
+        final tracks = [for (final i in q.order) ids[i]];
+        app.controller.sortPlaylist(
+          playlist,
+          PlaylistSortKey.title,
+          descending: true,
+        ); // C, B, A
+        final sorted = app.controller.queue!;
+        final rows = app.library.playlistTracks(playlist);
+        expect([for (final i in sorted.order) rows[i].id], tracks);
+        expect(rows[sorted.index].id, app.player.trackId);
+      },
+    );
+
+    test(
+      '#124/AK5 another playlist or a row gone meanwhile leave the queue alone',
+      () async {
+        app.library.addToPlaylist(playlist, ids);
+        final other = app.library.createPlaylist('Solo').id;
+        app.library.addToPlaylist(other, [ids[2], ids[0]]);
+        final started = app.controller.playPlaylist(playlist, index: 2);
+        await load();
+        await started;
+        app.controller.sortPlaylist(other, PlaylistSortKey.title);
+        expect(app.controller.queue, PlayQueue(playlist, 2));
+        expect(app.library.playlistTracks(other).first.id, ids[0]);
+
+        app.library.removeFromPlaylist(playlist, 0); // B, C; row 2 is no more
+        app.controller.sortPlaylist(
+          playlist,
+          PlaylistSortKey.title,
+          descending: true,
+        );
+        expect(app.controller.queue, PlayQueue(playlist, 2));
+        expect(app.player.trackId, ids[2]);
+      },
+    );
+
+    test(
+      '#124/AK5 without a playlist being played, sorting changes no queue',
+      () async {
+        app.library.addToPlaylist(playlist, ids);
+        app.controller.sortPlaylist(playlist, PlaylistSortKey.dateAdded);
+        expect(app.controller.queue, isNull);
+        app.controller.sortPlaylist('nope', PlaylistSortKey.title);
+        expect(app.controller.queue, isNull);
+      },
+    );
+  });
+
   test('#114 the controller and the player are the ones the app wires', () {
     final dir = Directory.systemTemp.createTempSync('wp_playlist_wire');
     addTearDown(() => dir.deleteSync(recursive: true));

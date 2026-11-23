@@ -289,6 +289,21 @@ class AppController extends ChangeNotifier {
     return next;
   }
 
+  /// #124: sorts the playlist once (see [Library.sortPlaylist]); a track of it being played goes on, and
+  /// the queue moves with its row, so the next track follows the new order (AK5).
+  void sortPlaylist(String id, PlaylistSortKey key, {bool descending = false}) {
+    final moved = library.sortPlaylist(id, key, descending: descending);
+    final q = _queue;
+    if (moved == null || q == null || q.playlistId != id) return;
+    final to = List.filled(moved.length, 0);
+    for (final (i, from) in moved.indexed) {
+      to[from] = i;
+    }
+    int row(int i) => i < to.length ? to[i] : i;
+    _queue = q.at(row(q.index), order: [for (final i in q.order) row(i)]);
+    notifyListeners();
+  }
+
   /// Titel in den Player laden (ohne abzuspielen, wie in der Swift-App). A track chosen on its own ends
   /// playing a playlist (#114).
   Future<bool> select(Track t) {

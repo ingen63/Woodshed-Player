@@ -482,6 +482,7 @@ class _LibraryViewState extends State<LibraryView> {
             },
             child: Text(l.renameEllipsis),
           ),
+          _sortMenu(p),
           CheckboxMenuButton(
             key: Key('shareAll:${p.name}'),
             value: p.shared,
@@ -689,6 +690,31 @@ class _LibraryViewState extends State<LibraryView> {
         ),
       ],
       child: Text(l.moveToFolder),
+    );
+  }
+
+  /// #124/AK1: sorts the playlist once by a criterion, ascending or descending; the result is its own
+  /// order, which can be changed by dragging as before.
+  Widget _sortMenu(Playlist p) {
+    final l = context.l10n;
+    return SubmenuButton(
+      key: Key('sortPlaylist:${p.name}'),
+      leadingIcon: const Icon(WsIcons.sort, size: 16),
+      menuChildren: [
+        for (final k in PlaylistSortKey.values)
+          for (final descending in [false, true])
+            MenuItemButton(
+              key: Key('sortBy:${k.name}:${descending ? 'desc' : 'asc'}'),
+              onPressed: () => c.sortPlaylist(p.id, k, descending: descending),
+              child: Text(
+                l.sortPlaylistOption(
+                  k.name,
+                  descending ? 'descending' : 'ascending',
+                ),
+              ),
+            ),
+      ],
+      child: Text(l.sortPlaylistBy),
     );
   }
 

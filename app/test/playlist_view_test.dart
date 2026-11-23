@@ -159,6 +159,62 @@ void main() {
   });
 
   testWidgets(
+    '#124/AK1, AK3 «Sort by» in the playlist menu offers every criterion both ways; dragging goes on',
+    (tester) async {
+      final app = await pumpApp(tester);
+      final p = app.library.createPlaylist('Band');
+      app.library.addToPlaylist(p.id, [
+        for (final t in ['Bossa', 'Ärger', 'Zebra', 'Bossa']) idOf(app, t),
+      ]);
+      await tester.pump();
+      await openPlaylist(tester, 'Band');
+
+      await openPlaylistMenu(tester, 'Band');
+      await tester.tap(find.byKey(const Key('sortPlaylist:Band')));
+      await tester.pumpAndSettle();
+      expect(find.text(de.sortPlaylistBy), findsOneWidget);
+      for (final key in ['title', 'artist', 'duration', 'dateAdded']) {
+        for (final (dir, text) in [
+          ('asc', 'ascending'),
+          ('desc', 'descending'),
+        ]) {
+          final item = find.byKey(Key('sortBy:$key:$dir'));
+          expect(item, findsOneWidget);
+          expect(
+            find.descendant(
+              of: item,
+              matching: find.text(de.sortPlaylistOption(key, text)),
+            ),
+            findsOneWidget,
+          );
+        }
+      }
+      expect(
+        de.sortPlaylistOption('duration', 'descending'),
+        'Dauer, absteigend',
+      );
+      await tester.tap(find.byKey(const Key('sortBy:title:desc')));
+      await tester.pumpAndSettle();
+      expect(titles(app, p.id), ['Zebra', 'Bossa', 'Bossa', 'Ärger']);
+
+      await openPlaylistMenu(tester, 'Band');
+      await tester.tap(find.byKey(const Key('sortPlaylist:Band')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('sortBy:title:asc')));
+      await tester.pumpAndSettle();
+      expect(titles(app, p.id), ['Ärger', 'Bossa', 'Bossa', 'Zebra']);
+
+      // #124/AK3: the sorted order is the playlist's own and can be dragged further
+      await dragTo(
+        tester,
+        find.byKey(const Key('entry:Band:3')),
+        find.byKey(const Key('entry:Band:0')),
+      );
+      expect(titles(app, p.id), ['Zebra', 'Ärger', 'Bossa', 'Bossa']);
+    },
+  );
+
+  testWidgets(
     '#114/AK9, AK11 the library shows a cloud or a device per playlist; the menu switches it',
     (tester) async {
       final app = await pumpApp(tester);

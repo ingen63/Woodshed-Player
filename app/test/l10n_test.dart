@@ -16,9 +16,13 @@ Map<String, Object?> _arb(String name) =>
 Set<String> _keys(Map<String, Object?> arb) =>
     arb.keys.where((k) => !k.startsWith('@')).toSet();
 
-/// Placeholder names used in a message (`{name}`, also inside plural/select).
+/// Placeholder names used in a message (`{name}`, also inside plural/select); the texts of select and
+/// plural cases (`title{Title}`, after a word) are no placeholders (#124).
 Set<String> _placeholders(String message) =>
-    RegExp(r'\{(\w+)[,}]').allMatches(message).map((m) => m.group(1)!).toSet();
+    RegExp(r'(?<!\w)\{(\w+)[,}]')
+        .allMatches(message)
+        .map((m) => m.group(1)!)
+        .toSet();
 
 void main() {
   final arbFiles =

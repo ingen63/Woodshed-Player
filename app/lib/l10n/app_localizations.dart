@@ -1232,6 +1232,18 @@ abstract class AppLocalizations {
   /// **'Playlist actions'**
   String get playlistActions;
 
+  /// #124: submenu of a playlist; sorts it once, the result becomes its own order
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get sortPlaylistBy;
+
+  /// #124: one entry of «Sort by»: the criterion and the direction
+  ///
+  /// In en, this message translates to:
+  /// **'{key, select, title{Title} artist{Artist} duration{Duration} other{Date added}}, {direction, select, descending{descending} other{ascending}}'**
+  String sortPlaylistOption(String key, String direction);
+
   /// #114: submenu of a track
   ///
   /// In en, this message translates to:

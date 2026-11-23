@@ -409,6 +409,11 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get playlistActions => pseudo(super.playlistActions);
   @override
+  String get sortPlaylistBy => pseudo(super.sortPlaylistBy);
+  @override
+  String sortPlaylistOption(String key, String direction) =>
+      pseudo(super.sortPlaylistOption(key, direction));
+  @override
   String get addToPlaylist => pseudo(super.addToPlaylist);
   @override
   String get removeFromPlaylist => pseudo(super.removeFromPlaylist);
