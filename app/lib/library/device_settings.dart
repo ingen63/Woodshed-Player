@@ -10,6 +10,7 @@
 // #113: the recording source (system audio or microphone) last chosen on this device.
 // #54: the storage chosen for the sync on this device (the tokens are in the keychain or IndexedDB, never here).
 // #123: whether the section with all tracks («Library») is open in the library list; closed by default.
+// #129: the width of the library sidebar chosen on this device.
 // #107: own tracks and folders (#114: and playlists) held back from the sync until the user keeps or removes
 // them.
 import 'dart:convert';
@@ -35,6 +36,7 @@ class DeviceSettings {
     this.recordingSource,
     this.syncProvider,
     this.libraryOpen = false,
+    this.sidebarWidth,
   });
 
   static const fileName = 'device.json';
@@ -91,6 +93,9 @@ class DeviceSettings {
   /// it, so the playlists show without scrolling. Written only while true.
   final bool libraryOpen;
 
+  /// #129/AK3: width of the library sidebar (points) chosen on this device; null: the default width.
+  final double? sidebarWidth;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -106,6 +111,7 @@ class DeviceSettings {
     String? recordingSource,
     String? Function()? syncProvider,
     bool? libraryOpen,
+    double? Function()? sidebarWidth,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -122,6 +128,7 @@ class DeviceSettings {
     recordingSource: recordingSource ?? this.recordingSource,
     syncProvider: syncProvider == null ? this.syncProvider : syncProvider(),
     libraryOpen: libraryOpen ?? this.libraryOpen,
+    sidebarWidth: sidebarWidth == null ? this.sidebarWidth : sidebarWidth(),
   );
 
   Map<String, Object?> toJson() => {
@@ -140,6 +147,7 @@ class DeviceSettings {
     if (recordingSource != null) 'recordingSource': recordingSource,
     if (syncProvider != null) 'syncProvider': syncProvider,
     if (libraryOpen) 'libraryOpen': true,
+    if (sidebarWidth != null) 'sidebarWidth': sidebarWidth,
   };
 
   static String newDeviceId([Random? random]) {
@@ -195,6 +203,10 @@ class DeviceSettings {
               _ => null,
             },
             libraryOpen: j['libraryOpen'] == true,
+            sidebarWidth: switch (j['sidebarWidth']) {
+              final num v when v > 0 && v.isFinite => v.toDouble(),
+              _ => null,
+            },
           );
         }
       }

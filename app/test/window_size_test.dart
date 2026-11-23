@@ -1,19 +1,22 @@
 // #130: default and minimum size of the window. AKn = n-th acceptance criterion of #130. The fonts of the
 // app (Inter, JetBrains Mono) are loaded so that the text has its real width and height; the cores are
 // fakes. AK2 (fits on a small screen) and AK4 (size kept after a restart) are tested natively in
-// macos/RunnerTests.
+// macos/RunnerTests. #129: the same with the widest and the narrowest library sidebar.
 import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_controller.dart';
+import 'package:woodshed_player/app/sidebar_width.dart';
 import 'package:woodshed_player/ui/library_view.dart';
 import 'package:woodshed_player/ui/style.dart';
 import 'package:woodshed_player/ui/window_size.dart';
 
 import 'fakes.dart';
 import 'home_page_test.dart' show pumpApp, select;
+
+Finder byKey(String k) => find.byKey(Key(k));
 
 Future<void> _loadFont(String family, String dir, List<String> files) async {
   final loader = FontLoader(family);
@@ -61,15 +64,18 @@ List<String> _scrolling(WidgetTester tester) => [
 ];
 
 /// The app at [size] in [locale] with a loaded track and a running metronome, so that every area shows its
-/// mini bar too (the largest content). Calls [check] once per area.
+/// mini bar too (the largest content). [sidebar]: the width of the library sidebar chosen (#129). Calls
+/// [check] once per area.
 Future<void> _eachArea(
   WidgetTester tester,
   Size size,
   Locale locale,
-  void Function(AppArea area) check,
-) async {
+  void Function(AppArea area) check, {
+  double? sidebar,
+}) async {
   await _loadFonts();
   final app = await pumpApp(tester, size: size, locale: locale);
+  await tester.runAsync(() => app.library.setSidebarWidth(sidebar));
   await select(tester, app, 'Bossa');
   app.controller.metronome.toggle();
   for (final area in AppArea.values) {
@@ -95,21 +101,93 @@ void main() {
     );
 
     testWidgets(
-      '#130/AK3 minimum size, $locale: library sidebar, nothing overflows, Player and Practice '
-      'without scrolling',
+      '#130/AK3 #133/AK1 minimum size, $locale: library sidebar, every area without scrolling '
+      'or overflow',
       (tester) async {
         await _eachArea(tester, minWindowSize, locale, (area) {
           expect(find.byKey(const Key('layout:desktop')), findsOneWidget);
           expect(_overflows(tester), isEmpty, reason: area.name);
-          if (area != AppArea.metronome) {
-            expect(_scrolling(tester), isEmpty, reason: area.name);
-          }
+          expect(_scrolling(tester), isEmpty, reason: area.name);
         });
         // the library sidebar in its standard width beside the player (#129 makes it draggable)
         expect(minWindowSize.width, greaterThan(WsSize.tabletMax));
       },
     );
+
+    for (final (name, chosen) in [
+      ('widest', sidebarMaxWidth),
+      ('narrowest', sidebarMinWidth),
+    ]) {
+      for (final size in [minWindowSize, defaultWindowSize]) {
+        testWidgets(
+          '#129/AK2 #130/AK3 $name sidebar, window $size, $locale: nothing overflows, Player and '
+          'Practice without scrolling',
+          (tester) async {
+            await _eachArea(tester, size, locale, sidebar: chosen, (area) {
+              expect(find.byKey(const Key('layout:desktop')), findsOneWidget);
+              expect(_overflows(tester), isEmpty, reason: area.name);
+              if (area != AppArea.metronome || size == defaultWindowSize) {
+                expect(_scrolling(tester), isEmpty, reason: area.name);
+              }
+              if (area == AppArea.player) {
+                expect(
+                  tester.getSize(find.byKey(const Key('librarySidebar'))).width,
+                  sidebarWidth(chosen, size.width),
+                );
+              }
+            });
+          },
+        );
+      }
+    }
   }
+
+  // #133: the area Metronome with every state of the ramp (off, by bars, by time), the largest content
+  for (final locale in const [Locale('de'), Locale('en')]) {
+    for (final (name, size) in [
+      ('minimum', minWindowSize),
+      ('default', defaultWindowSize),
+    ]) {
+      testWidgets(
+        '#133/AK1 #133/AK2 #133/AK4 #133/AK5 metronome at the $name size, $locale: every ramp '
+        'state without scrolling or overflow',
+        (tester) async {
+          await _loadFonts();
+          final app = await pumpApp(tester, size: size, locale: locale);
+          await select(tester, app, 'Bossa', area: AppArea.metronome);
+          final m = app.controller.metronome;
+          for (final (enabled, byTime) in [
+            (false, false),
+            (true, false),
+            (true, true),
+          ]) {
+            m.setRamp(enabled: enabled, byTime: byTime);
+            await tester.pump();
+            final state = 'ramp $enabled, by time $byTime';
+            expect(byKey('metronomeColumns'), findsOneWidget, reason: state);
+            expect(byKey('miniBar:track'), findsOneWidget, reason: state);
+            expect(_overflows(tester), isEmpty, reason: state);
+            expect(_scrolling(tester), isEmpty, reason: state);
+          }
+        },
+      );
+    }
+  }
+
+  testWidgets('#133/AK3 tablet and phone: the metronome stays in one column', (
+    tester,
+  ) async {
+    for (final size in const [Size(820, 1180), Size(390, 844)]) {
+      final app = await pumpApp(tester, size: size);
+      app.controller.setArea(AppArea.metronome);
+      await tester.pump();
+      expect(byKey('metronomeScreen'), findsOneWidget);
+      expect(byKey('metronomeColumns'), findsNothing);
+      final tempo = tester.getRect(byKey('card:metronome'));
+      final ramp = tester.getRect(byKey('card:ramp'));
+      expect(ramp.top, greaterThan(tempo.bottom), reason: '$size');
+    }
+  });
 
   testWidgets(
     '#130/AK3 below the minimum height Practice would need scrolling',

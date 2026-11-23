@@ -1,14 +1,17 @@
 // Main window in the design «Studio» (#30) with the areas Player, Practice and Metronome (#115). By window
 // width: desktop (> 1000) with the area switcher in the title bar and the library beside the player,
 // tablet (600–1000) with the switcher on top and the library as a drawer, phone (< 600) with a tab bar at
-// the bottom. All state lives in the controllers; neither a change of size nor of area loses playback,
-// the metronome, position, loop or tempo (#115/AK3).
+// the bottom. On the desktop the edge of the library can be dragged (#129). All state lives in the
+// controllers; neither a change of size nor of area loses playback, the metronome, position, loop or tempo
+// (#115/AK3).
 import 'dart:async';
 
+import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app/app_controller.dart';
+import '../app/sidebar_width.dart';
 import '../metronome/practice_shortcuts.dart';
 import 'about_dialog.dart';
 import 'areas.dart';
@@ -346,19 +349,8 @@ class _HomePageState extends State<HomePage> {
             ),
             Expanded(
               child: c.area == AppArea.player
-                  ? Row(
-                      children: [
-                        Container(
-                          width: 280,
-                          color: ws.panel,
-                          child: LibraryView(
-                            controller: c,
-                            searchFocus: _searchFocus,
-                          ),
-                        ),
-                        const VerticalDivider(width: 1),
-                        Expanded(child: _content()),
-                      ],
+                  ? LayoutBuilder(
+                      builder: (context, box) => _withSidebar(box.maxWidth),
                     )
                   : _content(),
             ),
@@ -367,6 +359,86 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  /// #129: the width of the sidebar while its edge is dragged; saved when the drag ends.
+  double? _draggedWidth;
+
+  /// #129: width of the sidebar and position of the pointer when the drag began.
+  (double, double)? _dragStart;
+
+  /// #129: the library beside the player, its edge dragged with the mouse or a finger (AK1, AK5); a double
+  /// click restores the default width (AK4). The width stays within its limits, also in a narrower window
+  /// (AK2), and is kept on this device (AK3).
+  Widget _withSidebar(double windowWidth) {
+    final ws = WsTheme.of(context);
+    final width = sidebarWidth(
+      _draggedWidth ?? c.library.sidebarWidth,
+      windowWidth,
+    );
+    // a finger needs a wider grip than the mouse pointer
+    final touch = !isDesktopPlatform(Theme.of(context).platform);
+    final grip = touch ? 24.0 : 8.0;
+    return Stack(
+      children: [
+        Row(
+          children: [
+            Container(
+              key: const Key('librarySidebar'),
+              width: width,
+              color: ws.panel,
+              child: LibraryView(controller: c, searchFocus: _searchFocus),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(child: _content()),
+          ],
+        ),
+        Positioned(
+          // mostly over the player, so that the scroll bar of the library stays free
+          left: width - grip / 4,
+          width: grip,
+          top: 0,
+          bottom: 0,
+          child: MouseRegion(
+            key: const Key('sidebarEdge'),
+            cursor: SystemMouseCursors.resizeColumn,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              // the edge follows the pointer from where it went down, without the drag slop
+              dragStartBehavior: DragStartBehavior.down,
+              onHorizontalDragStart: (d) => setState(() {
+                _dragStart = (width, d.globalPosition.dx);
+                _draggedWidth = width;
+              }),
+              onHorizontalDragUpdate: (d) => setState(() {
+                final (startWidth, startX) = _dragStart ?? (width, 0.0);
+                _draggedWidth = sidebarWidth(
+                  startWidth + d.globalPosition.dx - startX,
+                  windowWidth,
+                );
+              }),
+              onHorizontalDragEnd: (_) => _endDrag(),
+              // also a click without a drag: the width stays
+              onHorizontalDragCancel: _endDrag,
+              onDoubleTap: () => _saveSidebarWidth(null),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _endDrag() {
+    final dragged = _draggedWidth;
+    if (dragged != null) _saveSidebarWidth(dragged);
+  }
+
+  void _saveSidebarWidth(double? width) {
+    setState(() {
+      _draggedWidth = null;
+      _dragStart = null;
+    });
+    unawaited(c.library.setSidebarWidth(width?.roundToDouble()));
   }
 
   Widget _tablet() {

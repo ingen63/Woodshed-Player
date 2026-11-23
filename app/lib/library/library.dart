@@ -918,6 +918,18 @@ class Library extends ChangeNotifier {
     await saving;
   }
 
+  /// #129/AK3: width of the library sidebar chosen on this device; null: the default width.
+  double? get sidebarWidth => _device.sidebarWidth;
+
+  /// #129/AK3, AK4: remembers the width of the library sidebar on this device (null: back to the default);
+  /// a failed write keeps it for this run only.
+  Future<void> setSidebarWidth(double? width) async {
+    if (_device.sidebarWidth == width) return;
+    final saving = _updateDevice(_device.copyWith(sidebarWidth: () => width));
+    notifyListeners();
+    await saving;
+  }
+
   /// #54/AK7: the storage chosen for the sync on this device (`google`); null: none.
   Future<void> setSyncProvider(String? name) async {
     if (_device.syncProvider == name) return;
