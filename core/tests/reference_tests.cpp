@@ -876,6 +876,69 @@ std::vector<unsigned char> wavInMemory(int rate, int frames) {
   return b;
 }
 
+// #120: a minimal M4A (one AAC track at 44.1 kHz, no priming) with `frames` placeholder frames of
+// 1024 samples, frame i made of 10 + i % 7 bytes of the value i, in chunks of 10 frames.
+std::vector<uint8_t> m4aInMemory(uint32_t frames) {
+  std::vector<uint8_t> f;
+  auto u32 = [](std::vector<uint8_t> &b, uint32_t v) {
+    for (int i = 0; i < 4; ++i)
+      b.push_back(static_cast<uint8_t>(v >> (24 - 8 * i)));
+  };
+  auto box = [&](const char *type, const std::vector<uint8_t> &body) {
+    std::vector<uint8_t> b;
+    u32(b, static_cast<uint32_t>(body.size() + 8));
+    b.insert(b.end(), type, type + 4);
+    b.insert(b.end(), body.begin(), body.end());
+    return b;
+  };
+  auto cat = [](std::initializer_list<std::vector<uint8_t>> parts) {
+    std::vector<uint8_t> b;
+    for (const auto &p : parts)
+      b.insert(b.end(), p.begin(), p.end());
+    return b;
+  };
+  auto words = [&](std::initializer_list<uint32_t> v) {
+    std::vector<uint8_t> b;
+    for (const uint32_t x : v)
+      u32(b, x);
+    return b;
+  };
+  std::vector<uint8_t> data, sizes = words({0, 0, frames});
+  for (uint32_t i = 0; i < frames; ++i) {
+    data.insert(data.end(), 10 + i % 7, static_cast<uint8_t>(i));
+    u32(sizes, 10 + i % 7);
+  }
+  const uint32_t duration = frames * 1024;
+  std::vector<uint8_t> entry = words({0, 1, 0, 0, 0x00020010, 0, uint32_t{kRate} << 16});
+  entry.resize(28); // reserved, data reference index, version, channels, bits, rate
+  const auto stsd = box("stsd", cat({words({0, 1}), box("mp4a", entry)}));
+  auto stbl = [&](uint32_t base) {
+    std::vector<uint8_t> offsets = words({0, (frames + 9) / 10});
+    for (uint32_t c = 0, at = base; c < (frames + 9) / 10; ++c) {
+      u32(offsets, at);
+      for (uint32_t i = 10 * c; i < std::min(frames, 10 * c + 10); ++i)
+        at += 10 + i % 7;
+    }
+    return box("stbl", cat({stsd, box("stts", words({0, 1, frames, 1024})),
+                            box("stsc", words({0, 1, 1, 10, 1})), box("stsz", sizes),
+                            box("stco", offsets)}));
+  };
+  auto moov = [&](uint32_t base) {
+    const auto mdia = box(
+        "mdia", cat({box("mdhd", words({0, 0, 0, kRate, duration, 0})),
+                     box("hdlr", words({0, 0, 0x736f756e, 0, 0, 0})), box("minf", stbl(base))}));
+    std::vector<uint8_t> mvhd = words({0, 0, 0, kRate, duration, 0x00010000});
+    mvhd.resize(100);
+    std::vector<uint8_t> tkhd = words({0, 0, 0, 1, 0, duration});
+    tkhd.resize(84);
+    return box("moov", cat({box("mvhd", mvhd), box("trak", cat({box("tkhd", tkhd), mdia}))}));
+  };
+  const auto ftyp = box("ftyp", cat({{'M', '4', 'A', ' '}, words({0})}));
+  const size_t base = ftyp.size() + moov(0).size() + 8;
+  f = cat({ftyp, moov(static_cast<uint32_t>(base)), box("mdat", data)});
+  return f;
+}
+
 // #116: trimming through the C API. A 2 s WAV (16 bit, 44.1 kHz) cut to [0.5, 1.75] keeps
 // round(0.5 × 44100) = 22050 to round(1.75 × 44100) = 77175, that is 55125 frames of 2 bytes after
 // the 44-byte header; the same sine as FLAC (encoded by libFLAC) stays FLAC and lossless. The new
@@ -913,7 +976,22 @@ void trimInMemory() {
   record("trim_flac", std::vector<float>(b, b + wp_trim_size(r)));
   wp_trim_free(r);
   wp_destroy(p);
-  // too short, M4A-like or no audio: an error and no result
+  // #120/AK4: an M4A is cut alike natively and in the browser: the same bytes. Trimming does not
+  // decode, so the AAC frames are placeholders: 100 frames of 1024 samples, frame i of 10 + i % 7
+  // bytes holding i; [0.7, 2.2] s keeps frames 29 (pre-roll) to 94, the edit list skips 1024.
+  const std::vector<uint8_t> m4a = m4aInMemory(100);
+  CHECK(wp_trim(m4a.data(), m4a.size(), 0.7, 2.2, &r) == WP_OK);
+  if (!r)
+    return;
+  const auto *m = static_cast<const unsigned char *>(wp_trim_data(r));
+  CHECK(std::memcmp(m + 4, "ftyp", 4) == 0);
+  CHECK(wp_trim_start(r) == 30 * 1024.0 / kRate && wp_trim_end(r) == 95 * 1024.0 / kRate);
+  const std::vector<uint8_t> out(m, m + wp_trim_size(r));
+  const uint8_t first[] = {29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29};
+  CHECK(std::search(out.begin(), out.end(), first, first + 11) != out.end());
+  record("trim_m4a", std::vector<float>(m, m + wp_trim_size(r)));
+  wp_trim_free(r);
+  // too short or no audio: an error and no result
   CHECK(wp_trim(wav.data(), wav.size(), 0.5, 1.25, &r) == WP_ERR_INVALID_ARGUMENT && !r);
   const std::string junk(512, 'x');
   CHECK(wp_trim(junk.data(), junk.size(), 0.0, 1.0, &r) == WP_ERR_UNSUPPORTED_FORMAT && !r);
@@ -1151,7 +1229,7 @@ int main(int argc, char **argv) {
   run("#9/AK7 load from file, waveform, errors", loadFromFile);
   run("#9/AK7 recording unavailable offline", recordingUnavailableOffline);
   run("#11 browser entry points at their limits", webEntryPointsAtTheirLimits);
-  run("#116/AK4 #116/AK7 trimming WAV and FLAC in memory", trimInMemory);
+  run("#116/AK4 #116/AK7 #120/AK4 trimming WAV, FLAC and M4A in memory", trimInMemory);
   run("#76/AK1 #76/AK2 sample rate lower limit", sampleRateLowerLimit);
   run("#97/AK1 #97/AK2 #97/AK3 sample rate upper limit", sampleRateUpperLimit);
 

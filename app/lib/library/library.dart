@@ -81,8 +81,14 @@ class ImportFailed extends LibraryMessage {
 
 /// #116/AK9: why trimming a track failed; the UI words it in the user's language.
 enum TrimProblem {
-  /// The format cannot be trimmed (M4A) or the file is damaged.
+  /// The format cannot be trimmed or the file is damaged.
   format,
+
+  /// #120: an MP4/M4A file with several audio tracks.
+  multipleTracks,
+
+  /// #120: a fragmented MP4/M4A file.
+  fragmented,
 
   /// Less than 1 s would remain.
   tooShort,
@@ -1526,13 +1532,13 @@ class Library extends ChangeNotifier {
 
   // ---- Trimming (#116) ----
 
-  /// #116: whether a track of this file type can be trimmed: MP3, WAV, FLAC and AAC (ADTS). M4A cannot
-  /// (the menu item stays greyed out with a hint).
+  /// #116: whether a track of this file type can be trimmed: MP3, WAV, FLAC, AAC (ADTS) and, since #120,
+  /// M4A/MP4 (AAC or ALAC). Other types cannot (the menu item stays greyed out with a hint).
   static bool trimmable(Track t) {
     final name = t.fileName;
     final dot = name.lastIndexOf('.');
     final ext = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
-    return const {'mp3', 'wav', 'flac', 'aac'}.contains(ext);
+    return const {'mp3', 'wav', 'flac', 'aac', 'm4a', 'mp4'}.contains(ext);
   }
 
   /// #116: cuts the audio file of track [id] to [start] … [end] seconds with [trim]; the old file is not
@@ -1573,6 +1579,8 @@ class Library extends ChangeNotifier {
       return fail(switch (cut.code) {
         WpCode.invalidArgument => TrimProblem.tooShort,
         WpCode.unsupportedFormat => TrimProblem.format,
+        WpCode.multipleTracks => TrimProblem.multipleTracks,
+        WpCode.fragmented => TrimProblem.fragmented,
         WpCode.outOfMemory => TrimProblem.memory,
         _ => TrimProblem.failed,
       });

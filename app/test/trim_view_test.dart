@@ -200,7 +200,7 @@ void main() {
     },
   );
 
-  testWidgets('#116 M4A: the menu item is greyed out with a hint', (
+  testWidgets('#120/AK1 M4A: the menu item is available, without a hint', (
     tester,
   ) async {
     await pumpApp(
@@ -214,9 +214,29 @@ void main() {
     final item = tester.widget<MenuItemButton>(
       find.byKey(const Key('trimTrack')),
     );
-    expect(item.onPressed, isNull);
-    expect(find.text(de.trimUnavailable), findsOneWidget);
+    expect(item.onPressed, isNotNull);
+    expect(find.byKey(const Key('trimUnavailable')), findsNothing);
   });
+
+  testWidgets(
+    '#116 other file types: the menu item is greyed out with a hint',
+    (tester) async {
+      await pumpApp(
+        tester,
+        titles: const [],
+        files: {'Song.ogg': Uint8List.fromList(utf8.encode('vorbis'))},
+        trimmer: fakeTrim,
+      );
+      await tester.tap(find.byKey(const Key('menu:Song')));
+      await tester.pumpAndSettle();
+      final item = tester.widget<MenuItemButton>(
+        find.byKey(const Key('trimTrack')),
+      );
+      expect(item.onPressed, isNull);
+      expect(find.text(de.trimUnavailable), findsOneWidget);
+      expect(de.trimUnavailable.contains('M4A'), isFalse);
+    },
+  );
 
   test('#116/AK9 every reason has its own text in English and German', () {
     final en = lookupAppLocalizations(const Locale('en'));

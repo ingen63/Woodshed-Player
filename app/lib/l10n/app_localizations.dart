@@ -1382,10 +1382,10 @@ abstract class AppLocalizations {
   /// **'Trim start and end …'**
   String get trimTrackEllipsis;
 
-  /// #116: hint of the greyed out menu item for M4A
+  /// #116, #120/AK1: hint of the greyed out menu item for file types that cannot be trimmed
   ///
   /// In en, this message translates to:
-  /// **'M4A files cannot be trimmed yet.'**
+  /// **'This file type cannot be trimmed.'**
   String get trimUnavailable;
 
   /// #116/AK1: title of the trim view
@@ -1471,6 +1471,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'«{title}» could not be trimmed: this file type cannot be trimmed, or the file is damaged.'**
   String trimFailedFormat(String title);
+
+  /// #120/AK5
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be trimmed: the file has several audio tracks. The track is unchanged.'**
+  String trimFailedMultipleTracks(String title);
+
+  /// #120/AK5
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be trimmed: the file is a fragmented MP4, which cannot be trimmed. The track is unchanged.'**
+  String trimFailedFragmented(String title);
 
   /// #116/AK7, AK9
   ///

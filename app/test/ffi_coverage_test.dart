@@ -202,6 +202,8 @@ void main() {
       WpCode.unsupportedSampleRate,
       define('WP_ERR_UNSUPPORTED_SAMPLE_RATE'),
     );
+    expect(WpCode.multipleTracks, define('WP_ERR_MULTIPLE_TRACKS'));
+    expect(WpCode.fragmented, define('WP_ERR_FRAGMENTED'));
     expect(WpSampleRate.min, define('WP_MIN_SAMPLE_RATE'));
     expect(
       WpTrimmed.minSeconds,
@@ -216,9 +218,11 @@ void main() {
     expect(WpCode.loadRunning, define('WP_LOAD_RUNNING'));
     expect(WpCode.loadReady, define('WP_LOAD_READY'));
     final errDefines = RegExp(r'#define WP_ERR_\w+').allMatches(header).length;
+    // #120: WP_ERR_MULTIPLE_TRACKS and WP_ERR_FRAGMENTED only come from wp_trim (TrimProblem), never from
+    // loading
     expect(
       errDefines,
-      9,
+      11,
       reason: 'new WP_ERR_* in wp_core.h: update WpCode and loadErrorMessage',
     );
   });

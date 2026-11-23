@@ -1,13 +1,14 @@
-// #116: fuzz target for trimming (wp::trim::trim) on raw bytes: WAV, FLAC, MP3, ADTS or anything
-// else.
+// #116: fuzz target for trimming (wp::trim::trim) on raw bytes: WAV, FLAC, MP3, ADTS, MP4/M4A
+// (#120, AAC and ALAC seeds) or anything else.
 //
 // The first two bytes choose start and end (in 1/16 s); the rest is the file, so seed files keep
 // their layout after a two-byte prefix. A crash, a sanitizer finding or a broken invariant aborts.
 //
 // Invariants: the result is WP_OK or a documented error code; on an error there are no bytes. On
 // success the new file has the format of the old one, start and end are finite with at least
-// 1 s minus one frame between them (ADTS rounds to frames of up to 4096 samples), and trimming the
-// new file again to its whole length succeeds or reports a documented error.
+// 1 s minus one frame between them (ADTS rounds to frames of up to 4096 samples, MP4 to its
+// samples), and trimming the new file again to its whole length succeeds or reports a documented
+// error.
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -20,7 +21,7 @@ namespace {
 
 bool knownError(int r) {
   return r == WP_ERR_INVALID_ARGUMENT || r == WP_ERR_UNSUPPORTED_FORMAT ||
-         r == WP_ERR_OUT_OF_MEMORY;
+         r == WP_ERR_OUT_OF_MEMORY || r == WP_ERR_MULTIPLE_TRACKS || r == WP_ERR_FRAGMENTED;
 }
 
 // Largest deviation of the cut from the request: an ADTS frame of 4 × 1024 samples at 7350 Hz.

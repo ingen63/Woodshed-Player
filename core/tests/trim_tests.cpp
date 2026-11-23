@@ -1,4 +1,5 @@
-// #116: trimming start and end of WAV, FLAC, MP3 and ADTS files (src/trim.cpp). The trimmed files
+// #116: trimming start and end of WAV, FLAC, MP3 and ADTS files (src/trim.cpp; MP4 in
+// trim_mp4_tests.cpp). The trimmed files
 // are decoded again by the core (wp::decodeMemory, the path of the player and the web core) and
 // checked against the positions of the clicks in the test audio: clicks3.* has clicks at 0.5, 1.0,
 // 2.0 and 2.5 s (core/tools/make_test_audio.sh), WAV and FLAC files are generated here.
@@ -363,10 +364,10 @@ void rangeRules() { // #116/AK7
   CHECK(wp::trim::trim(shortWav.data(), shortWav.size(), 0.0, 0.9).code == WP_ERR_INVALID_ARGUMENT);
 }
 
-void unsupportedFiles() { // #116: M4A is not trimmed; unknown and damaged files are refused
+void unsupportedFiles() { // #116: unknown and damaged files are refused (#120: M4A in
+                          // trim_mp4_tests)
   const Bytes m4a = readFile("sine440.m4a");
   CHECK(wp::trim::detect(m4a.data(), m4a.size()) == Format::Mp4);
-  CHECK(wp::trim::trim(m4a.data(), m4a.size(), 0.0, 1.0).code == WP_ERR_UNSUPPORTED_FORMAT);
   const Bytes garbage(5000, 0x42);
   CHECK(wp::trim::detect(garbage.data(), garbage.size()) == Format::Unknown);
   CHECK(wp::trim::trim(garbage.data(), garbage.size(), 0.0, 1.0).code == WP_ERR_UNSUPPORTED_FORMAT);
@@ -838,7 +839,7 @@ int main() {
   run("#116/AK4 MP3 without LAME tag", mp3WithoutLameTag);
   run("#116/AK4 ADTS at frame boundaries", adtsAtFrameBoundaries);
   run("#116/AK7 at least 1 s, end after start", rangeRules);
-  run("#116 M4A, unknown and damaged files refused", unsupportedFiles);
+  run("#116 unknown and damaged files refused", unsupportedFiles);
   run("#116 C API", capiResult);
   run("#116/AK4 MP3 info frame: counts, seek table, CRCs", infoFrameIsConsistent);
   run("#116/AK4 #116/AK7 MP3 from the start, to the end", mp3FromTheStartToTheEnd);

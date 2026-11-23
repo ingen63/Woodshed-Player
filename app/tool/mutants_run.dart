@@ -56,8 +56,9 @@ List<(String, List<String>)> coreTestPrograms(String core) => [
     'fuzz_capi_replay',
     ['$core/tests/fuzz/regressions/capi', '$core/tests/fuzz/corpus/capi'],
   ),
-  // #116: trimming
+  // #116: trimming; #120: MP4
   ('trim_tests', []),
+  ('trim_mp4_tests', []),
   (
     'fuzz_trim_replay',
     ['$core/tests/fuzz/regressions/trim', '$core/tests/fuzz/corpus/trim'],

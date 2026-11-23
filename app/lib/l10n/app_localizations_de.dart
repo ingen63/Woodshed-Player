@@ -827,7 +827,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get trimTrackEllipsis => 'Anfang und Ende abschneiden …';
 
   @override
-  String get trimUnavailable => 'M4A-Dateien lassen sich noch nicht kürzen.';
+  String get trimUnavailable => 'Dieser Dateityp lässt sich nicht kürzen.';
 
   @override
   String trimTitle(String title) {
@@ -878,6 +878,16 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String trimFailedFormat(String title) {
     return '«$title» konnte nicht gekürzt werden: Dieser Dateityp lässt sich nicht kürzen, oder die Datei ist beschädigt.';
+  }
+
+  @override
+  String trimFailedMultipleTracks(String title) {
+    return '«$title» konnte nicht gekürzt werden: Die Datei hat mehrere Audiospuren. Der Titel ist unverändert.';
+  }
+
+  @override
+  String trimFailedFragmented(String title) {
+    return '«$title» konnte nicht gekürzt werden: Die Datei ist ein fragmentiertes MP4, das sich nicht kürzen lässt. Der Titel ist unverändert.';
   }
 
   @override

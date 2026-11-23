@@ -17,6 +17,12 @@ abstract final class WpCode {
   static const busy = -8;
   static const unsupportedSampleRate = -9;
 
+  /// #120: trimming an MP4 with several audio tracks.
+  static const multipleTracks = -10;
+
+  /// #120: trimming a fragmented MP4.
+  static const fragmented = -11;
+
   static const loadIdle = 0;
   static const loadRunning = 1;
   static const loadReady = 2;

@@ -104,97 +104,110 @@ void main() {
   });
 
   group('#116 trimming in the library', () {
-    test('#116/AK5 #116/AK6 new ID from the new file; title, artist, folder, playlists, tempo and loops stay', () async {
-      final d = await device(InMemoryProvider(), 1);
-      final lib = d.library;
-      var t = await d.add('song.mp3');
-      final folder = lib.createFolder('Gig');
-      lib.moveTracks({t.id}, folder.id);
-      lib.editMetadata(t.id, title: 'Intro', artist: 'Band');
-      final p = lib.createPlaylist('Set');
-      lib.addToPlaylist(p.id, [t.id, t.id]);
-      // three loops: 3–5 s (active), 0.5–1.5 s (before the cut), 7–9.5 s (over the end)
-      lib.updateSettings(
-        t.id,
-        const PlaybackSettings(
-          speedEnabled: true,
-          speed: 0.75,
-          loopEnabled: true,
-          loopStart: 3,
-          loopEnd: 5,
-        ),
-      );
-      t = lib.track(t.id)!;
-      final loops = {
-        ...t.loops,
-        'aaaaaaaa': const LoopRange(0.5, 1.5),
-        'bbbbbbbb': const LoopRange(7, 9.5),
-      };
-      final old = t.id;
-      final withLoops = t.copyWith(loops: loops);
-      expect(withLoops.loops.length, 3);
-      // the extra loops go through the shared record, as a sync would bring them
-      final state = lib.state;
-      await lib.mergeRemote(
-        state.copyWith(
-          tracks: {
-            ...state.tracks,
-            old: state.tracks[old]!.update(
-              withLoops.toShared(),
-              Hlc(clock.millisecondsSinceEpoch + 1, 0, 'ffff'),
+    // #120/AK6: M4A goes through the same steps as MP3
+    for (final (ext, ids) in [
+      ('mp3', '#116/AK5 #116/AK6'),
+      ('m4a', '#120/AK6'),
+    ]) {
+      test(
+        '$ids $ext: new ID from the new file; title, artist, folder, playlists, tempo and loops stay',
+        () async {
+          final d = await device(InMemoryProvider(), 1);
+          final lib = d.library;
+          var t = await d.add('song.$ext');
+          final folder = lib.createFolder('Gig');
+          lib.moveTracks({t.id}, folder.id);
+          lib.editMetadata(t.id, title: 'Intro', artist: 'Band');
+          final p = lib.createPlaylist('Set');
+          lib.addToPlaylist(p.id, [t.id, t.id]);
+          // three loops: 3–5 s (active), 0.5–1.5 s (before the cut), 7–9.5 s (over the end)
+          lib.updateSettings(
+            t.id,
+            const PlaybackSettings(
+              speedEnabled: true,
+              speed: 0.75,
+              loopEnabled: true,
+              loopStart: 3,
+              loopEnd: 5,
             ),
-          },
-        ),
-      );
-      expect(lib.track(old)!.loops.length, 3);
+          );
+          t = lib.track(t.id)!;
+          final loops = {
+            ...t.loops,
+            'aaaaaaaa': const LoopRange(0.5, 1.5),
+            'bbbbbbbb': const LoopRange(7, 9.5),
+          };
+          final old = t.id;
+          final withLoops = t.copyWith(loops: loops);
+          expect(withLoops.loops.length, 3);
+          // the extra loops go through the shared record, as a sync would bring them
+          final state = lib.state;
+          await lib.mergeRemote(
+            state.copyWith(
+              tracks: {
+                ...state.tracks,
+                old: state.tracks[old]!.update(
+                  withLoops.toShared(),
+                  Hlc(clock.millisecondsSinceEpoch + 1, 0, 'ffff'),
+                ),
+              },
+            ),
+          );
+          expect(lib.track(old)!.loops.length, 3);
 
-      final next = await lib.trimTrack(old, 2, 8, fakeTrim);
-      final file = Uint8List.fromList([
-        ...sources['song.mp3']!,
-        ...utf8.encode('|2.0-8.0'),
-      ]);
-      expect(next, sha(file), reason: 'the ID is the SHA-256 of the new file');
-      expect(lib.track(old), isNull);
-      final n = lib.track(next!)!;
-      expect(n.fileName, '$next.mp3');
-      expect(await d.store.read(Library.trackName(n.fileName)), file);
-      expect(
-        await d.store.exists(Library.trackName('$old.mp3')),
-        isFalse,
-        reason: 'the original is not kept',
+          final next = await lib.trimTrack(old, 2, 8, fakeTrim);
+          final file = Uint8List.fromList([
+            ...sources['song.$ext']!,
+            ...utf8.encode('|2.0-8.0'),
+          ]);
+          expect(
+            next,
+            sha(file),
+            reason: 'the ID is the SHA-256 of the new file',
+          );
+          expect(lib.track(old), isNull);
+          final n = lib.track(next!)!;
+          expect(n.fileName, '$next.$ext');
+          expect(await d.store.read(Library.trackName(n.fileName)), file);
+          expect(
+            await d.store.exists(Library.trackName('$old.$ext')),
+            isFalse,
+            reason: 'the original is not kept',
+          );
+          // AK5
+          expect(n.title, 'Intro');
+          expect(n.artist, 'Band');
+          expect(n.folderId, folder.id);
+          expect(lib.playlist(p.id)!.entries, [next, next]);
+          expect(lib.playlistTracks(p.id).map((x) => x.id), [next, next]);
+          expect(n.settings.speedEnabled, isTrue);
+          expect(n.settings.speed, 0.75);
+          expect(n.duration, 6);
+          expect(n.hasArtwork, isFalse);
+          // AK6: 3–5 s → 1–3 s (active), 0.5–1.5 s dropped, 7–9.5 s → 5–6 s
+          expect(n.settings.loopEnabled, isTrue);
+          expect((n.settings.loopStart, n.settings.loopEnd), (1.0, 3.0));
+          expect(n.loops.values.toSet(), {
+            const LoopRange(1, 3),
+            const LoopRange(5, 6),
+          });
+          // the old record is a tombstone naming the new track
+          final rec = lib.state.tracks[old]!;
+          expect(rec.alive, isFalse);
+          expect(rec.values[Library.replacedByField], next);
+          // saved: a restart shows the same
+          final again = Library(
+            d.store,
+            probe: (_) => 10,
+            readSource: (s) async => null,
+            now: () => clock,
+          );
+          await again.load();
+          expect(again.tracks.map((x) => x.id), [next]);
+          expect(again.track(next)!.title, 'Intro');
+        },
       );
-      // AK5
-      expect(n.title, 'Intro');
-      expect(n.artist, 'Band');
-      expect(n.folderId, folder.id);
-      expect(lib.playlist(p.id)!.entries, [next, next]);
-      expect(lib.playlistTracks(p.id).map((x) => x.id), [next, next]);
-      expect(n.settings.speedEnabled, isTrue);
-      expect(n.settings.speed, 0.75);
-      expect(n.duration, 6);
-      expect(n.hasArtwork, isFalse);
-      // AK6: 3–5 s → 1–3 s (active), 0.5–1.5 s dropped, 7–9.5 s → 5–6 s
-      expect(n.settings.loopEnabled, isTrue);
-      expect((n.settings.loopStart, n.settings.loopEnd), (1.0, 3.0));
-      expect(n.loops.values.toSet(), {
-        const LoopRange(1, 3),
-        const LoopRange(5, 6),
-      });
-      // the old record is a tombstone naming the new track
-      final rec = lib.state.tracks[old]!;
-      expect(rec.alive, isFalse);
-      expect(rec.values[Library.replacedByField], next);
-      // saved: a restart shows the same
-      final again = Library(
-        d.store,
-        probe: (_) => 10,
-        readSource: (s) async => null,
-        now: () => clock,
-      );
-      await again.load();
-      expect(again.tracks.map((x) => x.id), [next]);
-      expect(again.track(next)!.title, 'Intro');
-    });
+    }
 
     test(
       '#116/AK6 an active loop outside the kept part is switched off',
@@ -250,7 +263,7 @@ void main() {
       },
     );
 
-    test('#116/AK9 a failed cut or write leaves the track unchanged and names the reason', () async {
+    test('#116/AK9 #120/AK5 a failed cut or write leaves the track unchanged and names the reason', () async {
       final d = await device(InMemoryProvider(), 4);
       final t = await d.add('a.mp3');
       final before = jsonEncode(d.library.state.toJson());
@@ -268,6 +281,12 @@ void main() {
         TrimProblem.format,
       );
       expect(await problem(failing(WpCode.outOfMemory)), TrimProblem.memory);
+      // #120/AK5: MP4 files the core cannot cut name their own reason
+      expect(
+        await problem(failing(WpCode.multipleTracks)),
+        TrimProblem.multipleTracks,
+      );
+      expect(await problem(failing(WpCode.fragmented)), TrimProblem.fragmented);
       expect(await problem(failing(-99)), TrimProblem.failed);
       expect(
         await problem((b, s, e) async => throw StateError('worker gone')),
@@ -291,33 +310,36 @@ void main() {
       expect(d.library.tracks.single.id, t.id);
     });
 
-    test(
-      '#116 M4A is not trimmed; nor a file only on another device',
-      () async {
-        final d = await device(InMemoryProvider(), 5);
-        sources['b.m4a'] = bytes('aac');
-        final t = (await d.library.importFiles(['b.m4a'])).imported.single;
-        expect(Library.trimmable(t), isFalse);
-        for (final ext in ['mp3', 'MP3', 'wav', 'flac', 'aac']) {
-          expect(Library.trimmable(t.copyWith(fileName: 'x.$ext')), isTrue);
-        }
-        expect(Library.trimmable(t.copyWith(fileName: 'x.mp4')), isFalse);
-        expect(await d.library.trimTrack(t.id, 1, 5, fakeTrim), isNull);
-        expect(
-          (d.library.lastError! as TrimFailed).problem,
-          TrimProblem.format,
-        );
-        // a file missing on this device
-        final m = await d.add('c.mp3');
-        await d.store.delete(Library.trackName(m.fileName));
-        expect(await d.library.trimTrack(m.id, 1, 5, fakeTrim), isNull);
-        expect(
-          (d.library.lastError! as TrimFailed).problem,
-          TrimProblem.notOnDevice,
-        );
-        expect(d.library.track(m.id), isNotNull);
-      },
-    );
+    test('#116 #120/AK1 other file types are not trimmed, M4A and MP4 are; nor a file only on another device', () async {
+      final d = await device(InMemoryProvider(), 5);
+      sources['b.ogg'] = bytes('vorbis');
+      final t = (await d.library.importFiles(['b.ogg'])).imported.single;
+      expect(Library.trimmable(t), isFalse);
+      for (final ext in [
+        'mp3',
+        'MP3',
+        'wav',
+        'flac',
+        'aac',
+        'm4a',
+        'M4A',
+        'mp4',
+      ]) {
+        expect(Library.trimmable(t.copyWith(fileName: 'x.$ext')), isTrue);
+      }
+      expect(Library.trimmable(t.copyWith(fileName: 'x.m4b')), isFalse);
+      expect(await d.library.trimTrack(t.id, 1, 5, fakeTrim), isNull);
+      expect((d.library.lastError! as TrimFailed).problem, TrimProblem.format);
+      // a file missing on this device
+      final m = await d.add('c.mp3');
+      await d.store.delete(Library.trackName(m.fileName));
+      expect(await d.library.trimTrack(m.id, 1, 5, fakeTrim), isNull);
+      expect(
+        (d.library.lastError! as TrimFailed).problem,
+        TrimProblem.notOnDevice,
+      );
+      expect(d.library.track(m.id), isNotNull);
+    });
   });
 
   group('#116 trimming, details', () {

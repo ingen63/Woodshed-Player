@@ -495,7 +495,8 @@ class _LibraryViewState extends State<LibraryView> {
 }
 
 /// Edits title and artist of an imported or recorded track (#24); the audio file stays unchanged.
-/// #116/AK1: «Trim start and end …»; greyed out for M4A, with the reason below it.
+/// #116/AK1: «Trim start and end …»; greyed out for file types the core cannot trim, with the reason below it
+/// (#120: M4A can be trimmed).
 Widget trimMenuItem(BuildContext context, AppController c, Track t) {
   final l = context.l10n;
   final can = Library.trimmable(t);

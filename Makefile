@@ -317,6 +317,7 @@ WEB_TEST_LIMIT ?= 300
 test-web:
 	app/tool/build_web_core.sh
 	mkdir -p app/test/web/wp_core && cp app/web/wp_core/* app/test/web/wp_core/
+	mkdir -p app/test/web/audio && cp core/tests/audio/clicks3.m4a app/test/web/audio/
 	cd app && CHROME_EXECUTABLE="$(CURDIR)/tools/chrome_autoplay.sh" \
 	  perl -e '$$SIG{ALRM} = sub { kill "KILL", -$$$$; }; setpgrp; alarm shift; system @ARGV; exit($$? >> 8 || ($$? ? 1 : 0))' \
 	  $(WEB_TEST_LIMIT) flutter test --platform chrome --reporter failures-only test/web/ \

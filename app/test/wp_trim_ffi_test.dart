@@ -62,4 +62,22 @@ void main() {
     },
     skip: skip,
   );
+
+  test('#120/AK2 #120/AK4 wpTrim cuts an M4A at frame boundaries and stays an M4A with the same codec', () {
+    wpCoreLibraryPath = lib.absolute.path;
+    for (final (name, codec) in [
+      ('clicks3.m4a', 'mp4a'),
+      ('clicks3_alac.m4a', 'alac'),
+    ]) {
+      final m4a = File('../core/tests/audio/$name').readAsBytesSync();
+      final r = wpTrim(m4a, 0.7, 2.2);
+      expect(r.code, WpCode.ok, reason: name);
+      expect((r.start - 0.7).abs(), lessThanOrEqualTo(0.05), reason: name);
+      expect((r.end - 2.2).abs(), lessThanOrEqualTo(0.05), reason: name);
+      final out = r.bytes!;
+      expect(String.fromCharCodes(out.sublist(4, 8)), 'ftyp');
+      expect(String.fromCharCodes(out).contains(codec), isTrue, reason: name);
+      expect(String.fromCharCodes(out).contains('Test Artist'), isTrue);
+    }
+  }, skip: skip);
 }

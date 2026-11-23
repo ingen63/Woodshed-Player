@@ -208,6 +208,8 @@ def trim_corpus():
         "adts": cut(8, 24, whole("clicks3.aac")),
         "flac": cut(8, 24, whole("clicks3.flac")),
         "m4a_head": cut(0, 16, head("sine440.m4a", 1500)),
+        "m4a_aac": cut(11, 24, whole("clicks3.m4a")),  # #120
+        "m4a_alac": cut(11, 24, whole("clicks3_alac.m4a")),
         "garbage": cut(0, 16, bytes(range(256))),
     }
 

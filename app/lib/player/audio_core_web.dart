@@ -299,7 +299,8 @@ class WebAudioCore implements AudioCore {
   static int _code(JSObject track) => (track['code'] as JSNumber).toDartInt;
 
   /// #116: cuts the file [bytes] to [start] … [end] seconds in the loader worker, with the same core code as
-  /// natively (MP3, WAV, FLAC and AAC in ADTS; the browser only decodes AAC, it does not cut it).
+  /// natively (MP3, WAV, FLAC, AAC in ADTS and, #120, M4A/MP4; the browser only decodes AAC, it does not cut
+  /// it).
   Future<WpTrimmed> trim(Uint8List bytes, double start, double end) async {
     final copy = Uint8List.fromList(bytes).buffer.toJS;
     final r =

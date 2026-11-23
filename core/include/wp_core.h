@@ -31,6 +31,8 @@ typedef struct wp_player wp_player;
 #define WP_ERR_CANCELLED -7               /* durch ein neueres Laden abgebrochen */
 #define WP_ERR_BUSY -8                    /* Befehls-Queue voll */
 #define WP_ERR_UNSUPPORTED_SAMPLE_RATE -9 /* rate outside WP_MIN/MAX_SAMPLE_RATE (#76, #97) */
+#define WP_ERR_MULTIPLE_TRACKS -10        /* trimming: MP4 with several audio tracks (#120) */
+#define WP_ERR_FRAGMENTED -11             /* trimming: fragmented MP4 (#120) */
 
 /* Range of sample rates the core accepts, both limits included (#76, #97). A player configured
  * outside it renders silence and answers every load with WP_ERR_UNSUPPORTED_SAMPLE_RATE. */
@@ -115,16 +117,19 @@ typedef struct wp_trim_result wp_trim_result;
 /* Keeps [start, end] seconds of the audio file in data/size (the whole file) and writes the new
  * file to *out (free it with wp_trim_free). Same format as before: WAV and FLAC exact to the sample
  * (FLAC encoded again, lossless), MP3 at frame boundaries without encoding again (exact with
- * decoders that honour the LAME tag, such as the core's), AAC in ADTS at the nearest frame
- * boundary. start and end are clamped to the file; at least WP_TRIM_MIN_SECONDS must remain. WP_OK,
- * WP_ERR_INVALID_ARGUMENT (no data or out, range too short, NaN), WP_ERR_UNSUPPORTED_FORMAT
- * (MP4/M4A, unknown or damaged file) or WP_ERR_OUT_OF_MEMORY; on an error *out is NULL. */
+ * decoders that honour the LAME tag, such as the core's), AAC in ADTS and MP4/M4A (AAC or ALAC,
+ * #120; an edit list skips the encoder delay) at the nearest frame boundary. start and end are
+ * clamped to the file; at least WP_TRIM_MIN_SECONDS must remain. WP_OK, WP_ERR_INVALID_ARGUMENT (no
+ * data or out, range too short, NaN), WP_ERR_UNSUPPORTED_FORMAT (unknown or damaged file),
+ * WP_ERR_MULTIPLE_TRACKS, WP_ERR_FRAGMENTED (MP4) or WP_ERR_OUT_OF_MEMORY (also MP4 from 4 GiB on);
+ * on an error *out is NULL. */
 WP_API int wp_trim(const void *data, size_t size, double start, double end, wp_trim_result **out);
 /* Bytes of the trimmed file, valid until wp_trim_free. */
 WP_API const void *wp_trim_data(const wp_trim_result *r);
 WP_API size_t wp_trim_size(const wp_trim_result *r);
 /* Where the new file starts and ends in the old one (seconds); differs from the request only where
- * frame boundaries forced it (ADTS: at most half a frame, MP3 without LAME tag: not before 12 ms).
+ * frame boundaries forced it (ADTS and MP4: at most half a frame, MP3 without LAME tag: not before
+ * 12 ms).
  */
 WP_API double wp_trim_start(const wp_trim_result *r);
 WP_API double wp_trim_end(const wp_trim_result *r);

@@ -661,9 +661,9 @@
   "@trimTrackEllipsis": {
     "description": "#116/AK1: context menu item of a track"
   },
-  "trimUnavailable": "M4A files cannot be trimmed yet.",
+  "trimUnavailable": "This file type cannot be trimmed.",
   "@trimUnavailable": {
-    "description": "#116: hint of the greyed out menu item for M4A"
+    "description": "#116, #120/AK1: hint of the greyed out menu item for file types that cannot be trimmed"
   },
   "trimTitle": "Trim «{title}»",
   "@trimTitle": {
@@ -741,6 +741,24 @@
   "trimFailedFormat": "«{title}» could not be trimmed: this file type cannot be trimmed, or the file is damaged.",
   "@trimFailedFormat": {
     "description": "#116/AK9",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trimFailedMultipleTracks": "«{title}» could not be trimmed: the file has several audio tracks. The track is unchanged.",
+  "@trimFailedMultipleTracks": {
+    "description": "#120/AK5",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trimFailedFragmented": "«{title}» could not be trimmed: the file is a fragmented MP4, which cannot be trimmed. The track is unchanged.",
+  "@trimFailedFragmented": {
+    "description": "#120/AK5",
     "placeholders": {
       "title": {
         "type": "String"

@@ -502,6 +502,89 @@ core/src/trim.cpp | cxx_remove_void_call | at.push_back(at.back() + f.samples);
 core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data + frames[i].pos, frames[i].len);
 core/src/trim_api.cpp | cxx_ne_to_eq | if (r.code != WP_OK)
 
+
+# ---- core/src/trim_mp4.cpp (#120) ----
+# Grenzfall: Schranken gegen Lesen über das Ende einer Box oder der Datei (Boxköpfe, Tabellen,
+# Versionsbyte, iTunSMPB-Text, Sample-Lagen). «>» statt «>=», ein vertauschtes Rechenzeichen oder «*»
+# statt «/» ändert nur, ob eine Box verworfen wird, die genau dort endet oder zu kurz ist; die
+# Prüfungen danach (Zahl der Samples in stts, stsz, stsc und stco, die Lage im mdat) verwerfen dieselben
+# Dateien. trim_mp4_tests prüft abgeschnittene und widersprüchliche Dateien, Fuzzing (fuzz_trim mit den
+# M4A-Samen, auch gezielt nur mit ihnen, 550 000 Läufe) findet keinen Absturz.
+core/src/trim_mp4.cpp | cxx_lt_to_le | if (to - p < 16) | 18
+core/src/trim_mp4.cpp | cxx_ge_to_gt | return b.bodySize() >= v0 && b.bodySize() >= (b.body(d)[0] == 1 ? v1 : v0); | 23
+core/src/trim_mp4.cpp | cxx_ge_to_gt | return b.bodySize() >= v0 && b.bodySize() >= (b.body(d)[0] == 1 ? v1 : v0); | 45
+core/src/trim_mp4.cpp | cxx_sub_to_add | return t.count <= (b->bodySize() - countAt - 4) / width; | 36
+core/src/trim_mp4.cpp | cxx_div_to_mul | return t.count <= (b->bodySize() - countAt - 4) / width; | 51
+core/src/trim_mp4.cpp | cxx_lt_to_le | while (p < len && text[p] == ' ') | 14
+core/src/trim_mp4.cpp | cxx_lt_to_le | for (; p < len && text[p] != ' ' && text[p] != 0; ++p) { | 14
+core/src/trim_mp4.cpp | cxx_lt_to_le | if (!stsd || stsd->bodySize() < 16 || rd32(stsd->body(d) + 4) != 1) | 33
+core/src/trim_mp4.cpp | cxx_gt_to_ge | (fixedSize != 0 && n > size / fixedSize)) | 28
+core/src/trim_mp4.cpp | cxx_div_to_mul | (fixedSize != 0 && n > size / fixedSize)) | 35
+core/src/trim_mp4.cpp | cxx_lt_to_le | for (uint32_t c = 0, e = 0; c < chunkTable.count && i < n; ++c) { | 33
+core/src/trim_mp4.cpp | cxx_gt_to_ge | if (o > size || len > size - o) | 13
+core/src/trim_mp4.cpp | cxx_ge_to_gt | const bool v1 = elst->bodySize() >= 4 && b[0] == 1; | 38
+
+# Grenzfall: Vergleiche, die nur bei exakter Gleichheit anders ausgehen: Zeit genau 2^53, Länge der
+# Edit-List genau gleich dem Rest, Priming oder Rest genau gleich der Länge, gewünschtes Sample genau in
+# der Mitte zwischen zwei Frame-Grenzen (wie bei ADTS in trim.cpp), Medienzeit genau 2^31 − 1 (Edit-List
+# Version 0 oder 1, beide richtig), ein Sample der Dauer 0 am Anfang (nur dann gleicht der leere Zähler
+# dem Abstand) und die nächste Grenze zum Anfang erst am Dateiende (dazu müsste ein Sample länger als
+# 1 s sein).
+core/src/trim_mp4.cpp | cxx_gt_to_ge | if (i == n || times[i] > kMaxTime) | 30
+core/src/trim_mp4.cpp | cxx_lt_to_le | if (segment != 0 && length < static_cast<double>(total - e0)) | 34
+core/src/trim_mp4.cpp | cxx_lt_to_le | const uint64_t to = count ? priming + count : (remainder < total ? total - remainder : 0); | 62
+core/src/trim_mp4.cpp | cxx_le_to_lt | if (priming < total && to > priming && to <= total) { | 47
+core/src/trim_mp4.cpp | cxx_gt_to_ge | return (it == times.end() || *it - m > m - times[k - 1]) ? k - 1 : k; | 42
+core/src/trim_mp4.cpp | cxx_sub_to_add | const size_t k0 = std::min(n - 1, nearest(e0 + static_cast<uint64_t>(s0))); | 32
+core/src/trim_mp4.cpp | cxx_gt_to_ge | mediaTime > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()); | 39
+core/src/trim_mp4.cpp | cxx_gt_to_ge | if (count > 0 && rd32(m.data() + m.size() - 4) == delta) { | 33
+
+# gleichwertig: Die innere Schleife hört bei i == n ohnehin auf, eine weitere Runde der äusseren ändert
+# nichts; bei c == 0 ist «last» noch 0 und jeder Chunk hat mindestens ein Sample; der iTunSMPB-Text
+# liegt immer innerhalb seiner Box, nie an ihrem Ende.
+core/src/trim_mp4.cpp | cxx_lt_to_le | for (uint32_t c = 0, e = 0; c < chunkTable.count && i < n; ++c) { | 57
+core/src/trim_mp4.cpp | cxx_gt_to_ge | if (c > 0 && chunks[c].samples == last) | 29
+core/src/trim_mp4.cpp | cxx_lt_to_le | if (smpb.pos && smpb.pos >= b.pos && smpb.pos < b.end()) | 53
+
+# Mull-Grenze: Von Hand gemessen (Aufruf im Quelltext abgeschaltet, nativ gebaut): trim_mp4_tests
+# oder fuzz_trim_replay scheitern an jedem dieser Mutanten, weil dann eine Box, ein Tabelleneintrag,
+# eine Dauer oder das Audio fehlt. Im Mutationsbau lässt Mull sie wirkungslos, wie bei trim.cpp (#116).
+core/src/trim_mp4.cpp | cxx_remove_void_call | chunks.push_back({offset[k], 0, 0}); | 7
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, wide ? 0x01000000u : 0); | 11
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, 1); | 11
+core/src/trim_mp4.cpp | cxx_remove_void_call | put64(m, mediaTime); | 13
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, static_cast<uint32_t>(duration)); | 13
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, static_cast<uint32_t>(mediaTime)); | 13
+core/src/trim_mp4.cpp | cxx_remove_void_call | close(m, elstAt); | 11
+core/src/trim_mp4.cpp | cxx_remove_void_call | close(m, edtsAt); | 11
+core/src/trim_mp4.cpp | cxx_remove_void_call | withDuration(m, d, mb, 16, 24, mediaDuration); | 15
+core/src/trim_mp4.cpp | cxx_remove_void_call | raw(m, d, nb); | 19
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, 0); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, 1); | 25
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, delta); | 25
+core/src/trim_mp4.cpp | cxx_remove_void_call | close(m, at); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, 0); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, static_cast<uint32_t>(c + 1)); | 23
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, last); | 23
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, 1); | 23
+core/src/trim_mp4.cpp | cxx_remove_void_call | close(m, at); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, 0); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, fixedSize); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, sampleSize(k)); | 23
+core/src/trim_mp4.cpp | cxx_remove_void_call | close(m, at); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, 0); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(m, static_cast<uint32_t>(chunks.size())); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | m.resize(m.size() + chunks.size() * 4); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | close(m, at); | 21
+core/src/trim_mp4.cpp | cxx_remove_void_call | close(m, minfAt); | 15
+core/src/trim_mp4.cpp | cxx_remove_void_call | raw(m, d, mb); | 15
+core/src/trim_mp4.cpp | cxx_remove_void_call | raw(m, d, b); | 7
+core/src/trim_mp4.cpp | cxx_remove_void_call | writeSmpb(m.data() + at + (smpb.pos - b.pos), smpb, mediaTime, times[k1] - m1, m1 - m0); | 9
+core/src/trim_mp4.cpp | cxx_remove_void_call | close(m, moovAt); | 3
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(r.bytes, static_cast<uint32_t>(payload + 8)); | 7
+core/src/trim_mp4.cpp | cxx_remove_void_call | put32(r.bytes, fourcc("mdat")); | 7
+core/src/trim_mp4.cpp | cxx_remove_void_call | raw(r.bytes, d, b); | 7
+
 # ---- app/lib/library/library.dart (#116) ----
 # gleichwertig: current() folgt höchstens 16 Ersetzungen und dient nur als Schutz gegen einen Kreis in
 # einer beschädigten Datei; ob 16 oder 17 Schritte, das Ergebnis ist ein Titel des Kreises bzw. das

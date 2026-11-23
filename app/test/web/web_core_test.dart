@@ -9,6 +9,7 @@
 library;
 
 import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web/web.dart' as web;
@@ -146,5 +147,48 @@ void main() {
     final core = c.player.core as WebAudioCore;
     final short = await core.trim(bytes, 0.2, 0.9);
     expect(short.code, WpCode.invalidArgument);
+  });
+
+  test('#120/AK2 #120/AK4 #120/AK6 trimming an M4A in the browser: the core cuts it, the browser decodes the result', () async {
+    // clicks3.m4a (AAC, clicks at 0.5, 1.0, 2.0 and 2.5 s), copied next to the test page by make test-web
+    final response = await web.window.fetch('audio/clicks3.m4a'.toJS).toDart;
+    expect(
+      response.ok,
+      isTrue,
+      reason: 'audio/clicks3.m4a missing (make test-web)',
+    );
+    final m4a = (await response.arrayBuffer().toDart).toDart.asUint8List();
+    final c = await createAppController();
+    final key = (c.files as WebFilePlatform).register('Clicks.m4a', m4a);
+    final old = (await c.importFiles([key])).imported.single;
+    final next = await c.trimTrack(old.id, 0.7, 2.2);
+    expect(next, isNotNull, reason: '${c.message}');
+    expect(c.library.track(old.id), isNull);
+    final t = c.library.track(next!)!;
+    expect(t.title, old.title);
+    expect(t.fileName, endsWith('.m4a'));
+    expect((t.duration - 1.5).abs(), lessThanOrEqualTo(0.05));
+    // the browser decodes the new file as it is played: it honours the edit list, so the file is as long
+    // as the core says and starts where the cut is (the click at 1.0 s of the old file)
+    final bytes = (await c.library.readAudio(t))!;
+    final ctx = web.OfflineAudioContext(2.toJS, 44100, 44100);
+    final buffer = await ctx
+        .decodeAudioData(Uint8List.fromList(bytes).buffer.toJS)
+        .toDart;
+    expect((buffer.duration - t.duration).abs(), lessThanOrEqualTo(0.005));
+    final left = buffer.getChannelData(0).toDart;
+    final click = left.indexWhere((x) => x.abs() > 0.3) / buffer.sampleRate;
+    // the cut: AAC frame 32 of the old file minus its priming of 2112 samples (as natively)
+    const cutAt = (32 * 1024 - 2112) / 44100;
+    expect(t.duration, closeTo((97 * 1024 - 2112) / 44100 - cutAt, 1e-9));
+    expect((click - (1.0 - cutAt)).abs(), lessThanOrEqualTo(0.005));
+    expect(
+      left.take(441).every((x) => x.abs() < 0.01),
+      isTrue,
+      reason: 'no click at the start',
+    );
+    // loaded again with the new file, decoded by the browser
+    expect(c.player.trackId, next);
+    expect(c.player.duration, closeTo(t.duration, 0.01));
   });
 }

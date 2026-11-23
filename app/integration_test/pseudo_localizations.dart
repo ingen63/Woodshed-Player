@@ -491,6 +491,12 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String trimFailedFormat(String title) =>
       pseudo(super.trimFailedFormat(title));
   @override
+  String trimFailedMultipleTracks(String title) =>
+      pseudo(super.trimFailedMultipleTracks(title));
+  @override
+  String trimFailedFragmented(String title) =>
+      pseudo(super.trimFailedFragmented(title));
+  @override
   String trimFailedTooShort(String title) =>
       pseudo(super.trimFailedTooShort(title));
   @override

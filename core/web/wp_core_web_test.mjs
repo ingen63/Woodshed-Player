@@ -239,8 +239,15 @@ const tests = {
     check(flac.code === WP_OK && new TextDecoder().decode(flac.bytes.subarray(0, 4)) === 'fLaC', 'FLAC stays FLAC');
     const short = decoder.trim(readFileSync(join(audioDir, 'clicks3.mp3')), 1.0, 1.5);
     check(short.code === WP_ERR_INVALID_ARGUMENT && !short.bytes, 'less than 1 s refused');
-    const m4a = decoder.trim(readFileSync(join(audioDir, 'sine440.m4a')), 0, 1);
-    check(m4a.code === WP_ERR_UNSUPPORTED_FORMAT, 'M4A not trimmed');
+    // #120/AK4: M4A (AAC and ALAC) is cut by the core as well, with the same result as natively
+    // (trim_mp4_tests): AAC frame 32 minus the priming of 2112 samples, ALAC packet 8
+    const m4a = decoder.trim(readFileSync(join(audioDir, 'clicks3.m4a')), 0.7, 2.2);
+    check(m4a.code === WP_OK && new TextDecoder().decode(m4a.bytes.subarray(4, 8)) === 'ftyp', 'M4A stays M4A');
+    near(m4a.start, (32 * 1024 - 2112) / 44100, 1e-9, 'M4A start at a frame boundary');
+    near(m4a.end, (97 * 1024 - 2112) / 44100, 1e-9, 'M4A end at a frame boundary');
+    const alac = decoder.trim(readFileSync(join(audioDir, 'clicks3_alac.m4a')), 0.7, 2.2);
+    check(alac.code === WP_OK, 'ALAC trimmed');
+    near(alac.start, (8 * 4096) / 44100, 1e-9, 'ALAC start at a packet boundary');
   },
   // #93: running out of memory reports WP_ERR_OUT_OF_MEMORY instead of aborting the WASM core (it is
   // built with -fwasm-exceptions); the previous title stays playable and loading works again.

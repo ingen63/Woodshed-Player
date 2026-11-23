@@ -1,5 +1,6 @@
 // Trimming the start and end of an audio file (#116), see trim.hpp.
 #include "trim.hpp"
+#include "trim_mp4.hpp"
 
 #include "flac_writer.hpp"
 #include "miniaudio_impl.hpp"
@@ -92,24 +93,6 @@ uint16_t crc16(const uint8_t *data, size_t n, uint16_t crc = 0) {
           (crc & 1) ? static_cast<uint16_t>((crc >> 1) ^ 0xA001) : static_cast<uint16_t>(crc >> 1);
   }
   return crc;
-}
-
-// ---- The range ----
-
-// Samples [first, last) of a file with `total` samples at `rate` for the requested seconds; false
-// if fewer than kMinSeconds remain (NaN included).
-bool sampleRange(double start, double end, long long total, double rate, long long &first,
-                 long long &last) {
-  if (!(rate > 0) || total <= 0 || std::isnan(start) || std::isnan(end))
-    return false;
-  const double duration = static_cast<double>(total) / rate;
-  start = std::clamp(start, 0.0, duration);
-  end = std::clamp(end, 0.0, duration);
-  if (end - start < kMinSeconds - 1e-9)
-    return false;
-  first = std::clamp(std::llround(start * rate), 0LL, total);
-  last = std::clamp(std::llround(end * rate), first, total);
-  return true;
 }
 
 Result failure(int code) {
@@ -677,6 +660,22 @@ Result trimAdts(const uint8_t *data, size_t size, double start, double end) {
 
 } // namespace
 
+// ---- The range ----
+
+bool sampleRange(double start, double end, long long total, double rate, long long &first,
+                 long long &last) {
+  if (!(rate > 0) || total <= 0 || std::isnan(start) || std::isnan(end))
+    return false;
+  const double duration = static_cast<double>(total) / rate;
+  start = std::clamp(start, 0.0, duration);
+  end = std::clamp(end, 0.0, duration);
+  if (end - start < kMinSeconds - 1e-9)
+    return false;
+  first = std::clamp(std::llround(start * rate), 0LL, total);
+  last = std::clamp(std::llround(end * rate), first, total);
+  return true;
+}
+
 Format detect(const uint8_t *data, size_t size) {
   if (!data)
     return Format::Unknown;
@@ -709,6 +708,7 @@ Result trim(const uint8_t *data, size_t size, double start, double end) {
     case Format::Adts:
       return trimAdts(data, size, start, end);
     case Format::Mp4:
+      return trimMp4(data, size, start, end);
     case Format::Unknown:
       break;
     }

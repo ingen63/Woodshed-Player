@@ -409,7 +409,7 @@ final _trimFree = _lib
       void Function(Pointer<_TrimResult>)
     >('wp_trim_free');
 
-/// #116: keeps [start]–[end] seconds of the audio file [bytes] (MP3, WAV, FLAC, AAC in ADTS) and returns
+/// #116: keeps [start]–[end] seconds of the audio file [bytes] (MP3, WAV, FLAC, AAC in ADTS, #120: M4A) and returns
 /// the new file in the same format. Blocks while it cuts (FLAC is encoded again); call it off the UI
 /// isolate for large files.
 WpTrimmed wpTrim(Uint8List bytes, double start, double end) {

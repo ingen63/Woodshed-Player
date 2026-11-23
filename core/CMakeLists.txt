@@ -182,8 +182,8 @@ target_link_libraries(wp_flacwriter PUBLIC wp_flac)
 wp_strict_warnings(wp_flacwriter)
 wp_mutate(wp_flacwriter)
 
-# #116: trimming start and end of a file in memory (WAV, FLAC, MP3, ADTS)
-add_library(wp_trim STATIC src/trim.cpp)
+# #116: trimming start and end of a file in memory (WAV, FLAC, MP3, ADTS; #120: MP4)
+add_library(wp_trim STATIC src/trim.cpp src/trim_mp4.cpp)
 target_include_directories(wp_trim PUBLIC include src)
 target_link_libraries(wp_trim PUBLIC wp_miniaudio wp_flacwriter)
 wp_strict_warnings(wp_trim)
@@ -265,6 +265,16 @@ target_link_libraries(trim_tests PRIVATE wp_trim wp_playercore)
 target_compile_definitions(trim_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
 wp_strict_warnings(trim_tests)
 add_test(NAME trim_tests COMMAND trim_tests)
+
+# #120: trimming MP4/M4A; on Apple platforms the results are also decoded by the system decoder
+add_executable(trim_mp4_tests tests/trim_mp4_tests.cpp src/trim_api.cpp)
+target_link_libraries(trim_mp4_tests PRIVATE wp_trim)
+if(APPLE)
+  target_link_libraries(trim_mp4_tests PRIVATE "-framework AudioToolbox" "-framework CoreFoundation")
+endif()
+target_compile_definitions(trim_mp4_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
+wp_strict_warnings(trim_mp4_tests)
+add_test(NAME trim_mp4_tests COMMAND trim_mp4_tests)
 
 # #61: the device shell (src/player.cpp) compiled into the test itself, on the null device
 add_executable(device_tests tests/device_tests.cpp)

@@ -821,7 +821,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trimTrackEllipsis => 'Trim start and end …';
 
   @override
-  String get trimUnavailable => 'M4A files cannot be trimmed yet.';
+  String get trimUnavailable => 'This file type cannot be trimmed.';
 
   @override
   String trimTitle(String title) {
@@ -872,6 +872,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String trimFailedFormat(String title) {
     return '«$title» could not be trimmed: this file type cannot be trimmed, or the file is damaged.';
+  }
+
+  @override
+  String trimFailedMultipleTracks(String title) {
+    return '«$title» could not be trimmed: the file has several audio tracks. The track is unchanged.';
+  }
+
+  @override
+  String trimFailedFragmented(String title) {
+    return '«$title» could not be trimmed: the file is a fragmented MP4, which cannot be trimmed. The track is unchanged.';
   }
 
   @override

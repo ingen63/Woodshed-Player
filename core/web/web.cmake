@@ -49,7 +49,7 @@ target_include_directories(wp_flacwriter PUBLIC src)
 target_link_libraries(wp_flacwriter PUBLIC wp_flac)
 wp_strict_warnings(wp_flacwriter)
 target_compile_options(wp_flacwriter PUBLIC ${WP_TEST_COMPILE})
-add_library(wp_trim STATIC src/trim.cpp)
+add_library(wp_trim STATIC src/trim.cpp src/trim_mp4.cpp)
 target_include_directories(wp_trim PUBLIC include src)
 target_link_libraries(wp_trim PUBLIC wp_miniaudio wp_flacwriter)
 target_link_options(wp_trim PUBLIC ${WP_TEST_LINK})
@@ -73,6 +73,11 @@ target_link_libraries(trim_tests PRIVATE wp_trim wp_playercore)
 target_compile_definitions(trim_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
 wp_strict_warnings(trim_tests)
 add_test(NAME trim_tests COMMAND trim_tests)
+add_executable(trim_mp4_tests tests/trim_mp4_tests.cpp src/trim_api.cpp) # #120
+target_link_libraries(trim_mp4_tests PRIVATE wp_trim)
+target_compile_definitions(trim_mp4_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
+wp_strict_warnings(trim_mp4_tests)
+add_test(NAME trim_mp4_tests COMMAND trim_mp4_tests)
 
 # #9: the same reference cases as natively; compared against the native outputs (#9/AK7)
 include(tests/reference.cmake)
@@ -83,7 +88,7 @@ include(tests/fuzz/fuzz.cmake)
 
 # ---- Kern fürs AudioWorklet ----
 # #116: trimming (src/trim*.cpp, the FLAC writer and libFLAC) is part of the web core.
-set(WP_WEB_OWN web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp src/trim.cpp
+set(WP_WEB_OWN web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp src/trim.cpp src/trim_mp4.cpp
   src/trim_api.cpp src/flac_writer.cpp ${WP_ENGINE_SOURCES})
 add_executable(wp_core_web ${WP_WEB_OWN} src/miniaudio_impl.c ${WP_FLAC_SOURCES})
 target_include_directories(wp_core_web PRIVATE include web ${WP_ENGINE_INCLUDES})
