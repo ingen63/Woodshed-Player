@@ -203,6 +203,7 @@ String _repoPath(String path) =>
     path.startsWith('../') ? path.substring(3) : 'app/$path';
 
 void main() {
+  // slow: scans every source file of app/lib, app/packages, app/tool and core/
   test('#45/AK5: no German string literals in app/lib, app/packages, app/tool and core/', () {
     final hits = <String>[];
     for (final root in _roots) {

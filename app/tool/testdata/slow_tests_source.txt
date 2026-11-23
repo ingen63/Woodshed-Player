@@ -1,0 +1,36 @@
+// Staged source of app/test/a_test.dart for tool/slow_tests_test.dart (#128); never run.
+void main() {
+  setUpAll(() {});
+  tearDownAll(() {});
+  // line 5 above is fictitious: the reporter names the setUpAll call
+
+  // a fast logic test
+  // it has no reason and needs none
+  //
+  test('logic fast', () {});
+  // logic slow with reason:
+  // slow: walks 1000 random cases
+  // more about the cases
+  //
+  test('logic slow with reason', () {});
+  // slow: this reason belongs to no test, a code line follows
+  final x = 1;
+  //
+  //
+  //
+  test('logic slow, reason too far up', () {});
+  //
+  //
+  //
+  testWidgets('widget under its limit', (tester) async {});
+  //
+  //
+  //
+  // slow:
+  testWidgets('widget slow', (tester) async {});
+  //
+  //
+  //
+  // slow: 100 random cases
+  property('property slow with reason', (r) {});
+}

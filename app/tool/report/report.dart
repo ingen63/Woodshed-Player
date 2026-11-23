@@ -3,7 +3,8 @@
 //
 // Four layers, each with its own status by a rule stated on the page, no overall grade (rules in
 // docs/TESTS.md, section «Übersichtsseite Testqualität (#12)»):
-// 1 Hygiene: failed and flaky tests from JUnit (ctest, flutter test converted from its JSON reporter).
+// 1 Hygiene: failed and flaky tests from JUnit (ctest, flutter test converted from its JSON reporter),
+//   slow Dart tests without a reason (tool/slow_tests.dart, #128) as a hint.
 // 2 Adequacy: line coverage per part (tool/coverage.dart) and not detected mutants (local/mutants/).
 // 3 Traceability: per acceptance criterion «with test», «checked», «manual only» or «without».
 // 4 Outcome: bug issues with a found:* label name the test that should have caught them and the
@@ -14,6 +15,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../coverage.dart';
+import '../slow_tests.dart';
 
 // ---------------------------------------------------------------- texts and status
 
@@ -233,11 +235,12 @@ class JUnitSource {
   int get skipped => cases?.where((c) => c.skipped).length ?? 0;
 }
 
-Status hygieneStatus(List<JUnitSource> sources) {
+/// [slow]: Dart tests over their limit without a reason (#128), only a hint.
+Status hygieneStatus(List<JUnitSource> sources, {int slow = 0}) {
   final withData = sources.where((s) => s.cases != null).toList();
   if (withData.isEmpty) return Status.noData;
   if (withData.any((s) => s.failed.isNotEmpty)) return Status.fail;
-  if (withData.any((s) => s.flaky.isNotEmpty)) return Status.hint;
+  if (slow > 0 || withData.any((s) => s.flaky.isNotEmpty)) return Status.hint;
   return Status.ok;
 }
 
@@ -869,6 +872,7 @@ class ReportInput {
     this.mutantsDiff,
     this.issues,
     this.marks = const {},
+    this.slow,
     this.previous,
   });
 
@@ -885,6 +889,10 @@ class ReportInput {
   /// Issues from `gh issue list --json …`; null without GitHub.
   final List<Map<String, Object?>>? issues;
   final Map<Criterion, List<String>> marks;
+
+  /// Dart tests over their limit without `// slow:` (tool/slow_tests.dart, #128), paths relative
+  /// to the repository; null without the JSON result of the app tests.
+  final List<TestTime>? slow;
   ({String version, Metrics metrics})? previous;
 }
 
@@ -906,7 +914,8 @@ class Report {
   final List<IssueRow>? reqs;
   final List<Escape>? esc;
 
-  Status get hygiene => hygieneStatus(input.junit);
+  Status get hygiene =>
+      hygieneStatus(input.junit, slow: input.slow?.length ?? 0);
   Status get adequacy => adequacyStatus(input.coverage, input.mutantsFull);
   Status get traceability => traceabilityStatus(reqs);
   Status get outcome => outcomeStatus(esc);
@@ -1053,6 +1062,16 @@ void _hygiene(StringBuffer h, Report r, Texts t) {
     for (final s in sources)
       for (final c in s.flaky) '${s.name}: ${c.name}',
   ]);
+  final slow = r.input.slow ?? const <TestTime>[];
+  if (slow.isNotEmpty) {
+    h.write(
+      '<p><b>${_e(t('hygiene.slowList', {'logic': t.number(logicLimit, digits: 2), 'widget': t.number(widgetLimit)}))}</b></p><ul>',
+    );
+    for (final s in slow) {
+      h.write('<li>${_e(_slowItem(t, s))}</li>');
+    }
+    h.write('</ul>');
+  }
   final all = [
     for (final s in sources)
       for (final c in s.cases ?? const <TestCase>[]) (s.name, c),
@@ -1306,6 +1325,13 @@ void _history(StringBuffer h, Report r, Texts t) {
   h.write('</section>');
 }
 
+String _slowItem(Texts t, TestTime s) => t('hygiene.slowItem', {
+  'file': '${s.path}:${s.line}',
+  'kind': t(s.widget ? 'hygiene.widget' : 'hygiene.logic'),
+  'seconds': t.number(s.seconds, digits: 2),
+  'name': s.name,
+});
+
 /// Short Markdown summary for the GitHub run summary.
 String renderSummary(Report r, Texts t, String pagePath) {
   final i = r.input;
@@ -1322,8 +1348,15 @@ String renderSummary(Report r, Texts t, String pagePath) {
                   'tests': m['tests'],
                   'failed': m['failed'],
                   'flaky': m['flaky'],
-                })),
-    )
+                })) +
+          (i.slow == null || i.slow!.isEmpty
+              ? ''
+              : t('summary.slow', {'n': i.slow!.length})),
+    );
+  for (final s in i.slow ?? const <TestTime>[]) {
+    b.writeln('  - ${_slowItem(t, s)}');
+  }
+  b
     ..writeln(
       t('summary.fit', {'status': t('status.${r.adequacy.key}')}) +
           (cov == null

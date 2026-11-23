@@ -172,6 +172,7 @@ void main() {
       );
     });
 
+    // slow: 25 seeds with 30 random steps on three devices and their syncs (random inputs)
     test('random changes on three devices, synced in random order, converge (random inputs)', () async {
       final stats = [0, 0, 0]; // tracks, tombstones, tracks with loops
       for (var seed = 0; seed < 25; seed++) {

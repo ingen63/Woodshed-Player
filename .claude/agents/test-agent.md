@@ -111,6 +111,10 @@ Lange Build-Ausgaben füllen den Kontext. Immer so aufrufen:
    Deckt ein vorhandener benannter Test genau diesen Fund schon ab (ohne Korrektur rot), kein zweiter Test:
    nur der Verweis `found bug N` im Kommentar und der Testname im Eintrag. War es kein Fehler im Code, sondern
    eine falsch formulierte Invariante des Tests, wird der Startwert nicht eingetragen.
+
+   **Laufzeitgrenze (#128).** Ein neuer Dart-Test bleibt unter 0,25 s (`test`) bzw. 2 s (`testWidgets`); keine
+   Echtzeit-Pausen, kleine Daten. Braucht er von der Sache her länger (Zufallsfälle, echter Kern, Scan vieler
+   Dateien), steht direkt über dem Test `// slow: <Grund>`. Prüfen: `dart app/tool/slow_tests.dart` nach dem Lauf.
 4. **Abschluss:** Nur die Testdateien einzeln stagen (`git add <Datei>`, nie `git add -A` oder `git add .`) und committen:
    `git commit -m "test(auto): Tests für <Kurzbeschreibung> (<sha des Ausgangscommits>)"`.
 5. **Bericht:** Build-Ergebnis je Plattform, Testlauf (bestanden/fehlgeschlagen), neue Tests (Datei + Name),

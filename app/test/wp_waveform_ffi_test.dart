@@ -41,6 +41,7 @@ File _sineWav(Directory dir, double seconds, double amp) {
 }
 
 void main() {
+  // slow: decodes a 2 s WAV file in the real core
   test('Wellenform eines Sinus mit Amplitude 0,5 und Fehlerfälle', () {
     if (!needs(
       macosCoreRequired,

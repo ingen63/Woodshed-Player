@@ -89,6 +89,7 @@ Map<String, Uint8List> pool(int n) => {
 
 void main() {
   group('#10/AK6 sync on 2 to 4 devices', () {
+    // slow: every random case runs 2 to 4 devices with edits and syncs through one cloud
     property('random edits, deletions and syncs on 2 to 4 devices converge', (
       r,
     ) async {
@@ -461,6 +462,7 @@ void main() {
 
   group('#10/AK7, #53/AK5 damaged device file', () {
     final outcomes = <String, int>{};
+    // slow: every case builds two devices on a cloud and syncs a damaged device file
     property('a damaged device file never crashes and never loses local data', (
       r,
     ) async {

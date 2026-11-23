@@ -242,6 +242,7 @@ void main() {
 
   group('#53/AK2 devices changing at the same time converge in any order (random, fixed seeds)', () {
     for (final count in [2, 3]) {
+      // slow: 20 seeds of interleaved writes on 2 or 3 devices, synced in random order
       test(
         '$count devices, writes interleaved, synced in random order',
         () async {

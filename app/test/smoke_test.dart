@@ -110,6 +110,7 @@ void main() {
   });
 
   group('#13/AK5 tools/smoke_app.sh', () {
+    // slow: runs tools/smoke_app.sh as a shell process
     test('passes on exit code 0 with «smoke: ok», WP_SMOKE=1 set', () {
       final r = smokeScript(
         tmp,
@@ -120,6 +121,7 @@ void main() {
       expect(r.stdout, contains('smoke_app: passed, exit code 0'));
     });
 
+    // slow: runs tools/smoke_app.sh twice as a shell process
     test('fails on another exit code or without «smoke: ok»', () {
       var r = smokeScript(tmp, 'echo "smoke: FAILED, no playback"; exit 1');
       expect(r.exitCode, 1);

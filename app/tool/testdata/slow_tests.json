@@ -1,0 +1,21 @@
+{"protocolVersion":"0.1.1","runnerVersion":null,"pid":1,"type":"start","time":0}
+{"suite":{"id":0,"platform":"vm","path":"/repo/app/test/a_test.dart"},"type":"suite","time":0}
+{"test":{"id":1,"name":"loading /repo/app/test/a_test.dart","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":0}
+{"testID":1,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":9000}
+{"test":{"id":2,"name":"(setUpAll)","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":5,"column":3,"url":"file:///repo/app/test/a_test.dart"},"type":"testStart","time":9000}
+{"testID":2,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":14000}
+{"test":{"id":3,"name":"logic fast","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":10,"column":3,"url":"file:///repo/app/test/a_test.dart"},"type":"testStart","time":14000}
+{"testID":3,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":14200}
+{"test":{"id":4,"name":"logic slow with reason","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":15,"column":3,"url":"file:///repo/app/test/a_test.dart"},"type":"testStart","time":14200}
+{"testID":4,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":15200}
+{"test":{"id":5,"name":"logic slow, reason too far up","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":21,"column":3,"url":"file:///repo/app/test/a_test.dart"},"type":"testStart","time":15200}
+{"testID":5,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":15500}
+{"test":{"id":6,"name":"widget under its limit","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":25,"root_column":3,"root_url":"file:///repo/app/test/a_test.dart"},"type":"testStart","time":15500}
+{"testID":6,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":17000}
+{"test":{"id":7,"name":"widget slow","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":30,"root_column":3,"root_url":"file:///repo/app/test/a_test.dart"},"type":"testStart","time":17000}
+{"testID":7,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":19500}
+{"test":{"id":8,"name":"property slow with reason","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":40,"column":3,"url":"file:///repo/app/test/property/property.dart","root_line":35,"root_column":3,"root_url":"file:///repo/app/test/a_test.dart"},"type":"testStart","time":19500}
+{"testID":8,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":21000}
+{"test":{"id":9,"name":"(tearDownAll)","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":6,"column":3,"url":"file:///repo/app/test/a_test.dart"},"type":"testStart","time":21000}
+{"testID":9,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":26000}
+{"success":true,"type":"done","time":26000}

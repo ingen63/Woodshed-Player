@@ -295,6 +295,7 @@ Map<String, Object?> snapshot(Library lib) => {
 
 void main() {
   group('#10/AK1 library', () {
+    // slow: every random case imports tracks and runs up to 35 random operations
     property(
       'sorting and moving into folders neither lose nor duplicate a track',
       (r) async {
@@ -326,6 +327,7 @@ void main() {
       },
     );
 
+    // slow: every random case imports tracks and saves and loads library.json on disk
     property('saving and loading gives the same state', (r) async {
       final t = TestLibrary(r);
       await t.library.load();

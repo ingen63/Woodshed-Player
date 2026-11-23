@@ -220,6 +220,7 @@ zugeordnet.
 | Gerätehülle (`player.cpp`) von innen auf dem Null-Gerät: Meldungen von miniaudio, Neustart des Geräts, Metronom über die C-API | vorhanden: `core/tests/device_tests.cpp` (#61) | – |
 | Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug, `make mutants`, `make mutants-diff`, Job `mutants-diff` | vorhanden: `app/tool/mutants*.dart`, `core/tests/mutants/`, `tools/mutants-exclude.txt` (#11); kein offener Mutant mehr (#61, Abschnitt «Mutationstests (#11)») | – |
 | Übersichtsseite Testqualität: vier Schichten mit Status, Zuordnung `#nn/AKn`, Verlauf, «keine Daten» | vorhanden: `make report`, `app/tool/report/` mit `report_test.dart`, Artefakt `test-quality-report` im Job `checks` (#12) | – |
+| Laufzeitgrenze je Dart-Test (Logik 0,25 s, Widget 2 s), Begründung `// slow: <Grund>`, Hinweis auf der Übersichtsseite und in der Zusammenfassung des Jobs `checks` | vorhanden: `app/tool/slow_tests.dart` mit `slow_tests_test.dart` (#128) | – |
 | Netzwerkfreiheit bei jedem Push: Prüfung mit eigenen Tests | vorhanden: `make network-free`, Job `network-free` in `test-quality.yml`, `test_quality_workflow_test.dart` (#58/AK6) | – |
 
 ## Ausführen
@@ -250,6 +251,7 @@ make bench          # Leistungs- und Lasttests von Kern und Bibliothek (nächtli
 make mutants        # Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug (#11), local/mutants/full/
 make mutants-diff   # Mutationstests der seit BASE geänderten Zeilen (Vorgabe origin/main), local/mutants/diff/
 make report         # Übersichtsseite Testqualität aus den vorhandenen Ergebnissen (#12), local/test-quality/report/
+dart app/tool/slow_tests.dart  # Dart-Tests über ihrer Laufzeitgrenze ohne «// slow:» aus dem letzten make test (#128)
 ```
 
 Entwicklerwerkzeuge (nicht Teil der App): Flutter, CMake, Emscripten 7.0.0 für `test-wasm` (Homebrew `emscripten`, in beiden Workflows dieselbe Version), Homebrew `llvm` für
@@ -1147,7 +1149,7 @@ Es gibt **keine Gesamtnote**. Jede Schicht hat ihren eigenen Status nach einer R
 
 | Schicht | erfüllt | Hinweis | nicht erfüllt | keine Daten |
 |---|---|---|---|---|
-| 1 Hygiene | kein fehlgeschlagener, kein flaky Test | flaky Tests | ein Test schlägt fehl (auch eine Testdatei, die nicht lädt) | keine JUnit-Datei |
+| 1 Hygiene | kein fehlgeschlagener, kein flaky Test, kein Dart-Test über seiner Laufzeitgrenze ohne Begründung | flaky Tests oder zu langsame Dart-Tests ohne `// slow:` (#128) | ein Test schlägt fehl (auch eine Testdatei, die nicht lädt) | keine JUnit-Datei |
 | 2 Angemessenheit | C++-Kern und Dart-Logik ≥ Untergrenze, kein nicht erkannter Mutant | Untergrenze erreicht, aber nicht erkannte Mutanten, kein voller Mutationslauf oder ein Teil ohne Daten | ein Teil unter der Untergrenze oder eine Logikdatei, die kein Test lädt | keine Abdeckung |
 | 3 Anforderungsbezug | jedes Kriterium mit Test, geprüft oder abgehakt | Kriterien ohne Test, ohne Prüfung und ohne Haken | – | `gh` nicht erreichbar |
 | 4 Ergebnis | jeder Fehler mit `found:*` nennt den Test, der ihn hätte fangen müssen, und den Regressionstest | eine Antwort fehlt | – | `gh` nicht erreichbar oder noch kein Fehler mit `found:*` |
@@ -1184,6 +1186,49 @@ Stand.
 Kurzfassung in Markdown auf der Standardausgabe). Die Tests des Werkzeugs (`app/tool/report/report_test.dart`, Namen
 `#12/AKn`, in `make test-tools`) prüfen die Regeln, die Zuordnung, die Prüfkommentare (erfundene Issues in
 `app/tool/report/testdata/issues.json`), den Verlauf und einen Lauf in einem gestellten Repository mit und ohne Daten.
+
+## Laufzeitgrenze für Dart-Tests (#128)
+
+Langsame Tests verlängern jeden Lauf und vervielfachen sich in `make mutants-diff`: Für jeden Mutanten läuft die
+ganze Testdatei. Darum hat jeder Dart-Test unter `app/test/` eine Grenze:
+
+| Art | erkannt an | Grenze |
+|---|---|---|
+| Logik-Test | `test(...)`, auch über Helfer wie `property(...)` | 0,25 s |
+| Widget-Test | `testWidgets(...)` (der JSON-Reporter nennt `package:flutter_test/src/widget_tester.dart` als Ort) | 2,0 s |
+
+**Gemessen** wird die Zeit von `testStart` bis `testDone` in der JSON-Ausgabe von `flutter test` (`make test-app`
+schreibt sie nach `local/test-quality/flutter/app.json`, in CI `make coverage-run`). Die Ladephase einer Datei
+(«loading …») und `setUpAll`/`tearDownAll` sind versteckte Tests und zählen nicht.
+
+**Begründung:** Braucht ein Test von der Sache her länger, steht direkt über der Zeile, die ihn erklärt, ein Kommentar
+`// slow: <Grund>`, z. B.
+
+```dart
+    // slow: every random case runs 2 to 4 devices with edits and syncs through one cloud
+    property('random edits, deletions and syncs on 2 to 4 devices converge', (r) async {
+```
+
+Die Zeile kommt vom Reporter (bei Helfern wie `property(...)` die Zeile des Aufrufs in der Testdatei). Gezählt wird der
+Block der Kommentarzeilen direkt darüber; steht eine Codezeile oder Leerzeile dazwischen, gilt die Begründung nicht.
+`// slow:` ohne Grund gilt nicht.
+
+**Befund:** `dart app/tool/slow_tests.dart [<json> …]` listet jeden Test über seiner Grenze ohne Begründung mit
+Datei:Zeile, Art, Dauer und Name (Vorgabe: `local/test-quality/flutter/app.json`). Dieselbe Liste steht auf der
+Übersichtsseite in der Schicht «Hygiene» und in der Zusammenfassung des Jobs `checks`. Sie ist ein Hinweis, nie ein
+Fehler: Die Zeiten sind Wanduhrzeit, während andere Testdateien parallel laufen, und schwanken je nach Last.
+
+**Wahl der Grenzen** (Messung am 23.11.2026, zwei volle Läufe, MacBook Pro M1 Pro; Einzelheiten im Kommentar zu #128):
+Logik-Tests haben einen Median von 4 ms und 90 % unter 35 ms. Mit 0,1 s wären 25–31 Tests gemeldet, die Hälfte nur in
+einem Lauf; über 0,25 s lagen in beiden Läufen nur Zufalls- und Eigenschaftstests, der Scan aller Quelltexte und der
+Wellenform-Test mit echtem Kern. Widget-Tests haben einen Median von 0,2–0,26 s und 90 % unter 0,93 s; der erste
+Widget-Test einer Datei trägt rund 1 s Aufwärmen. Mit 0,5 s wären 41–50 Tests gemeldet, mit 1 s 18 je Lauf, aber
+jedes Mal andere; über 2 s lag kein Widget-Test in beiden Läufen. Widget-Tests werden nicht mutiert.
+
+**Begründet** sind heute: `sync_test.dart` (#37/AK1 random changes), `sync_devices_test.dart` (#53/AK2),
+`property/sync_property_test.dart` (#10/AK6, #10/AK7), `property/library_property_test.dart` (#10/AK1, zwei Tests),
+`property/library_files_property_test.dart` (#10/AK3), `english_dev_texts_test.dart` (#45/AK5),
+`smoke_test.dart` (#13/AK5, startet ein Shell-Skript) und `wp_waveform_ffi_test.dart`. Der C++-Kern bleibt aussen vor: `ctest` misst nur ganze Testprogramme.
 
 ## Wackelnde Tests (#62)
 

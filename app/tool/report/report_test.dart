@@ -240,6 +240,32 @@ void main() {
       expect('${r.stdout}', contains('2.3.4+5'));
     });
 
+    test('#128/AK5 slow tests without a reason are a hint in «Hygiene» and in the summary', () {
+      write(
+        'local/test-quality/flutter/app.json',
+        File('tool/testdata/slow_tests.json')
+            .readAsStringSync()
+            .replaceAll('/repo/', '${repo.path}/'),
+      );
+      write(
+        'app/test/a_test.dart',
+        File('tool/testdata/slow_tests_source.txt').readAsStringSync(),
+      );
+      final r = run(ghWorks: false, args: ['--no-gh', '--summary']);
+      expect(r.exitCode, 0, reason: '${r.stderr}');
+      final item = _t('hygiene.slowItem', {
+        'file': 'app/test/a_test.dart:30',
+        'kind': _t('hygiene.widget'),
+        'seconds': '2,50',
+        'name': 'widget slow',
+      });
+      final html = page();
+      expect(_badge(html, 'hygiene'), Status.hint.key);
+      expect(html, contains(item));
+      expect('${r.stdout}', contains(_t('summary.slow', {'n': 2})));
+      expect('${r.stdout}', contains('  - $item'));
+    });
+
     test('AK1: the page works offline: no script, no external resource', () {
       final r = run();
       expect(r.exitCode, 0, reason: '${r.stderr}');

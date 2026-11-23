@@ -10,7 +10,7 @@
 // Inputs below the repository, each optional (missing data is shown as such, never an error):
 //   local/test-quality/junit/*.xml     JUnit: ctest (core.xml); flutter test writes JSON to
 //                                      local/test-quality/flutter/<name>.json, converted here to
-//                                      junit/<name>.xml
+//                                      junit/<name>.xml; app.json also gives the slow tests (#128)
 //   app/coverage/lcov.info, core/build-cov/lcov.info, tools/coverage-min   (make coverage-run)
 //   local/mutants/full|diff/results.json   (make mutants, make mutants-diff)
 //   issues and comments via `gh issue list` (only while generating; the app never does this)
@@ -19,6 +19,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../coverage.dart';
+import '../slow_tests.dart';
 import 'report.dart';
 
 String? _run(String exe, List<String> args, String dir) {
@@ -81,6 +82,23 @@ List<JUnitSource> readJUnit(String root) {
           return JUnitSource(n, error: e.message);
         }
       }(),
+  ];
+}
+
+/// Slow app tests without a reason (#128) from local/test-quality/flutter/app.json, paths relative
+/// to [root]; null without that file.
+List<TestTime>? readSlowTests(String root) {
+  final f = File('$root/local/test-quality/flutter/app.json');
+  if (!f.existsSync()) return null;
+  return [
+    for (final t in slowTests(f.readAsStringSync(), readSource))
+      TestTime(
+        path: relativePath(t.path, root),
+        line: t.line,
+        name: t.name,
+        seconds: t.seconds,
+        widget: t.widget,
+      ),
   ];
 }
 
@@ -221,6 +239,7 @@ void main(List<String> args) {
     mutantsDiff: _mutants(repo, 'diff'),
     issues: gh ? _issues(repo) : null,
     marks: testMarks(repo, files),
+    slow: readSlowTests(repo),
   );
   final report = Report(input, t);
   input.previous = recordHistory(

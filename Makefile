@@ -106,7 +106,7 @@ test-app:
 # coverage check and diff, pre-push hook (#8/AK6)
 TOOL_TESTS = tool/after_commit_hook_test.dart tool/coverage_test.dart tool/pre_push_hook_test.dart \
              tool/network_free_test.dart tool/mutants_test.dart tool/report/report_test.dart \
-             tool/web_start_check_test.dart tool/clean_tmp_test.dart
+             tool/web_start_check_test.dart tool/clean_tmp_test.dart tool/slow_tests_test.dart
 test-tools:
 	@$(QA_DIRS)
 	cd app && flutter test --reporter failures-only $(call FLUTTER_JSON,tools) $(TOOL_TESTS)

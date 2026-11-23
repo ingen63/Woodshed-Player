@@ -85,6 +85,7 @@ void main() {
 
   group('#10/AK3 damaged library.json', () {
     final outcomes = <String, int>{};
+    // slow: every random case loads a damaged golden library.json and saves it again
     property('damaged library.json never crashes and is reported', (r) async {
       final g = pick(r, goldenNames);
       final (bytes, damage) = corrupt(r, golden(g), ids: referenceIds);
