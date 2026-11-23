@@ -63,8 +63,9 @@ void main() {
         final info = await IoFileStore(base).storageInfo();
         expect(info.used, 100);
       },
-      // symbolic links need extra rights on Windows
-      skip: Platform.isWindows,
+      skip: Platform.isWindows
+          ? 'symbolic links need extra rights on Windows (#125: skip with reason)'
+          : null,
     );
   });
 
