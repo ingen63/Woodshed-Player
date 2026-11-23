@@ -906,6 +906,18 @@ class Library extends ChangeNotifier {
     await _updateDevice(_device.copyWith(recordingSource: name));
   }
 
+  /// #123: the section «Library» (all tracks) is open in the library list on this device; closed by default.
+  bool get libraryOpen => _device.libraryOpen;
+
+  /// #123/AK2, AK3: opens or closes the section «Library»; kept per device (a failed write keeps it for
+  /// this run only).
+  Future<void> setLibraryOpen(bool open) async {
+    if (_device.libraryOpen == open) return;
+    final saving = _updateDevice(_device.copyWith(libraryOpen: open));
+    notifyListeners();
+    await saving;
+  }
+
   /// #54/AK7: the storage chosen for the sync on this device (`google`); null: none.
   Future<void> setSyncProvider(String? name) async {
     if (_device.syncProvider == name) return;

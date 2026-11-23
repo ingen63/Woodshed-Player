@@ -125,25 +125,28 @@ class _LibraryViewState extends State<LibraryView> {
                       key: const Key('libraryList'),
                       padding: const EdgeInsets.only(bottom: 24),
                       children: [
-                        if (folders.isNotEmpty)
-                          _SectionHeader(
-                            key: const Key('section:none'),
-                            label: context.l10n.noFolder,
-                            icon: WsIcons.tray,
-                            onDrop: (id) => lib.placeTrack(id as String, null),
-                            fileTarget: const FolderDropTarget(null),
-                            fileHover: _hovered(const FolderDropTarget(null)),
-                          ),
-                        for (final t in loose)
-                          _row(t, fileTarget: const FolderDropTarget(null)),
-                        if (loose.isEmpty && folders.isNotEmpty)
-                          _Placeholder(
-                            context.l10n.noTracksWithoutFolder,
-                            onDrop: (id) => lib.placeTrack(id, null),
-                            fileTarget: const FolderDropTarget(null),
-                            fileHover: _hovered(const FolderDropTarget(null)),
-                          ),
-                        for (final f in folders) ..._folder(f),
+                        // #123: all tracks in one section, closed by default
+                        _SectionHeader(
+                          key: const Key('section:library'),
+                          label: context.l10n.library,
+                          icon: WsIcons.musicNote,
+                          expanded: lib.libraryOpen,
+                          onToggle: () => lib.setLibraryOpen(!lib.libraryOpen),
+                          // #123/AK5: files from outside go in without a folder
+                          accepts: (_) => false,
+                          onDrop: (_) {},
+                          fileTarget: const FolderDropTarget(null),
+                          fileHover: _hovered(const FolderDropTarget(null)),
+                          trailing: [
+                            Text(
+                              '${lib.tracks.length}',
+                              style: WsTheme.of(context)
+                                  .number(12, color: WsTheme.of(context).muted),
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                        ),
+                        if (lib.libraryOpen) ..._allTracks(folders, loose),
                         _PlaylistsHeader(
                           onAdd: () => newPlaylist(context, lib),
                         ),
@@ -183,6 +186,28 @@ class _LibraryViewState extends State<LibraryView> {
       children: [for (final t in found) _row(t)],
     );
   }
+
+  /// #123: the section «Library»: tracks without a folder, then the folders.
+  List<Widget> _allTracks(List<TrackFolder> folders, List<Track> loose) => [
+    if (folders.isNotEmpty)
+      _SectionHeader(
+        key: const Key('section:none'),
+        label: context.l10n.noFolder,
+        icon: WsIcons.tray,
+        onDrop: (id) => lib.placeTrack(id as String, null),
+        fileTarget: const FolderDropTarget(null),
+        fileHover: _hovered(const FolderDropTarget(null)),
+      ),
+    for (final t in loose) _row(t, fileTarget: const FolderDropTarget(null)),
+    if (loose.isEmpty && folders.isNotEmpty)
+      _Placeholder(
+        context.l10n.noTracksWithoutFolder,
+        onDrop: (id) => lib.placeTrack(id, null),
+        fileTarget: const FolderDropTarget(null),
+        fileHover: _hovered(const FolderDropTarget(null)),
+      ),
+    for (final f in folders) ..._folder(f),
+  ];
 
   /// #121/AK4: files dragged in from outside are over [target].
   bool _hovered(FileDropTarget target) => c.fileDropHover.value == target;

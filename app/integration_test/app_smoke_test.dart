@@ -32,6 +32,11 @@ void main() {
     // Import: the generated file dropped onto the window
     await dropFiles(tester, c, [t.wav]);
     await tester.pump();
+    // #123/AK1, AK2: the section with all tracks is closed on a new device; a tap opens it
+    expect(c.library.libraryOpen, isFalse);
+    expect(find.byKey(const Key('track:Sine test tone')), findsNothing);
+    await tester.tap(find.byKey(const Key('section:library')));
+    await tester.pump();
     expect(find.byKey(const Key('track:Sine test tone')), findsOneWidget);
     // 4 s at 44.1 kHz, resampled to the device rate: still 4 s
     expect(p.duration, closeTo(4.0, 0.01));

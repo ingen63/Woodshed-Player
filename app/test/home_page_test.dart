@@ -29,6 +29,7 @@ Future<TestApp> pumpApp(
   SyncService? sync,
   CloudAccount Function(Library library)? cloud,
   AudioTrimmer? trimmer,
+  bool libraryOpen = true,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -40,6 +41,7 @@ Future<TestApp> pumpApp(
     sync: sync == null ? null : (_) => sync,
     cloud: cloud,
     trimmer: trimmer,
+    libraryOpen: libraryOpen,
   );
   await tester.runAsync(() async {
     await app.library.load();
@@ -117,7 +119,8 @@ void main() {
     testWidgets('Desktop: Bibliothek links, Player daneben', (tester) async {
       await pumpApp(tester);
       expect(find.byKey(const Key('layout:desktop')), findsOneWidget);
-      expect(find.text('Bibliothek'), findsOneWidget);
+      // the title of the panel and (#123) the section with all tracks
+      expect(find.text('Bibliothek'), findsNWidgets(2));
       expect(find.byKey(const Key('track:Bossa')), findsOneWidget);
       expect(
         find.byKey(const Key('playerScreen')),

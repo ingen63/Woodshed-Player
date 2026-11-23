@@ -1,5 +1,6 @@
 // Attrappen für Tests ohne Audiogerät und ohne nativen Teil (#15, #17).
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -264,13 +265,32 @@ class TestApp {
     CloudAccount Function(Library library)? cloud,
     Random? random,
     AudioTrimmer? trimmer,
+    bool libraryOpen = true,
   }) {
+    // #123: the section «Library» is closed on a new device; tests about its rows start with it open. The
+    // device ID comes from the same random source the library would have used, so IDs stay as before.
+    final r = Random(3);
+    final device = File('${dir.path}/${DeviceSettings.fileName}');
+    if (libraryOpen &&
+        FileSystemEntity.typeSync(device.path) ==
+            FileSystemEntityType.notFound) {
+      device
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync(
+          jsonEncode(
+            DeviceSettings(
+              deviceId: DeviceSettings.newDeviceId(r),
+              libraryOpen: true,
+            ).toJson(),
+          ),
+        );
+    }
     library = Library(
       IoFileStore(dir),
       probe: (_) => duration,
       readSource: readLocalFile,
       saveDelay: Duration.zero,
-      random: Random(3),
+      random: r,
     );
     player = PlayerService(
       core,

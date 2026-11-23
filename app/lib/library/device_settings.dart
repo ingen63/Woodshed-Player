@@ -9,6 +9,7 @@
 // #115: the area (Player, Practice, Metronome) last chosen on this device, opened again after a restart.
 // #113: the recording source (system audio or microphone) last chosen on this device.
 // #54: the storage chosen for the sync on this device (the tokens are in the keychain or IndexedDB, never here).
+// #123: whether the section with all tracks («Library») is open in the library list; closed by default.
 // #107: own tracks and folders (#114: and playlists) held back from the sync until the user keeps or removes
 // them.
 import 'dart:convert';
@@ -33,6 +34,7 @@ class DeviceSettings {
     this.area,
     this.recordingSource,
     this.syncProvider,
+    this.libraryOpen = false,
   });
 
   static const fileName = 'device.json';
@@ -85,6 +87,10 @@ class DeviceSettings {
   /// #54/AK7: the storage chosen on this device (`google`); null: no sync, no connection (AK6).
   final String? syncProvider;
 
+  /// #123/AK1, AK3: the section «Library» (all tracks) is open on this device. Closed unless the user opened
+  /// it, so the playlists show without scrolling. Written only while true.
+  final bool libraryOpen;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -99,6 +105,7 @@ class DeviceSettings {
     String? area,
     String? recordingSource,
     String? Function()? syncProvider,
+    bool? libraryOpen,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -114,6 +121,7 @@ class DeviceSettings {
     area: area ?? this.area,
     recordingSource: recordingSource ?? this.recordingSource,
     syncProvider: syncProvider == null ? this.syncProvider : syncProvider(),
+    libraryOpen: libraryOpen ?? this.libraryOpen,
   );
 
   Map<String, Object?> toJson() => {
@@ -131,6 +139,7 @@ class DeviceSettings {
     if (area != null) 'area': area,
     if (recordingSource != null) 'recordingSource': recordingSource,
     if (syncProvider != null) 'syncProvider': syncProvider,
+    if (libraryOpen) 'libraryOpen': true,
   };
 
   static String newDeviceId([Random? random]) {
@@ -185,6 +194,7 @@ class DeviceSettings {
               final String v when v.isNotEmpty => v,
               _ => null,
             },
+            libraryOpen: j['libraryOpen'] == true,
           );
         }
       }
