@@ -19,6 +19,28 @@ VivaPlan.
   arbeiten in temporären Ordnern.
 - **Oberflächentests** prüfen auf ARB-Schlüssel oder setzen die Sprache fest, nie auf die Systemsprache.
 
+## Testqualität
+
+**Kein Test ohne neue Prüfung (#126).** Geänderte Logik wird getestet, und kein Mutant bleibt unbeurteilt, aber ohne
+Tests, die nichts Neues prüfen. Vor jedem neuen Test stehen drei Angaben fest: welche Regel er schützt, welche
+realistische Änderung am Code ihn fehlschlagen lässt, und dass bei dieser Änderung kein anderer Test fehlschlägt.
+Fehlt eine davon, wird der Test nicht geschrieben.
+
+Kein eigener Test wird:
+
+- Code, der sich durch Lesen prüfen lässt (wenige Zeilen, höchstens eine Verzweigung);
+- reine Weiterleitung (Getter, Wrapper, Aufruf der C-API ohne eigene Logik);
+- ein Vorgabewert, eine Konstante oder ein einzelner Tabelleneintrag;
+- was der Compiler oder `flutter analyze` prüft;
+- Verhalten einer fremden Bibliothek (miniaudio, signalsmith-stretch, Flutter);
+- ein Duplikat einer schon geprüften Regel;
+- weitere Eingabewerte, die durch dieselbe Verzweigung laufen wie ein schon geprüfter Wert.
+
+Ausgenommen bleiben Tests zu Abnahmekriterien (`#22/AK2`), Regressionstests zu gefundenen Fehlern, Golden-Dateien und
+Tests zu Speichern und Laden der Bibliothek (`library.json`, alte Formate, Migration). Der `test-agent` nennt im
+Bericht je neuem Test die geschützte Regel und die Änderung, die ihn fehlschlagen lässt
+(`.claude/agents/test-agent.md`). Bestehende Tests werden mit dieser Regel nicht gekürzt.
+
 ## Schichten
 
 | Schicht | Wo | Was geprüft wird | Stand |
@@ -1023,6 +1045,11 @@ gemessen: ohne den Aufruf scheitert ein Test, der Eintrag nennt ihn) (#61/AK3). 
 den Lauf ab. Die Einträge sind an Datei,
 Mutator und Quelltextzeile gebunden, nicht an die Zeilennummer; ändert sich die Zeile, erscheint der Mutant wieder und
 wird neu beurteilt. Ein voller Lauf meldet Einträge ohne Treffer. Einen Mutation Score als Zielwert gibt es nicht.
+
+Ein Test, der einen Mutanten tötet, folgt der Regel aus «Testqualität» (#126): Steht hinter einem nicht erkannten
+Mutanten keine realistische Fehlerquelle, wird er mit Begründung ausgeschlossen statt mit einem eigens dafür
+geschriebenen Test erkannt. Die Begründung nutzt eine der erlaubten Arten oben; passt keine, braucht eine neue Art
+ein eigenes Issue (das Werkzeug kennt nur diese Arten).
 
 **Vor dem Push und nächtlich (AK5).** Der `test-agent` lässt im Vollmodus `make mutants-diff` laufen und meldet jeden
 nicht erkannten Mutanten mit Datei und Zeile (`.claude/agents/test-agent.md`). Im Workflow läuft der Job `mutants-diff`

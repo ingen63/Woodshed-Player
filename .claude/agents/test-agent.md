@@ -23,8 +23,10 @@ Teststrategie, Schichten und Testmatrix stehen in `docs/TESTS.md`; neue Fälle f
   Dart-Logik mit eigenem Werkzeug; im Hintergrund starten, Dauer je nach Änderung Minuten bis eine Stunde).
   Endet er mit Code 3, stehen die nicht erkannten Mutanten in `local/mutants/diff/missed.txt`: **jeden mit Datei und
   Zeile melden** (`datei:zeile:spalte: mutator | Quelltextzeile`). Einen Test schreibst Du dafür, wenn er im
-  Rahmen des Auftrags liegt; einen Ausschluss (`tools/mutants-exclude.txt`) nie selbst, das entscheidet Dein
-  Auftraggeber (Begründung «gleichwertig» oder «Grenzfall», `docs/TESTS.md`). Fehlt Mull (Code 2), das melden.
+  Rahmen des Auftrags liegt und die drei Pflichtangaben (Schritt 3) erfüllt. Steht hinter dem Mutanten keine
+  realistische Fehlerquelle, schreibst Du keinen eigens dafür gedachten Test, sondern meldest ihn als Kandidaten
+  für einen Ausschluss mit Begründung. Einen Ausschluss (`tools/mutants-exclude.txt`) trägst Du nie selbst ein, das
+  entscheidet Dein Auftraggeber (erlaubte Arten in `docs/TESTS.md`, «Mutationstests»). Fehlt Mull (Code 2), das melden.
 
 ## Ausgaben kurz halten (verbindlich)
 
@@ -70,7 +72,34 @@ Lange Build-Ausgaben füllen den Kontext. Immer so aufrufen:
    - Tests zu Abnahmekriterien heissen bzw. kommentieren `#22/AK2`.
    - **Testaudio** nur erzeugen (Sinus, Stille, Klicks per Code) oder CC0 mit Quelle. Nie Dateien aus der eigenen Bibliothek.
    - Keine neuen Abhängigkeiten ohne Rückfrage.
+
+   **Pflicht vor jedem neuen Test (#126).** Bevor Du einen Test schreibst, kannst Du drei Dinge angeben:
+   1. **Regel:** welche Regel der Test schützt (Abnahmekriterium, Zeile der Funktionstabelle, Rechenregel).
+   2. **Bruch:** welche realistische Änderung am Code ihn fehlschlagen lässt (z. B. `<=` statt `<` an der
+      Loop-Grenze, vergessene Umrechnung Samples ↔ Sekunden, Feld beim Schreiben von `library.json` vergessen).
+   3. **Nur dieser Test:** dass bei dieser Änderung kein anderer, schon vorhandener Test fehlschlägt.
+   Fehlt eine der drei Angaben, schreibst Du den Test nicht.
+
+   **Kein eigener Test wird:**
+   - Code, der sich durch Lesen prüfen lässt (wenige Zeilen, höchstens eine Verzweigung).
+   - Reine Weiterleitung (Getter, Wrapper, Aufruf der C-API ohne eigene Logik, Delegation an einen Service).
+   - Ein Vorgabewert, eine Konstante oder ein einzelner Tabelleneintrag (z. B. eine Zeile einer Zuordnung).
+   - Was der Compiler oder `flutter analyze` prüft (Typen, Nullbarkeit, vollständige `switch`, `-Wall -Wextra -Werror`).
+   - Verhalten einer fremden Bibliothek (miniaudio, signalsmith-stretch, Flutter); geprüft wird nur, was unser Code
+     damit macht.
+   - Ein Duplikat: dieselbe Regel ist schon durch einen anderen Test geprüft.
+   - Weitere Eingabewerte, die durch dieselbe Verzweigung laufen wie ein schon geprüfter Wert.
+
+   **Ausgenommen** (wird immer geschrieben, auch wenn eine Kategorie oben zutrifft):
+   - Tests zu Abnahmekriterien (`#22/AK2`).
+   - Regressionstests zu gefundenen Fehlern.
+   - Golden-Dateien (`app/test/golden/`, `core/tests/golden/`).
+   - Speichern und Laden der Bibliothek (`library.json`, alte Formate, Migration).
+
+   Bestehende Tests kürzt Du nicht wegen dieser Regel.
 4. **Abschluss:** Nur die Testdateien einzeln stagen (`git add <Datei>`, nie `git add -A` oder `git add .`) und committen:
    `git commit -m "test(auto): Tests für <Kurzbeschreibung> (<sha des Ausgangscommits>)"`.
 5. **Bericht:** Build-Ergebnis je Plattform, Testlauf (bestanden/fehlgeschlagen), neue Tests (Datei + Name),
+   je neuem Test die geschützte Regel und die Änderung, die ihn fehlschlagen lässt (bei Ausnahmen die Ausnahme),
+   geänderte Logik, für die Du nach der Regel oben bewusst keinen Test geschrieben hast (mit Kategorie),
    gefundene Fehler im Produktivcode, was nicht getestet werden konnte und warum.
