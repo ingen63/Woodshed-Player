@@ -132,3 +132,62 @@ struct DragAndDropTests {
     #expect(p["y"] == 50)
   }
 }
+
+/// #130: default and minimum size of the window, saved frame.
+struct WindowSizeTests {
+  let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
+
+  @Test("#130/AK1 large screen: the default size, centred")
+  func defaultSizeOnLargeScreen() {
+    let visible = NSRect(x: 0, y: 80, width: 2560, height: 1360)
+    let frame = MainFlutterWindow.initialFrame(visible: visible, styleMask: style)
+    let content = NSWindow.contentRect(forFrameRect: frame, styleMask: style)
+    #expect(content.size == MainFlutterWindow.defaultContentSize)
+    #expect(frame.midX == visible.midX)
+    #expect(frame.midY == visible.midY)
+  }
+
+  @Test("#130/AK2 small screen (1280 × 800): as large as possible and centred")
+  func smallScreen() {
+    let visible = NSRect(x: 0, y: 70, width: 1280, height: 705)  // 800 minus menu bar and dock
+    let frame = MainFlutterWindow.initialFrame(visible: visible, styleMask: style)
+    #expect(visible.contains(frame))
+    #expect(frame.height == visible.height)
+    #expect(frame.width == NSWindow.frameRect(
+      forContentRect: NSRect(origin: .zero, size: MainFlutterWindow.defaultContentSize),
+      styleMask: style
+    ).width)
+    #expect(frame.midX == visible.midX)
+    #expect(frame.midY == visible.midY)
+  }
+
+  @Test("#130/AK3 the window has a minimum size")
+  @MainActor
+  func minimumSize() throws {
+    let window = try #require(NSApp.windows.compactMap { $0 as? MainFlutterWindow }.first)
+    #expect(window.contentMinSize == MainFlutterWindow.minContentSize)
+    #expect(window.frameAutosaveName == MainFlutterWindow.frameName)
+  }
+
+  @Test("#130/AK4 a changed size is saved and restored at the next start")
+  @MainActor
+  func sizeKept() {
+    let name = "WoodshedTestWindow-\(UUID().uuidString)"
+    defer { UserDefaults.standard.removeObject(forKey: "NSWindow Frame \(name)") }
+    let first = MainFlutterWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: style, backing: .buffered,
+      defer: true)
+    first.applyWindowSize(name: name)
+    let changed = NSRect(x: 100, y: 120, width: 1100, height: 720)
+    first.setFrame(changed, display: false)
+    #expect(first.frameAutosaveName == name)
+    first.saveFrame(usingName: name)
+
+    let next = MainFlutterWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: style, backing: .buffered,
+      defer: true)
+    next.applyWindowSize(name: name)
+    #expect(next.frame.size == changed.size)
+    #expect(next.contentMinSize == MainFlutterWindow.minContentSize)
+  }
+}

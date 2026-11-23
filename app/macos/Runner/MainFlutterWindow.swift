@@ -18,8 +18,42 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
     registerKeychainChannel(flutterViewController.engine.binaryMessenger)
     registerWebAuthChannel(flutterViewController.engine.binaryMessenger)
     registerForDraggedTypes([.fileURL])
+    applyWindowSize()
 
     super.awakeFromNib()
+  }
+
+  // MARK: Window size (#130): default and minimum size of the Flutter view, measured in
+  // app/test/window_size_test.dart (the same numbers stand in app/lib/ui/window_size.dart).
+
+  /// First start: Player, Practice and Metronome show every control without scrolling.
+  static let defaultContentSize = NSSize(width: 1200, height: 880)
+  /// Smallest size: the library sidebar has room (desktop layout) and nothing overflows.
+  static let minContentSize = NSSize(width: 1010, height: 650)
+  /// Key of the saved frame in the user defaults.
+  static let frameName = "WoodshedMainWindow"
+
+  /// The frame of the first start: the default size, shrunk to the [visible] area of the screen if that is
+  /// smaller, and centred in it.
+  static func initialFrame(visible: NSRect, styleMask: NSWindow.StyleMask) -> NSRect {
+    let full = NSWindow.frameRect(
+      forContentRect: NSRect(origin: .zero, size: defaultContentSize), styleMask: styleMask)
+    let width = min(full.width, visible.width)
+    let height = min(full.height, visible.height)
+    return NSRect(
+      x: (visible.midX - width / 2).rounded(), y: (visible.midY - height / 2).rounded(),
+      width: width, height: height)
+  }
+
+  /// Sets the minimum size and restores the frame saved under [name]; without one (first start) the window
+  /// opens with [initialFrame]. Every later change of size or position is saved under [name].
+  func applyWindowSize(name: String = MainFlutterWindow.frameName) {
+    contentMinSize = Self.minContentSize
+    if !setFrameUsingName(name) {
+      let visible = (screen ?? NSScreen.main)?.visibleFrame ?? frame
+      setFrame(Self.initialFrame(visible: visible, styleMask: styleMask), display: true)
+    }
+    setFrameAutosaveName(name)
   }
 
   private(set) var channel: FlutterMethodChannel?

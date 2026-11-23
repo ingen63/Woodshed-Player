@@ -30,6 +30,7 @@ Future<TestApp> pumpApp(
   CloudAccount Function(Library library)? cloud,
   AudioTrimmer? trimmer,
   bool libraryOpen = true,
+  Locale locale = testLocale,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -56,7 +57,7 @@ Future<TestApp> pumpApp(
   });
   await tester.pumpWidget(
     MaterialApp(
-      locale: testLocale,
+      locale: locale,
       localizationsDelegates: testDelegates,
       supportedLocales: testLocales,
       theme: woodshedTheme(Brightness.light),
