@@ -633,4 +633,4 @@ app/lib/sync/providers/http_transport_io.dart | dart_false_to_true | final bytes
 # gleichwertig: Der Empfänger beantwortet die eine Anfrage vollständig, bevor er schliesst; offen ist
 # dann höchstens eine ruhende Keep-alive-Verbindung, die close() auch ohne force sofort beendet (Test
 # «a browser that keeps its connection open» in google_drive_details_test.dart).
-app/lib/sync/providers/google_auth_desktop.dart | dart_true_to_false | await server.close(force: true);
+app/lib/sync/providers/google_auth_desktop.dart | dart_true_to_false | await server?.close(force: true);

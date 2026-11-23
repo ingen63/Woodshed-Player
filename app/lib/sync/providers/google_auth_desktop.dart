@@ -1,6 +1,7 @@
-// Google sign-in on the desktop (#54/AK1, AK5): OAuth with PKCE in the system browser. A receiver on
-// 127.0.0.1 with a free port takes the answer; the refresh token goes into the keychain and lasts until
-// the user signs out. Access tokens (about 1 h) stay in memory and are renewed silently.
+// Google sign-in on the desktop (#54/AK1, AK5): OAuth with PKCE. On macOS in the sign-in window of the
+// system (SystemSignIn), the answer comes through the reversed client ID as URL scheme. Elsewhere (later
+// Windows, Linux) in the system browser, a receiver on 127.0.0.1 with a free port takes the answer. The
+// refresh token goes into the keychain and lasts until the user signs out. Access tokens (about 1 h) stay in memory and are renewed silently.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -8,6 +9,7 @@ import 'dart:math';
 
 import '../cloud_provider.dart';
 import '../secret_store.dart';
+import '../system_sign_in.dart';
 import 'google_auth.dart';
 import 'http_transport.dart';
 
@@ -16,6 +18,7 @@ class DesktopGoogleAuth extends GoogleAuth {
     required this.transport,
     required this.secrets,
     required this.openBrowser,
+    this.systemSignIn,
     this.clientId = googleDesktopClientId,
     this.clientSecret = googleDesktopSecret,
     this.waitForBrowser = const Duration(minutes: 5),
@@ -30,8 +33,15 @@ class DesktopGoogleAuth extends GoogleAuth {
 
   /// Opens the sign-in page in the system browser.
   final Future<void> Function(String url) openBrowser;
+
+  /// The sign-in window of the system (macOS). If set, the sign-in runs there and [openBrowser] and the
+  /// receiver on 127.0.0.1 are not used; Safari with «HTTPS-Only» refuses an http:// redirect.
+  final SystemSignIn? systemSignIn;
   final String clientId;
   final String clientSecret;
+
+  /// The secret sent to Google: none with the sign-in window, the client of type «iOS» has none.
+  String get _secret => systemSignIn == null ? clientSecret : '';
 
   /// How long the receiver waits for the browser.
   final Duration waitForBrowser;
@@ -45,7 +55,6 @@ class DesktopGoogleAuth extends GoogleAuth {
   DateTime? _expires;
   bool _needsSignIn = false;
   Future<String>? _renewing;
-  HttpServer? _server;
   Completer<Uri?>? _waiting;
 
   @override
@@ -80,7 +89,7 @@ class DesktopGoogleAuth extends GoogleAuth {
     final reply = await transport.send(
       HttpCall.form('POST', googleTokenUrl, {
         'client_id': clientId,
-        if (clientSecret.isNotEmpty) 'client_secret': clientSecret,
+        if (_secret.isNotEmpty) 'client_secret': _secret,
         'grant_type': 'refresh_token',
         'refresh_token': refresh,
       }),
@@ -118,43 +127,69 @@ class DesktopGoogleAuth extends GoogleAuth {
     cancelSignIn();
     final verifier = pkceVerifier(random);
     final state = randomState(random);
-    final HttpServer server;
-    try {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    } on SocketException {
-      return SignInResult.failed;
+    final system = systemSignIn;
+    final scheme = googleRedirectScheme(clientId);
+    HttpServer? server;
+    final String redirect;
+    if (system != null) {
+      // macOS: the sign-in window of the system, the answer comes through the custom scheme (AK1)
+      redirect = '$scheme:/oauthredirect';
+    } else {
+      try {
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      } on SocketException {
+        return SignInResult.failed;
+      }
+      redirect = 'http://127.0.0.1:${server.port}/';
     }
-    _server = server;
-    final redirect = 'http://127.0.0.1:${server.port}/';
     final waiting = _waiting = Completer<Uri?>();
-    server.listen((req) async {
-      final q = req.uri.queryParameters;
-      final mine = q['state'] == state;
+    void deliver(Uri? uri) {
+      if (!waiting.isCompleted) waiting.complete(uri);
+    }
+
+    var windowOpen = false;
+
+    server?.listen((req) async {
+      final mine = req.uri.queryParameters['state'] == state;
       req.response
         ..statusCode = mine ? HttpStatus.ok : HttpStatus.notFound
         ..headers.contentType = ContentType.html
         ..write(mine ? _page(doneText) : '');
       await req.response.close();
-      if (mine && !waiting.isCompleted) waiting.complete(req.uri);
+      if (mine) deliver(req.uri);
     }, onError: (_) {});
     try {
-      await openBrowser(
-        googleAuthUrl
-            .replace(
-              queryParameters: {
-                'client_id': clientId,
-                'redirect_uri': redirect,
-                'response_type': 'code',
-                'scope': googleScope,
-                'code_challenge': pkceChallenge(verifier),
-                'code_challenge_method': 'S256',
-                'state': state,
-                'access_type': 'offline',
-                'prompt': 'consent',
-              },
-            )
-            .toString(),
+      final url = googleAuthUrl.replace(
+        queryParameters: {
+          'client_id': clientId,
+          'redirect_uri': redirect,
+          'response_type': 'code',
+          'scope': googleScope,
+          'code_challenge': pkceChallenge(verifier),
+          'code_challenge_method': 'S256',
+          'state': state,
+          'access_type': 'offline',
+          'prompt': 'consent',
+        },
       );
+      if (system != null) {
+        // a closed window, a foreign answer or a failure of the window: no sign-in
+        windowOpen = true;
+        unawaited(
+          system
+              .authenticate(url, scheme)
+              .then(
+                (uri) => uri?.queryParameters['state'] == state ? uri : null,
+                onError: (Object _) => null,
+              )
+              .then((uri) {
+                windowOpen = false;
+                deliver(uri);
+              }),
+        );
+      } else {
+        await openBrowser(url.toString());
+      }
       final answer = await waiting.future.timeout(
         waitForBrowser,
         onTimeout: () => null,
@@ -164,7 +199,7 @@ class DesktopGoogleAuth extends GoogleAuth {
       final reply = await transport.send(
         HttpCall.form('POST', googleTokenUrl, {
           'client_id': clientId,
-          if (clientSecret.isNotEmpty) 'client_secret': clientSecret,
+          if (_secret.isNotEmpty) 'client_secret': _secret,
           'code': code,
           'code_verifier': verifier,
           'grant_type': 'authorization_code',
@@ -189,10 +224,18 @@ class DesktopGoogleAuth extends GoogleAuth {
     } on CloudError {
       return SignInResult.failed;
     } finally {
-      await server.close(force: true);
-      if (identical(_server, server)) _server = null;
+      if (!waiting.isCompleted) waiting.complete(null);
+      await server?.close(force: true);
+      if (windowOpen) await _closeWindow(system!);
       if (identical(_waiting, waiting)) _waiting = null;
     }
+  }
+
+  /// Closes the sign-in window after a timeout or [cancelSignIn]; a failure there changes nothing.
+  static Future<void> _closeWindow(SystemSignIn system) async {
+    try {
+      await system.cancel();
+    } catch (_) {}
   }
 
   static String _page(String text) {

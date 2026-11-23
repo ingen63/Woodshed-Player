@@ -172,7 +172,7 @@ class CloudAccount extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// AK1, AK7: signs in (desktop: system browser). True when signed in, false if it failed, null when
+  /// AK1, AK7: signs in (macOS: sign-in window of the system). True when signed in, false if it failed, null when
   /// the page went to Google and comes back signed in (web).
   Future<bool?> signIn({String doneText = ''}) async {
     if (choice != CloudChoice.google || _signingIn) return false;

@@ -1,6 +1,7 @@
 // Sign-in at Google for the Drive sync (#54/AK1, AK5). Only the right `drive.file` is asked for: the app
-// sees only the files it created itself. Desktop: OAuth with PKCE in the system browser and a receiver on
-// 127.0.0.1, refresh token in the keychain (google_auth_desktop.dart). Browser: redirect with
+// sees only the files it created itself. macOS: OAuth with PKCE in the sign-in window of the system, answer
+// through a custom URL scheme; other desktops: system browser and a receiver on 127.0.0.1. Refresh token in
+// the keychain (google_auth_desktop.dart). Browser: redirect with
 // `response_type=token` (Google wants the client secret for the code exchange of a web client), token in
 // IndexedDB, renewed by a redirect with `prompt=none` (google_auth_web.dart).
 import 'dart:convert';
@@ -19,6 +20,22 @@ const googleWebClientId =
     '1006497985345-me94u7thnv7bupkmcq7370q2v4qu3v4c.apps.googleusercontent.com';
 const googleDesktopClientId =
     '1006497985345-53qpph7kj3k35ataaj4tqav631o3eih9.apps.googleusercontent.com';
+
+/// The client of type «iOS» for the macOS app (bundle ID ch.woodshed-player-app.desktop), without a
+/// secret. Its sign-in runs in the sign-in window of the system and comes back through the reversed client
+/// ID as URL scheme ([googleRedirectScheme]).
+const googleMacClientId =
+    '1006497985345-91ndhendoi8ighd516f33g1veprm6el7.apps.googleusercontent.com';
+
+/// The URL scheme Google redirects to for a client of type «iOS»: the client ID reversed,
+/// `com.googleusercontent.apps.<id>`.
+String googleRedirectScheme(String clientId) {
+  const suffix = '.apps.googleusercontent.com';
+  final id = clientId.endsWith(suffix)
+      ? clientId.substring(0, clientId.length - suffix.length)
+      : clientId;
+  return 'com.googleusercontent.apps.$id';
+}
 
 /// Google may want the «secret» of the desktop client in the code exchange although an installed app
 /// cannot keep it secret. It is not in the repository; a build passes it with

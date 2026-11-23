@@ -21,6 +21,7 @@ import 'file_store_io.dart';
 import 'keychain_store.dart';
 import 'library_settings_store.dart';
 import 'smoke.dart';
+import 'web_auth_channel.dart';
 
 /// App services. [baseDir] replaces the app folder (library, metronome settings), e.g. in the smoke
 /// test, so the real library is never touched. [tapTempo] lets UI tests set the tap clock (#13).
@@ -61,6 +62,7 @@ Future<AppController> createAppController({
               library: library,
               secrets: KeychainStore(),
               openUrl: files.openUrl,
+              systemSignIn: Platform.isMacOS ? WebAuthChannel() : null,
               playing: () => playerService.isPlaying,
             );
           },

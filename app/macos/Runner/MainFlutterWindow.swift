@@ -1,4 +1,5 @@
 import AVFoundation
+import AuthenticationServices
 import Cocoa
 import FlutterMacOS
 import UniformTypeIdentifiers
@@ -15,6 +16,7 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
     RegisterGeneratedPlugins(registry: flutterViewController)
     registerFileChannel(flutterViewController.engine.binaryMessenger)
     registerKeychainChannel(flutterViewController.engine.binaryMessenger)
+    registerWebAuthChannel(flutterViewController.engine.binaryMessenger)
     registerForDraggedTypes([.fileURL])
 
     super.awakeFromNib()
@@ -182,5 +184,70 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
         result(FlutterMethodNotImplemented)
       }
     }
+  }
+}
+
+// MARK: Sign-in window (#54/AK1): ASWebAuthenticationSession for the cloud sign-in. The provider answers
+// through a custom URL scheme; Safari with «HTTPS-Only» refuses a redirect to http://127.0.0.1.
+
+extension MainFlutterWindow: ASWebAuthenticationPresentationContextProviding {
+  private static var webAuthChannel: FlutterMethodChannel?
+  private static var webAuthSession: ASWebAuthenticationSession?
+
+  func registerWebAuthChannel(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "woodshed/webauth", binaryMessenger: messenger)
+    MainFlutterWindow.webAuthChannel = channel
+    channel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "start":
+        guard let args = call.arguments as? [String: Any],
+          let url = (args["url"] as? String).flatMap(URL.init(string:)),
+          let scheme = args["scheme"] as? String, let self
+        else {
+          result(FlutterError(code: "args", message: "url or scheme missing", details: nil))
+          return
+        }
+        self.startWebAuth(url: url, scheme: scheme, result: result)
+      case "cancel":
+        // the completion handler of the session answers its start with nil
+        MainFlutterWindow.webAuthSession?.cancel()
+        MainFlutterWindow.webAuthSession = nil
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  private func startWebAuth(url: URL, scheme: String, result: @escaping FlutterResult) {
+    MainFlutterWindow.webAuthSession?.cancel()
+    let done: ASWebAuthenticationSession.CompletionHandler = { callback, error in
+      DispatchQueue.main.async {
+        if let callback {
+          result(callback.absoluteString)
+        } else if let e = error as? ASWebAuthenticationSessionError, e.code == .canceledLogin {
+          result(nil)
+        } else {
+          result(
+            FlutterError(code: "webauth", message: error?.localizedDescription ?? "no answer", details: nil))
+        }
+      }
+    }
+    let session: ASWebAuthenticationSession
+    if #available(macOS 14.4, *) {
+      session = ASWebAuthenticationSession(url: url, callback: .customScheme(scheme), completionHandler: done)
+    } else {
+      session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme, completionHandler: done)
+    }
+    session.presentationContextProvider = self
+    MainFlutterWindow.webAuthSession = session
+    if !session.start() {
+      MainFlutterWindow.webAuthSession = nil
+      result(FlutterError(code: "webauth", message: "the sign-in window did not open", details: nil))
+    }
+  }
+
+  func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+    self
   }
 }
