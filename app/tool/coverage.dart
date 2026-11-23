@@ -95,14 +95,28 @@ Part classify(String path, String source) {
   return Part.dartLogic;
 }
 
-/// True if a Dart file has no executable code (only constants and comments), so the VM reports no
-/// lines for it even when it is imported. Rule: no parenthesis outside comments.
+/// True if a Dart file has no executable code (only constants, abstract interfaces and comments), so
+/// the VM reports no lines for it even when it is imported. Rule: no parenthesis outside comments, or
+/// only abstract classes whose members are bodiless declarations (`Future<void> f(int a);`).
 bool declarationsOnly(String source) {
-  final code = source
+  final lines = source
       .split('\n')
-      .map((l) => l.trimLeft().startsWith('//') ? '' : l)
-      .join('\n');
-  return !code.contains('(');
+      .map((l) => l.trim())
+      .where((l) => l.isNotEmpty && !l.startsWith('//'))
+      .toList();
+  if (!lines.any((l) => l.contains('('))) return true;
+  final abstractClass = RegExp(r'^abstract (interface )?class \w+[^{(]*\{$');
+  for (final l in lines) {
+    if (l.startsWith('import ') || l == '}' || l.startsWith('@')) continue;
+    if (abstractClass.hasMatch(l)) continue;
+    if (l.contains('{') ||
+        l.contains('=>') ||
+        l.contains('=') ||
+        !l.endsWith(';')) {
+      return false;
+    }
+  }
+  return true;
 }
 
 class PartResult {

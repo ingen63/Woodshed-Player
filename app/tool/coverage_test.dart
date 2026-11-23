@@ -100,6 +100,38 @@ void main() {
       expect(declarationsOnly(_logicSource), isFalse);
     });
 
+    test('declarations only: an abstract interface without bodies', () {
+      expect(
+        declarationsOnly(
+          '// x\nabstract class A {\n  /// Doc (y).\n  Future<Uri?> f(Uri u, String s);\n\n'
+          '  Future<void> g();\n}\n',
+        ),
+        isTrue,
+      );
+      expect(
+        declarationsOnly('abstract class A {\n  int f() => 1;\n}\n'),
+        isFalse,
+      );
+      expect(
+        declarationsOnly(
+          'abstract class A {\n  void f() {\n    g();\n  }\n}\n',
+        ),
+        isFalse,
+      );
+      expect(
+        declarationsOnly(
+          'abstract class A {\n  void f();\n}\nfinal a = b();\n',
+        ),
+        isFalse,
+      );
+      expect(
+        declarationsOnly(
+          'abstract class A {\n  A();\n  void f();\n}\nclass B {\n}\n',
+        ),
+        isFalse,
+      );
+    });
+
     test('the report shows UI, web and generated files apart from the parts with a minimum', () {
       final e = evaluate(
         min: 80,
