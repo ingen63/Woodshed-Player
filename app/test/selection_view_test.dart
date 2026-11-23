@@ -370,6 +370,50 @@ void main() {
     expect(de.selectionCount(4), '4 ausgewählt');
   });
 
+  for (final key in [LogicalKeyboardKey.delete, LogicalKeyboardKey.backspace]) {
+    testWidgets(
+      '#122/AK8 ${key.keyLabel} deletes the selected tracks after the same question',
+      (tester) async {
+        final app = await pumpApp(tester);
+        await clickWith(tester, LogicalKeyboardKey.metaLeft, 'Bossa');
+        await clickWith(tester, LogicalKeyboardKey.metaLeft, 'Zebra');
+        await tester.sendKeyEvent(key);
+        await tester.pumpAndSettle();
+        expect(find.text(de.deleteTracksTitle(2)), findsOneWidget);
+        await tester.tap(find.byKey(const Key('confirm')));
+        await tester.pumpAndSettle();
+        expect([for (final t in app.library.tracks) t.title], ['Ärger']);
+        expect(find.byKey(const Key('selectionBar')), findsNothing);
+      },
+    );
+  }
+
+  testWidgets('#122/AK8 without a selection the key deletes nothing here', (
+    tester,
+  ) async {
+    final app = await pumpApp(tester);
+    await clickWith(tester, LogicalKeyboardKey.metaLeft, 'Bossa');
+    await clickWith(tester, LogicalKeyboardKey.metaLeft, 'Bossa');
+    await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(app.library.tracks, hasLength(3));
+  });
+
+  testWidgets('#122/AK8 Backspace in the search field edits the search only', (
+    tester,
+  ) async {
+    final app = await pumpApp(tester);
+    await clickWith(tester, LogicalKeyboardKey.metaLeft, 'Bossa');
+    await tester.tap(find.byKey(const Key('librarySearch')));
+    await tester.enterText(find.byKey(const Key('librarySearch')), 'Bos');
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(app.library.tracks, hasLength(3));
+  });
+
   testWidgets('#122/AK6 Escape ends the selection', (tester) async {
     await pumpApp(tester);
     await clickWith(tester, LogicalKeyboardKey.metaLeft, 'Bossa');

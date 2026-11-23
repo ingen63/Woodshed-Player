@@ -124,12 +124,21 @@ class _LibraryViewState extends State<LibraryView> {
     _focus.requestFocus();
   }
 
-  /// #122/AK6: Escape ends the selection.
-  KeyEventResult _key(FocusNode _, KeyEvent e) {
-    if (e is KeyDownEvent &&
-        e.logicalKey == LogicalKeyboardKey.escape &&
+  /// #122/AK6: Escape ends the selection. AK8: Delete or Backspace deletes the selected tracks after the
+  /// question of «Delete»; not while typing in a field of the library (the search).
+  KeyEventResult _key(FocusNode node, KeyEvent e) {
+    if (e is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = e.logicalKey;
+    if (key == LogicalKeyboardKey.escape &&
         (!_selection.isEmpty || _selection.mode)) {
       _selection.clear();
+      return KeyEventResult.handled;
+    }
+    if ((key == LogicalKeyboardKey.delete ||
+            key == LogicalKeyboardKey.backspace) &&
+        !_selection.isEmpty &&
+        node.hasPrimaryFocus) {
+      _deleteSelected(_picked);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
