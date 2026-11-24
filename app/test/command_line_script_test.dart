@@ -15,11 +15,19 @@ void main() {
     expect(text, contains('Contents/MacOS/Woodshed Player'));
     expect(text, contains(r'exec -a "$(basename "$0")" "$BIN" "$@"'));
     expect(text, contains('set -- --help'));
-    final readme = File('../README.md').readAsStringSync();
-    expect(readme, contains('| Kommandozeile (nur Mac, #140) |'));
-    expect(readme, contains('cp tools/woodshed ~/bin/woodshed'));
-    expect(readme, contains('woodshed play --title'));
-    expect(readme, contains('woodshed record'));
+    // #145: the feature table moved to docs/FUNKTIONEN.md; both READMEs keep a short section.
+    final features = File('../docs/FUNKTIONEN.md').readAsStringSync();
+    expect(features, contains('| Kommandozeile (nur Mac, #140) |'));
+    for (final name in ['README.md', 'README.de.md', 'docs/FUNKTIONEN.md']) {
+      final readme = File('../$name').readAsStringSync();
+      expect(
+        readme,
+        contains('cp tools/woodshed ~/bin/woodshed'),
+        reason: name,
+      );
+      expect(readme, contains('woodshed play --title'), reason: name);
+      expect(readme, contains('woodshed record'), reason: name);
+    }
   });
 
   test('#140: the exit codes are those of wp_cli.h', () {

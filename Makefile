@@ -72,7 +72,7 @@ test-changelog:
 	python3 tools/changelog.py check
 
 # #139: the packages of the release workflow, from the apps built before (flutter build macos --release,
-# flutter build web --release with --dart-define=WP_GIT_TAG=$(TAG)); see README «Release».
+# flutter build web --release with --dart-define=WP_GIT_TAG=$(TAG)); see docs/ENTWICKLUNG.md «Release».
 TAG ?= $(shell git describe --tags --abbrev=0 --match 'v*' 2>/dev/null)
 package:
 	tools/package.sh macos $(TAG) local/release

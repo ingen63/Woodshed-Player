@@ -6,7 +6,7 @@ VivaPlan.
 
 ## Grundsatz
 
-- **Die Regeln sind die Referenz, nicht das alte Programm.** Massgebend sind die Funktionstabelle in `README.md` und die
+- **Die Regeln sind die Referenz, nicht das alte Programm.** Massgebend sind die Funktionstabelle in `docs/FUNKTIONEN.md` und die
   Abnahmekriterien der Issues (z. B. «Tempo 0,1× – 2× in 0,05er-Schritten», «Ende mindestens 1 s nach dem Anfang»,
   «Klicks bei 120 BPM genau 22 050 Samples auseinander»).
 - **Jede Regel hat mindestens einen Fall mit hergeleitetem Erwartungswert.** Der Erwartungswert wird von Hand aus der
@@ -718,7 +718,7 @@ sie neu schreibt (#53).
 
 ## Netzwerkfreiheit (#58)
 
-Das Versprechen «kein Netzwerk ausser beschlossenen Funktionen» (`CLAUDE.md`, README Datenschutz) prüft
+Das Versprechen «kein Netzwerk ausser beschlossenen Funktionen» (`CLAUDE.md`, README «Privacy» bzw. «Datenschutz», `docs/FUNKTIONEN.md` «Datenschutz im Detail») prüft
 `make network-free`, auch nachdem die Cloud-Anbieter (#38) Netzwerkcode mitbringen. Das Ziel führt die Prüfung
 `app/tool/network_free.dart` aus, dann ihre Tests `app/tool/network_free_test.dart` und `app/test/sync_app_test.dart`
 (#37/AK2: ohne Konto entsteht kein `HttpClient`). Der Workflow `test-quality.yml` startet es im Job `network-free` bei

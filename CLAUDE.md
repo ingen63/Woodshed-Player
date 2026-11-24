@@ -1,6 +1,6 @@
 # Arbeitsanleitung für Claude Code
 
-Woodshed Player ist ein Übe-Player für Musiker (Bibliothek, Tempo ohne Tonhöhenänderung, Loops, Metronom, später Aufnahme und Cloud-Sync). Umbau von SwiftUI (`WoodshedPlayer/`, macOS 14+/iOS 17+) auf Flutter (`app/`) mit C++-Audio-Kern (`core/`), Plan in `docs/UMBAUPLAN-FLUTTER.md`. Überblick in `README.md`, Lizenz MIT.
+Woodshed Player ist ein Übe-Player für Musiker (Bibliothek, Tempo ohne Tonhöhenänderung, Loops, Metronom, später Aufnahme und Cloud-Sync). Umbau von SwiftUI (`WoodshedPlayer/`, macOS 14+/iOS 17+) auf Flutter (`app/`) mit C++-Audio-Kern (`core/`), Plan in `docs/UMBAUPLAN-FLUTTER.md`. Überblick in `README.md` (Englisch) und `README.de.md` (Deutsch), Funktionen im Detail in `docs/FUNKTIONEN.md`, Bauen und Release in `docs/ENTWICKLUNG.md`. Lizenz MIT.
 
 ## Technik
 
@@ -15,7 +15,8 @@ Woodshed Player ist ein Übe-Player für Musiker (Bibliothek, Tempo ohne Tonhöh
 
 ## Sprache
 
-- **Mit Dir, in Commits, Issues und Dokumenten** (`docs/`, `README.md`): Deutsch mit «ss» statt «ß», Anrede **«Du»**.
+- **Mit Dir, in Commits, Issues und Dokumenten** (`docs/`, `README.de.md`): Deutsch mit «ss» statt «ß», Anrede **«Du»**.
+- **`README.md` ist englisch**, `README.de.md` die gleichwertige deutsche Fassung mit denselben Abschnitten; Änderungen kommen im selben Commit in beide.
 - **Code ist englisch:** Bezeichner, Kommentare, Testnamen, Log- und Fehlermeldungen im Code. Neuer und geänderter Code wird englisch geschrieben. Bestehende deutsche Kommentare übersetzt Du nur in Zeilen, die Du ohnehin änderst; eine Übersetzung in grossem Stil braucht ein eigenes Issue. Test-Kennungen bleiben `#22/AK2`. Das Swift-Altprojekt bleibt, wie es ist.
 - **Die Oberfläche ist mehrsprachig.** Englisch ist Standard- und Rückfallsprache, Deutsch die zweite Sprache. Weitere Sprachen kommen nur über eine zusätzliche Übersetzungsdatei dazu, ohne Codeänderung.
   - Texte für die Oberfläche (Beschriftungen, Menüs, Dialoge, Hilfe, Fehlermeldungen an die Nutzerin oder den Nutzer) schreibst Du nie fest in den Code. Sie stehen in ARB-Dateien unter `app/lib/l10n/` (`app_en.arb` als Vorlage, `app_de.arb`) und werden mit Flutter `gen-l10n` erzeugt (`AppLocalizations.of(context)`).
@@ -71,7 +72,7 @@ tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitT
     | `core/src`, `core/web`, `app/lib` ausser `app/lib/ui` | `make mutants-diff MUTANTS_ARGS="--file '<regex der geänderten Dateien>'"` (Zwischenspeicher bleibt an, kein `--fresh`); Wiederholung mit `--rerun` bzw. `--exclusions-only` im selben `MUTANTS_ARGS` |
     | `app/lib/ui`, `app/integration_test` | `make test-ui`, bei Bezug zu iPhone/iPad auch `make test-ios` |
     | `app/web`, `*_web.dart`, `core/web` | `make test-web` |
-    | nur `docs/`, `README.md`, `.github/` | nur `make format-check` und `make lint` (actionlint) |
+    | nur `docs/`, `README.md`, `README.de.md`, `.github/` | nur `make format-check` und `make lint` (actionlint) |
 
   - **«Prüfe #Nr»** übernimmt die Ergebnisse des Laufs vor dem Commit, wenn seither nichts geändert ist (derselbe Commit, sauberer Arbeitsbaum), und nennt sie im Kommentar. Neu laufen nur Tests zu Nachbesserungen und Kriterien, die der Lauf nicht abdeckt.
   - Kriterien, die nur auf GitHub prüfbar sind, bleiben offen bis zum nächsten Push mit Lauf; kein Push nur dafür.
@@ -87,5 +88,5 @@ tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitT
 - **Keine fremden Audiodateien.** Testaudio erzeugen (Sinus, Klicks) oder CC0 mit Quelle.
 - **Lizenzen:** nur MIT-verträglich (MIT, BSD, Apache-2.0, Public Domain/MIT-0), keine GPL/AGPL. Ausnahme: LGPL für den MP3-Encoder des Exports (#141), nur dynamisch gebunden und austauschbar, mit Lizenztext und Quellenangabe im Repo. Schriften zusätzlich unter SIL OFL 1.1 (unverändert einbinden, Lizenztext und Copyright-Hinweis ins Repo). Neue Abhängigkeiten nur nach Rückfrage.
 - Audio und Oberfläche trennen: Audio in `core/` (Swift: `Audio/`), Daten in `Model/`, Darstellung in `Views/`.
-- `README.md` (Funktionstabelle, Datenschutz) im selben Zug nachführen, wenn sich Verhalten oder Begriffe ändern.
+- `docs/FUNKTIONEN.md` (Funktionstabelle, Datenschutz im Detail) im selben Zug nachführen, wenn sich Verhalten oder Begriffe ändern; `README.md` und `README.de.md` dazu, wenn es den Überblick betrifft (Funktionen, Plattformen, Installation, Datenschutz kurz).
 - Jede Änderung muss auf macOS, iOS und Web bauen; Änderungen am Kern auch als WASM. Aufnahme gibt es auf iPhone/iPad nicht.

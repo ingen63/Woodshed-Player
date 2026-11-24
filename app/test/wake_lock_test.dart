@@ -328,7 +328,8 @@ void main() {
     });
 
     test('AK6: README describes it', () {
-      final readme = read('../README.md');
+      // #145: the feature table moved from README.md to docs/FUNKTIONEN.md.
+      final readme = read('../docs/FUNKTIONEN.md');
       expect(readme, contains('**Bildschirm bleibt an** (#109'));
     });
   });

@@ -649,8 +649,9 @@ void main() {
     }
   });
 
-  test('#115/AK15 README describes the three areas', () {
-    final readme = File('../README.md').readAsStringSync();
+  test('#115/AK15 the feature reference describes the three areas', () {
+    // #145: the feature table moved from README.md to docs/FUNKTIONEN.md.
+    final readme = File('../docs/FUNKTIONEN.md').readAsStringSync();
     for (final s in [
       'Player',
       'Üben',

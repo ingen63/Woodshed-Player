@@ -158,7 +158,8 @@ void main() {
 
   group('#41 documents', () {
     test('#41/AK3 README names platforms, cloud and hosting', () {
-      final readme = read('../README.md');
+      // #145: the feature table moved from README.md to docs/FUNKTIONEN.md.
+      final readme = read('../docs/FUNKTIONEN.md');
       expect(readme, contains('Plattformen'));
       expect(readme, contains('Google Drive'));
       expect(readme, isNot(contains('OneDrive'))); // #55 not planned

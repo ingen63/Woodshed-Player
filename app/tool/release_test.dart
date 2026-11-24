@@ -771,27 +771,34 @@ void main() {
   });
 
   group('#139/AK11 README', () {
-    final readme = read('../README.md');
-    String section(String heading) {
-      final start = readme.indexOf('\n## $heading\n');
-      expect(start, isNot(-1), reason: 'section «$heading» missing');
-      final end = readme.indexOf('\n## ', start + 1);
-      return readme.substring(start, end == -1 ? readme.length : end);
+    String section(String file, String heading) {
+      final text = read(file);
+      final start = text.indexOf('\n## $heading\n');
+      expect(start, isNot(-1), reason: '$file: section «$heading» missing');
+      final end = text.indexOf('\n## ', start + 1);
+      return text.substring(start, end == -1 ? text.length : end);
     }
 
-    test(
-      'installation: where the packages are, how to open the unsigned app',
-      () {
-        final install = section('Installation');
-        expect(install, contains('/releases'));
-        expect(install, contains('WoodshedPlayer-<Version>-macos.dmg'));
-        expect(install, contains('WoodshedPlayer-<Version>-web.zip'));
-        expect(install, contains('**Rechtsklick › '));
-      },
-    );
+    // #145: English README.md and German README.de.md both explain the installation.
+    for (final (file, rightClick) in [
+      ('../README.md', '**Right-click › '),
+      ('../README.de.md', '**Rechtsklick › '),
+    ]) {
+      test(
+        'installation in $file: where the packages are, how to open the unsigned app',
+        () {
+          final install = section(file, 'Installation');
+          expect(install, contains('/releases'));
+          expect(install, contains('WoodshedPlayer-<Version>-macos.dmg'));
+          expect(install, contains('WoodshedPlayer-<Version>-web.zip'));
+          expect(install, contains(rightClick));
+        },
+      );
+    }
 
     test('release flow: write, translate, check, tag', () {
-      final release = section('Release');
+      // #145: the release flow moved to docs/ENTWICKLUNG.md.
+      final release = section('../docs/ENTWICKLUNG.md', 'Release');
       for (final step in [
         'CHANGELOG.md',
         'CHANGELOG.en.md',
