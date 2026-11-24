@@ -89,7 +89,7 @@ include(tests/fuzz/fuzz.cmake)
 # ---- Kern fürs AudioWorklet ----
 # #116: trimming (src/trim*.cpp, the FLAC writer and libFLAC) is part of the web core.
 set(WP_WEB_OWN web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp src/trim.cpp src/trim_mp4.cpp
-  src/trim_api.cpp src/flac_writer.cpp ${WP_ENGINE_SOURCES})
+  src/trim_api.cpp src/mp3_api_stub.cpp src/flac_writer.cpp ${WP_ENGINE_SOURCES})
 add_executable(wp_core_web ${WP_WEB_OWN} src/miniaudio_impl.c ${WP_FLAC_SOURCES})
 target_include_directories(wp_core_web PRIVATE include web ${WP_ENGINE_INCLUDES})
 target_include_directories(wp_core_web SYSTEM PRIVATE ${WP_ENGINE_SYSTEM_INCLUDES} ${WP_THIRD_PARTY}/miniaudio

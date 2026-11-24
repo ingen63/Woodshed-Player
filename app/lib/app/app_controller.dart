@@ -15,6 +15,7 @@ import '../sync/cloud_account.dart';
 import '../sync/sync_service.dart';
 import 'file_drop.dart';
 import 'file_platform.dart';
+import 'track_export.dart';
 
 /// #115: the three areas of the app, in the order of their tabs (⌘1, ⌘2, ⌘3).
 enum AppArea {
@@ -37,6 +38,7 @@ class AppController extends ChangeNotifier {
     CloudAccount? cloud,
     Random? random,
     this.trimmer,
+    this.mp3,
   }) : session = PracticeSession(player, metronome),
        cloud = cloud ?? CloudAccount(library: library),
        _random = random ?? Random() {
@@ -77,6 +79,20 @@ class AppController extends ChangeNotifier {
 
   /// #116: cuts audio files (the core); null where trimming is not available (tests without a core).
   final AudioTrimmer? trimmer;
+
+  /// #141: encodes a file as MP3 (the core with LAME); null where the export is not offered (iPhone,
+  /// iPad, browser, tests without a core).
+  final Mp3Encode? mp3;
+
+  /// #141: exports tracks as MP3 files; null where [mp3] is.
+  TrackExporter? get exporter => switch (mp3) {
+    final encode? => TrackExporter(
+      library: library,
+      fetchAudio: sync.fetchAudio,
+      encode: encode,
+    ),
+    null => null,
+  };
 
   /// #115/AK7: the area shown, the one last chosen on this device.
   AppArea get area => AppArea.named(library.area);

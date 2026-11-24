@@ -1,7 +1,7 @@
 # Test and hygiene targets for the Flutter app (app/) and the C++ audio core (core/), #7.
 # Strategy and test matrix: docs/TESTS.md. Developer tools: Flutter, CMake, Homebrew llvm
 # (clang-format, clang-tidy), actionlint. core/third_party/ is never formatted, linted or read.
-.PHONY: help test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools format format-check lint lint-dart \
+.PHONY: help lame test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools format format-check lint lint-dart \
         lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
         mutants-diff fuzz fuzz-wasm fuzz-wasm-build fuzz-wasm-findings report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
         test-ui test-ios test-web test-web-start smoke-app pseudo-l10n bench clean-tmp
@@ -37,6 +37,7 @@ help:
 	@echo "make clean-tmp      remove what aborted test runs left in the temp directory (unchanged for 60 min)"
 	@echo "make test-wasm      core tests under Node.js (Emscripten)"
 	@echo "make test-core-debug core tests in a Debug build (same cases and tolerances as Release)"
+	@echo "make lame           MP3 encoder LAME from its source into local/lame (#141)"
 	@echo "make sanitize       core tests with AddressSanitizer and UndefinedBehaviorSanitizer"
 	@echo "make sanitize-thread core tests with ThreadSanitizer"
 	@echo "make fuzz           libFuzzer with ASan/UBSan, FUZZ_SECONDS per target (default 60)"
@@ -177,6 +178,11 @@ coverage-diff: coverage-run
 # third_party) and sets the sanitizer options for ctest; any finding fails its test. A
 # self-test with a deliberate bug per sanitizer proves that. Fuzz targets (#10, make fuzz) build in
 # the same way with -DWP_SANITIZE=address,undefined.
+# #141: the MP3 encoder LAME (LGPL) from its source into local/lame (fixed version and checksum); the
+# Mac app's build phase «Embed LAME» puts it into Contents/Frameworks, the MP3 tests load it from there.
+lame:
+	tools/build-lame.sh
+
 sanitize:
 	cmake -S core -B core/build-asan -DCMAKE_BUILD_TYPE=Debug -DWP_SANITIZE=address,undefined >/dev/null
 	$(PIPEFAIL) cmake --build core/build-asan -j 8 2>&1 | tail -20

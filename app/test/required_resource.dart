@@ -12,6 +12,7 @@ const audioDeviceRequired = 'WP_AUDIO_DEVICE_REQUIRED';
 const pythonRequired = 'WP_PYTHON_REQUIRED';
 const actionlintRequired = 'WP_ACTIONLINT_REQUIRED';
 const optimizedBuildRequired = 'WP_OPTIMIZED_BUILD_REQUIRED';
+const lameRequired = 'WP_LAME_REQUIRED'; // #141
 
 /// Every variable of #125 (Dart and C++), for the check of their values.
 const requiredVariables = [
@@ -20,6 +21,7 @@ const requiredVariables = [
   pythonRequired,
   actionlintRequired,
   optimizedBuildRequired,
+  lameRequired,
 ];
 
 /// Whether [variable] makes its resource required: unset or empty → false, `1` → true; any other

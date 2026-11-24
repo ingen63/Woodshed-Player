@@ -290,5 +290,17 @@
   "selectionActions": "Aktionen für die ausgewählten Titel",
   "selectionDone": "Fertig",
   "deleteTracksTitle": "{count, plural, =1{1 Titel löschen?} other{{count} Titel löschen?}}",
-  "deleteTracksText": "Die Titel werden aus der App entfernt. Die Originaldateien bleiben unverändert."
+  "deleteTracksText": "Die Titel werden aus der App entfernt. Die Originaldateien bleiben unverändert.",
+  "exportEllipsis": "Als MP3 exportieren …",
+  "exportHere": "Hierhin exportieren",
+  "exportTitle": "{count, plural, =1{1 Titel wird exportiert} other{{count} Titel werden exportiert}}",
+  "exportProgress": "{index} von {total}: {title}",
+  "exportDone": "{count, plural, =0{Kein Titel exportiert.} =1{1 Titel exportiert.} other{{count} Titel exportiert.}}",
+  "exportCancelled": "{count, plural, =0{Export abgebrochen. Kein Titel exportiert.} =1{Export abgebrochen. 1 Titel exportiert.} other{Export abgebrochen. {count} Titel exportiert.}}",
+  "exportResultTitle": "Export",
+  "exportFailedNotLoaded": "«{title}» liess sich nicht aus der Cloud laden.",
+  "exportFailedFormat": "«{title}»: Diese Datei lässt sich nicht lesen.",
+  "exportFailedEncoder": "«{title}»: MP3 ist nicht verfügbar, der Encoder fehlt.",
+  "exportFailedWrite": "«{title}»: Die Datei liess sich nicht schreiben.",
+  "exportFailed": "«{title}» liess sich nicht exportieren."
 }

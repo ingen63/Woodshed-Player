@@ -28,8 +28,17 @@ const coreLicenses = {
   ),
 };
 
+/// #141: LAME (LGPL) is not part of the core: the Mac app carries it as a separate library for the MP3
+/// export and loads it at run time. Version, source and the replaceable file are named in the text.
+const lameLicense = (name: 'LAME', asset: 'assets/licenses/lame/LICENSE.txt');
+
 void registerCoreLicenses([AssetBundle? bundle]) {
   final b = bundle ?? rootBundle;
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      lameLicense.name,
+    ], await b.loadString(lameLicense.asset));
+  });
   for (final lib in coreLicenses.values) {
     LicenseRegistry.addLicense(() async* {
       yield LicenseEntryWithLineBreaks([

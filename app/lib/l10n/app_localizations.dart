@@ -1843,6 +1843,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The tracks are removed from the app. The original files stay unchanged.'**
   String get deleteTracksText;
+
+  /// #141: context menu of one or several selected tracks
+  ///
+  /// In en, this message translates to:
+  /// **'Export as MP3 …'**
+  String get exportEllipsis;
+
+  /// #141: button of the folder dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Export here'**
+  String get exportHere;
+
+  /// #141/AK12: title of the progress dialog
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Exporting 1 track} other{Exporting {count} tracks}}'**
+  String exportTitle(int count);
+
+  /// #141/AK12: the track being exported
+  ///
+  /// In en, this message translates to:
+  /// **'{index} of {total}: {title}'**
+  String exportProgress(int index, int total, String title);
+
+  /// #141/AK13: result
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No track exported.} =1{1 track exported.} other{{count} tracks exported.}}'**
+  String exportDone(int count);
+
+  /// #141/AK12: result after cancelling
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Export cancelled. No track exported.} =1{Export cancelled. 1 track exported.} other{Export cancelled. {count} tracks exported.}}'**
+  String exportCancelled(int count);
+
+  /// #141: title of the result dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get exportResultTitle;
+
+  /// #141/AK14
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be loaded from the cloud.'**
+  String exportFailedNotLoaded(String title);
+
+  /// #141/AK13
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}»: this file cannot be read.'**
+  String exportFailedFormat(String title);
+
+  /// #141/AK16
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}»: MP3 is not available, the encoder is missing.'**
+  String exportFailedEncoder(String title);
+
+  /// #141/AK13
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}»: the file could not be written.'**
+  String exportFailedWrite(String title);
+
+  /// #141/AK13
+  ///
+  /// In en, this message translates to:
+  /// **'«{title}» could not be exported.'**
+  String exportFailed(String title);
 }
 
 class _AppLocalizationsDelegate

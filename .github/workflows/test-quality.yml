@@ -107,6 +107,7 @@ jobs:
       LLVM_PROFDATA: llvm-profdata-18
       WP_PYTHON_REQUIRED: '1'  # #125: site build tests (about_test, web_hosting_test)
       WP_ACTIONLINT_REQUIRED: '1'  # #125: installed below, test_quality_workflow_test #64/AK4
+      WP_LAME_REQUIRED: '1'  # #125, #141: built below, core/tests/mp3_export_tests.cpp
     steps:
       - uses: actions/checkout@v7
         with:
@@ -145,6 +146,8 @@ jobs:
         run: |
           (cd app && flutter pub get >/dev/null)
           (cd app/packages/wp_core && flutter pub get >/dev/null)
+      - name: LAME for the MP3 export tests, from its source (#141/AK15)
+        run: tools/build-lame.sh
       - name: make format-check (#7/AK2)
         run: make format-check
       - name: make lint (#7/AK3, actionlint #64)
@@ -366,15 +369,20 @@ jobs:
       - name: Packages
         working-directory: app
         run: flutter pub get >/dev/null
-      - name: FFI tests against the core library (#125/AK4, #116/AK4, #28/AK6)
+      - name: LAME, the MP3 encoder the app carries (#141/AK15)
+        # universal library from its source with a fixed version and checksum; the app's build phase
+        # «Embed LAME» puts it into Contents/Frameworks
+        run: tools/build-lame.sh
+      - name: FFI tests against the core library (#125/AK4, #116/AK4, #28/AK6, #141)
         # the push runs flutter test on Linux, where these tests are skipped; here they must run
         env:
           WP_MACOS_CORE_REQUIRED: '1'
           WP_AUDIO_DEVICE_REQUIRED: '1'  # the null device above
+          WP_LAME_REQUIRED: '1'  # built above
         run: |
           cmake -S core -B core/build -DCMAKE_BUILD_TYPE=Release >/dev/null
           cmake --build core/build -j 4 --target wp_core 2>&1 | tail -20
-          cd app && flutter test --reporter expanded test/wp_trim_ffi_test.dart test/wp_waveform_ffi_test.dart
+          cd app && flutter test --reporter expanded test/wp_trim_ffi_test.dart test/wp_waveform_ffi_test.dart test/mp3_ffi_test.dart
       - name: macOS build (debug)
         working-directory: app
         run: flutter build macos --debug

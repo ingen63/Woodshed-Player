@@ -17,6 +17,7 @@ import '../library/library.dart';
 import '../player/play_queue.dart';
 import '../time_format.dart';
 import 'about_dialog.dart';
+import 'export_dialog.dart';
 import 'file_drop.dart';
 import 'sync_settings.dart';
 import 'messages.dart';
@@ -604,6 +605,7 @@ class _LibraryViewState extends State<LibraryView> {
                 child: Text(l.editTrackEllipsis),
               ),
               trimMenuItem(context, c, t),
+              ?exportMenuItem(context, c, [t.id]),
               _folderMenu([t.id]),
               _playlistMenu([t.id]),
               CheckboxMenuButton(
@@ -632,6 +634,7 @@ class _LibraryViewState extends State<LibraryView> {
   List<Widget> _tracksMenu(List<String> ids) => [
     _playlistMenu(ids),
     _folderMenu(ids),
+    ?exportMenuItem(context, c, ids),
     MenuItemButton(
       key: const Key('deleteSelected'),
       leadingIcon: const Icon(WsIcons.trash, size: 16),

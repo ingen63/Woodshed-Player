@@ -9,6 +9,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_controller.dart';
+import 'package:woodshed_player/app/track_export.dart';
 import 'package:woodshed_player/app/file_platform.dart';
 import 'package:woodshed_player/app/file_store_io.dart';
 import 'package:woodshed_player/app/recording_controller.dart';
@@ -210,6 +211,15 @@ class FakeFiles implements FilePlatform {
   @override
   Future<String?> recordingsDir() async => recordings;
 
+  /// #141: the folder the next export picks (null: cancelled) and the prompts it was asked with.
+  String? nextFolder;
+  final folderPrompts = <String>[];
+  @override
+  Future<String?> pickFolder(String prompt) async {
+    folderPrompts.add(prompt);
+    return nextFolder;
+  }
+
   /// Folder for recordings (#4); null: none, as without a support folder.
   String? recordings;
 
@@ -272,6 +282,7 @@ class TestApp {
     CloudAccount Function(Library library)? cloud,
     Random? random,
     AudioTrimmer? trimmer,
+    Mp3Encode? mp3,
     bool libraryOpen = true,
   }) {
     // #123: the section «Library» is closed on a new device; tests about its rows start with it open. The
@@ -316,6 +327,7 @@ class TestApp {
       cloud: cloud?.call(library),
       random: random ?? Random(7),
       trimmer: trimmer,
+      mp3: mp3,
     );
   }
 

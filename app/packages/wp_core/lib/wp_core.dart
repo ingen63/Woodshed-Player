@@ -4,8 +4,10 @@
 /// Ein Test (app/test/ffi_coverage_test.dart) prüft, dass jede Funktion aus wp_core.h hier angebunden ist.
 library;
 
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -510,4 +512,126 @@ abstract final class WpRecorder {
 
   /// Bisher kam nur Stille an (keine Berechtigung oder es läuft nichts).
   static bool get onlySilence => _recOnlySilence() != 0;
+}
+
+// ---- MP3 export (#141) ----
+
+final _mp3Available = _lib
+    .lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>(
+      'wp_mp3_available',
+    );
+final _mp3Export = _lib
+    .lookupFunction<
+      Int32 Function(
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Int32,
+        Pointer<Int32>,
+        Pointer<Double>,
+      ),
+      int Function(
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        int,
+        Pointer<Int32>,
+        Pointer<Double>,
+      )
+    >('wp_mp3_export');
+
+/// Runs wp_mp3_export in a new isolate. A function of its own, so that the isolate gets only these
+/// values (a closure would take the caller's Completer and callbacks with it, which cannot be sent).
+Future<int> _exportInIsolate(
+  String? corePath,
+  String lamePath,
+  String input,
+  String output,
+  int kbps,
+  int flagAddress,
+  int progressAddress,
+) => Isolate.run(() {
+  if (corePath != null) _libraryPath = corePath;
+  final l = lamePath.toNativeUtf8();
+  final i = input.toNativeUtf8();
+  final o = output.toNativeUtf8();
+  try {
+    return _mp3Export(
+      l,
+      i,
+      o,
+      kbps,
+      Pointer<Int32>.fromAddress(flagAddress),
+      Pointer<Double>.fromAddress(progressAddress),
+    );
+  } finally {
+    malloc
+      ..free(l)
+      ..free(i)
+      ..free(o);
+  }
+});
+
+/// #141: MP3 export with LAME, loaded by the core from [lamePath] at run time (never linked).
+abstract final class WpMp3 {
+  static const sampleRate = 44100;
+  static const minBitrate = 32;
+  static const maxBitrate = 320;
+
+  /// Whether LAME can be loaded from [lamePath].
+  static bool available(String lamePath) {
+    final p = lamePath.toNativeUtf8();
+    try {
+      return _mp3Available(p) != 0;
+    } finally {
+      malloc.free(p);
+    }
+  }
+
+  /// Encodes [input] to the MP3 file [output] (frames only, no tag) in a background isolate. Completing
+  /// [cancel] stops it (WpCode.cancelled, the file is removed); [onProgress] gets 0 … 1 now and then.
+  /// Returns a WpCode.
+  static Future<int> export(
+    String lamePath,
+    String input,
+    String output, {
+    int kbps = 192,
+    Future<void>? cancel,
+    void Function(double fraction)? onProgress,
+  }) async {
+    final flag = calloc<Int32>();
+    final progress = calloc<Double>();
+    final flagAddress = flag.address, progressAddress = progress.address;
+    final corePath = _libraryPath;
+    var running = true;
+    unawaited(
+      cancel?.then((_) {
+        if (running) flag.value = 1;
+      }),
+    );
+    final ticker = onProgress == null
+        ? null
+        : Timer.periodic(
+            const Duration(milliseconds: 100),
+            (_) => onProgress(progress.value),
+          );
+    try {
+      return await _exportInIsolate(
+        corePath,
+        lamePath,
+        input,
+        output,
+        kbps,
+        flagAddress,
+        progressAddress,
+      );
+    } finally {
+      running = false;
+      ticker?.cancel();
+      onProgress?.call(progress.value);
+      calloc
+        ..free(flag)
+        ..free(progress);
+    }
+  }
 }

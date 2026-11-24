@@ -1140,4 +1140,78 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get deleteTracksText =>
       'Die Titel werden aus der App entfernt. Die Originaldateien bleiben unverändert.';
+
+  @override
+  String get exportEllipsis => 'Als MP3 exportieren …';
+
+  @override
+  String get exportHere => 'Hierhin exportieren';
+
+  @override
+  String exportTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Titel werden exportiert',
+      one: '1 Titel wird exportiert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String exportProgress(int index, int total, String title) {
+    return '$index von $total: $title';
+  }
+
+  @override
+  String exportDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Titel exportiert.',
+      one: '1 Titel exportiert.',
+      zero: 'Kein Titel exportiert.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String exportCancelled(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Export abgebrochen. $count Titel exportiert.',
+      one: 'Export abgebrochen. 1 Titel exportiert.',
+      zero: 'Export abgebrochen. Kein Titel exportiert.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get exportResultTitle => 'Export';
+
+  @override
+  String exportFailedNotLoaded(String title) {
+    return '«$title» liess sich nicht aus der Cloud laden.';
+  }
+
+  @override
+  String exportFailedFormat(String title) {
+    return '«$title»: Diese Datei lässt sich nicht lesen.';
+  }
+
+  @override
+  String exportFailedEncoder(String title) {
+    return '«$title»: MP3 ist nicht verfügbar, der Encoder fehlt.';
+  }
+
+  @override
+  String exportFailedWrite(String title) {
+    return '«$title»: Die Datei liess sich nicht schreiben.';
+  }
+
+  @override
+  String exportFailed(String title) {
+    return '«$title» liess sich nicht exportieren.';
+  }
 }

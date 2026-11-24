@@ -23,6 +23,8 @@ const _pointeeTypes = {
   'wp_player': '_Player',
   'void': 'Void', // #116: file bytes
   'wp_trim_result': '_TrimResult', // #116
+  'int': 'Int32', // #141: cancel flag of wp_mp3_export
+  'double': 'Double', // #141: progress of wp_mp3_export
 };
 
 /// Maps a C type from wp_core.h to the native type of the Dart binding, or `null` if unknown.
@@ -204,6 +206,11 @@ void main() {
     );
     expect(WpCode.multipleTracks, define('WP_ERR_MULTIPLE_TRACKS'));
     expect(WpCode.fragmented, define('WP_ERR_FRAGMENTED'));
+    expect(WpCode.encoderUnavailable, define('WP_ERR_ENCODER_UNAVAILABLE'));
+    expect(WpCode.fileUnwritable, define('WP_ERR_FILE_UNWRITABLE'));
+    expect(WpMp3.sampleRate, define('WP_MP3_SAMPLE_RATE'));
+    expect(WpMp3.minBitrate, define('WP_MP3_MIN_BITRATE'));
+    expect(WpMp3.maxBitrate, define('WP_MP3_MAX_BITRATE'));
     expect(WpSampleRate.min, define('WP_MIN_SAMPLE_RATE'));
     expect(
       WpTrimmed.minSeconds,
@@ -219,10 +226,11 @@ void main() {
     expect(WpCode.loadReady, define('WP_LOAD_READY'));
     final errDefines = RegExp(r'#define WP_ERR_\w+').allMatches(header).length;
     // #120: WP_ERR_MULTIPLE_TRACKS and WP_ERR_FRAGMENTED only come from wp_trim (TrimProblem), never from
-    // loading
+    // loading; #141: WP_ERR_ENCODER_UNAVAILABLE and WP_ERR_FILE_UNWRITABLE only from wp_mp3_export
+    // (ExportProblem)
     expect(
       errDefines,
-      11,
+      13,
       reason: 'new WP_ERR_* in wp_core.h: update WpCode and loadErrorMessage',
     );
   });

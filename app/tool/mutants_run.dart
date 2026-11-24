@@ -50,6 +50,8 @@ List<(String, List<String>)> coreTestPrograms(String core) => [
   ('sound_gate_tests', []),
   // #140: command line
   ('cli_tests', []),
+  // #141: MP3 export (LAME from local/lame)
+  ('mp3_export_tests', []),
   ('capi_tests', ['--null-backend']),
   ('device_tests', []),
   ('realtime_tests', []),

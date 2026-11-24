@@ -281,6 +281,7 @@ CI-Job, der die Ressource hat, setzt eine Variable den Test auf Pflicht; fehlt d
 | `WP_AUDIO_DEVICE_REQUIRED` | ein Audiogerät, auch das Null-Gerät (`WP_AUDIO_BACKEND=null`) | `app/test/wp_waveform_ffi_test.dart`; im Kern `capi_tests.cpp` (`pathEndingInDot`, `loadAndTransport`) | `macos` für die FFI-Tests (Null-Gerät). Die Linux-Runner haben kein Gerät: `capi_tests` überspringt dort die Ladefälle, `capi_null_backend_tests` prüft sie auf dem Null-Gerät |
 | `WP_PYTHON_REQUIRED` | `python3` für den Bau der Website | `app/test/about_test.dart` (#50), `app/test/web_hosting_test.dart` (#41) | `checks` |
 | `WP_ACTIONLINT_REQUIRED` | `actionlint` (`ACTIONLINT` oder im `PATH`) | `app/test/test_quality_workflow_test.dart` (#64/AK4) | `checks` |
+| `WP_LAME_REQUIRED` | der MP3-Encoder LAME aus `tools/build-lame.sh` (`local/lame/`) oder `WP_LAME_PATH` (#141) | `core/tests/mp3_export_tests.cpp`, `app/test/mp3_ffi_test.dart` | `checks` (Linux, Kern) und `macos` (FFI): bauen LAME vorher mit `tools/build-lame.sh` |
 | `WP_OPTIMIZED_BUILD_REQUIRED` | optimierter Build ohne Sanitizer für die Zeitgrenzen (`core/tests/test_timing.hpp`) | `core/tests/bench_tests.cpp`, ebenso gemeldet von `engine_tests.cpp` und `waveform_tests.cpp` | `bench` (`make bench`, Release) |
 
 Die Hilfsfunktionen: `app/test/required_resource.dart` (`needs`, am Anfang des Testkörpers) und

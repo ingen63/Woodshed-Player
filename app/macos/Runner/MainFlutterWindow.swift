@@ -128,6 +128,18 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
         panel.begin { response in
           result(response == .OK ? panel.urls.map(\.path) : [])
         }
+      case "pickFolder":
+        // #141: the target folder of the export; the sandbox lets the app write there
+        // (com.apple.security.files.user-selected.read-write)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        if let prompt = call.arguments as? String { panel.prompt = prompt }
+        panel.begin { response in
+          result(response == .OK ? panel.url?.path : nil)
+        }
       case "supportDir":
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

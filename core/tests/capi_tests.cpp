@@ -101,6 +101,15 @@ void errorMessagesAndFileDuration() {
   CHECK(wp_file_duration("") == WP_ERR_INVALID_ARGUMENT);
 }
 
+void mp3ExportWithoutEncoder() {
+  // #141: the MP3 export of wp_core without LAME (the encoding is tested in mp3_export_tests)
+  CHECK(wp_mp3_available("/nonexistent/libmp3lame.dylib") == 0);
+  CHECK(wp_mp3_export("/nonexistent/libmp3lame.dylib", kSine.c_str(), "/nonexistent/out.mp3", 192,
+                      nullptr, nullptr) == WP_ERR_ENCODER_UNAVAILABLE);
+  CHECK(std::string(wp_error_message(WP_ERR_ENCODER_UNAVAILABLE)) == "MP3 encoder not available");
+  CHECK(std::string(wp_error_message(WP_ERR_FILE_UNWRITABLE)) == "File cannot be written");
+}
+
 // #105/AK2 (regression for found bug 39, fuzz regression capi/path_ending_in_dot): a path that ends
 // in '.' (the folder ".", a file "song.") made miniaudio read past the end of the path
 // (stack-buffer-overflow found by fuzz_capi). Such a file decodes like any other, a folder is a
@@ -304,6 +313,7 @@ int main(int argc, char **argv) {
   const std::vector<std::pair<std::string, std::function<void()>>> tests = {
       {"nullHandleIsSafe", nullHandleIsSafe},
       {"errorMessagesAndFileDuration", errorMessagesAndFileDuration},
+      {"mp3ExportWithoutEncoder", mp3ExportWithoutEncoder},
       {"pathEndingInDot", pathEndingInDot},
       {"loadAndTransport", loadAndTransport},
       {"metronomeThroughCApi", metronomeThroughCApi},

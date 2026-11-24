@@ -23,6 +23,12 @@ abstract final class WpCode {
   /// #120: trimming a fragmented MP4.
   static const fragmented = -11;
 
+  /// #141: MP3 export without its encoder library (LAME).
+  static const encoderUnavailable = -12;
+
+  /// #141: the exported file cannot be written.
+  static const fileUnwritable = -13;
+
   static const loadIdle = 0;
   static const loadRunning = 1;
   static const loadReady = 2;

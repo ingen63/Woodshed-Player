@@ -33,6 +33,10 @@ const char *errorMessage(int code) {
     return "Audio core busy, try again";
   case kErrUnsupportedSampleRate:
     return "Sample rate outside the range of the audio core";
+  case kErrEncoderUnavailable:
+    return "MP3 encoder not available";
+  case kErrFileUnwritable:
+    return "File cannot be written";
   default:
     return "Unknown error";
   }

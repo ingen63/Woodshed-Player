@@ -28,6 +28,9 @@ enum ErrorCode {
   kErrCancelled = -7,
   kErrBusy = -8,
   kErrUnsupportedSampleRate = -9,
+  // -10, -11: trimming MP4 (wp_core.h)
+  kErrEncoderUnavailable = -12, // #141: MP3 export without its encoder library
+  kErrFileUnwritable = -13,     // #141: the exported file cannot be written
 };
 
 // Deutscher Text zu einem Fehlercode (statisch, nie nullptr).

@@ -9,4 +9,6 @@ Unverändert übernommen, Lizenztexte im jeweiligen Ordner. miniaudio und Signal
 | `signalsmith-linear/` | https://github.com/Signalsmith-Audio/linear (von signalsmith-stretch benötigt) | Tag 0.6.6 | MIT |
 | `flac/` | https://github.com/xiph/flac (libFLAC, #113) | Tag 1.5.0 (1507800) | BSD-3-Clause (`COPYING.Xiph`) |
 
+LAME (MP3-Encoder für den Export, #141, LGPL) liegt nicht hier: `tools/build-lame.sh` baut ihn aus der Quelle mit fester Version und Prüfsumme nach `local/lame/`, die Mac-App legt ihn als eigene Bibliothek in `Contents/Frameworks` und lädt ihn nur zum Export (`dlopen`). Lizenz und Quelle: `app/assets/licenses/lame/LICENSE.txt`.
+
 Aktualisieren: neue Version holen, Dateien ersetzen, Version hier nachführen, `ctest` im Kern laufen lassen. Die Lizenzdatei zusätzlich nach `app/assets/licenses/<Ordner>/` kopieren; die App zeigt sie auf der Lizenzseite (#119), ein Test prüft, dass jede Bibliothek dieser Tabelle dort steht und der Text gleich ist.

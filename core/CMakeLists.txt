@@ -208,15 +208,32 @@ if(NOT WIN32)
   wp_mutate(wp_cli)
 endif()
 
+# #141: MP3 export; LAME is loaded at run time (dlopen), never linked. Apple devices read M4A/AAC
+# through ExtAudioFile; elsewhere miniaudio reads MP3, WAV and FLAC.
+if(APPLE)
+  set(WP_MP3_READER src/mp3_reader_apple.mm)
+else()
+  set(WP_MP3_READER src/mp3_reader_stub.cpp)
+endif()
+add_library(wp_mp3 STATIC src/mp3_export.cpp ${WP_MP3_READER})
+target_include_directories(wp_mp3 PUBLIC include src)
+target_link_libraries(wp_mp3 PUBLIC wp_miniaudio ${CMAKE_DL_LIBS})
+if(APPLE)
+  target_compile_options(wp_mp3 PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+  target_link_libraries(wp_mp3 PUBLIC "-framework AudioToolbox" "-framework Foundation")
+endif()
+wp_strict_warnings(wp_mp3)
+wp_mutate(wp_mp3)
+
 # Kern mit C-API (wp_core.h)
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(WP_RECORDER src/recorder_mac.mm)
 else()
   set(WP_RECORDER src/recorder_stub.cpp)
 endif()
-add_library(wp_core SHARED src/player.cpp src/trim_api.cpp ${WP_RECORDER})
+add_library(wp_core SHARED src/player.cpp src/trim_api.cpp src/mp3_api.cpp ${WP_RECORDER})
 target_include_directories(wp_core PUBLIC include)
-target_link_libraries(wp_core PRIVATE wp_playercore wp_trim)
+target_link_libraries(wp_core PRIVATE wp_playercore wp_trim wp_mp3)
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   target_link_libraries(wp_core PRIVATE wp_reccore)
 endif()
@@ -270,6 +287,14 @@ wp_strict_warnings(recorder_tests)
 add_test(NAME recorder_tests COMMAND recorder_tests)
 
 # #140: armed recording, sound and silence detection with generated sine and silence
+# #141: MP3 export with LAME from local/lame (tools/build-lame.sh) or WP_LAME_PATH
+add_executable(mp3_export_tests tests/mp3_export_tests.cpp src/mp3_api.cpp)
+target_link_libraries(mp3_export_tests PRIVATE wp_mp3 wp_playercore)
+target_compile_definitions(mp3_export_tests
+                           PRIVATE WP_LAME_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../local/lame")
+wp_strict_warnings(mp3_export_tests)
+add_test(NAME mp3_export_tests COMMAND mp3_export_tests)
+
 add_executable(sound_gate_tests tests/sound_gate_tests.cpp)
 target_link_libraries(sound_gate_tests PRIVATE wp_reccore wp_playercore)
 wp_strict_warnings(sound_gate_tests)
@@ -352,7 +377,7 @@ include(tests/fuzz/fuzz.cmake)
 # memory ends as killed or timeout (#11/AK4).
 if(WP_MULL_PLUGIN)
   set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests recorder_tests
-    sound_gate_tests cli_tests capi_tests
+    sound_gate_tests cli_tests capi_tests mp3_export_tests
     device_tests realtime_tests reference_tests trim_tests fuzz_decoder_replay fuzz_capi_replay
     fuzz_trim_replay)
   foreach(t IN LISTS WP_MUTANT_TESTS)

@@ -85,6 +85,16 @@ Future<AppController> createAppController({
     // #116: FLAC is encoded again, so the cut runs off the UI isolate
     trimmer: (bytes, start, end) =>
         Isolate.run(() => wpTrim(bytes, start, end)),
+    // #141: MP3 export on the Mac; LAME lies in the app's Frameworks folder (tools/build-lame.sh)
+    mp3: Platform.isMacOS
+        ? (input, output, {cancel, onProgress}) => WpMp3.export(
+            bundledLamePath(),
+            input,
+            output,
+            cancel: cancel,
+            onProgress: onProgress,
+          )
+        : null,
   );
   // #54/AK1: the first frame never waits on keychain, network or sync
   startInBackground(controller);
@@ -94,6 +104,10 @@ Future<AppController> createAppController({
   }
   return controller;
 }
+
+/// #141: LAME inside the app: `Woodshed Player.app/Contents/Frameworks/libmp3lame.dylib`.
+String bundledLamePath() =>
+    '${File(Platform.resolvedExecutable).parent.parent.path}/Frameworks/libmp3lame.dylib';
 
 /// The recording of [controller], shared by the record button and the command line (#140).
 final _recordings = Expando<RecordingController>();

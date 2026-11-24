@@ -33,6 +33,8 @@ typedef struct wp_player wp_player;
 #define WP_ERR_UNSUPPORTED_SAMPLE_RATE -9 /* rate outside WP_MIN/MAX_SAMPLE_RATE (#76, #97) */
 #define WP_ERR_MULTIPLE_TRACKS -10        /* trimming: MP4 with several audio tracks (#120) */
 #define WP_ERR_FRAGMENTED -11             /* trimming: fragmented MP4 (#120) */
+#define WP_ERR_ENCODER_UNAVAILABLE -12    /* MP3 export: encoder library missing (#141) */
+#define WP_ERR_FILE_UNWRITABLE -13        /* MP3 export: output file cannot be written (#141) */
 
 /* Range of sample rates the core accepts, both limits included (#76, #97). A player configured
  * outside it renders silence and answers every load with WP_ERR_UNSUPPORTED_SAMPLE_RATE. */
@@ -134,6 +136,24 @@ WP_API size_t wp_trim_size(const wp_trim_result *r);
 WP_API double wp_trim_start(const wp_trim_result *r);
 WP_API double wp_trim_end(const wp_trim_result *r);
 WP_API void wp_trim_free(wp_trim_result *r);
+
+/* ---- MP3 export (#141) ---- */
+/* The encoder is LAME (LGPL), loaded at run time from lame_path (dlopen), never linked. */
+#define WP_MP3_SAMPLE_RATE 44100
+#define WP_MP3_MIN_BITRATE 32
+#define WP_MP3_MAX_BITRATE 320
+/* 1 if LAME can be loaded from lame_path, else 0. */
+WP_API int wp_mp3_available(const char *lame_path);
+/* Decodes in_path (MP3, WAV, FLAC; on Apple devices also M4A/AAC) and writes it to out_path as MP3:
+ * CBR at kbps (WP_MP3_MIN_BITRATE … WP_MP3_MAX_BITRATE), WP_MP3_SAMPLE_RATE Hz, the channels of the
+ * source (more than two are mixed to two), MPEG frames only (the first is LAME's info frame), no
+ * tag. Blocks until done; *cancel (may be NULL) is read between blocks, non-zero cancels; *progress
+ * (may be NULL) gets 0 … 1. WP_OK, WP_ERR_INVALID_ARGUMENT, WP_ERR_ENCODER_UNAVAILABLE,
+ * WP_ERR_FILE_NOT_FOUND, WP_ERR_UNSUPPORTED_FORMAT, WP_ERR_UNSUPPORTED_SAMPLE_RATE,
+ * WP_ERR_OUT_OF_MEMORY, WP_ERR_FILE_UNWRITABLE or WP_ERR_CANCELLED; on an error out_path is
+ * removed. */
+WP_API int wp_mp3_export(const char *lame_path, const char *in_path, const char *out_path, int kbps,
+                         int *cancel, double *progress);
 
 /* ---- Recording: system audio (macOS 14.2+) or microphone (macOS, #113); elsewhere < 0 ---- */
 /* Error codes of wp_rec_start (#44); the UI maps each one to its own localized text. */

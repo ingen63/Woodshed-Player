@@ -757,3 +757,21 @@ app/lib/library/metadata.dart | dart_le_to_lt | while (p + 8 <= end) {
 # ein Kopf ohne Inhalt, der nichts enthält. Ergebnis jeweils: kein Jahr.
 app/lib/library/metadata.dart | dart_add_to_sub | if (p + 16 > end) return null;
 app/lib/library/metadata.dart | dart_gt_to_ge | if (p + 16 > end) return null;
+
+# ---- core/src/mp3_export.cpp, app/lib/app/track_export.dart, app/lib/library/id3_tag.dart (#141) ----
+# gleichwertig: Bei genau zwei Kanälen öffnet «>=» den Decoder ein zweites Mal mit zwei Kanälen; das
+# Ergebnis ist derselbe Stereo-Strom.
+core/src/mp3_export.cpp | cxx_gt_to_ge | if (res == MA_SUCCESS && r->decoder.outputChannels > 2) {
+# gleichwertig: copy legt nur fest, ob BytesBuilder die hinzugefügten Listen kopiert; die Bytes sind
+# dieselben.
+app/lib/app/track_export.dart | dart_false_to_true | final out = BytesBuilder(copy: false)
+app/lib/library/id3_tag.dart | dart_false_to_true | final frames = BytesBuilder(copy: false);
+# Grenzfall: flush wartet, bis die Datei auf dem Datenträger ist, bevor der Export sie als fertig meldet;
+# lesen lässt sie sich so oder so gleich danach.
+app/lib/app/track_export.dart | dart_true_to_false | await File(target).writeAsBytes(out.toBytes(), flush: true);
+# Grenzfall: Nur wenn das Schreiben mitten in der Datei scheitert (Datenträger voll) bleibt ohne das
+# Löschen eine halbe Datei zurück; scheitert schon das Öffnen (kein Ordner), entsteht keine Datei.
+app/lib/app/track_export.dart | dart_remove_void_call | _remove(target);
+# Grenzfall: lame_encode_flush schreibt immer die letzten Frames (mindestens eines), gibt also nie 0
+# zurück; nur dann unterschiede sich «<=» von «<».
+core/src/mp3_export.cpp | cxx_lt_to_le | if (tail < 0)

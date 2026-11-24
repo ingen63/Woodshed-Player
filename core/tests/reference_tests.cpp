@@ -824,6 +824,20 @@ void loadFromFile() {
   wp_destroy(p);
 }
 
+void mp3ExportUnavailableOffline() {
+  // #141, #9/AK7: the offline and browser cores have no MP3 export (mp3_api_stub.cpp): the encoder
+  // is never available, the export reports WP_ERR_ENCODER_UNAVAILABLE and touches nothing.
+  CHECK(wp_mp3_available("libmp3lame.dylib") == 0);
+  CHECK(wp_mp3_available(nullptr) == 0);
+  int cancel = 0;
+  double progress = -1;
+  CHECK(wp_mp3_export("libmp3lame.dylib", "in.wav", "out.mp3", 192, &cancel, &progress) ==
+        WP_ERR_ENCODER_UNAVAILABLE);
+  CHECK(progress == -1);
+  CHECK(wp_mp3_export(nullptr, nullptr, nullptr, 0, nullptr, nullptr) ==
+        WP_ERR_ENCODER_UNAVAILABLE);
+}
+
 void recordingUnavailableOffline() {
   // #9/AK7: the offline and browser cores have no recording (recorder_stub.cpp): not available,
   // start reports WP_REC_ERR_UNSUPPORTED, idle values, an English error text.
@@ -1232,6 +1246,7 @@ int main(int argc, char **argv) {
   run("#3/AK20 #9/AK5 metronome with title", metronomeWithTitle);
   run("#9/AK7 load from file, waveform, errors", loadFromFile);
   run("#9/AK7 recording unavailable offline", recordingUnavailableOffline);
+  run("#141 MP3 export unavailable offline", mp3ExportUnavailableOffline);
   run("#11 browser entry points at their limits", webEntryPointsAtTheirLimits);
   run("#116/AK4 #116/AK7 #120/AK4 trimming WAV, FLAC and M4A in memory", trimInMemory);
   run("#76/AK1 #76/AK2 sample rate lower limit", sampleRateLowerLimit);

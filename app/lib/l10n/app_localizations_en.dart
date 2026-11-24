@@ -1132,4 +1132,78 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get deleteTracksText =>
       'The tracks are removed from the app. The original files stay unchanged.';
+
+  @override
+  String get exportEllipsis => 'Export as MP3 …';
+
+  @override
+  String get exportHere => 'Export here';
+
+  @override
+  String exportTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Exporting $count tracks',
+      one: 'Exporting 1 track',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String exportProgress(int index, int total, String title) {
+    return '$index of $total: $title';
+  }
+
+  @override
+  String exportDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tracks exported.',
+      one: '1 track exported.',
+      zero: 'No track exported.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String exportCancelled(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Export cancelled. $count tracks exported.',
+      one: 'Export cancelled. 1 track exported.',
+      zero: 'Export cancelled. No track exported.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get exportResultTitle => 'Export';
+
+  @override
+  String exportFailedNotLoaded(String title) {
+    return '«$title» could not be loaded from the cloud.';
+  }
+
+  @override
+  String exportFailedFormat(String title) {
+    return '«$title»: this file cannot be read.';
+  }
+
+  @override
+  String exportFailedEncoder(String title) {
+    return '«$title»: MP3 is not available, the encoder is missing.';
+  }
+
+  @override
+  String exportFailedWrite(String title) {
+    return '«$title»: the file could not be written.';
+  }
+
+  @override
+  String exportFailed(String title) {
+    return '«$title» could not be exported.';
+  }
 }

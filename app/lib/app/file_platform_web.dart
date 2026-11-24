@@ -63,6 +63,10 @@ class WebFilePlatform implements FilePlatform {
   @override
   Future<String?> recordingsDir() async => null;
 
+  /// #141: no export in the browser.
+  @override
+  Future<String?> pickFolder(String prompt) async => null;
+
   /// #113/AK6: no microphone recording in the browser.
   @override
   Future<bool> microphoneAccess() async => false;

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/sync/cloud_account.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_controller.dart';
+import 'package:woodshed_player/app/track_export.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/sync/sync_service.dart';
 import 'package:woodshed_player/time_format.dart';
@@ -29,6 +30,7 @@ Future<TestApp> pumpApp(
   SyncService? sync,
   CloudAccount Function(Library library)? cloud,
   AudioTrimmer? trimmer,
+  Mp3Encode? mp3,
   bool libraryOpen = true,
   Locale locale = testLocale,
 }) async {
@@ -42,6 +44,7 @@ Future<TestApp> pumpApp(
     sync: sync == null ? null : (_) => sync,
     cloud: cloud,
     trimmer: trimmer,
+    mp3: mp3,
     libraryOpen: libraryOpen,
   );
   await tester.runAsync(() async {

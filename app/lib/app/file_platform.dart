@@ -124,6 +124,9 @@ abstract class FilePlatform {
   /// Audiodateien wählen (mehrere). Leer bei Abbruch.
   Future<List<String>> pickAudioFiles();
 
+  /// #141: a folder to export into, with [prompt] on the button; null if cancelled or not possible here.
+  Future<String?> pickFolder(String prompt) async => null;
+
   /// *Application Support* der App.
   Future<String?> supportDir();
 
@@ -181,6 +184,10 @@ class ChannelFilePlatform implements FilePlatform {
       (await _channel.invokeMethod<List<Object?>>('pickAudioFiles'))
           ?.cast<String>() ??
       const [];
+
+  @override
+  Future<String?> pickFolder(String prompt) =>
+      _channel.invokeMethod<String>('pickFolder', prompt);
 
   @override
   Future<String?> supportDir() => _channel.invokeMethod<String>('supportDir');

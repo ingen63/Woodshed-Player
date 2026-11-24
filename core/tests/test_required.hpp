@@ -14,6 +14,7 @@ namespace wptest {
 
 constexpr const char *kAudioDeviceRequired = "WP_AUDIO_DEVICE_REQUIRED";
 constexpr const char *kOptimizedBuildRequired = "WP_OPTIMIZED_BUILD_REQUIRED";
+constexpr const char *kLameRequired = "WP_LAME_REQUIRED"; // #141: MP3 encoder (tools/build-lame.sh)
 
 enum class Requirement { Optional, Required, Invalid };
 

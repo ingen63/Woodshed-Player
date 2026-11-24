@@ -101,6 +101,28 @@ void main() {
     expect(main, contains('registerCoreLicenses();'));
   });
 
+  test('#141/AK17 LAME: version, source and checksum as built by tools/build-lame.sh, LGPL text', () async {
+    final script = File('../tools/build-lame.sh').readAsStringSync();
+    String value(String name) => RegExp(
+      '^$name=(\\S+)\$',
+      multiLine: true,
+    ).firstMatch(script)!.group(1)!;
+    final text = File(lameLicense.asset).readAsStringSync();
+    expect(text, startsWith('LAME ${value('VERSION')} (libmp3lame)'));
+    expect(text, contains('SHA-256: ${value('SHA256')}'));
+    expect(text, contains('lame-${value('VERSION')}.tar.gz'));
+    expect(text, contains('Contents/Frameworks/libmp3lame.dylib'));
+    expect(text, contains('GNU LIBRARY GENERAL PUBLIC LICENSE'));
+    expect(text, contains('Copyright'));
+    final entries = await LicenseRegistry.licenses.toList();
+    final lame = entries.where((l) => l.packages.contains('LAME')).toList();
+    expect(lame, hasLength(1));
+    expect(
+      _words(lame.single.paragraphs.map((p) => p.text).join(' ')),
+      _words(text),
+    );
+  });
+
   test('#119/AK3 every library in core/third_party/README.md has an entry', () {
     final folders = _readmeFolders();
     expect(folders, isNotEmpty);

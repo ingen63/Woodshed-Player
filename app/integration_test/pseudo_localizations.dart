@@ -623,6 +623,35 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String deleteTracksTitle(int count) => pseudo(super.deleteTracksTitle(count));
   @override
   String get deleteTracksText => pseudo(super.deleteTracksText);
+  @override
+  String get exportEllipsis => pseudo(super.exportEllipsis);
+  @override
+  String get exportHere => pseudo(super.exportHere);
+  @override
+  String exportTitle(int count) => pseudo(super.exportTitle(count));
+  @override
+  String exportProgress(int index, int total, String title) =>
+      pseudo(super.exportProgress(index, total, title));
+  @override
+  String exportDone(int count) => pseudo(super.exportDone(count));
+  @override
+  String exportCancelled(int count) => pseudo(super.exportCancelled(count));
+  @override
+  String get exportResultTitle => pseudo(super.exportResultTitle);
+  @override
+  String exportFailedNotLoaded(String title) =>
+      pseudo(super.exportFailedNotLoaded(title));
+  @override
+  String exportFailedFormat(String title) =>
+      pseudo(super.exportFailedFormat(title));
+  @override
+  String exportFailedEncoder(String title) =>
+      pseudo(super.exportFailedEncoder(title));
+  @override
+  String exportFailedWrite(String title) =>
+      pseudo(super.exportFailedWrite(title));
+  @override
+  String exportFailed(String title) => pseudo(super.exportFailed(title));
 }
 
 /// Loads [PseudoLocalizations] for any locale.
