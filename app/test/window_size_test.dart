@@ -1,14 +1,18 @@
 // #130: default and minimum size of the window. AKn = n-th acceptance criterion of #130. The fonts of the
 // app (Inter, JetBrains Mono) are loaded so that the text has its real width and height; the cores are
 // fakes. AK2 (fits on a small screen) and AK4 (size kept after a restart) are tested natively in
-// macos/RunnerTests. #129: the same with the widest and the narrowest library sidebar.
+// macos/RunnerTests. #129: the same with the widest and the narrowest library sidebar. #135: the
+// title of the library sidebar at every width of the sidebar.
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/app/sidebar_width.dart';
+import 'package:woodshed_player/l10n/app_localizations.dart';
 import 'package:woodshed_player/ui/library_view.dart';
 import 'package:woodshed_player/ui/style.dart';
 import 'package:woodshed_player/ui/window_size.dart';
@@ -205,6 +209,99 @@ void main() {
       );
     },
   );
+
+  // #135: the header of the library sidebar at the narrowest, the standard and the widest width, with
+  // mouse-sized (macOS) and touch-sized buttons (iPad)
+  for (final locale in const [Locale('de'), Locale('en')]) {
+    for (final platform in const [TargetPlatform.macOS, TargetPlatform.iOS]) {
+      for (final chosen in const [
+        sidebarMinWidth,
+        sidebarDefaultWidth,
+        370.0,
+        sidebarMaxWidth,
+      ]) {
+        testWidgets(
+          '#135/AK1 #135/AK2 #135/AK3 sidebar $chosen pt, $platform, $locale: title at least body '
+          'text size on one line, every action reachable, buttons large enough',
+          (tester) async {
+            debugDefaultTargetPlatformOverride = platform;
+            addTearDown(() => debugDefaultTargetPlatformOverride = null);
+            await _loadFonts();
+            final app = await pumpApp(
+              tester,
+              size: const Size(1366, 1024),
+              locale: locale,
+            );
+            await tester.runAsync(() => app.library.setSidebarWidth(chosen));
+            await select(
+              tester,
+              app,
+              'Bossa',
+              area: AppArea.player,
+            ); // rebuilds
+            final sidebar = tester.getRect(byKey('librarySidebar'));
+            expect(sidebar.width, chosen);
+            final l = lookupAppLocalizations(locale);
+
+            // AK1: the title, measured as drawn (a FittedBox would scale it down)
+            final title = byKey('libraryTitle');
+            expect(find.text(l.library), findsWidgets);
+            final paragraph = tester.renderObject<RenderParagraph>(title);
+            final scale = tester.getRect(title).height / paragraph.size.height;
+            final fontSize = paragraph.text.style!.fontSize! * scale;
+            final body = Theme.of(tester.element(title))
+                .textTheme
+                .bodyMedium!
+                .fontSize!;
+            expect(fontSize, greaterThanOrEqualTo(body));
+            expect(paragraph.didExceedMaxLines, isFalse);
+            expect(
+              paragraph.size.height,
+              lessThan(paragraph.text.style!.fontSize! * 2),
+            ); // one line
+
+            // AK2: no overflow, both buttons and the "⋯" menu inside the sidebar
+            expect(_overflows(tester), isEmpty);
+            final buttons = ['addFiles', 'sortMenu', 'libraryMoreMenu'];
+            for (final k in buttons) {
+              final r = tester.getRect(byKey(k));
+              expect(r.left, greaterThanOrEqualTo(sidebar.left), reason: k);
+              expect(r.right, lessThanOrEqualTo(sidebar.right), reason: k);
+              expect(
+                r.left,
+                greaterThanOrEqualTo(tester.getRect(title).right),
+                reason: k,
+              );
+            }
+            await tester.tap(byKey('libraryMoreMenu'));
+            await tester.pumpAndSettle();
+            for (final k in [
+              'newFolder',
+              'appearance-system',
+              'appearance-light',
+              'appearance-dark',
+              'aboutButton',
+            ]) {
+              expect(byKey(k).hitTestable(), findsOneWidget, reason: k);
+            }
+            expect(_overflows(tester), isEmpty);
+            await tester.tapAt(Offset.zero);
+            await tester.pumpAndSettle();
+
+            // AK3: touch-sized buttons on the iPad
+            if (platform == TargetPlatform.iOS) {
+              for (final k in buttons) {
+                final r = tester.getSize(byKey(k));
+                expect(r.width, greaterThanOrEqualTo(44), reason: k);
+                expect(r.height, greaterThanOrEqualTo(44), reason: k);
+              }
+            }
+            debugDefaultTargetPlatformOverride = null;
+          },
+        );
+      }
+    }
+  }
 
   test('#130 the native window uses the same sizes', () {
     final swift = File('macos/Runner/MainFlutterWindow.swift')

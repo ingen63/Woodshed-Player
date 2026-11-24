@@ -210,6 +210,8 @@ void main() {
       tester,
     ) async {
       final app = await pumpApp(tester);
+      await tester.tap(find.byKey(const Key('libraryMoreMenu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('newFolder')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('nameField')), 'Übungen');

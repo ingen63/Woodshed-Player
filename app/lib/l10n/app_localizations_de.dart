@@ -108,6 +108,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sortCustom => 'Eigene Reihenfolge';
 
   @override
+  String get libraryMore => 'Weitere Aktionen';
+
+  @override
   String get appearance => 'Darstellung';
 
   @override

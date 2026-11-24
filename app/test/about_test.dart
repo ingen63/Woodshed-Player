@@ -152,6 +152,8 @@ void main() {
       tester,
     ) async {
       final app = await pump(tester);
+      await tester.tap(find.byKey(const Key('libraryMoreMenu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('aboutButton')));
       await tester.pumpAndSettle();
       expect(find.text(de.aboutVersion(appVersion)), findsOneWidget);
@@ -187,6 +189,8 @@ void main() {
     testWidgets('#50/AK6 About shows Git tag and build date', (tester) async {
       final app = await pump(tester);
       app.files.build = BuildInfo.parse('v1.2.0', '2026-11-19');
+      await tester.tap(find.byKey(const Key('libraryMoreMenu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('aboutButton')));
       await tester.pumpAndSettle();
       expect(find.text(de.aboutTag('v1.2.0')), findsOneWidget);
@@ -197,6 +201,8 @@ void main() {
       tester,
     ) async {
       await pump(tester);
+      await tester.tap(find.byKey(const Key('libraryMoreMenu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('aboutButton')));
       await tester.pumpAndSettle();
       expect(find.text(de.aboutNoTag), findsOneWidget);

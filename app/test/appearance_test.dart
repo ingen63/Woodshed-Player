@@ -147,14 +147,14 @@ void main() {
     }
 
     Brightness brightness(WidgetTester tester) =>
-        Theme.of(tester.element(find.byKey(const Key('appearanceMenu'))))
+        Theme.of(tester.element(find.byKey(const Key('libraryMoreMenu'))))
             .brightness;
 
     WsTheme ws(WidgetTester tester) =>
-        WsTheme.of(tester.element(find.byKey(const Key('appearanceMenu'))));
+        WsTheme.of(tester.element(find.byKey(const Key('libraryMoreMenu'))));
 
     Future<void> choose(WidgetTester tester, Appearance a) async {
-      await tester.tap(find.byKey(const Key('appearanceMenu')));
+      await tester.tap(find.byKey(const Key('libraryMoreMenu')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(Key('appearance-${a.name}')));
       await tester.pumpAndSettle();
@@ -162,7 +162,7 @@ void main() {
 
     testWidgets('#31/AK1 menu offers System, Light and Dark', (tester) async {
       await pump(tester);
-      await tester.tap(find.byKey(const Key('appearanceMenu')));
+      await tester.tap(find.byKey(const Key('libraryMoreMenu')));
       await tester.pumpAndSettle();
       for (final t in [
         de.appearanceSystem,
@@ -171,7 +171,10 @@ void main() {
       ]) {
         expect(find.text(t), findsOneWidget);
       }
-      expect(find.byTooltip(de.appearance), findsOneWidget);
+      expect(
+        find.text(de.appearance),
+        findsOneWidget,
+      ); // #135: heading in the "⋯" menu
     });
 
     testWidgets('#31/AK1 the button is reachable in the phone layout', (
@@ -230,15 +233,13 @@ void main() {
 
     for (final p in [TargetPlatform.macOS, TargetPlatform.iOS]) {
       testWidgets(
-        '#31/AK1 the library title stays on one line next to the new button ($p)',
+        '#31/AK1 the library title stays on one line next to the buttons ($p)',
         (tester) async {
           debugDefaultTargetPlatformOverride = p;
           addTearDown(() => debugDefaultTargetPlatformOverride = null);
           await pump(tester);
           final title = tester.getRect(find.text(de.library));
-          final button = tester.getRect(
-            find.byKey(const Key('appearanceMenu')),
-          );
+          final button = tester.getRect(find.byKey(const Key('addFiles')));
           expect(title.height, lessThan(30)); // one line of titleLarge (22)
           expect(title.right, lessThanOrEqualTo(button.left));
           debugDefaultTargetPlatformOverride = null;

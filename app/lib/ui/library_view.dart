@@ -942,6 +942,8 @@ Future<String?> askName(
   );
 }
 
+enum _HeaderAction { newFolder, about }
+
 class _Header extends StatelessWidget {
   const _Header({required this.controller});
   final AppController controller;
@@ -956,12 +958,13 @@ class _Header extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            // One line; shrinks in narrow sidebars instead of breaking the word (#31: one more button).
+            // One line; shrinks only if a language needs it (#135: at least body text size from 260 pt).
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
                 l.library,
+                key: const Key('libraryTitle'),
                 maxLines: 1,
                 style: Theme.of(context).textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.bold),
@@ -975,14 +978,6 @@ class _Header extends StatelessWidget {
             ),
             icon: const Icon(WsIcons.add),
             onPressed: () => controller.pickAndImport(),
-          ),
-          IconButton(
-            key: const Key('newFolder'),
-            tooltip: l.newFolderShortcut(
-              shortcutLabel(platform, 'N', command: true, shift: true),
-            ),
-            icon: const Icon(WsIcons.folderBadgePlus),
-            onPressed: () => newFolder(context, lib),
           ),
           PopupMenuButton<TrackSortOrder>(
             key: const Key('sortMenu'),
@@ -999,16 +994,37 @@ class _Header extends StatelessWidget {
                 ),
             ],
           ),
-          PopupMenuButton<Appearance>(
-            key: const Key('appearanceMenu'),
-            tooltip: l.appearance,
-            icon: Icon(switch (lib.appearance) {
-              Appearance.system => WsIcons.appearanceAuto,
-              Appearance.light => WsIcons.sun,
-              Appearance.dark => WsIcons.moon,
-            }),
-            onSelected: (a) => lib.appearance = a,
+          // #135: New folder, Appearance and About behind "⋯", so the title keeps its room.
+          PopupMenuButton<Object>(
+            key: const Key('libraryMoreMenu'),
+            tooltip: l.libraryMore,
+            icon: const Icon(WsIcons.ellipsis),
+            onSelected: (v) {
+              switch (v) {
+                case _HeaderAction.newFolder:
+                  newFolder(context, lib);
+                case _HeaderAction.about:
+                  showAbout(context, controller.files);
+                case Appearance a:
+                  lib.appearance = a;
+              }
+            },
             itemBuilder: (_) => [
+              PopupMenuItem(
+                key: const Key('newFolder'),
+                value: _HeaderAction.newFolder,
+                child: Text(
+                  l.newFolderShortcut(
+                    shortcutLabel(platform, 'N', command: true, shift: true),
+                  ),
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                key: const Key('appearanceHeading'),
+                enabled: false,
+                child: Text(l.appearance),
+              ),
               for (final a in Appearance.values)
                 CheckedPopupMenuItem(
                   key: Key('appearance-${a.name}'),
@@ -1016,13 +1032,13 @@ class _Header extends StatelessWidget {
                   checked: lib.appearance == a,
                   child: Text(appearanceLabel(l, a)),
                 ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                key: const Key('aboutButton'),
+                value: _HeaderAction.about,
+                child: Text(l.aboutApp),
+              ),
             ],
-          ),
-          IconButton(
-            key: const Key('aboutButton'),
-            tooltip: l.aboutApp,
-            icon: const Icon(WsIcons.info),
-            onPressed: () => showAbout(context, controller.files),
           ),
         ],
       ),

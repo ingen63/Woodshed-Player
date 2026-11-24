@@ -108,6 +108,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sortCustom => 'Custom order';
 
   @override
+  String get libraryMore => 'More actions';
+
+  @override
   String get appearance => 'Appearance';
 
   @override

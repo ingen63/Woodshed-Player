@@ -73,6 +73,8 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get sortCustom => pseudo(super.sortCustom);
   @override
+  String get libraryMore => pseudo(super.libraryMore);
+  @override
   String get appearance => pseudo(super.appearance);
   @override
   String get appearanceSystem => pseudo(super.appearanceSystem);

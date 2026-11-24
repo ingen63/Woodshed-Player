@@ -278,6 +278,12 @@ abstract class AppLocalizations {
   /// **'Custom order'**
   String get sortCustom;
 
+  /// No description provided for @libraryMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get libraryMore;
+
   /// No description provided for @appearance.
   ///
   /// In en, this message translates to:
