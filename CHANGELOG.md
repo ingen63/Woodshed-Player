@@ -2,7 +2,7 @@
 
 Release Notes von Woodshed Player, neueste Version zuerst. Diese Datei ist massgebend; [`CHANGELOG.en.md`](CHANGELOG.en.md) übersetzt jede Version. Jeder Eintrag beginnt mit `## Version X.Y.Z` und hat die Abschnitte «Neu, geändert, behoben» und «Tests und Entwicklung» (mindestens einen, in dieser Reihenfolge); jeder Punkt nennt seine Issues. `python3 tools/changelog.py check` prüft beide Dateien (#139).
 
-## Version 0.9.0
+## Version 1.0.0-beta.1
 
 ### Neu, geändert, behoben
 
@@ -10,12 +10,15 @@ Release Notes von Woodshed Player, neueste Version zuerst. Diese Datei ist massg
 - **MP3-Export (#141):** Ausgewählte Titel als MP3 exportieren, mit Jahr als Metadatum (`--year` für die scharfe Aufnahme).
 - **Bibliothek (#135, #136, #137):** Titel besser lesbar, «Neuer Ordner», Darstellung und Info im Menü «⋯»; ungültige Loops werden beim Speichern und Kürzen verworfen; eine gelöschte lokale Playlist stört den Abgleich nicht mehr.
 - **OneDrive entfernt (#55):** aus Doku und Web-App.
+- **Menüleiste und Sprache (#144):** Die Menüleiste des Mac folgt der Systemsprache; iOS und macOS melden Englisch und Deutsch als Sprachen der App; die Web-App setzt die Sprache der Seite.
+- **Gleichnamige Einträge (#143):** Die Bibliothek bricht bei gleichnamigen Titeln, Ordnern oder Playlists nicht mehr ab.
 
 ### Tests und Entwicklung
 
 - Release-Workflow mit macOS-Paket, Web-App und zweisprachigen Release Notes (#139).
 - Testseite und Testprogramm K0 für die direkte Verbindung zwischen Geräten (#52).
 - Nächtliche Mutationstests mit Zwischenspeicher je Quellstand (#138); abgebrochene Verbindung der Kommandozeile unter Linux ohne unbehandelten Fehler (#140).
+- Englische Projekt-README mit deutscher Fassung (#145).
 
 ## Version 0.8.2
 

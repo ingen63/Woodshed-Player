@@ -6,7 +6,7 @@ Bauen, Testen, Technik und Release von Woodshed Player. Den Überblick gibt die 
 
 Ein Tag `v*` startet [`.github/workflows/release.yml`](../.github/workflows/release.yml) (#139): Er prüft die Release Notes, baut das macOS-Paket und die Web-App und legt einen **Entwurf** unter *Releases* an. Fehlt die Version in einer Sprache oder schlägt ein Paket fehl, entsteht kein Entwurf; der rote Lauf nennt Sprache bzw. Plattform.
 
-1. **Version setzen:** `version` in `app/pubspec.yaml` und `appVersion` in `app/lib/app/app_info.dart`, z. B. `0.9.0`.
+1. **Version setzen:** `version` in `app/pubspec.yaml` und `appVersion` in `app/lib/app/app_info.dart`, z. B. `0.9.0`. Vorabversionen heissen wie bei VivaPlan `1.0.0-beta.N`, der Titel des Release lautet dann «Woodshed Player 1.0.0 Beta N». Windows kennt in der Versionsnummer nur Ziffern: Dort wird `1.0.0-beta.N` zu `1.0.0.N` (#60). Flutter nimmt die vierte Stelle aus der Build-Nummer, darum steht in `pubspec.yaml` `1.0.0-beta.N+N`.
 2. **Eintrag schreiben:** in `CHANGELOG.md` oben `## Version 0.9.0` mit den Abschnitten `### Neu, geändert, behoben` und `### Tests und Entwicklung` (mindestens einer, in dieser Reihenfolge); jeder Punkt nennt seine Issues (`#123`). Eine Einleitung vor dem ersten Abschnitt ist erlaubt.
 3. **Übersetzen:** denselben Eintrag in `CHANGELOG.en.md` mit `### New, changed, fixed` und `### Tests and development`, dieselben Issue-Nummern je Abschnitt.
 4. **Prüfen:** `make test-changelog` (läuft auch in `make test` und in CI); `python3 tools/changelog.py notes v0.9.0` zeigt den Text des Entwurfs (Englisch offen, Deutsch aufklappbar), `python3 tools/changelog.py tag v0.9.0` prüft, dass der Tag zur App-Version passt.
