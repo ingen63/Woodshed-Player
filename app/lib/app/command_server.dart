@@ -42,7 +42,7 @@ class CommandServer {
         0,
       );
       final s = CommandServer._(server, path);
-      server.listen((client) => unawaited(_serve(client, handler)));
+      server.listen((client) => unawaited(serve(client, handler)));
       return s;
     } on Object catch (e) {
       debugPrint('Command line: socket not available: $e');
@@ -51,7 +51,11 @@ class CommandServer {
   }
 
   // network-free: local unix socket, the connection of one call of the command line
-  static Future<void> _serve(Socket client, CommandHandler handler) async {
+  @visibleForTesting
+  static Future<void> serve(Socket client, CommandHandler handler) async {
+    // A program that goes away resets the connection (Linux: ECONNRESET); the socket reports that on
+    // `done`, which would otherwise be an unhandled error. Going away is handled by `gone` below.
+    client.done.ignore();
     final interrupt = Completer<void>();
     final request = Completer<String?>();
     final lines = client

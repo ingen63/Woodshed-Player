@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -738,6 +739,18 @@ void main() {
       },
     );
 
+    test('#140/AK14: a connection reset by the program (Linux) is no unhandled error', () async {
+      final input = StreamController<Uint8List>();
+      final client = _ResetSocket(input.stream);
+      final served = CommandServer.serve(client, handler);
+      input.add(utf8.encode('{"version":1,"command":"record"}\n'));
+      await eventually(() => recording.phase == RecordingPhase.armed, 'armed');
+      await input.close();
+      await served;
+      expect(recording.phase, RecordingPhase.idle);
+      expect(client.written.last, 'exit ${CliExit.cancelled}\n');
+    });
+
     test('#140: a request the app does not understand ends with a message and code 2', () async {
       server = await CommandServer.start(path, handler);
       expect(await call(['not json']), [
@@ -814,4 +827,29 @@ void main() {
       },
     );
   });
+}
+
+/// A connection whose program went away with a reset, as on Linux: the socket reports
+/// «Connection reset by peer» on `done` (#140/AK14).
+class _ResetSocket extends StreamView<Uint8List> implements Socket {
+  _ResetSocket(super.stream);
+
+  final written = <String>[];
+
+  @override
+  final Future<void> done = Future<void>.error(
+    const SocketException('Connection reset by peer (OS Error: errno = 104)'),
+  );
+
+  @override
+  void write(Object? object) => written.add('$object');
+
+  @override
+  Future<void> flush() async {}
+
+  @override
+  Future<void> close() async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
