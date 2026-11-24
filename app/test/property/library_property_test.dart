@@ -7,6 +7,7 @@
 //   list only tracks of the library, and saving and loading keeps them with their order.
 // - #116: tracks are trimmed at random: the track keeps its place (no track lost or added), its loops lie
 //   within the new length, and no playlist names the old ID any more.
+// - #136: after every step every loop lies within 0 ≤ start < end ≤ duration.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -191,16 +192,7 @@ Future<String> trimStep(Random r, Library lib) async {
   expect(lib.track(id), isNull, reason: 'old track still shown');
   final n = lib.track(next)!;
   expect(n.duration, closeTo(b - a, 1e-9));
-  for (final l in [
-    ...n.loops.values.nonNulls,
-    if (n.loopId != null) LoopRange(n.settings.loopStart, n.settings.loopEnd),
-  ]) {
-    expect(
-      l.start >= 0 && l.end <= n.duration + 1e-9 && l.start < l.end,
-      isTrue,
-      reason: 'loop ${l.start}–${l.end} outside 0–${n.duration}',
-    );
-  }
+  checkLoops(lib, 'trim'); // #136/AK2
   for (final p in lib.playlists) {
     expect(p.entries, isNot(contains(id)), reason: 'playlist names the old ID');
   }
@@ -271,6 +263,23 @@ void checkTracks(Library lib, Set<String> expected, String after) {
       isTrue,
       reason: 'track in a missing folder after $after',
     );
+  }
+  checkLoops(lib, after);
+}
+
+/// #136/AK2: every loop of every track lies within 0 ≤ start < end ≤ duration, the active one included.
+void checkLoops(Library lib, String after) {
+  for (final t in lib.tracks) {
+    for (final l in [
+      ...t.loops.values.nonNulls,
+      if (t.loopId != null) LoopRange(t.settings.loopStart, t.settings.loopEnd),
+    ]) {
+      expect(
+        l.start >= 0 && l.start < l.end && l.end <= t.duration + 1e-9,
+        isTrue,
+        reason: 'loop ${l.start}–${l.end} outside 0–${t.duration} after $after',
+      );
+    }
   }
 }
 

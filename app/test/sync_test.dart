@@ -513,7 +513,7 @@ void main() {
         a
             .t(t.id)
             .settings
-            .copyWith(loopEnabled: true, loopStart: 1, loopEnd: 2),
+            .copyWith(loopEnabled: true, loopStart: 0.25, loopEnd: 0.5),
       );
       tick();
       b.library.updateSettings(
@@ -521,7 +521,7 @@ void main() {
         b
             .t(t.id)
             .settings
-            .copyWith(loopEnabled: true, loopStart: 3, loopEnd: 4),
+            .copyWith(loopEnabled: true, loopStart: 0.75, loopEnd: 1),
       );
       final idA = a.t(t.id).loopId!;
       final idB = b.t(t.id).loopId!;
@@ -531,11 +531,11 @@ void main() {
       await a.sync.sync();
       for (final d in [a, b]) {
         final tr = d.t(t.id);
-        expect(tr.loops[idA], const LoopRange(1, 2));
-        expect(tr.loops[idB], const LoopRange(3, 4));
+        expect(tr.loops[idA], const LoopRange(0.25, 0.5));
+        expect(tr.loops[idB], const LoopRange(0.75, 1));
         // the later change decides which loop is shown
         expect(tr.loopId, idB);
-        expect(tr.settings.loopStart, 3);
+        expect(tr.settings.loopStart, 0.75);
       }
     });
 
@@ -548,7 +548,7 @@ void main() {
       tick();
       a.library.updateSettings(
         t.id,
-        a.t(t.id).settings.copyWith(loopStart: 1, loopEnd: 2),
+        a.t(t.id).settings.copyWith(loopStart: 0.25, loopEnd: 0.5),
       );
       final x = a.t(t.id).loopId!;
       a.library.updateSettings(
@@ -558,7 +558,7 @@ void main() {
       tick();
       a.library.updateSettings(
         t.id,
-        a.t(t.id).settings.copyWith(loopStart: 5, loopEnd: 6),
+        a.t(t.id).settings.copyWith(loopStart: 1.25, loopEnd: 1.5),
       );
       final y = a.t(t.id).loopId!;
       expect(a.t(t.id).loops[x], isNull, reason: 'x was cleared');
@@ -568,7 +568,7 @@ void main() {
       tick();
       a.library.updateSettings(
         t.id,
-        a.t(t.id).settings.copyWith(loopStart: 5, loopEnd: 7),
+        a.t(t.id).settings.copyWith(loopStart: 1.25, loopEnd: 1.75),
       );
       tick();
       b.library.updateSettings(
@@ -578,7 +578,7 @@ void main() {
       tick();
       b.library.updateSettings(
         t.id,
-        b.t(t.id).settings.copyWith(loopStart: 8, loopEnd: 9),
+        b.t(t.id).settings.copyWith(loopStart: 2, loopEnd: 2.25),
       );
       final z = b.t(t.id).loopId!;
       await b.sync.sync();
@@ -591,7 +591,7 @@ void main() {
           isNull,
           reason: 'deleted by B after A changed it',
         );
-        expect(rec['loops.$z'], {'start': 8.0, 'end': 9.0});
+        expect(rec['loops.$z'], {'start': 2.0, 'end': 2.25});
         expect(d.t(t.id).loopId, z);
       }
     });

@@ -5,6 +5,11 @@
       "seed": 1819084227,
       "found": "2026-11-19",
       "note": "moveTracks with a negative row threw a RangeError"
+    },
+    {
+      "seed": 1600748318,
+      "found": "2026-11-24",
+      "note": "updateSettings stored a loop with its start after its end; trimming moved it unchanged (#136)"
     }
   ],
   "saving and loading gives the same state": [
@@ -12,6 +17,11 @@
       "seed": 1819234688,
       "found": "2026-11-19",
       "note": "moveTracks with a negative row threw a RangeError"
+    },
+    {
+      "seed": 1592956022,
+      "found": "2026-11-24",
+      "note": "updateSettings stored a loop with its start after its end; trimming moved it unchanged (#136)"
     }
   ],
   "loop bounds are valid after every change": [

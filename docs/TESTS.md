@@ -529,7 +529,7 @@ in `app/test/property/` gibt; die Namen liest der Test aus den Aufrufen von `pro
 
 | Eigenschaft | Datei | Invariante |
 |---|---|---|
-| Sortieren und Verschieben | `library_property_test.dart` | nach jedem von 5–35 zufälligen Schritten (Import, Ordner anlegen, umbenennen, löschen, verschieben, ziehen, Sortierung, Titel, Einstellungen, Löschen) jeder Titel genau einmal, in einem bestehenden Ordner oder ohne |
+| Sortieren und Verschieben | `library_property_test.dart` | nach jedem von 5–35 zufälligen Schritten (Import, Ordner anlegen, umbenennen, löschen, verschieben, ziehen, Sortierung, Titel, Einstellungen, Löschen) jeder Titel genau einmal, in einem bestehenden Ordner oder ohne; jeder Loop in 0 ≤ Anfang < Ende ≤ Dauer (#136) |
 | Speichern und Laden | `library_property_test.dart` | geladener Stand = gespeicherter Stand; erneutes Speichern schreibt dieselbe Datei |
 | Loop-Grenzen | `player_property_test.dart` | nach Laden (gespeicherte Grenzen, auch ausserhalb der Datei) und jeder Änderung: 0 ≤ Anfang, Ende ≤ Dauer; ab 1 s Dauer Ende ≥ Anfang + 1 s; der Kern hat genau den aktiven Loop |
 | Zeitformat | `player_property_test.dart` | `parseTime(formatTime(x)) == x` (ganze Sekunden bis 100 h), dasselbe mit Zehnteln und im Zeitfeld; beliebiges x ergibt ⌊x⌋ |
@@ -1323,6 +1323,7 @@ Stand #127 (23.11.2026), je Fund belegt mit zurückgenommener Korrektur:
 | 39 | `capi/path_ending_in_dot` | `pathEndingInDot` (`capi_tests.cpp`) | rot unter `make sanitize` (#105) |
 | 43 | `trim/flac_seek_infinity` | «#116 regression (found bug 43) …» (`trim_tests.cpp`, neu) | rot unter `make sanitize` |
 | 44 | `trim/m4a_empty_mvhd_at_end` | «#120 regression (found bug 44) …» (`trim_mp4_tests.cpp`, neu) | rot unter `make sanitize` |
+| 46 | Startwert 1600748318 und 1592956022 | «#136 regression (found bug 46), seed …» (`trim_test.dart`, neu) | rot |
 
 Aus `regressions.json` entfernt (#127/AK3): der Startwert 1819282202 unter «damaged state.json never crashes and never
 loses local data», denn diese Eigenschaft gibt es seit #53 nicht mehr (`state.json` wurde durch Gerätedateien
@@ -1645,3 +1646,13 @@ hinzukommenden Geräts (#104) dürfen den alten Titel behalten.
     parallelen ctest-Fälle `capi_tests` und `capi_null_backend_tests` denselben festen Ordner anlegten und löschten
     (Abschnitt «Wackelnde Tests»). Behoben mit einem eigenen Ordner je Lauf; Nachweis: beide Fälle parallel 30 Mal
     grün, der volle Kernlauf unter ASan 10 Mal grün.
+46. 24.11.2026, #136, nächtlicher Zufallstest (Lauf 45159576773, `library_property_test.dart`, Schritt `trimStep`):
+    Nach dem Kürzen hatte ein Titel einen Loop mit Anfang hinter dem Ende (194,93–183,83 s bzw. 67,36–14,76 s).
+    Ursache: `Library.updateSettings` (`Track.withSettings`) speicherte die Grenzen ungeprüft, auch umgekehrt oder
+    ausserhalb des Titels, als aktiven Loop; `LoopRange.trimmed` verschob einen umgekehrten Loop unverändert. Im
+    Player entsteht so ein Loop nicht (er begrenzt die Grenzen selbst), wohl aber über jeden anderen Aufrufer.
+    Behoben in `track.dart`: `LoopRange.within` begrenzt einen Loop auf 0 … Dauer und verwirft ihn, wenn nichts
+    bleibt; `withSettings` und `trimmed` nutzen es, ein verworfener Loop gilt als gelöscht. Startwerte 1600748318
+    und 1592956022 in `regressions.json`, Test «#136 regression (found bug 46), seed …» (`trim_test.dart`, #127):
+    Titel von 270 s bzw. 262,5 s, Loop 219,2–208,1 s bzw. 167,4–114,8 s, gekürzt; ohne Behebung rot. Der Zufallstest
+    prüft seither nach jedem Schritt, dass jeder Loop in 0 ≤ Anfang < Ende ≤ Dauer liegt (#136/AK2).

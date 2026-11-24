@@ -37,10 +37,10 @@ AudioTrimmer failing(int code) =>
     (b, s, e) async => WpTrimmed.failed(code);
 
 class Device {
-  Device(this.cloud, int seed) {
+  Device(this.cloud, int seed, {double duration = 10}) {
     library = Library(
       store,
-      probe: (_) => 10,
+      probe: (_) => duration,
       readSource: (s) async => sources[s],
       now: () => clock,
       saveDelay: Duration.zero,
@@ -66,8 +66,12 @@ class Device {
   }
 }
 
-Future<Device> device(InMemoryProvider cloud, int seed) async {
-  final d = Device(cloud, seed);
+Future<Device> device(
+  InMemoryProvider cloud,
+  int seed, {
+  double duration = 10,
+}) async {
+  final d = Device(cloud, seed, duration: duration);
   await d.library.load();
   addTearDown(d.sync.dispose);
   return d;
@@ -101,6 +105,115 @@ void main() {
         expect(const LoopRange(8.5, 9).trimmed(2, 6), isNull);
       },
     );
+    test('#136/AK2 an invalid loop (start at or after its end) is dropped', () {
+      expect(const LoopRange(5, 3).trimmed(2, 6), isNull);
+      expect(const LoopRange(4, 4).trimmed(2, 6), isNull);
+      expect(const LoopRange(double.nan, 4).trimmed(2, 6), isNull);
+    });
+  });
+
+  group('#136/AK2 loops stay within 0 … duration', () {
+    test('within clamps to 0 … duration and drops what is left empty', () {
+      expect(const LoopRange(-1, 4).within(10), const LoopRange(0, 4));
+      expect(const LoopRange(3, 12).within(10), const LoopRange(3, 10));
+      expect(const LoopRange(3, 4).within(10), const LoopRange(3, 4));
+      expect(const LoopRange(5, 3).within(10), isNull);
+      expect(const LoopRange(4, 4).within(10), isNull);
+      expect(const LoopRange(10, 12).within(10), isNull);
+      expect(const LoopRange(-2, 0).within(10), isNull);
+      // unknown duration (0): only the start is clamped
+      expect(const LoopRange(-1, 12).within(0), const LoopRange(0, 12));
+    });
+
+    Future<(Device, Track)> one() async {
+      final d = await device(InMemoryProvider(), 23);
+      return (d, await d.add('a.mp3'));
+    }
+
+    test('a loop reaching outside the track is clamped when stored', () async {
+      final (d, t) = await one();
+      d.library.updateSettings(
+        t.id,
+        const PlaybackSettings(loopEnabled: true, loopStart: -1, loopEnd: 12),
+      );
+      final n = d.library.track(t.id)!;
+      expect((n.settings.loopStart, n.settings.loopEnd), (0.0, 10.0));
+      expect(n.loops[n.loopId], const LoopRange(0, 10));
+      expect(n.settings.loopEnabled, isTrue);
+    });
+
+    test('a reversed loop counts as cleared: none is created', () async {
+      final (d, t) = await one();
+      d.library.updateSettings(
+        t.id,
+        const PlaybackSettings(loopEnabled: true, loopStart: 8, loopEnd: 7),
+      );
+      final n = d.library.track(t.id)!;
+      expect(n.loopId, isNull);
+      expect(n.loops, isEmpty);
+      expect(
+        (n.settings.loopEnabled, n.settings.loopStart, n.settings.loopEnd),
+        (false, 0.0, 0.0),
+      );
+    });
+
+    test('a reversed loop over an active one deletes it', () async {
+      final (d, t) = await one();
+      d.library.updateSettings(
+        t.id,
+        const PlaybackSettings(loopEnabled: true, loopStart: 2, loopEnd: 4),
+      );
+      final id = d.library.track(t.id)!.loopId!;
+      d.library.updateSettings(
+        t.id,
+        const PlaybackSettings(loopEnabled: true, loopStart: 6, loopEnd: 4),
+      );
+      final n = d.library.track(t.id)!;
+      expect(n.loopId, isNull);
+      expect(n.loops, {id: null});
+      expect(n.settings.loopEnabled, isFalse);
+    });
+
+    test('settings without a loop end stay as they are', () async {
+      final (d, t) = await one();
+      const s = PlaybackSettings(speed: 0.5, loopStart: 3);
+      d.library.updateSettings(t.id, s);
+      final n = d.library.track(t.id)!;
+      expect(n.settings, s);
+      expect(n.loopId, isNull);
+    });
+
+    // #136 regression (found bug 46), regressions.json seeds 1600748318 and 1592956022: updateSettings
+    // stored a loop with its start after its end as the active loop; trimming moved it unchanged, so the
+    // trimmed track had the loop 194.93–183.83 s (67.36–14.76 s) in a file of 219.89 s (111.18 s).
+    for (final (seed, length, start, end, cut, cutEnd) in [
+      (1600748318, 270.0, 219.2, 208.1, 24.27, 244.16),
+      (1592956022, 262.5, 167.4, 114.8, 100.04, 211.22),
+    ]) {
+      test(
+        '#136 regression (found bug 46), seed $seed: a reversed loop does not survive trimming',
+        () async {
+          final d = await device(InMemoryProvider(), 24, duration: length);
+          final t = await d.add('a.mp3');
+          d.library.updateSettings(
+            t.id,
+            PlaybackSettings(loopEnabled: true, loopStart: start, loopEnd: end),
+          );
+          final next = await d.library.trimTrack(t.id, cut, cutEnd, fakeTrim);
+          final n = d.library.track(next!)!;
+          for (final l in [
+            ...n.loops.values.nonNulls,
+            if (n.loopId != null)
+              LoopRange(n.settings.loopStart, n.settings.loopEnd),
+          ]) {
+            expect(l.start, greaterThanOrEqualTo(0));
+            expect(l.start, lessThan(l.end));
+            expect(l.end, lessThanOrEqualTo(n.duration));
+          }
+          expect(n.loopId, isNull);
+        },
+      );
+    }
   });
 
   group('#116 trimming in the library', () {

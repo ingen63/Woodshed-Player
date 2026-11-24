@@ -119,9 +119,17 @@ class Track {
   );
 
   /// New playback settings from the player. Setting a loop where there was none creates a loop with a
-  /// new ID from [newLoopId]; clearing it deletes the active loop (#37/AK4).
+  /// new ID from [newLoopId]; clearing it deletes the active loop (#37/AK4). #136: a loop is clamped to
+  /// 0 … [duration]; one with nothing left (start at or after its end) counts as cleared.
   Track withSettings(PlaybackSettings s, String Function() newLoopId) {
-    final hasLoop = s.loopEnd > 0;
+    // no loop end (0) leaves nothing of the range either
+    final range = LoopRange(s.loopStart, s.loopEnd).within(duration);
+    final hasLoop = range != null;
+    if (hasLoop) {
+      s = s.copyWith(loopStart: range.start, loopEnd: range.end);
+    } else if (s.loopEnd > 0) {
+      s = s.copyWith(loopEnabled: false, loopStart: 0, loopEnd: 0);
+    }
     if (hasLoop && loopId == null) {
       final id = newLoopId();
       return copyWith(
@@ -325,11 +333,16 @@ class LoopRange {
   Map<String, Object?> toJson() => {'start': start, 'end': end};
 
   /// #116/AK6: this loop in a file trimmed to [cut] … [cut] + [length] seconds: moved by [cut], clamped to
-  /// 0 … [length]; null if it lies entirely outside (touching a bound counts as outside).
-  LoopRange? trimmed(double cut, double length) {
-    final s = start - cut, e = end - cut;
-    if (e <= 0 || s >= length) return null;
-    return LoopRange(max(0.0, s), min(length, e));
+  /// 0 … [length]; null if it lies entirely outside (touching a bound counts as outside) or, #136, was
+  /// invalid before (start at or after its end).
+  LoopRange? trimmed(double cut, double length) =>
+      LoopRange(start - cut, end - cut).within(length);
+
+  /// #136: this loop clamped to 0 … [duration] (only to 0 while the duration is unknown, 0); null if
+  /// nothing is left of it (start at or after its end, or not a number).
+  LoopRange? within(double duration) {
+    final s = max(0.0, start), e = duration > 0 ? min(duration, end) : end;
+    return s < e ? LoopRange(s, e) : null;
   }
 
   /// null for a deleted loop or invalid contents.
