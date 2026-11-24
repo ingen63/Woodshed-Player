@@ -389,6 +389,10 @@ app/lib/library/library.dart | dart_le_to_lt | if (total <= cacheLimit) return c
 # Speicherfreigabe: Gibt nur das Encoder-Objekt frei (ein Leck, Lecks zählen im Mutationslauf nicht).
 # Die Datei ist zu diesem Zeitpunkt schon fertig geschrieben (finish), die Ausgabe ist dieselbe.
 core/src/flac_writer.cpp | cxx_remove_void_call | FLAC__stream_encoder_delete(encoder_);
+# Speicherfreigabe: Gibt nur den Encoder frei, dessen Start (init) gescheitert ist; open() meldet in
+# beiden Fällen false, es entsteht keine Datei (#138: nur in CI gemeldet, lokal hielt Mulls
+# Zwischenspeicher einen alten Treffer an derselben Stelle).
+core/src/flac_writer.cpp | cxx_remove_void_call | FLAC__stream_encoder_delete(e);
 
 # ---- core/src/recorder_core.cpp (#113) ----
 # Grenzfall: Ohne close() im Destruktor läuft das miniaudio-Gerät auf
@@ -403,6 +407,7 @@ core/src/recorder_core.cpp | cxx_remove_void_call | MicInput::~MicInput() { clos
 # dieser Stelle endet oder abgeschnitten ist; die Prüfung danach (Signatur, Länge, gültiger Kopf, der
 # nächste Frame) lehnt dieselben Eingaben ab. Fuzzing (fuzz_trim) findet dabei keinen Absturz.
 core/src/trim.cpp | cxx_le_to_lt | return pos <= size && size - pos >= n && std::memcmp(data + pos, tag, n) == 0;
+core/src/trim.cpp | cxx_ge_to_gt | return pos <= size && size - pos >= n && std::memcmp(data + pos, tag, n) == 0;
 core/src/trim.cpp | cxx_ge_to_gt | while (tagAt(data, size, p, "ID3") && size - p >= 10) {
 core/src/trim.cpp | cxx_sub_to_add | if (end - from >= 128 && tagAt(data, size, end - 128, "TAG"))
 core/src/trim.cpp | cxx_ge_to_gt | if (end - from >= 128 && tagAt(data, size, end - 128, "TAG"))
@@ -419,9 +424,12 @@ core/src/trim.cpp | cxx_le_to_lt | while (p <= size && size - p >= 8) {
 core/src/trim.cpp | cxx_sub_to_add | while (p <= size && size - p >= 8) {
 core/src/trim.cpp | cxx_ge_to_gt | while (p <= size && size - p >= 8) {
 core/src/trim.cpp | cxx_sub_to_add | if (tagAt(data, size, p, "fmt ") && len >= 16 && size - p - 8 >= 16)
+core/src/trim.cpp | cxx_ge_to_gt | if (tagAt(data, size, p, "fmt ") && len >= 16 && size - p - 8 >= 16) | 67
 core/src/trim.cpp | cxx_sub_to_add | else if (tagAt(data, size, p, "fact") && len >= 4 && size - p - 8 >= 4)
+core/src/trim.cpp | cxx_ge_to_gt | else if (tagAt(data, size, p, "fact") && len >= 4 && size - p - 8 >= 4) | 71
 core/src/trim.cpp | cxx_sub_to_add | if (size - p - 8 < size_t{len} + (len & 1))
 core/src/trim.cpp | cxx_lt_to_le | if (size - p - 8 < size_t{len} + (len & 1))
+core/src/trim.cpp | cxx_add_to_sub | if (size - p - 8 < size_t{len} + (len & 1))
 core/src/trim.cpp | cxx_ge_to_gt | if (tag == 0xFFFE && fmtLen >= 26 && size - fmt >= 26)
 core/src/trim.cpp | cxx_lt_to_le | if (p > size || size - p < 4)
 core/src/trim.cpp | cxx_sub_to_add | if (size - p - 4 < len)
@@ -446,16 +454,33 @@ core/src/trim.cpp | cxx_lt_to_le | (rateIndex < 0 || ri == rateIndex)) {
 
 # gleichwertig: reserve() legt nur Speicher an; Inhalt und Grösse des Ergebnisses bleiben gleich.
 core/src/trim.cpp | cxx_remove_void_call | r.bytes.reserve(dataHeader + 8 + keep + 1 + (size - afterData));
+core/src/trim.cpp | cxx_remove_void_call | r.bytes.reserve(audio + info.size() + bytes.size() + (size - tags));
 core/src/trim.cpp | cxx_add_to_sub | r.bytes.reserve(dataHeader + 8 + keep + 1 + (size - afterData));
 core/src/trim.cpp | cxx_sub_to_add | r.bytes.reserve(dataHeader + 8 + keep + 1 + (size - afterData));
 core/src/trim.cpp | cxx_add_to_sub | r.bytes.reserve(audio + info.size() + bytes.size() + (size - tags));
 core/src/trim.cpp | cxx_sub_to_add | r.bytes.reserve(audio + info.size() + bytes.size() + (size - tags));
+
+# gleichwertig: (#138) An dieser Stelle gibt es fmt- und data-Chunk, und der data-Chunk folgt hinter dem
+# ganzen fmt-Chunk (die Schleife springt um 8 + fmtLen weiter, ihr Kopf liegt ganz in der Datei). Also ist
+# size − fmt mindestens fmtLen + 8, bei fmtLen >= 26 immer über 26; die Prüfung schlägt nie an.
+core/src/trim.cpp | cxx_sub_to_add | if (tag == 0xFFFE && fmtLen >= 26 && size - fmt >= 26)
+
+# gleichwertig: (#138) sampleRange() bekommt nie die Rate 0: WAV verwirft rate == 0, MP3 und ADTS nehmen sie
+# aus ihren Tabellen (alle > 0), FLAC verlangt, dass der Decoder dieselbe Rate meldet, MP4 verwirft
+# timescale 0. «rate >= 0» statt «> 0» ändert also nichts.
+core/src/trim.cpp | cxx_gt_to_ge | if (!(rate > 0) || total <= 0 || std::isnan(start) || std::isnan(end))
+
+# Grenzfall: (#138) Nur ein Datenstrom aus genau einem MP3-Frame endet mit dem ersten Frame
+# (p + f.len == to). Er dauert höchstens 72 ms und ist für das Kürzen (mindestens 1 s) ohnehin zu
+# kurz; mit dem Mutanten lautet der Fehler «unbekanntes Format» statt «ungültiger Bereich».
+core/src/trim.cpp | cxx_add_to_sub | const bool confirmed = ok && (!frames.empty() || p + f.len == to ||
 
 # gleichwertig: sampleRange() wird nur mit einer Länge > 0 erreicht, wo sie 0 ist, bleibt ohnehin weniger
 # als 1 s; dr_flac meldet MA_AT_END nur zusammen mit 0 Frames (die Bedingung prüft got == 0 zuerst);
 # libFLAC schreibt genau zwei Blöcke (Stream-Info und Vorbis-Kommentar), «--i» statt «++i» besucht
 # dieselben; FlacWriter: «>=» beim Vergrössern und beim Springen ans Ende ergibt dieselben Bytes.
 core/src/flac_writer.cpp | cxx_gt_to_ge | if (offset > w->memory_->size())
+core/src/flac_writer.cpp | cxx_gt_to_ge | if (w->memoryPos_ + bytes > out.size())
 core/src/trim.cpp | cxx_le_to_lt | if (!(rate > 0) || total <= 0 || std::isnan(start) || std::isnan(end))
 core/src/trim.cpp | cxx_ne_to_eq | if (got == 0 || (rr != MA_SUCCESS && rr != MA_AT_END))
 core/src/trim.cpp | cxx_pre_inc_to_pre_dec | for (size_t i = 1; i < fresh.size(); ++i)
@@ -489,6 +514,8 @@ core/src/trim.cpp | cxx_remove_void_call | r.bytes.push_back(0);
 core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data + afterData, size - afterData);
 core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, data, pos + 4); // ID3v2 before the stream (if any) and «fLaC»
 core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, encoded.data() + freshFrames, encoded.size() - freshFrames);
+core/src/trim.cpp | cxx_remove_void_call | append(r.bytes, keep[i].first, keep[i].second);
+core/src/flac_writer.cpp | cxx_remove_void_call | out.resize(w->memoryPos_ + bytes);
 core/src/trim.cpp | cxx_remove_void_call | append(bytes, empty.data(), empty.size());
 core/src/trim.cpp | cxx_remove_void_call | out.push_back(empty.size());
 core/src/trim.cpp | cxx_remove_void_call | append(bytes, data + frames[i].pos, frames[i].len);
@@ -630,6 +657,10 @@ app/lib/sync/providers/google_drive_provider.dart | dart_true_to_false | for (fi
 # nicht mehr verändert, das Ergebnis ist byte-gleich.
 app/lib/sync/providers/google_drive_provider.dart | dart_false_to_true | final b = BytesBuilder(copy: false)
 app/lib/sync/providers/http_transport_io.dart | dart_false_to_true | final bytes = BytesBuilder(copy: false);
+# gleichwertig: (#138) Nach close() ist _closed gesetzt und bleibt es; jeder weitere Hochlade-Versuch
+# wirft in _send() vor der ersten Anfrage, eine gemerkte Sitzung wird also nie mehr benutzt. Das Leeren
+# gibt nur Speicher frei.
+app/lib/sync/providers/google_drive_provider.dart | dart_remove_void_call | _sessions.clear();
 # gleichwertig: Der Empfänger beantwortet die eine Anfrage vollständig, bevor er schliesst; offen ist
 # dann höchstens eine ruhende Keep-alive-Verbindung, die close() auch ohne force sofort beendet (Test
 # «a browser that keeps its connection open» in google_drive_details_test.dart).

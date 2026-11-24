@@ -11,6 +11,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show max;
+import 'dart:typed_data' show BytesBuilder;
+
+import 'package:crypto/crypto.dart' show sha256;
 
 /// Outcome of one mutant. «timeout» counts as detected (an endless loop), like in VivaPlan.
 enum Outcome { killed, timeout, survived, excluded, unviable }
@@ -854,6 +857,44 @@ String originalTestReport(
         '${shown.length < text.length ? ', last ${shown.length} of ${text.length} lines' : ''}:',
     ...shown,
   ].join('\n');
+}
+
+/// File name of Mull's cache for the core sources [sources] (path → content), in local/mutants/.
+/// Mull keys a cached result only by the mutant's place (mutator, file, line, column), not by the
+/// code standing there. A cache filled from other sources gave old results for new code at the same
+/// place, e.g. «killed» for a mutant that no test can detect (#138/AK1). So each state of the
+/// mutated sources gets its own cache; new or changed tests keep it.
+String coreCacheName(Map<String, List<int>> sources) {
+  final all = BytesBuilder(copy: false);
+  for (final path in sources.keys.toList()..sort()) {
+    final content = sources[path]!;
+    all
+      ..add(utf8.encode('$path\u0000${content.length}\u0000'))
+      ..add(content);
+  }
+  final hash = sha256.convert(all.takeBytes()).toString().substring(0, 16);
+  return 'core-cache-$hash.db';
+}
+
+/// Arguments of `flutter test` for the Dart part. A mutant run stops at its first failure
+/// (#138/AK3): one failing test detects it, the remaining files would only cost time.
+List<String> dartTestArgs(List<String> files, {required bool mutant}) => [
+  'test',
+  '--no-pub',
+  '--reporter',
+  'failures-only',
+  '--concurrency',
+  '2',
+  if (mutant) '--fail-fast',
+  ...files,
+];
+
+/// Time limit of a Dart mutant: 3 × the slowest baseline, at least [minimum]. The baselines run in
+/// every copy of app/ at once, under the same load as the mutants (#138/AK3).
+Duration dartTimeLimit(Iterable<Duration> baselines, Duration minimum) {
+  final slowest = baselines.fold(Duration.zero, (a, b) => b > a ? b : a);
+  final limit = slowest * 3;
+  return limit > minimum ? limit : minimum;
 }
 
 final _compileError = RegExp(

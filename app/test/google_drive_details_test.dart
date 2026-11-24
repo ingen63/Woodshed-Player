@@ -520,6 +520,21 @@ void main() {
       },
     );
 
+    test('#138/AK2 choosing «None» while signed in signs out first', () async {
+      final lib = await library();
+      await lib.setSyncProvider('google');
+      final b = _Backend()..signedInValue = true;
+      final account = CloudAccount(library: lib, loadGoogle: () async => b);
+      await account.open();
+      expect(account.signedIn, isTrue);
+      await account.choose(CloudChoice.none);
+      expect(b.signOuts, 1);
+      expect(b.disposed, isTrue);
+      expect(account.signedIn, isFalse);
+      expect(lib.device.syncProvider, isNull);
+      account.dispose();
+    });
+
     test('disposing the account disposes the backend', () async {
       final lib = await library();
       await lib.setSyncProvider('google');

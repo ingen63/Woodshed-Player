@@ -391,6 +391,76 @@ void main() {
     });
   });
 
+  group('#138/AK3: Dart time limit under load', () {
+    test('3 × the slowest of the parallel baselines, at least the minimum', () {
+      const minimum = Duration(seconds: 60);
+      expect(
+        dartTimeLimit(const [
+          Duration(seconds: 33),
+          Duration(seconds: 41),
+          Duration(seconds: 38),
+        ], minimum),
+        const Duration(seconds: 123),
+      );
+      expect(dartTimeLimit(const [Duration(seconds: 2)], minimum), minimum);
+      expect(dartTimeLimit(const [Duration(seconds: 20)], minimum), minimum);
+      expect(
+        dartTimeLimit(const [Duration(seconds: 21)], minimum),
+        const Duration(seconds: 63),
+      );
+    });
+
+    test('a mutant run stops at its first failure, the baseline does not', () {
+      final mutant = dartTestArgs(['test/a_test.dart'], mutant: true);
+      final base = dartTestArgs(['test/a_test.dart'], mutant: false);
+      expect(mutant, contains('--fail-fast'));
+      expect(base, isNot(contains('--fail-fast')));
+      expect(mutant.first, 'test');
+      expect(mutant.last, 'test/a_test.dart');
+      expect(base, [
+        'test',
+        '--no-pub',
+        '--reporter',
+        'failures-only',
+        '--concurrency',
+        '2',
+        'test/a_test.dart',
+      ]);
+    });
+  });
+
+  group('#138/AK1: Mull cache per state of the core sources', () {
+    test('a change of a source gives another cache, the order does not', () {
+      final a = {
+        'core/src/trim.cpp': utf8.encode('if (a >= b)'),
+        'core/src/flac_writer.cpp': utf8.encode('x'),
+      };
+      final name = coreCacheName(a);
+      expect(name, matches(RegExp(r'^core-cache-[0-9a-f]{16}\.db$')));
+      expect(
+        coreCacheName({
+          'core/src/flac_writer.cpp': utf8.encode('x'),
+          'core/src/trim.cpp': utf8.encode('if (a >= b)'),
+        }),
+        name,
+      );
+      expect(
+        coreCacheName({...a, 'core/src/trim.cpp': utf8.encode('if (a > b)')}),
+        isNot(name),
+        reason: 'other code at the same place',
+      );
+      expect(
+        coreCacheName({...a, 'core/src/new.cpp': utf8.encode('')}),
+        isNot(name),
+      );
+      // the same bytes split differently between path and content
+      expect(
+        coreCacheName({'ab': utf8.encode('c')}),
+        isNot(coreCacheName({'a': utf8.encode('bc')})),
+      );
+    });
+  });
+
   group('a limited run leaves nothing in the temporary directory', () {
     // like flutter test: a directory with a file in TMPDIR, removed only on a normal end
     const leave =

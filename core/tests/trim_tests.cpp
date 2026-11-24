@@ -138,6 +138,19 @@ bool contains(const Bytes &b, const char *text) {
   return std::search(b.begin(), b.end(), text, text + n) != b.end();
 }
 
+// Position of the first audio frame of a FLAC file starting with «fLaC» (after the last metadata
+// block); 0 if the blocks run past the end.
+size_t flacAudioStart(const Bytes &b) {
+  for (size_t p = 4; p + 4 <= b.size();) {
+    const size_t len = (size_t{b[p + 1]} << 16) | (size_t{b[p + 2]} << 8) | b[p + 3];
+    const bool last = (b[p] & 0x80) != 0;
+    p += 4 + len;
+    if (last)
+      return p <= b.size() ? p : 0;
+  }
+  return 0;
+}
+
 // ---- WAV ----
 
 void wav16CutsExactlyAndKeepsChunks() { // #116/AK4
@@ -220,6 +233,16 @@ void flacKeepsBitDepth() { // #116/AK4
     const std::vector<float> old = decode(in), out = decode(r.bytes);
     CHECK(frames(out) == 66150); // 1.5 s
     CHECK(std::equal(out.begin(), out.end(), old.begin() + 11025 * 2));
+    // #138/AK2: the audio of the result are exactly the frames of the encoder, nothing after the
+    // last one (the same samples encoded here give the same frames)
+    Bytes ref;
+    CHECK(w.openMemory(&ref, kRate, 1, bits));
+    CHECK(w.writeInt(s.data() + 11025, 66150));
+    CHECK(w.close());
+    const size_t a = flacAudioStart(r.bytes), b = flacAudioStart(ref);
+    CHECK(a > 0 && b > 0);
+    CHECK(std::equal(r.bytes.begin() + static_cast<std::ptrdiff_t>(a), r.bytes.end(),
+                     ref.begin() + static_cast<std::ptrdiff_t>(b), ref.end()));
   }
 }
 
@@ -230,11 +253,16 @@ void flacWriterMemoryLimits() { // #116: depths libFLAC stores, nothing open aft
   CHECK(!w.openMemory(&out, kRate, 2, 3));
   CHECK(!w.openMemory(&out, kRate, 2, 33));
   CHECK(!w.openMemory(&out, kRate, 0, 16));
-  // a target that holds something already is emptied first
-  out.assign(100, 0x55);
+  // a target that holds something already is emptied first (#138/AK2: nothing of it stays at the
+  // end, the bytes are those written into an empty target)
+  Bytes empty;
+  CHECK(w.openMemory(&empty, kRate, 2, 4));
+  CHECK(w.close());
+  out.assign(4096, 0x55);
   CHECK(w.openMemory(&out, kRate, 2, 4));
   CHECK(w.close());
   CHECK(std::memcmp(out.data(), "fLaC", 4) == 0);
+  CHECK(out == empty);
   CHECK(w.openMemory(&out, kRate, 2, 32));
   const int32_t big[2] = {2147483647, -2147483647};
   CHECK(w.writeInt(big, 1));
@@ -839,6 +867,48 @@ void flacShorterThanItsHeader() {
   CHECK(wp::trim::trim(flac.data(), flac.size(), 0.5, 2.0).code == WP_ERR_UNSUPPORTED_FORMAT);
 }
 
+// #138/AK2: an ID3v2 header cut off before its 10 bytes is no tag (nothing is read past the end,
+// ASan in make sanitize and in the mutation build), and two tags in a row both stay.
+void id3v2CutOffAndTwice() {
+  for (const Bytes &cut : {Bytes{'I', 'D', '3', 4, 0, 0, 0},
+                           Bytes{'I', 'D', '3', 4, 0, 0, 0, 0, 0, 2, 'a', 'b', // a whole tag,
+                                 'I', 'D', '3', 4, 0, 0, 0}}) {                // then a cut-off one
+    CHECK(wp::trim::detect(cut.data(), cut.size()) == Format::Unknown);
+    CHECK(wp::trim::trim(cut.data(), cut.size(), 0, 1).code == WP_ERR_UNSUPPORTED_FORMAT);
+  }
+
+  const Bytes mp3 = readFile("clicks3.mp3");
+  Bytes in = {'I', 'D', '3', 4, 0, 0, 0, 0, 0, 2, 'a', 'b'};
+  in.insert(in.end(), {'I', 'D', '3', 3, 0, 0, 0, 0, 0, 3, 'c', 'd', 'e'});
+  in.insert(in.end(), mp3.begin(), mp3.end());
+  CHECK(wp::trim::detect(in.data(), in.size()) == Format::Mp3);
+  const wp::trim::Result r = wp::trim::trim(in.data(), in.size(), 0.7, 2.2);
+  CHECK(r.code == WP_OK);
+  // both tags stay in front, then the same as the cut of the file without them (the decoder of the
+  // core skips only one ID3v2 tag, so the result is compared bytewise)
+  const wp::trim::Result plain = wp::trim::trim(mp3.data(), mp3.size(), 0.7, 2.2);
+  CHECK(plain.code == WP_OK);
+  CHECK(r.bytes.size() == 25 + plain.bytes.size());
+  CHECK(r.bytes.size() > 25 && std::equal(in.begin(), in.begin() + 25, r.bytes.begin()));
+  CHECK(r.bytes.size() > 25 &&
+        std::equal(plain.bytes.begin(), plain.bytes.end(), r.bytes.begin() + 25, r.bytes.end()));
+}
+
+// #138/AK2: a VBRI header (Fraunhofer encoders) is the first frame without audio like an Info
+// frame; the cut replaces it with an own Info frame and does not take it along as audio.
+void mp3WithVbriHeader() {
+  Bytes in = readFile("clicks3.mp3");
+  CHECK(in.size() > 40 && std::memcmp(in.data() + 36, "Info", 4) == 0);
+  std::memcpy(in.data() + 36, "VBRI", 4);
+  const wp::trim::Result r = wp::trim::trim(in.data(), in.size(), 0.0, 1.5);
+  CHECK(r.code == WP_OK);
+  CHECK(wp::trim::detect(r.bytes.data(), r.bytes.size()) == Format::Mp3);
+  CHECK(contains(r.bytes, "Info") && !contains(r.bytes, "VBRI"));
+  // #116/AK4: without a LAME tag in the original the cut from 0 is within the tolerance (the new
+  // tag cannot ask the decoder to skip less than its own 529 samples)
+  CHECK(std::fabs((frames(decode(r.bytes)) - 66150) / static_cast<double>(kRate)) <= kMaxDeviation);
+}
+
 void run(const char *name, void (*test)()) {
   const int before = failures;
   test();
@@ -872,6 +942,8 @@ int main() {
   run("#116/AK7 tolerance of the shortest range", rangeTolerance);
   run("#116/AK4 odd WAV data, ID3v2 before RIFF, junk before MP3", moreLayouts);
   run("#116 regression (found bug 43): FLAC shorter than its header", flacShorterThanItsHeader);
+  run("#138/AK2 ID3v2 cut off, two ID3v2 tags", id3v2CutOffAndTwice);
+  run("#138/AK2 MP3 with VBRI header", mp3WithVbriHeader);
   std::printf("%s\n", failures == 0 ? "all trim tests passed" : "trim tests FAILED");
   return failures == 0 ? 0 : 1;
 }

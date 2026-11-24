@@ -999,8 +999,12 @@ Plugin). Im Workflow: die Debian-Pakete für Ubuntu 24.04 und LLVM 18 (`clang-18
   Mutanten aus, der in ihm steckt. Ein Mutant ist erkannt, wenn ein Programm ihn erkennt. Mulls Abdeckungsfilter
   (nur ausgeführte Zeilen mutieren) ist bewusst aus: Er übersprang Funktionen, die die Tests ausführen
   (`Engine::apply` in `engine_tests`, die ganze geteilte Bibliothek in `capi_tests`). Mulls Zwischenspeicher
-  (`local/mutants/core-cache.db`) behält erkannte Mutanten auch nach einer Änderung des Testprogramms; nur die
-  übrigen laufen erneut. `--fresh` beginnt neu.
+  (`local/mutants/core-cache-<Prüfsumme>.db`) behält erkannte Mutanten auch nach einer Änderung des Testprogramms;
+  nur die übrigen laufen erneut. `--fresh` beginnt neu. Mull kennt einen gespeicherten Mutanten nur an seiner
+  Stelle (Mutator, Datei, Zeile, Spalte), nicht am Code dort. Darum gilt ein Zwischenspeicher nur für einen Stand von
+  `core/src`, `core/include` und `core/web` (SHA-256 im Namen); ändert sich dort etwas, beginnt ein neuer, und die
+  alten werden gelöscht (#138: vorher galten lokal gleichwertige Mutanten als erkannt, weil früher an derselben
+  Stelle anderer Code stand und erkannt worden war).
 - **Schneller Schalter:** Mull fragt bei jedem Aufruf einer mutierten Funktion `getenv(<Mutant>)`, ob der Mutant
   aktiv ist. In den Render-Schleifen (je Sample) brauchten die Metronom-Tests so 65 s statt 0,7 s, die Engine-Tests
   endeten nicht in 200 s. `core/tests/mutants/mutant_switch.cpp` ersetzt im Mutationsbau `getenv` und beantwortet die
@@ -1028,14 +1032,15 @@ Plugin). Im Workflow: die Debian-Pakete für Ubuntu 24.04 und LLVM 18 (`clang-18
   wenn es keine gibt, die über eine Datei dazwischen, und so weiter. Die Widget-Tests erreichen über die Oberfläche
   fast jede Datei und machten jeden Mutanten minutenlang; die Logik prüfen ihre eigenen Tests. Ein Mutant läuft in
   einer von `MUTANTS_JOBS` Kopien von `app/` (`local/mutants/<Lauf>/dart/ws<n>`, ohne Build-Ordner; die Ordner neben
-  `app/` als Links) mit `flutter test --no-pub --concurrency 2 <Testdateien>`.
+  `app/` als Links) mit `flutter test --no-pub --concurrency 2 --fail-fast <Testdateien>`: Der erste scheiternde
+  Test erkennt den Mutanten, die übrigen Testdateien laufen nicht mehr (#138).
 - Ein Mutant, der nicht übersetzt, zählt als «nicht übersetzbar», nicht als erkannt.
 
 **Grenzen: Zeit, Speicher, Parallelität (AK3, AK4).**
 
 | | C++-Kern | Dart-Logik |
 |---|---|---|
-| Zeitlimit je Mutant | max(10 × Dauer des unveränderten Programms, 20 s) (`--minimum-timeout`); Aufwärm- und Basislauf 300 s | max(3 × Dauer des unveränderten Testlaufs der Datei, 60 s) |
+| Zeitlimit je Mutant | max(10 × Dauer des unveränderten Programms, 20 s) (`--minimum-timeout`); Aufwärm- und Basislauf 300 s | max(3 × Dauer des unveränderten Testlaufs der Datei, 60 s); dieser Basislauf läuft in allen `MUTANTS_JOBS` Kopien gleichzeitig, unter derselben Last wie die Mutanten, der langsamste zählt (#138) |
 | Speicher je Testprozess | 1024 MiB (`WP_TEST_MEMORY_LIMIT_MB`, `--memory-mib`): Wächter-Thread in jedem Testprogramm (`core/tests/mutants/memory_guard.cpp`) prüft alle 2 ms den physischen Speicher (macOS `phys_footprint`, Linux `/proc/self/statm`) und beendet das Programm mit Code 86 (zählt als erkannt). Eine Adressraumgrenze (`RLIMIT_AS`) gibt es im Mutationsbau nicht: ASan reserviert Terabytes Adressraum für seinen Schattenspeicher | 4096 MiB für `flutter test` mit allen Kindprozessen (Compiler, Test-VM), von aussen alle 250 ms über `ps` gemessen; darüber wird der ganze Prozessbaum beendet (zählt als erkannt, Vermerk «memory limit») |
 | Parallele Prozesse | `MUTANTS_JOBS` Mutanten gleichzeitig (Vorgabe 4, `--workers`) | `MUTANTS_JOBS` Kopien, je `flutter test --concurrency 2` |
 | Grösster Speicherbedarf | 4 × 1 GiB | 4 × 4 GiB, gemessen je Lauf rund 1–1,7 GiB |
@@ -1066,6 +1071,22 @@ nicht erkannten Mutanten mit Datei und Zeile (`.claude/agents/test-agent.md`). I
 nächtlich (nach einem neuen Commit, von Hand mit `nightly=true`) gegen den letzten erfolgreichen Nachtlauf, höchstens
 3 Tage zurück, sonst gegen den Stand vor 24 Stunden; die Zusammenfassung steht im Lauf, die Ergebnisse im Artefakt
 `mutants-diff`. Nicht erkannte Mutanten lassen den Job scheitern, Zeitüberschreitungen nicht.
+
+**Lokal und in CI (#138).** Lokal läuft Mull 0.39.1 mit LLVM 23 (Homebrew) auf macOS mit libc++, in CI dieselbe
+Mull-Version mit LLVM 18 auf Ubuntu 24.04 mit libstdc++, ohne Zwischenspeicher. Beide erzeugen für dieselben Zeilen
+dieselben Mutanten (verglichen mit dem Lauf vom 23.11.2026 für `trim.cpp` und `flac_writer.cpp`: 475 gemeinsame,
+keiner nur lokal; die übrigen aus CI stehen in anderen Dateien oder in seither geänderten Zeilen). Dass CI 15 Mutanten meldete, die lokal bei #113, #116 und #54 nicht auftauchten, hatte zwei Gründe:
+
+- Lokal galten sie als erkannt, weil Mulls Zwischenspeicher den Treffer eines früheren Stands an derselben Stelle
+  zurückgab (siehe oben; ein frischer Lauf meldete lokal dieselben Mutanten wie CI). Seit #138 gehört der
+  Zwischenspeicher zu einem Stand der Quellen.
+- Unterschiede im Erkennen: ASan meldet Lesen hinter `size()` eines `std::vector`, aber innerhalb seiner Kapazität
+  («container-overflow») nur mit libc++ (macOS); mit libstdc++ (Linux) fehlt diese Kennzeichnung. Ein Test, der sich
+  auf ASan verlässt, braucht darum einen Puffer ohne Reserve oder prüft das Ergebnis selbst.
+
+Ein Ausschluss ist an Datei, Mutator und Quelltextzeile gebunden, nicht an Plattform oder Zeilennummer; er greift
+also auf beiden. Erkennt nur eine Plattform einen Mutanten, steht der Eintrag trotzdem in `tools/mutants-exclude.txt`;
+auf der anderen ist er ohne Treffer (ein voller Lauf meldet das nur als Hinweis).
 
 **Messung und Stand.** Gemessen am 20.11.2026 auf einem MacBook Pro M1 Pro (10 Kerne, 16 GB), macOS 26.7, Stand 871b6dc
 mit den Änderungen von #11, `make mutants` mit 4 parallelen Mutanten:

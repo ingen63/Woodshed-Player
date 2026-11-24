@@ -14,8 +14,9 @@
 //   MULL_RUNNER, MULL_PLUGIN or MULL_DIR (default ~/.local/opt/mull, docs/TESTS.md).
 // - dart: the Dart logic of app/lib; each mutant runs the tests that import its file in one of
 //   --jobs copies of app/ (local/mutants/<mode>/dart/ws<n>).
-// - --fresh forgets the Mull cache (local/mutants/core-cache.db): by default a killed mutant of an
-//   unchanged test program stays killed, the others run again.
+// - --fresh forgets the Mull cache (local/mutants/core-cache-<hash>.db, one per state of core/src,
+//   core/include and core/web, #138): by default a killed mutant stays killed while these sources
+//   stay the same (new tests only add kills), the others run again.
 // - --rerun (after new tests): the Dart mutants the previous run of the same mode detected or
 //   excluded keep their result (results.json); only the not detected and new ones run. The core
 //   needs no flag: the Mull cache already keeps detected mutants.
@@ -31,7 +32,8 @@ import 'dart:math';
 import 'coverage.dart' show changedLines;
 import 'mutants.dart';
 
-/// Time limits: Mull takes max(10 × baseline, minimum); a Dart mutant max(minimum, 3 × baseline).
+/// Time limits: Mull takes max(10 × baseline, minimum); a Dart mutant max(minimum, 3 × baseline),
+/// the Dart baseline measured in every copy of app/ at once (#138).
 const coreMinimumTimeoutMs = 20000;
 const dartMinimumTimeout = Duration(seconds: 60);
 
@@ -386,11 +388,23 @@ Future<List<Mutant>> runCore(
     '${Platform.numberOfProcessors}',
   ]);
 
-  final cache = '$src/local/mutants/core-cache.db';
-  if (fresh) {
-    for (final suffix in ['', '-shm', '-wal']) {
-      final f = File('$cache$suffix');
-      if (f.existsSync()) f.deleteSync();
+  // #138: one cache per state of the mutated sources; caches of other states are removed
+  final sources = <String, List<int>>{};
+  for (final dir in ['core/src', 'core/include', 'core/web']) {
+    final d = Directory('$src/$dir');
+    if (!d.existsSync()) continue;
+    for (final f in d.listSync(recursive: true).whereType<File>()) {
+      sources[f.path.substring(src.length + 1)] = f.readAsBytesSync();
+    }
+  }
+  final cacheDir = Directory('$src/local/mutants')..createSync(recursive: true);
+  final cacheName = coreCacheName(sources);
+  final cache = '${cacheDir.path}/$cacheName';
+  for (final f in cacheDir.listSync().whereType<File>()) {
+    final name = f.uri.pathSegments.last;
+    if (name.startsWith('core-cache') &&
+        (fresh || !name.startsWith(cacheName))) {
+      f.deleteSync();
     }
   }
   final runEnv = {
@@ -609,24 +623,19 @@ Future<List<Mutant>> runDart(
   Future<RunResult> flutterTest(
     String ws,
     List<String> files,
-    Duration timeout,
-  ) => runLimited(
+    Duration timeout, {
+    bool mutant = false,
+  }) => runLimited(
     'flutter',
-    [
-      'test',
-      '--no-pub',
-      '--reporter',
-      'failures-only',
-      '--concurrency',
-      '2',
-      ...files,
-    ],
+    dartTestArgs(files, mutant: mutant),
     workingDirectory: '$ws/app',
     timeout: timeout,
     memoryMiB: limit,
   );
 
-  // baseline per file: the selected tests pass unchanged and give the time limit
+  // baseline per file: the selected tests pass unchanged and give the time limit. They run in
+  // every copy at once, under the load the mutants run with (#138/AK3: measured alone, the limit
+  // was too short for 4 parallel runs on a CI runner with 4 cores, and most mutants timed out).
   final queue = <(String, DartSite, List<String>, Duration)>[];
   final result = <Mutant>[];
   for (final MapEntry(key: path, value: sites) in plan.entries) {
@@ -660,25 +669,27 @@ Future<List<Mutant>> runDart(
       }
     }
     if (toRun.isEmpty) continue;
-    final base = await flutterTest(
-      workspaces.first,
-      selected,
-      const Duration(minutes: 10),
-    );
-    if (base.end != RunEnd.passed) {
-      stderr.writeln(base.output.split('\n').take(40).join('\n'));
-      stderr.writeln('mutants: the tests of $rel fail without a mutant');
-      exit(2);
-    }
-    final limitTime = Duration(
-      milliseconds: max(
-        dartMinimumTimeout.inMilliseconds,
-        base.elapsed.inMilliseconds * 3,
+    final bases = await Future.wait(
+      workspaces.map(
+        (ws) => flutterTest(ws, selected, const Duration(minutes: 10)),
       ),
+    );
+    for (final base in bases) {
+      if (base.end != RunEnd.passed) {
+        stderr.writeln(base.output.split('\n').take(40).join('\n'));
+        stderr.writeln('mutants: the tests of $rel fail without a mutant');
+        exit(2);
+      }
+    }
+    final slowest = bases.map((b) => b.elapsed).reduce((a, b) => a > b ? a : b);
+    final limitTime = dartTimeLimit(
+      bases.map((b) => b.elapsed),
+      dartMinimumTimeout,
     );
     stdout.writeln(
       'dart: $rel ${toRun.length} mutants, ${selected.length} test files, '
-      'baseline ${base.elapsed.inSeconds} s, ${base.peakMiB} MiB',
+      'baseline ${slowest.inSeconds} s in ${bases.length} copies at once, '
+      '${bases.map((b) => b.peakMiB).reduce(max)} MiB',
     );
     for (final s in toRun) {
       queue.add((path, s, selected, limitTime));
@@ -699,7 +710,7 @@ Future<List<Mutant>> runDart(
       final file = File('$ws/app/$path');
       final original = sources[path]!;
       file.writeAsStringSync(site.apply(original));
-      final r = await flutterTest(ws, selected, limitTime);
+      final r = await flutterTest(ws, selected, limitTime, mutant: true);
       file.writeAsStringSync(original);
       final (outcome, note) = dartOutcome(r);
       final lines = original.split('\n');
