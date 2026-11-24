@@ -191,3 +191,27 @@ struct WindowSizeTests {
     #expect(next.contentMinSize == MainFlutterWindow.minContentSize)
   }
 }
+
+/// #140: the program of the app is its command line.
+struct CommandLineToolTests {
+  @Test("#140/AK16 without a command the program starts as the app")
+  func noCommandStartsTheApp() {
+    #expect(CommandLineTool.run(["Woodshed Player"]) == nil)
+    #expect(CommandLineTool.run(["Woodshed Player", "-NSDocumentRevisionsDebugMode", "YES"]) == nil)
+    #expect(CommandLineTool.run(["Woodshed Player", "stop"]) == nil)
+  }
+
+  @Test("#140/AK18 help and usage errors come from the core of the plugin")
+  func helpThroughTheCore() {
+    #expect(CommandLineTool.run(["woodshed", "help", "play"]) == 0)
+    #expect(CommandLineTool.run(["woodshed", "play"]) == 2)
+  }
+
+  @Test("#140/AK19 the socket file lies in the app's container and fits a Unix socket path")
+  func socketPath() {
+    let path = CommandLineTool.socketPath
+    #expect(path.hasSuffix("/Library/Containers/\(Bundle.main.bundleIdentifier!)/Data/wp-cli.sock"))
+    #expect(path.utf8.count <= 103)
+    #expect(!path.contains("://"))
+  }
+}

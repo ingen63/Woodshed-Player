@@ -103,7 +103,7 @@ abstract final class WpRecArming {
   static const minThresholdDb = -120.0;
   static const maxThresholdDb = 0.0;
   static const minSilenceSeconds = 0.1;
-  static const maxSilenceSeconds = 3600.0;
+  static const maxSilenceSeconds = 60.0;
 }
 
 /// Source of a recording (#113), the values of `WP_REC_SOURCE_*` in wp_core.h.

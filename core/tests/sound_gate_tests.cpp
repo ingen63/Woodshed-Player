@@ -69,6 +69,18 @@ public:
     samples_.insert(samples_.end(), static_cast<size_t>(frames(seconds)) * 2, value);
     return *this;
   }
+  // `seconds` below the threshold that differ from frame to frame and between the channels, so a
+  // frame from the wrong place or channel shows (hiss of a quiet room).
+  Signal &hiss(double seconds) {
+    const auto n = frames(seconds);
+    const float peak = SoundGate::linear(-60.0);
+    for (long long i = 0; i < n; ++i) {
+      const auto k = static_cast<long long>(samples_.size() / 2);
+      samples_.push_back(peak * static_cast<float>(k % 997) / 997.0f);
+      samples_.push_back(-peak * static_cast<float>(k % 991) / 991.0f);
+    }
+    return *this;
+  }
   [[nodiscard]] const std::vector<float> &samples() const { return samples_; }
   [[nodiscard]] uint32_t frameCount() const { return static_cast<uint32_t>(samples_.size() / 2); }
   static long long frames(double seconds) { return std::llround(seconds * kRate); }
@@ -259,6 +271,45 @@ void pauseJustBelowTheLimitKeepsRecording() { // #140/AK10: 4.99 s pause
         Signal::frames(1.0) + Signal::frames(4.99) + Signal::frames(1.0) + Signal::frames(2.0));
 }
 
+// The kept frames are exactly the frames of `s` from `from` to `to` seconds.
+bool keeps(const Collect &c, const Signal &s, double from, double to) {
+  const auto a = s.samples().begin() + Signal::frames(from) * 2;
+  const auto b = s.samples().begin() + Signal::frames(to) * 2;
+  return c.samples == std::vector<float>(a, b);
+}
+
+void leadInKeepsTheRecordedSoundBeforeTheTone() { // #140/AK8: nothing cut, nothing reordered
+  // 2.5 s of hiss: the ring wraps, its oldest frame is not at its start.
+  for (const double before : {2.5, 1.0, 0.4, 3.75}) {
+    Signal s;
+    s.hiss(before).tone(0.5).silence(6.0);
+    SoundGate gate;
+    const Collect c = run(gate, s, 700);
+    const double lead = std::min(before, 1.0);
+    CHECK(keeps(c, s, before - lead, before + 0.5 + 2.0));
+  }
+}
+
+void pauseKeepsTheRecordedSound() { // #140/AK10: the pause is in the file as recorded
+  Signal s;
+  s.tone(1.0).hiss(4.0).tone(1.0).hiss(2.0).silence(5.0);
+  SoundGate gate;
+  const Collect c = run(gate, s, 333);
+  CHECK(gate.state() == GateState::Done);
+  CHECK(keeps(c, s, 0.0, 1.0 + 4.0 + 1.0 + 2.0));
+}
+
+void tailKeepsTheRecordedSound() { // #140/AK9, AK11: also with a pause shorter than the tail
+  for (const double silence : {1.0, 2.0, 2.5, 5.0}) {
+    Signal s;
+    s.silence(0.5).tone(1.0).hiss(8.0);
+    SoundGate gate;
+    const Collect c = run(gate, s, 512, {-50.0, silence});
+    CHECK(gate.state() == GateState::Done);
+    CHECK(keeps(c, s, 0.0, 0.5 + 1.0 + 2.0));
+  }
+}
+
 void silenceAndThresholdCanBeChanged() { // #140/AK11
   // --silence 3: a 4 s pause ends the recording, the second tone is not in it.
   Signal s;
@@ -318,11 +369,11 @@ void blockSizeDoesNotMatter() { // #140/AK8, AK9, AK10: same file for any block 
 void initRejectsSettingsOutOfRange() { // #140/AK11
   SoundGate gate;
   CHECK(gate.init(kRate, 2, {-120.0, 0.1}));
-  CHECK(gate.init(kRate, 2, {0.0, 3600.0}));
+  CHECK(gate.init(kRate, 2, {0.0, 60.0}));
   CHECK(!gate.init(kRate, 2, {-120.5, 5.0}));
   CHECK(!gate.init(kRate, 2, {0.5, 5.0}));
   CHECK(!gate.init(kRate, 2, {-50.0, 0.05}));
-  CHECK(!gate.init(kRate, 2, {-50.0, 3601.0}));
+  CHECK(!gate.init(kRate, 2, {-50.0, 60.01}));
   CHECK(!gate.init(kRate, 2, {std::nan(""), 5.0}));
   CHECK(!gate.init(kRate, 2, {-50.0, std::nan("")}));
   CHECK(!gate.init(0, 2, {}));
@@ -448,6 +499,9 @@ int main() {
       {"stopsAfterFiveSecondsOfSilence", stopsAfterFiveSecondsOfSilence},
       {"shortPausesStayInTheRecording", shortPausesStayInTheRecording},
       {"pauseJustBelowTheLimitKeepsRecording", pauseJustBelowTheLimitKeepsRecording},
+      {"leadInKeepsTheRecordedSoundBeforeTheTone", leadInKeepsTheRecordedSoundBeforeTheTone},
+      {"pauseKeepsTheRecordedSound", pauseKeepsTheRecordedSound},
+      {"tailKeepsTheRecordedSound", tailKeepsTheRecordedSound},
       {"silenceAndThresholdCanBeChanged", silenceAndThresholdCanBeChanged},
       {"soundOnOneChannelCounts", soundOnOneChannelCounts},
       {"blockSizeDoesNotMatter", blockSizeDoesNotMatter},

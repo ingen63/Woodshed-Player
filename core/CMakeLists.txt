@@ -198,6 +198,16 @@ target_link_libraries(wp_reccore PUBLIC wp_miniaudio wp_flacwriter Threads::Thre
 wp_strict_warnings(wp_reccore)
 wp_mutate(wp_reccore)
 
+# #140: command line of the desktop app (wp_cli.h): arguments, help, the conversation with the
+# running app; the transport is a Unix domain socket on macOS and Linux (Windows follows with #60).
+# Linked into the app's program by the Flutter plugin, not into wp_core.
+if(NOT WIN32)
+  add_library(wp_cli STATIC src/cli.cpp src/cli_posix.cpp)
+  target_include_directories(wp_cli PUBLIC include src)
+  wp_strict_warnings(wp_cli)
+  wp_mutate(wp_cli)
+endif()
+
 # Kern mit C-API (wp_core.h)
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(WP_RECORDER src/recorder_mac.mm)
@@ -264,6 +274,14 @@ add_executable(sound_gate_tests tests/sound_gate_tests.cpp)
 target_link_libraries(sound_gate_tests PRIVATE wp_reccore wp_playercore)
 wp_strict_warnings(sound_gate_tests)
 add_test(NAME sound_gate_tests COMMAND sound_gate_tests)
+
+# #140: command line: arguments, help, conversation with a fake app over a real Unix domain socket
+if(NOT WIN32)
+  add_executable(cli_tests tests/cli_tests.cpp)
+  target_link_libraries(cli_tests PRIVATE wp_cli Threads::Threads)
+  wp_strict_warnings(cli_tests)
+  add_test(NAME cli_tests COMMAND cli_tests)
+endif()
 
 # #116: trimming WAV, FLAC, MP3 and ADTS; the results decoded again by the core (wp_playercore)
 add_executable(trim_tests tests/trim_tests.cpp src/trim_api.cpp)
@@ -334,7 +352,7 @@ include(tests/fuzz/fuzz.cmake)
 # memory ends as killed or timeout (#11/AK4).
 if(WP_MULL_PLUGIN)
   set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests recorder_tests
-    sound_gate_tests capi_tests
+    sound_gate_tests cli_tests capi_tests
     device_tests realtime_tests reference_tests trim_tests fuzz_decoder_replay fuzz_capi_replay
     fuzz_trim_replay)
   foreach(t IN LISTS WP_MUTANT_TESTS)

@@ -58,6 +58,12 @@ class CommandServer {
         .cast<List<int>>()
         .transform(utf8.decoder)
         .transform(const LineSplitter());
+    // The program went away (closed, or the connection broke): no request, or Ctrl-C.
+    void gone([Object? _]) {
+      if (!request.isCompleted) request.complete(null);
+      if (!interrupt.isCompleted) interrupt.complete();
+    }
+
     final sub = lines.listen(
       (line) {
         if (!request.isCompleted) {
@@ -66,14 +72,8 @@ class CommandServer {
           interrupt.complete();
         }
       },
-      onDone: () {
-        if (!request.isCompleted) request.complete(null);
-        if (!interrupt.isCompleted) interrupt.complete();
-      },
-      onError: (Object _) {
-        if (!request.isCompleted) request.complete(null);
-        if (!interrupt.isCompleted) interrupt.complete();
-      },
+      onDone: gone,
+      onError: gone,
       cancelOnError: true,
     );
     final out = _SocketOutput(client);

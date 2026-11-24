@@ -48,6 +48,8 @@ List<(String, List<String>)> coreTestPrograms(String core) => [
   ('recorder_tests', []),
   // #140: armed recording (sound and silence)
   ('sound_gate_tests', []),
+  // #140: command line
+  ('cli_tests', []),
   ('capi_tests', ['--null-backend']),
   ('device_tests', []),
   ('realtime_tests', []),

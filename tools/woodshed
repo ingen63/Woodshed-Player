@@ -1,0 +1,13 @@
+#!/bin/bash
+# Command line of Woodshed Player (#140): runs the program of the installed app with the arguments
+# (play, record, --help). Copy it under any name into a folder of your PATH, e.g. ~/bin/woodshed.
+# WOODSHED_APP chooses another copy of the app (default: /Applications/Woodshed Player.app).
+APP="${WOODSHED_APP:-/Applications/Woodshed Player.app}"
+BIN="$APP/Contents/MacOS/Woodshed Player"
+if [ ! -x "$BIN" ]; then
+  echo "Woodshed Player not found at $APP (set WOODSHED_APP)." >&2
+  exit 3
+fi
+[ $# -eq 0 ] && set -- --help
+# The help shows the name of this script.
+exec -a "$(basename "$0")" "$BIN" "$@"

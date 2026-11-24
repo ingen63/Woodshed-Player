@@ -22,7 +22,9 @@ constexpr double kPostrollSeconds = 2.0;
 constexpr double kMinThresholdDb = -120.0;
 constexpr double kMaxThresholdDb = 0.0;
 constexpr double kMinSilenceSeconds = 0.1;
-constexpr double kMaxSilenceSeconds = 3600.0;
+// The silence after the tail is held in memory until sound returns or the pause ends: at most
+// 58 s, about 22 MB at 48 kHz (89 MB at 192 kHz).
+constexpr double kMaxSilenceSeconds = 60.0;
 
 struct GateConfig {
   // A sample counts as sound when its magnitude on any channel exceeds this level.

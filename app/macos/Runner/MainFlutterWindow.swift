@@ -139,6 +139,9 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
           .appendingPathComponent("Recordings", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         result(dir.path)
+      case "commandSocket":
+        // #140: the socket file of the command line, the same path the app's program connects to.
+        result(CommandLineTool.socketPath)
       case "microphoneAccess":
         // #113/AK4: macOS asks once (NSMicrophoneUsageDescription); afterwards the answer stands until
         // the user changes it in System Settings › Privacy & Security › Microphone.

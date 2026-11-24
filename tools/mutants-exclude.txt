@@ -667,3 +667,76 @@ app/lib/sync/providers/google_drive_provider.dart | dart_remove_void_call | _ses
 app/lib/sync/providers/google_auth_desktop.dart | dart_true_to_false | await server?.close(force: true);
 # gleichwertig: Bei from == to ergeben beide Zweige dasselbe Paar (#122).
 app/lib/app/track_selection.dart | dart_le_to_lt | final (a, b) = from <= to ? (from, to) : (to, from);
+
+# ---- core/src/recorder_core.cpp, core/src/sound_gate.cpp (#140) ----
+# gleichwertig: Gemessen, Mull schaltet diese Mutanten nicht wirksam (Grenze des Werkzeugs, siehe
+# docs/TESTS.md; der Mutationsbuild mit -O1 bettet die kleinen Aufrufer ein): von Hand entfernt,
+# scheitern armedCaptureWritesOnlyTheSound bzw. jeder Test mit gespeicherten Frames (Exit-Code 1
+# oder Absturz beim Lesen der leeren Aufnahme).
+core/src/recorder_core.cpp | cxx_remove_void_call | gate_.feed(buf, n, sink);
+core/src/recorder_core.cpp | cxx_remove_void_call | writeFrames(buf, n);
+core/src/sound_gate.cpp | cxx_remove_void_call | sink.write(frames, count);
+# gleichwertig: Der Puffer für die Stille nach dem Nachlauf wird nur grösser; belegt werden höchstens
+# silence_ - postroll_ - 1 Frames (eine Stille von silence_ Frames beendet die Aufnahme vorher).
+core/src/sound_gate.cpp | cxx_sub_to_add | pending_.assign(static_cast<size_t>(silence_ - postroll_) * channels_, 0.0f);
+# Grenzfall: preroll_ = llround(Abtastrate) ist nur unter 0,5 Hz gleich 0; jede Abtastrate eines
+# Geräts liegt weit darüber.
+core/src/sound_gate.cpp | cxx_gt_to_ge | if (preroll_ > 0) {
+# gleichwertig: Nach der Schleife ist der Zustand nur dann «Recording», wenn sie mit i < count
+# abgebrochen hat; sonst ist i == count und der Zustand «Armed» (oder schon vorher «Recording»
+# mit i == 0, dann ist «<=» nur bei count == 0 anders, und ein leerer Block schreibt nichts).
+core/src/sound_gate.cpp | cxx_lt_to_le | if (i < count && state_.load() == GateState::Recording)
+# gleichwertig: Nach «Done» liest niemand mehr pos_ (feed() tut nichts mehr, init() setzt es zurück,
+# firstSound() und lastSound() sind davon unabhängig).
+core/src/sound_gate.cpp | cxx_add_assign_to_sub_assign | pos_ += count - i;
+core/src/sound_gate.cpp | cxx_sub_to_add | pos_ += count - i;
+
+# ---- app/lib/app (#140) ----
+# gleichwertig: gone() tut beim zweiten Aufruf nichts; ohne cancelOnError folgt dem Fehler nur noch
+# onDone, also derselbe Aufruf.
+app/lib/app/command_server.dart | dart_true_to_false | cancelOnError: true,
+# gleichwertig: client.close() direkt danach schreibt die gepufferten Zeilen selbst aus, bevor es
+# schliesst; der Test «a request over the local socket» liest alle Zeilen bis zum Ende.
+app/lib/app/command_server.dart | dart_remove_void_call | await client.flush();
+# gleichwertig: Das Programm schliesst seine Seite nach der Zeile «exit»; das Abo endet dann mit
+# onDone, gone() ist schon erledigt. Abbrechen ändert nach aussen nichts.
+app/lib/app/command_server.dart | dart_remove_void_call | await sub.cancel();
+# gleichwertig: close() entfernt die Socket-Datei auf zwei Wegen: ServerSocket.close() löscht sie
+# (gemessen, Test «a socket file left by an earlier run»), deleteSync() ebenso. Ohne den einen bleibt
+# der andere; ohne Datei erreicht kein Programm den Socket mehr.
+app/lib/app/command_server.dart | dart_remove_void_call | await _server.close();
+app/lib/app/command_server.dart | dart_remove_void_call | File(path).deleteSync();
+# gleichwertig: start() setzt _armed, bevor _update() oder _stop() es lesen; ohne Aufnahme tun beide
+# nichts (phase idle).
+app/lib/app/recording_controller.dart | dart_false_to_true | bool _armed = false;
+
+# ---- core/src/cli.cpp, core/src/cli_posix.cpp (#140) ----
+# gleichwertig: Gemessen, Mull schaltet diese Mutanten nicht wirksam (Grenze des Werkzeugs, siehe
+# oben): ohne push_back von Hand scheitern recordRequest und recordUsageErrors (Exit-Code 1).
+core/src/cli.cpp | cxx_remove_void_call | options.push_back(&source);
+core/src/cli.cpp | cxx_remove_void_call | options.push_back(&silence);
+core/src/cli.cpp | cxx_remove_void_call | options.push_back(&threshold);
+# Grenzfall: Nur bei einer Teil-Schreibung oder einem Signal während write() bzw. read() anders.
+# Eine Zeile der Kommandozeile (wenige hundert Bytes) schreibt write() in einen lokalen Stream-Socket
+# im Ganzen; ein Signal (Ctrl-C) unterbricht poll(), das in der Wartezeit läuft, nicht write().
+core/src/cli_posix.cpp | cxx_add_to_sub | const ssize_t n = ::write(fd_, data.data() + done, data.size() - done);
+core/src/cli_posix.cpp | cxx_sub_to_add | const ssize_t n = ::write(fd_, data.data() + done, data.size() - done);
+core/src/cli_posix.cpp | cxx_lt_to_le | if (n < 0 && errno == EINTR)
+core/src/cli_posix.cpp | cxx_lt_to_ge | if (n < 0 && errno == EINTR)
+core/src/cli_posix.cpp | cxx_eq_to_ne | if (n < 0 && errno == EINTR)
+core/src/cli_posix.cpp | cxx_le_to_lt | if (n <= 0)
+core/src/cli_posix.cpp | cxx_add_assign_to_sub_assign | done += static_cast<size_t>(n);
+# Grenzfall: Nur wenn poll() fehlschlägt oder errno von früher noch EINTR ist und poll() dann 0
+# meldet; beides gibt die nächste Wartezeit von 100 ms wieder gleich, die Tests sehen es nicht.
+core/src/cli_posix.cpp | cxx_lt_to_le | if (ready < 0 && errno == EINTR)
+core/src/cli_posix.cpp | cxx_lt_to_ge | if (ready < 0 && errno == EINTR)
+core/src/cli_posix.cpp | cxx_eq_to_ne | if (ready < 0 && errno == EINTR)
+# Grenzfall: Ein Pfad von genau 104 Bytes passt ohne abschliessende Null nicht in sun_path; mit «>»
+# schlüge connect() trotzdem fehl (kein Server kann ihn binden), nur das Kopieren liefe ein Byte über
+# das Feld hinaus, was make sanitize (ASan) meldet.
+core/src/cli_posix.cpp | cxx_ge_to_gt | if (path.empty() || path.size() >= sizeof addr.sun_path)
+# Grenzfall: socket() liefert 0 nur, wenn die Standardeingabe geschlossen ist.
+core/src/cli_posix.cpp | cxx_lt_to_le | if (fd < 0)
+# gleichwertig: Gemessen, Mull schaltet diesen Mutanten im Signal-Handler nicht wirksam (Grenze des
+# Werkzeugs): ohne _exit von Hand scheitert secondCtrlCEndsTheCommand (Exit-Code 2 statt 130).
+core/src/cli_posix.cpp | cxx_remove_void_call | ::_exit(WP_CLI_EXIT_CANCELLED);

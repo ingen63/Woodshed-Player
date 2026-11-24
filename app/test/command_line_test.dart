@@ -275,6 +275,21 @@ void main() {
         'Saved "Take 1" by Me, 00:30.',
       ); // the fake probe says 30 s
       expect(o.stderr, isEmpty);
+      // The command no longer listens: a later recording prints nothing here.
+      final lines = o.stdout.length;
+      expect(await recording.start(de, arming: const Arming()), isNull);
+      rec.gate = WpRecGate.recording;
+      await eventually(
+        () => recording.phase == RecordingPhase.recording,
+        'next recording',
+      );
+      expect(o.stdout, hasLength(lines));
+      rec.gate = WpRecGate.armed;
+      await eventually(
+        () => recording.phase == RecordingPhase.armed,
+        'armed again',
+      );
+      await recording.stop();
     });
 
     test('#140/AK12: without --title the recording is named after date and time as before', () async {
@@ -346,7 +361,7 @@ void main() {
       () async {
         for (final (silence, threshold) in [
           (0.09, -50.0),
-          (3600.1, -50.0),
+          (60.1, -50.0),
           (5.0, -120.1),
           (5.0, 0.1),
         ]) {
@@ -357,7 +372,7 @@ void main() {
           );
           expect(
             o.stderr.single,
-            'The threshold must be -120 to 0 dBFS, the pause 0.1 to 3600 s.',
+            'The threshold must be -120 to 0 dBFS, the pause 0.1 to 60 s.',
           );
         }
         expect(rec.path, isNull);
@@ -367,7 +382,7 @@ void main() {
         rec.gate = WpRecGate.done;
         expect(await finish(code), CliExit.ok);
         final o2 = Lines();
-        final code2 = await arm(record(silence: 3600, threshold: 0), o2);
+        final code2 = await arm(record(silence: 60, threshold: 0), o2);
         rec.gate = WpRecGate.done;
         expect(await finish(code2), CliExit.ok);
       },
@@ -442,8 +457,9 @@ void main() {
         'Only silence so far. If something is playing, allow Woodshed Player in '
         'System Settings > Privacy & Security > Screen & System Audio Recording.',
       );
-      // only once
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      // only once, over many ticks of 1 ms
+      const ticks = Duration(milliseconds: 20);
+      await Future<void>.delayed(ticks); // absence: no second hint
       expect(o.stderr, hasLength(1));
       interrupt.complete();
       expect(await finish(code), CliExit.cancelled);
@@ -629,12 +645,19 @@ void main() {
       expect(await played, ['out Playing "Solar" by Trio.', 'exit 0']);
     });
 
-    test('#140/AK14: the line «stop» is Ctrl-C', () async {
+    test('#140/AK14: the line «stop» is Ctrl-C, other lines are not', () async {
       server = await CommandServer.start(path, handler);
       final got = await call(
         ['{"version":1,"command":"record","title":"T"}'],
-        onLine: (got, s) {
-          if (got.length == 1) s.write('stop\n');
+        onLine: (got, s) async {
+          if (got.length != 1) return;
+          s.write('hello\n');
+          await s.flush();
+          const ticks = Duration(milliseconds: 50);
+          // «hello» must not stop it
+          await Future<void>.delayed(ticks); // absence: no stop
+          expect(recording.phase, RecordingPhase.armed);
+          s.write(' stop \n');
         },
       );
       expect(got.first, startsWith('out Armed:'));
@@ -723,6 +746,15 @@ void main() {
       () async {
         final long = '/tmp/${'x' * 120}.sock';
         expect(await CommandServer.start(long, handler), isNull);
+        // 103 bytes is the longest path that fits, 104 does not
+        final stem = '/tmp/wp${pid}_${DateTime.now().microsecondsSinceEpoch}';
+        final fits = '$stem${'x' * (maxSocketPath - 5 - stem.length)}.sock';
+        expect(fits.length, maxSocketPath);
+        server = await CommandServer.start(fits, handler);
+        expect(server, isNotNull);
+        await server!.close();
+        server = null;
+        expect(await CommandServer.start('${fits}x', handler), isNull);
         File(path).writeAsStringSync('not a socket');
         expect(await CommandServer.start(path, handler), isNull);
         expect(File(path).readAsStringSync(), 'not a socket'); // never deleted

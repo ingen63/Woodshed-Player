@@ -170,7 +170,7 @@ WP_API int wp_rec_start(const char *path);
 #define WP_REC_GATE_RECORDING 2 /* sound came: written from 1 s before the first sound */
 #define WP_REC_GATE_DONE 3      /* long enough silence: the file ends 2 s after the last sound */
 /* #140: like wp_rec_start_source, but armed: the file holds only 1 s before the first sample above
- * threshold_db (dBFS, -120 to 0) up to 2 s after the last one; silence_seconds (0.1 to 3600) of
+ * threshold_db (dBFS, -120 to 0) up to 2 s after the last one; silence_seconds (0.1 to 60) of
  * uninterrupted silence ends it (WP_REC_GATE_DONE, the caller then calls wp_rec_stop). Shorter
  * pauses stay in the file. 0 = ok, < 0 = WP_REC_ERR_* (settings out of range:
  * WP_REC_ERR_INVALID_ARGUMENT). */
