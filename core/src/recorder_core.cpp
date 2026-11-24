@@ -92,8 +92,11 @@ void WavFile::close() {
 
 Capture::~Capture() { close(); }
 
-int Capture::open(const char *path, double sampleRate, FileFormat format) {
+int Capture::open(const char *path, double sampleRate, FileFormat format, const GateConfig *gate) {
   close();
+  gated_ = gate != nullptr;
+  if (gate && !gate_.init(sampleRate, kChannels, *gate))
+    return WP_REC_ERR_INVALID_ARGUMENT;
   if (!ring_.init(static_cast<uint32_t>(sampleRate * kRingSeconds)))
     return WP_REC_ERR_OUT_OF_MEMORY;
   const auto rate = static_cast<uint32_t>(sampleRate);
@@ -123,10 +126,14 @@ void Capture::writeFrames(const float *frames, uint32_t count) {
 }
 
 void Capture::writerLoop() {
+  FileSink sink(*this);
   while (writerRun_.load() || ring_.availableRead() > 0) {
     uint32_t n = kWriteFrames;
     if (const float *buf = ring_.acquireRead(n)) {
-      writeFrames(buf, n);
+      if (gated_)
+        gate_.feed(buf, n, sink);
+      else
+        writeFrames(buf, n);
       ring_.commitRead(n);
     } else {
       // Waiting for the audio thread; without the pause the writer only spins (same output).

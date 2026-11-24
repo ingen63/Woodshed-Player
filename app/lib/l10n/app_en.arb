@@ -119,6 +119,7 @@
   "recordingSilent": "Only silence is coming in. Is music playing? Otherwise grant the permission: System Settings › Privacy & Security › Screen & System Audio Recording.",
   "recordingTooltip": "Records the system audio (without microphone). The recording is only stored locally and then added to the library.",
   "recordingErrorNoInput": "No microphone found, or it could not be opened.",
+  "recordingErrorInvalidArgument": "The threshold or the pause of the armed recording is out of range.",
   "recordingSource": "Recording source",
   "recordingSourceSystem": "System audio",
   "recordingSourceMicrophone": "Microphone",

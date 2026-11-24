@@ -148,6 +148,8 @@ WP_API void wp_trim_free(wp_trim_result *r);
 #define WP_REC_ERR_IO_PROC -9       /* IOProc could not be created */
 #define WP_REC_ERR_START -10        /* device could not be started */
 #define WP_REC_ERR_NO_INPUT -11     /* no input device (microphone) or it could not be opened */
+/* #140: threshold or pause of an armed recording out of range */
+#define WP_REC_ERR_INVALID_ARGUMENT -12
 /* Sources of wp_rec_start_source (#113). */
 #define WP_REC_SOURCE_SYSTEM 0 /* system audio without Woodshed Player's own sound, as FLAC */
 #define WP_REC_SOURCE_MIC 1    /* default input device of the system, as FLAC */
@@ -162,6 +164,23 @@ WP_API int wp_rec_start_source(const char *path, int source);
 /* Same as wp_rec_start_source(path, WP_REC_SOURCE_SYSTEM): the system audio as FLAC, without
  * Woodshed Player's own sound. 0 = ok, < 0 = WP_REC_ERR_*. */
 WP_API int wp_rec_start(const char *path);
+/* #140: states of an armed recording (wp_rec_gate_state). */
+#define WP_REC_GATE_OFF 0       /* no recording, or one started without arming */
+#define WP_REC_GATE_ARMED 1     /* recording the source, nothing written until the first sound */
+#define WP_REC_GATE_RECORDING 2 /* sound came: written from 1 s before the first sound */
+#define WP_REC_GATE_DONE 3      /* long enough silence: the file ends 2 s after the last sound */
+/* #140: like wp_rec_start_source, but armed: the file holds only 1 s before the first sample above
+ * threshold_db (dBFS, -120 to 0) up to 2 s after the last one; silence_seconds (0.1 to 3600) of
+ * uninterrupted silence ends it (WP_REC_GATE_DONE, the caller then calls wp_rec_stop). Shorter
+ * pauses stay in the file. 0 = ok, < 0 = WP_REC_ERR_* (settings out of range:
+ * WP_REC_ERR_INVALID_ARGUMENT). */
+WP_API int wp_rec_start_armed(const char *path, int source, double threshold_db,
+                              double silence_seconds);
+/* #140: WP_REC_GATE_* of the current or last recording. */
+WP_API int wp_rec_gate_state(void);
+/* #140: seconds written to the file so far (armed: from 1 s before the first sound; otherwise the
+ * same as wp_rec_seconds). */
+WP_API double wp_rec_kept_seconds(void);
 WP_API void wp_rec_stop(void);
 WP_API int wp_rec_is_recording(void);
 WP_API double wp_rec_seconds(void);

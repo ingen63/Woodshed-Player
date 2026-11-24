@@ -476,6 +476,12 @@ abstract class AppLocalizations {
   /// **'No microphone found, or it could not be opened.'**
   String get recordingErrorNoInput;
 
+  /// No description provided for @recordingErrorInvalidArgument.
+  ///
+  /// In en, this message translates to:
+  /// **'The threshold or the pause of the armed recording is out of range.'**
+  String get recordingErrorInvalidArgument;
+
   /// No description provided for @recordingSource.
   ///
   /// In en, this message translates to:

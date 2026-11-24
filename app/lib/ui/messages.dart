@@ -103,6 +103,7 @@ String recordingErrorMessage(AppLocalizations l, WpRecordingException e) {
     WpRecCode.ioProc => l.recordingErrorIoProc,
     WpRecCode.start => l.recordingErrorStart,
     WpRecCode.noInput => l.recordingErrorNoInput,
+    WpRecCode.invalidArgument => l.recordingErrorInvalidArgument,
     _ => l.recordingErrorUnknown(e.code),
   };
   return e.osStatus == 0 ? text : '$text (OSStatus ${e.osStatus})';

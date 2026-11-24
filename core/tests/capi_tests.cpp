@@ -230,6 +230,12 @@ void recorderStartsIdle() {
 #if defined(__APPLE__)
   CHECK(wp_rec_start(nullptr) == WP_REC_ERR_INVALID_PATH);
   CHECK(std::strcmp(wp_rec_error(), "No file path") == 0);
+  // #140/AK11: an armed recording checks its settings before it opens a device.
+  CHECK(wp_rec_start_armed(nullptr, WP_REC_SOURCE_MIC, -50.0, 5.0) == WP_REC_ERR_INVALID_PATH);
+  CHECK(wp_rec_start_armed("x.flac", WP_REC_SOURCE_MIC, 1.0, 5.0) == WP_REC_ERR_INVALID_ARGUMENT);
+  CHECK(wp_rec_start_armed("x.flac", WP_REC_SOURCE_MIC, -50.0, 0.0) == WP_REC_ERR_INVALID_ARGUMENT);
+  CHECK(std::strcmp(wp_rec_error(), "Threshold or pause out of range") == 0);
+  CHECK(wp_rec_start_armed("x.flac", 7, -50.0, 5.0) == WP_REC_ERR_UNSUPPORTED);
 #else
   CHECK(wp_rec_available() == 0);
   CHECK(wp_rec_start("x.wav") == WP_REC_ERR_UNSUPPORTED);
@@ -239,6 +245,8 @@ void recorderStartsIdle() {
   CHECK(wp_rec_level() == 0.0f);
   CHECK(wp_rec_only_silence() == 1);
   CHECK(wp_rec_os_status() == 0);
+  CHECK(wp_rec_gate_state() == WP_REC_GATE_OFF);
+  CHECK(wp_rec_kept_seconds() == 0.0);
   wp_rec_stop(); // stopping without a recording is harmless
   CHECK(wp_rec_is_recording() == 0);
 }

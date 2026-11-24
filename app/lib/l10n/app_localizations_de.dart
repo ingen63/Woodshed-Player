@@ -230,6 +230,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Kein Mikrofon gefunden, oder es liess sich nicht öffnen.';
 
   @override
+  String get recordingErrorInvalidArgument =>
+      'Schwelle oder Pause der scharfen Aufnahme liegen ausserhalb des erlaubten Bereichs.';
+
+  @override
   String get recordingSource => 'Aufnahmequelle';
 
   @override

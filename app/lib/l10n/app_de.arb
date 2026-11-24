@@ -63,6 +63,7 @@
   "recordingSilent": "Es kommt nur Stille an. Läuft gerade Musik? Sonst die Berechtigung erteilen: Systemeinstellungen › Datenschutz & Sicherheit › Bildschirm- & Systemaudioaufnahme.",
   "recordingTooltip": "Nimmt den Systemton auf (ohne Mikrofon). Die Aufnahme wird nur lokal gespeichert und danach in die Bibliothek übernommen.",
   "recordingErrorNoInput": "Kein Mikrofon gefunden, oder es liess sich nicht öffnen.",
+  "recordingErrorInvalidArgument": "Schwelle oder Pause der scharfen Aufnahme liegen ausserhalb des erlaubten Bereichs.",
   "recordingSource": "Aufnahmequelle",
   "recordingSourceSystem": "Systemton",
   "recordingSourceMicrophone": "Mikrofon",

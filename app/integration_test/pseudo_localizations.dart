@@ -145,6 +145,9 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get recordingErrorNoInput => pseudo(super.recordingErrorNoInput);
   @override
+  String get recordingErrorInvalidArgument =>
+      pseudo(super.recordingErrorInvalidArgument);
+  @override
   String get recordingSource => pseudo(super.recordingSource);
   @override
   String get recordingSourceSystem => pseudo(super.recordingSourceSystem);

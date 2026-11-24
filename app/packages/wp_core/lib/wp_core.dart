@@ -215,6 +215,18 @@ final _recStartSource = _lib
       Int32 Function(Pointer<Utf8>, Int32),
       int Function(Pointer<Utf8>, int)
     >('wp_rec_start_source');
+final _recStartArmed = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<Utf8>, Int32, Double, Double),
+      int Function(Pointer<Utf8>, int, double, double)
+    >('wp_rec_start_armed');
+final _recGateState = _lib.lookupFunction<Int32 Function(), int Function()>(
+  'wp_rec_gate_state',
+);
+final _recKeptSeconds = _lib
+    .lookupFunction<Double Function(), double Function()>(
+      'wp_rec_kept_seconds',
+    );
 final _recStop = _lib.lookupFunction<Void Function(), void Function()>(
   'wp_rec_stop',
 );
@@ -453,6 +465,25 @@ abstract final class WpRecorder {
   /// [WpRecordingException] with the error code if it fails.
   static void startSource(String path, WpRecSource source) =>
       _check(path, (c) => _recStartSource(c, source.code));
+
+  /// #140: starts an armed recording of [source] into [path]: only from 1 s before the first
+  /// sample above [thresholdDb] up to 2 s after the last; [silenceSeconds] of silence end it
+  /// ([gate] becomes [WpRecGate.done]). Throws [WpRecordingException] if it fails.
+  static void startArmed(
+    String path,
+    WpRecSource source, {
+    double thresholdDb = WpRecArming.defaultThresholdDb,
+    double silenceSeconds = WpRecArming.defaultSilenceSeconds,
+  }) => _check(
+    path,
+    (c) => _recStartArmed(c, source.code, thresholdDb, silenceSeconds),
+  );
+
+  /// #140: state of the current or last armed recording.
+  static WpRecGate get gate => WpRecGate.of(_recGateState());
+
+  /// #140: seconds written to the file (armed: from 1 s before the first sound).
+  static double get keptSeconds => _recKeptSeconds();
 
   static void _check(String path, int Function(Pointer<Utf8>) start) {
     final c = path.toNativeUtf8();

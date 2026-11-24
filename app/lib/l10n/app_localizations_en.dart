@@ -227,6 +227,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'No microphone found, or it could not be opened.';
 
   @override
+  String get recordingErrorInvalidArgument =>
+      'The threshold or the pause of the armed recording is out of range.';
+
+  @override
   String get recordingSource => 'Recording source';
 
   @override

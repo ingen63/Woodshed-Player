@@ -46,6 +46,8 @@ List<(String, List<String>)> coreTestPrograms(String core) => [
   ('waveform_tests', []),
   ('player_tests', []),
   ('recorder_tests', []),
+  // #140: armed recording (sound and silence)
+  ('sound_gate_tests', []),
   ('capi_tests', ['--null-backend']),
   ('device_tests', []),
   ('realtime_tests', []),

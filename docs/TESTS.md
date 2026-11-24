@@ -142,6 +142,7 @@ zugeordnet.
 | Fehlermeldungen und Berechtigungsdialog mehrsprachig | vorhanden: `recording_messages_test.dart` (#44), `permission_texts_test.dart` (#49) | – |
 | Ringpuffer, Schreib-Thread, WAV-Kopf (Stereo, float32, Abtastrate des Geräts), Pegel und Stille, Übernahme der Tap-Daten (interleaved, je Kanal ein Puffer, Mono, Geräteeingänge vor dem Tap) | vorhanden: `recorder_tests.cpp` (#68, `recorder_core.cpp` ohne Audiogerät) | – |
 | Systemton als FLAC (#118): 10 s über den Tap-Weg als gültiges FLAC (Stereo, 24 bit, alle Frames), höchstens eine 24-bit-Stufe vom Signal, vom Kern geladen; 60 s FLAC höchstens halb so gross wie WAV (float32); ältere WAV-Aufnahmen laden weiter | vorhanden: `recorder_tests.cpp` (`systemAudioTenSecondsAsFlac`, `systemAudioFlacIsAtMostHalfOfWav`, `olderWavRecordingStillLoads`), `recording_test.dart` (#118/AK1, AK5); Process Tap mit echtem Systemton siehe nächste Zeile | #118 |
+| Scharfe Aufnahme (#140): Ringpuffer für 1 s Vorlauf, Start 1 s vor dem ersten Ton über -50 dBFS, Ende 2 s nach dem letzten Ton, Stopp nach 5 s Stille, kürzere Pausen bleiben, `--silence`/`--threshold`, jede Blockgrösse gleich, FLAC-Datei der scharfen Aufnahme | vorhanden: `sound_gate_tests.cpp` (erzeugter Sinus und Stille, `sound_gate.cpp` ohne Audiogerät) | #140 |
 | Systemton-Aufnahme im Kern (`recorder_mac.mm`: Core Audio Process Tap, Aggregate-Device, IOProc) | Lücke: braucht echten Systemton, kein automatischer Test | #51 |
 
 ### Web/WASM
@@ -994,7 +995,7 @@ Plugin). Im Workflow: die Debian-Pakete für Ubuntu 24.04 und LLVM 18 (`clang-18
   gespeicherte Befehlszeile und trennt sie an Leerzeichen; der Projektpfad hat eines. Das Werkzeug baut deshalb über
   einen Link ohne Leerzeichen im temporären Ordner.
 - **Testauswahl (AK3):** Jedes Testprogramm des Kerns läuft einzeln unter `mull-runner` (`engine_tests`,
-  `metronome_tests`, `waveform_tests`, `player_tests`, `recorder_tests`, `capi_tests --null-backend`, `device_tests`,
+  `metronome_tests`, `waveform_tests`, `player_tests`, `recorder_tests`, `sound_gate_tests` (#140), `capi_tests --null-backend`, `device_tests`,
   `realtime_tests`, `reference_tests`, `fuzz_decoder_replay`, `fuzz_capi_replay`; nicht die Leistungstests aus #59) und führt jeden
   Mutanten aus, der in ihm steckt. Ein Mutant ist erkannt, wenn ein Programm ihn erkennt. Mulls Abdeckungsfilter
   (nur ausgeführte Zeilen mutieren) ist bewusst aus: Er übersprang Funktionen, die die Tests ausführen

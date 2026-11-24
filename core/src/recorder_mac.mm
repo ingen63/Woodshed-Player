@@ -106,21 +106,32 @@ void teardown(Recorder &r) {
 
 // #113: the default input device into a FLAC file. Without the microphone permission macOS
 // delivers silence; the app asks for the permission before it starts.
-int startMic(Recorder &r, const char *path) {
-  if (!r.mic.open())
-    return fail(r, WP_REC_ERR_NO_INPUT, "No input device could be opened");
-  r.sampleRate = r.mic.sampleRate();
-  const int opened = r.capture.open(path, r.sampleRate, wp::rec::FileFormat::Flac);
+// Opens the capture of a recording; with `gate` armed (#140). 0 or the WP_REC_ERR_* of the failure.
+int openCapture(Recorder &r, const char *path, const wp::rec::GateConfig *gate) {
+  const int opened = r.capture.open(path, r.sampleRate, wp::rec::FileFormat::Flac, gate);
+  if (opened == WP_REC_ERR_INVALID_ARGUMENT)
+    return fail(r, WP_REC_ERR_INVALID_ARGUMENT, "Threshold or pause out of range");
   if (opened == WP_REC_ERR_OUT_OF_MEMORY)
     return fail(r, WP_REC_ERR_OUT_OF_MEMORY, "No memory for the ring buffer");
   if (opened != 0)
     return fail(r, WP_REC_ERR_FILE, "FLAC file could not be created");
+  return 0;
+}
+
+int startMic(Recorder &r, const char *path, const wp::rec::GateConfig *gate) {
+  if (!r.mic.open())
+    return fail(r, WP_REC_ERR_NO_INPUT, "No input device could be opened");
+  r.sampleRate = r.mic.sampleRate();
+  const int opened = openCapture(r, path, gate);
+  if (opened != 0)
+    return opened;
   if (!r.mic.start(r.capture))
     return fail(r, WP_REC_ERR_START, "Microphone could not be started");
   return 0;
 }
 
-int startTap(Recorder &r, const char *path) API_AVAILABLE(macos(14.2)) {
+int startTap(Recorder &r, const char *path, const wp::rec::GateConfig *gate)
+    API_AVAILABLE(macos(14.2)) {
   // 1. Eigenen Prozess ausnehmen, damit die eigene Wiedergabe nicht doppelt im Mitschnitt landet.
   NSMutableArray<NSNumber *> *exclude = [NSMutableArray array];
   pid_t pid = getpid();
@@ -191,11 +202,9 @@ int startTap(Recorder &r, const char *path) API_AVAILABLE(macos(14.2)) {
   }
 
   // 3. Target: ring buffer (2 s), FLAC file (#118) and writer thread.
-  const int opened = r.capture.open(path, r.sampleRate, wp::rec::FileFormat::Flac);
-  if (opened == WP_REC_ERR_OUT_OF_MEMORY)
-    return fail(r, WP_REC_ERR_OUT_OF_MEMORY, "No memory for the ring buffer");
+  const int opened = openCapture(r, path, gate);
   if (opened != 0)
-    return fail(r, WP_REC_ERR_FILE, "FLAC file could not be created");
+    return opened;
 
   // 4. Starten. Beim ersten Mal fragt macOS hier nach der Berechtigung für Systemaudio.
   if (!r.queue)
@@ -233,7 +242,11 @@ int wp_rec_source_available(int source) {
 // The microphone records on every supported macOS.
 int wp_rec_available(void) { return wp_rec_source_available(WP_REC_SOURCE_MIC); }
 
-int wp_rec_start_source(const char *path, int source) {
+} // extern "C"
+
+namespace {
+// Starts a recording of `source`; with `gate` armed (#140).
+int start(const char *path, int source, const wp::rec::GateConfig *gate) {
   auto &r = rec();
   std::lock_guard<std::mutex> lock(r.mutex);
   if (r.recording.load())
@@ -246,12 +259,14 @@ int wp_rec_start_source(const char *path, int source) {
     return fail(r, WP_REC_ERR_UNSUPPORTED,
                 source == WP_REC_SOURCE_SYSTEM ? "Recording requires macOS 14.2 or later"
                                                : "Unknown recording source");
+  if (gate && !gate->valid())
+    return fail(r, WP_REC_ERR_INVALID_ARGUMENT, "Threshold or pause out of range");
   r.capture.meter().reset();
   int res = 0;
   if (source == WP_REC_SOURCE_MIC) {
-    res = startMic(r, path);
+    res = startMic(r, path, gate);
   } else if (@available(macOS 14.2, *)) {
-    res = startTap(r, path);
+    res = startTap(r, path, gate);
   }
   if (res != 0) {
     teardown(r);
@@ -259,6 +274,27 @@ int wp_rec_start_source(const char *path, int source) {
   }
   r.recording.store(true);
   return 0;
+}
+} // namespace
+
+extern "C" {
+
+int wp_rec_start_source(const char *path, int source) { return start(path, source, nullptr); }
+
+int wp_rec_start_armed(const char *path, int source, double threshold_db, double silence_seconds) {
+  const wp::rec::GateConfig gate{threshold_db, silence_seconds};
+  return start(path, source, &gate);
+}
+
+int wp_rec_gate_state(void) {
+  const auto &capture = rec().capture;
+  return capture.gated() ? static_cast<int>(capture.gate().state()) : WP_REC_GATE_OFF;
+}
+
+double wp_rec_kept_seconds(void) {
+  auto &r = rec();
+  return r.capture.gated() ? static_cast<double>(r.capture.gate().keptFrames()) / r.sampleRate
+                           : wp_rec_seconds();
 }
 
 int wp_rec_start(const char *path) { return wp_rec_start_source(path, WP_REC_SOURCE_SYSTEM); }

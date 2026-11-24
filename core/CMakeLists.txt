@@ -192,7 +192,7 @@ wp_mutate(wp_trim)
 # #68: platform-independent part of the recording (ring buffer, writer thread, WAV or FLAC file,
 # level, #113: microphone through miniaudio), tested without an audio device; recorder_mac.mm only
 # drives Core Audio.
-add_library(wp_reccore STATIC src/recorder_core.cpp)
+add_library(wp_reccore STATIC src/recorder_core.cpp src/sound_gate.cpp)
 target_include_directories(wp_reccore PUBLIC include)
 target_link_libraries(wp_reccore PUBLIC wp_miniaudio wp_flacwriter Threads::Threads)
 wp_strict_warnings(wp_reccore)
@@ -258,6 +258,12 @@ add_executable(recorder_tests tests/recorder_tests.cpp)
 target_link_libraries(recorder_tests PRIVATE wp_reccore wp_playercore)
 wp_strict_warnings(recorder_tests)
 add_test(NAME recorder_tests COMMAND recorder_tests)
+
+# #140: armed recording, sound and silence detection with generated sine and silence
+add_executable(sound_gate_tests tests/sound_gate_tests.cpp)
+target_link_libraries(sound_gate_tests PRIVATE wp_reccore wp_playercore)
+wp_strict_warnings(sound_gate_tests)
+add_test(NAME sound_gate_tests COMMAND sound_gate_tests)
 
 # #116: trimming WAV, FLAC, MP3 and ADTS; the results decoded again by the core (wp_playercore)
 add_executable(trim_tests tests/trim_tests.cpp src/trim_api.cpp)
@@ -327,7 +333,8 @@ include(tests/fuzz/fuzz.cmake)
 # mutants_selftest checks that an endless loop with and without growing
 # memory ends as killed or timeout (#11/AK4).
 if(WP_MULL_PLUGIN)
-  set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests recorder_tests capi_tests
+  set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests recorder_tests
+    sound_gate_tests capi_tests
     device_tests realtime_tests reference_tests trim_tests fuzz_decoder_replay fuzz_capi_replay
     fuzz_trim_replay)
   foreach(t IN LISTS WP_MUTANT_TESTS)

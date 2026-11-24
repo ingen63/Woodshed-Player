@@ -55,6 +55,9 @@ abstract final class WpRecCode {
   /// #113: no input device (microphone) or it could not be opened.
   static const noInput = -11;
 
+  /// #140: threshold or pause of an armed recording out of range.
+  static const invalidArgument = -12;
+
   static const all = [
     invalidPath,
     unsupported,
@@ -66,8 +69,41 @@ abstract final class WpRecCode {
     file,
     ioProc,
     start,
-    noInput, //
+    noInput,
+    invalidArgument, //
   ];
+}
+
+/// States of an armed recording (#140), the values of `WP_REC_GATE_*` in wp_core.h.
+enum WpRecGate {
+  /// No recording, or one started without arming.
+  off(0),
+
+  /// Recording the source, nothing written until the first sound.
+  armed(1),
+
+  /// Sound came: written from 1 s before the first sound.
+  recording(2),
+
+  /// Silence long enough: the file ends 2 s after the last sound; stop the recording.
+  done(3);
+
+  const WpRecGate(this.code);
+  final int code;
+
+  /// The state of [code]; [off] for an unknown one.
+  static WpRecGate of(int code) =>
+      values.firstWhere((g) => g.code == code, orElse: () => off);
+}
+
+/// Settings of an armed recording (#140) and their range, as in sound_gate.hpp.
+abstract final class WpRecArming {
+  static const defaultThresholdDb = -50.0;
+  static const defaultSilenceSeconds = 5.0;
+  static const minThresholdDb = -120.0;
+  static const maxThresholdDb = 0.0;
+  static const minSilenceSeconds = 0.1;
+  static const maxSilenceSeconds = 3600.0;
 }
 
 /// Source of a recording (#113), the values of `WP_REC_SOURCE_*` in wp_core.h.

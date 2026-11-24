@@ -11,6 +11,7 @@
 
 #include "flac_writer.hpp"
 #include "miniaudio_impl.hpp"
+#include "sound_gate.hpp"
 
 namespace wp::rec {
 
@@ -116,8 +117,12 @@ public:
   ~Capture();
 
   // Allocates the ring (kRingSeconds), creates the file and starts the writer thread.
-  // 0, WP_REC_ERR_OUT_OF_MEMORY or WP_REC_ERR_FILE. After an error close() cleans up.
-  int open(const char *path, double sampleRate, FileFormat format);
+  // With `gate` the recording is armed (#140): the writer thread hands the frames to a SoundGate,
+  // which writes only from one second before the first sound to two seconds after the last.
+  // 0, WP_REC_ERR_INVALID_ARGUMENT (gate settings), WP_REC_ERR_OUT_OF_MEMORY or WP_REC_ERR_FILE.
+  // After an error close() cleans up.
+  int open(const char *path, double sampleRate, FileFormat format,
+           const GateConfig *gate = nullptr);
   // Stops the writer after it has written everything in the ring, closes the file and frees the
   // ring. The level meter keeps its values (length of the finished recording).
   void close();
@@ -130,8 +135,23 @@ public:
 
   LevelMeter &meter() { return meter_; }
   FrameRing &ring() { return ring_; }
+  // #140: whether this recording is armed, and its gate (state and kept frames).
+  [[nodiscard]] bool gated() const { return gated_; }
+  [[nodiscard]] const SoundGate &gate() const { return gate_; }
 
 private:
+  // Writes the frames the gate keeps into the file.
+  class FileSink : public FrameSink {
+  public:
+    explicit FileSink(Capture &capture) : capture_(capture) {}
+    void write(const float *frames, uint32_t count) override {
+      capture_.writeFrames(frames, count);
+    }
+
+  private:
+    Capture &capture_;
+  };
+
   void writerLoop();
   void writeFrames(const float *frames, uint32_t count);
 
@@ -139,6 +159,8 @@ private:
   FrameRing ring_;
   WavFile wav_;
   FlacWriter flac_;
+  SoundGate gate_;
+  bool gated_ = false;
   std::thread writer_;
   std::atomic<bool> writerRun_{false};
 };
