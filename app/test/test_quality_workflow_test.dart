@@ -510,7 +510,7 @@ void main() {
       expect(
         changes,
         contains(
-          r'''echo "code=$(has '^(core/|app/|tools/|Makefile$|\.github/workflows/)')"''',
+          r'''echo "code=$(has '^(core/|app/|tools/|Makefile$|\.github/workflows/|CHANGELOG(\.en)?\.md$)')"''',
         ),
       );
       expect(changes, contains(r'app/lib/.*_web\.dart$'));

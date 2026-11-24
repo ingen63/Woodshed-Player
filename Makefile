@@ -4,7 +4,7 @@
 .PHONY: help lame test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools format format-check lint lint-dart \
         lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
         mutants-diff fuzz fuzz-wasm fuzz-wasm-build fuzz-wasm-findings report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
-        test-ui test-ios test-web test-web-start smoke-app pseudo-l10n bench clean-tmp
+        test-ui test-ios test-web test-web-start smoke-app pseudo-l10n bench clean-tmp test-changelog package
 
 SHELL := /bin/bash
 # A failing build must not be hidden by `| tail` (GNU Make 3.81 on macOS has no .SHELLFLAGS).
@@ -34,6 +34,8 @@ CPP_FILES  = $(LS_FILES) -- core | grep -v '^core/third_party/' | grep -E '\.(c|
 
 help:
 	@echo "make test           core (ctest), app (flutter test) and the hook tests"
+	@echo "make test-changelog CHANGELOG.md and CHANGELOG.en.md: same versions, sections and issues (#139)"
+	@echo "make package       release packages of TAG (default: latest tag) from the built apps into local/release (#139)"
 	@echo "make clean-tmp      remove what aborted test runs left in the temp directory (unchanged for 60 min)"
 	@echo "make test-wasm      core tests under Node.js (Emscripten)"
 	@echo "make test-core-debug core tests in a Debug build (same cases and tolerances as Release)"
@@ -62,7 +64,18 @@ help:
 	@echo "make report         overview page of the test quality: local/test-quality/report/index.html"
 
 # ---- Tests ----
-test: clean-tmp test-core test-app test-tools
+test: clean-tmp test-changelog test-core test-app test-tools
+
+# #139/AK6: the release notes in both languages (tools/changelog.py, Python standard library only)
+test-changelog:
+	python3 tools/changelog.py check
+
+# #139: the packages of the release workflow, from the apps built before (flutter build macos --release,
+# flutter build web --release with --dart-define=WP_GIT_TAG=$(TAG)); see README «Release».
+TAG ?= $(shell git describe --tags --abbrev=0 --match 'v*' 2>/dev/null)
+package:
+	tools/package.sh macos $(TAG) local/release
+	tools/package.sh web $(TAG) local/release
 
 # Removes what aborted runs left in $TMPDIR (flutter_tools.* of about 240 MB each, wp_* test
 # directories), unchanged for 60 minutes; see tools/clean-tmp.sh.
@@ -107,7 +120,8 @@ test-app:
 # coverage check and diff, pre-push hook (#8/AK6)
 TOOL_TESTS = tool/after_commit_hook_test.dart tool/coverage_test.dart tool/pre_push_hook_test.dart \
              tool/network_free_test.dart tool/mutants_test.dart tool/report/report_test.dart \
-             tool/web_start_check_test.dart tool/clean_tmp_test.dart tool/slow_tests_test.dart
+             tool/web_start_check_test.dart tool/clean_tmp_test.dart tool/slow_tests_test.dart \
+             tool/release_test.dart
 test-tools:
 	@$(QA_DIRS)
 	cd app && flutter test --reporter failures-only $(call FLUTTER_JSON,tools) $(TOOL_TESTS)

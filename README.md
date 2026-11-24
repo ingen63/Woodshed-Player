@@ -2,6 +2,33 @@
 
 Native SwiftUI-App für **macOS 14+** und **iOS/iPadOS 17+** aus einer gemeinsamen Codebasis.
 
+## Installation
+
+Die Pakete jeder Version liegen unter [Releases](https://github.com/ingen63/Woodshed-Player/releases), mit den Release Notes auf Englisch und Deutsch ([`CHANGELOG.en.md`](CHANGELOG.en.md), [`CHANGELOG.md`](CHANGELOG.md)). Jedes Paket enthält die Lizenz (`LICENSE`) und die Lizenztexte der Schriften und Kern-Bibliotheken (Ordner `Licenses` bzw. `licenses`).
+
+| Paket | Plattform |
+| --- | --- |
+| `WoodshedPlayer-<Version>-macos.dmg` | macOS 14 oder neuer, Apple Silicon und Intel (Universal) |
+| `WoodshedPlayer-<Version>-web.zip` | Web-App zum Selbst-Hosten, derselbe Stand wie unter <https://ingen63.github.io/Woodshed-Player/app/> |
+
+Windows und Linux folgen mit #60. Auf iPhone und iPad läuft die Web-App.
+
+- **macOS:** `.dmg` öffnen und *Woodshed Player* in den Ordner *Programme* ziehen. Die App ist nur ad hoc signiert und nicht notarisiert (es gibt kein Apple-Developer-Konto). Beim ersten Start darum im Finder **Rechtsklick › Öffnen** wählen und im Dialog nochmals *Öffnen*. Zeigt macOS nur «Nicht öffnen» oder «In den Papierkorb», unter *Systemeinstellungen › Datenschutz & Sicherheit* bei «Woodshed Player wurde blockiert» auf *Dennoch öffnen* klicken. Danach startet sie normal.
+- **Web-App:** Den Ordner aus dem `.zip` an die Wurzel eines Webservers mit HTTPS legen (oder lokal über `localhost` ausliefern). Die App läuft nur an der Wurzel (`/`), nicht in einem Unterordner.
+
+## Release
+
+Ein Tag `v*` startet [`.github/workflows/release.yml`](.github/workflows/release.yml) (#139): Er prüft die Release Notes, baut das macOS-Paket und die Web-App und legt einen **Entwurf** unter *Releases* an. Fehlt die Version in einer Sprache oder schlägt ein Paket fehl, entsteht kein Entwurf; der rote Lauf nennt Sprache bzw. Plattform.
+
+1. **Version setzen:** `version` in `app/pubspec.yaml` und `appVersion` in `app/lib/app/app_info.dart`, z. B. `0.9.0`.
+2. **Eintrag schreiben:** in `CHANGELOG.md` oben `## Version 0.9.0` mit den Abschnitten `### Neu, geändert, behoben` und `### Tests und Entwicklung` (mindestens einer, in dieser Reihenfolge); jeder Punkt nennt seine Issues (`#123`). Eine Einleitung vor dem ersten Abschnitt ist erlaubt.
+3. **Übersetzen:** denselben Eintrag in `CHANGELOG.en.md` mit `### New, changed, fixed` und `### Tests and development`, dieselben Issue-Nummern je Abschnitt.
+4. **Prüfen:** `make test-changelog` (läuft auch in `make test` und in CI); `python3 tools/changelog.py notes v0.9.0` zeigt den Text des Entwurfs (Englisch offen, Deutsch aufklappbar), `python3 tools/changelog.py tag v0.9.0` prüft, dass der Tag zur App-Version passt.
+5. **Tag setzen und pushen:** `git tag v0.9.0` und `git push origin v0.9.0`. Der Entwurf heisst «Woodshed Player 0.9.0».
+6. **Veröffentlichen:** unter *Releases* den Entwurf prüfen und *Publish release* klicken (**Publish**).
+
+Lokal baut `make package` die Pakete des letzten Tags nach `local/release/`, aus den zuvor gebauten Apps (`flutter build macos --release`; `flutter build web --release --base-href / --dart-define=WP_GIT_TAG=<Tag>`), und prüft Version, Tag, Universal-Binärdateien und Signatur. Die Web-App unter GitHub Pages veröffentlicht weiterhin `pages.yml` beim selben Tag.
+
 ## Starten
 
 1. **Xcode** aus dem Mac App Store installieren (Version 16 oder neuer) und einmal öffnen.

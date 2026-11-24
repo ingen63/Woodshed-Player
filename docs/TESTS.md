@@ -223,6 +223,7 @@ zugeordnet.
 | Mutationstests: Kern mit Mull, Dart-Logik mit eigenem Werkzeug, `make mutants`, `make mutants-diff`, Job `mutants-diff` | vorhanden: `app/tool/mutants*.dart`, `core/tests/mutants/`, `tools/mutants-exclude.txt` (#11); kein offener Mutant mehr (#61, Abschnitt «Mutationstests (#11)») | – |
 | Übersichtsseite Testqualität: vier Schichten mit Status, Zuordnung `#nn/AKn`, Verlauf, «keine Daten» | vorhanden: `make report`, `app/tool/report/` mit `report_test.dart`, Artefakt `test-quality-report` im Job `checks` (#12) | – |
 | Laufzeitgrenze je Dart-Test (Logik 0,25 s, Widget 2 s), Begründung `// slow: <Grund>`, Hinweis auf der Übersichtsseite und in der Zusammenfassung des Jobs `checks` | vorhanden: `app/tool/slow_tests.dart` mit `slow_tests_test.dart` (#128) | – |
+| Release Notes in beiden Sprachen (`tools/changelog.py check`, `make test-changelog`, Job `checks`), Pakete mit Prüfung von Version, Tag, Universal-Binärdateien, Signatur und Lizenztexten (`tools/package.sh`), Release-Workflow | vorhanden: `app/tool/release_test.dart`, `.github/workflows/release.yml` (#139); der Lauf beim Tag-Push nur auf GitHub | – |
 | Netzwerkfreiheit bei jedem Push: Prüfung mit eigenen Tests | vorhanden: `make network-free`, Job `network-free` in `test-quality.yml`, `test_quality_workflow_test.dart` (#58/AK6) | – |
 
 ## Ausführen
@@ -279,7 +280,7 @@ CI-Job, der die Ressource hat, setzt eine Variable den Test auf Pflicht; fehlt d
 |---|---|---|---|
 | `WP_MACOS_CORE_REQUIRED` | macOS mit gebautem Kern `core/build/libwp_core.dylib` | `app/test/wp_trim_ffi_test.dart`, `app/test/wp_waveform_ffi_test.dart` | `macos` (nächtlich): baut `wp_core` und führt beide Tests aus |
 | `WP_AUDIO_DEVICE_REQUIRED` | ein Audiogerät, auch das Null-Gerät (`WP_AUDIO_BACKEND=null`) | `app/test/wp_waveform_ffi_test.dart`; im Kern `capi_tests.cpp` (`pathEndingInDot`, `loadAndTransport`) | `macos` für die FFI-Tests (Null-Gerät). Die Linux-Runner haben kein Gerät: `capi_tests` überspringt dort die Ladefälle, `capi_null_backend_tests` prüft sie auf dem Null-Gerät |
-| `WP_PYTHON_REQUIRED` | `python3` für den Bau der Website | `app/test/about_test.dart` (#50), `app/test/web_hosting_test.dart` (#41) | `checks` |
+| `WP_PYTHON_REQUIRED` | `python3` für den Bau der Website und die Release Notes | `app/test/about_test.dart` (#50), `app/test/web_hosting_test.dart` (#41), `app/tool/release_test.dart` (#139) | `checks` |
 | `WP_ACTIONLINT_REQUIRED` | `actionlint` (`ACTIONLINT` oder im `PATH`) | `app/test/test_quality_workflow_test.dart` (#64/AK4) | `checks` |
 | `WP_LAME_REQUIRED` | der MP3-Encoder LAME aus `tools/build-lame.sh` (`local/lame/`) oder `WP_LAME_PATH` (#141) | `core/tests/mp3_export_tests.cpp`, `app/test/mp3_ffi_test.dart` | `checks` (Linux, Kern) und `macos` (FFI): bauen LAME vorher mit `tools/build-lame.sh` |
 | `WP_OPTIMIZED_BUILD_REQUIRED` | optimierter Build ohne Sanitizer für die Zeitgrenzen (`core/tests/test_timing.hpp`) | `core/tests/bench_tests.cpp`, ebenso gemeldet von `engine_tests.cpp` und `waveform_tests.cpp` | `bench` (`make bench`, Release) |
