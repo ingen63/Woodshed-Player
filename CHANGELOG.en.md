@@ -2,6 +2,21 @@
 
 Release notes of Woodshed Player, newest version first. This file translates [`CHANGELOG.md`](CHANGELOG.md) (German), which is authoritative. Every entry starts with `## Version X.Y.Z` and has the sections «New, changed, fixed» and «Tests and development» (at least one, in this order); every bullet names its issues. `python3 tools/changelog.py check` checks both files (#139).
 
+## Version 0.9.0
+
+### New, changed, fixed
+
+- **Command line (Mac only, #140):** `woodshed play` loads and plays a title of the library, `woodshed record` arms a recording: it starts with the first sound and ends after a pause; the app talks to the command only through a local socket file. Armed recording is also available in the app.
+- **MP3 export (#141):** Export selected titles as MP3, with the year as metadata (`--year` for armed recording).
+- **Library (#135, #136, #137):** Titles easier to read, «New folder», view and info in the «⋯» menu; invalid loops are dropped when saving and trimming; a deleted local playlist no longer disturbs the sync.
+- **OneDrive removed (#55):** from the docs and the web app.
+
+### Tests and development
+
+- Release workflow with macOS package, web app and release notes in two languages (#139).
+- Test page and test program K0 for the direct connection between devices (#52).
+- Nightly mutation tests with a cache per source state (#138); a broken connection of the command line on Linux without an unhandled error (#140).
+
 ## Version 0.8.2
 
 ### New, changed, fixed
