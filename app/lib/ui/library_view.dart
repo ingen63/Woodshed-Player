@@ -339,56 +339,59 @@ class _LibraryViewState extends State<LibraryView> {
     final tracks = lib.sortedTracksIn(f.id);
     final files = FolderDropTarget(f.id);
     return [
-      _SectionHeader(
-        key: Key('folder:${f.name}'),
-        label: f.name,
-        icon: WsIcons.folder,
-        expanded: open,
-        onToggle: () => setState(
-          () => open ? _collapsed.add(f.id) : _collapsed.remove(f.id),
+      _byId(
+        ('folder', f.id),
+        _SectionHeader(
+          key: Key('folder:${f.name}'),
+          label: f.name,
+          icon: WsIcons.folder,
+          expanded: open,
+          onToggle: () => setState(
+            () => open ? _collapsed.add(f.id) : _collapsed.remove(f.id),
+          ),
+          onDrop: (d) => lib.placeTracks({...?trackIds(d)}, f.id),
+          fileTarget: files,
+          fileHover: _hovered(files),
+          menu: (context) => [
+            MenuItemButton(
+              leadingIcon: const Icon(WsIcons.add, size: 16),
+              onPressed: () => c.pickAndImport(folderId: f.id),
+              child: Text(l.addMp3Ellipsis),
+            ),
+            MenuItemButton(
+              leadingIcon: const Icon(WsIcons.pencil, size: 16),
+              onPressed: () async {
+                final name = await askName(
+                  context,
+                  l.renameFolder,
+                  initial: f.name,
+                );
+                if (name != null) lib.renameFolder(f.id, name);
+              },
+              child: Text(l.renameEllipsis),
+            ),
+            CheckboxMenuButton(
+              key: Key('syncFolder:${f.name}'),
+              value: f.sync,
+              onChanged: (v) => lib.setFolderSync(f.id, v ?? true),
+              child: Text(l.syncFolder),
+            ),
+            MenuItemButton(
+              leadingIcon: const Icon(WsIcons.trash, size: 16),
+              onPressed: () async {
+                if (await confirm(
+                  context,
+                  title: l.deleteNamedTitle(f.name),
+                  text: l.deleteFolderText,
+                  action: l.deleteFolder,
+                )) {
+                  lib.deleteFolder(f.id);
+                }
+              },
+              child: Text(l.deleteFolder),
+            ),
+          ],
         ),
-        onDrop: (d) => lib.placeTracks({...?trackIds(d)}, f.id),
-        fileTarget: files,
-        fileHover: _hovered(files),
-        menu: (context) => [
-          MenuItemButton(
-            leadingIcon: const Icon(WsIcons.add, size: 16),
-            onPressed: () => c.pickAndImport(folderId: f.id),
-            child: Text(l.addMp3Ellipsis),
-          ),
-          MenuItemButton(
-            leadingIcon: const Icon(WsIcons.pencil, size: 16),
-            onPressed: () async {
-              final name = await askName(
-                context,
-                l.renameFolder,
-                initial: f.name,
-              );
-              if (name != null) lib.renameFolder(f.id, name);
-            },
-            child: Text(l.renameEllipsis),
-          ),
-          CheckboxMenuButton(
-            key: Key('syncFolder:${f.name}'),
-            value: f.sync,
-            onChanged: (v) => lib.setFolderSync(f.id, v ?? true),
-            child: Text(l.syncFolder),
-          ),
-          MenuItemButton(
-            leadingIcon: const Icon(WsIcons.trash, size: 16),
-            onPressed: () async {
-              if (await confirm(
-                context,
-                title: l.deleteNamedTitle(f.name),
-                text: l.deleteFolderText,
-                action: l.deleteFolder,
-              )) {
-                lib.deleteFolder(f.id);
-              }
-            },
-            child: Text(l.deleteFolder),
-          ),
-        ],
       ),
       if (open) ...[
         for (final t in tracks) _row(t, indent: true, fileTarget: files),
@@ -425,131 +428,139 @@ class _LibraryViewState extends State<LibraryView> {
       _ => lib.addToPlaylist(p.id, trackIds(d) ?? const [], at: at),
     };
     return [
-      _SectionHeader(
-        key: Key('playlist:${p.name}'),
-        label: p.name,
-        icon: WsIcons.musicNoteList,
-        expanded: open,
-        onToggle: () => setState(
-          () => open ? _openPlaylists.remove(p.id) : _openPlaylists.add(p.id),
-        ),
-        accepts: (d) => trackIds(d) != null || d is _EntryDrag,
-        onDrop: (d) => drop(d, tracks.length),
-        fileTarget: files,
-        fileHover: _hovered(files),
-        menuTooltip: l.playlistActions,
-        trailing: [
-          // #114/AK11: cloud = on all devices, device = only here
-          Tooltip(
-            message: p.shared ? l.playlistOnAllDevices : l.playlistOnThisDevice,
-            child: Icon(
-              p.shared
-                  ? WsIcons.cloud
-                  : (widget.touch ? WsIcons.phone : WsIcons.laptop),
-              key: Key('${p.shared ? 'shared' : 'local'}:${p.name}'),
-              size: 14,
-              color: ws.muted,
-              semanticLabel: p.shared
+      _byId(
+        ('playlist', p.id),
+        _SectionHeader(
+          key: Key('playlist:${p.name}'),
+          label: p.name,
+          icon: WsIcons.musicNoteList,
+          expanded: open,
+          onToggle: () => setState(
+            () => open ? _openPlaylists.remove(p.id) : _openPlaylists.add(p.id),
+          ),
+          accepts: (d) => trackIds(d) != null || d is _EntryDrag,
+          onDrop: (d) => drop(d, tracks.length),
+          fileTarget: files,
+          fileHover: _hovered(files),
+          menuTooltip: l.playlistActions,
+          trailing: [
+            // #114/AK11: cloud = on all devices, device = only here
+            Tooltip(
+              message: p.shared
                   ? l.playlistOnAllDevices
                   : l.playlistOnThisDevice,
+              child: Icon(
+                p.shared
+                    ? WsIcons.cloud
+                    : (widget.touch ? WsIcons.phone : WsIcons.laptop),
+                key: Key('${p.shared ? 'shared' : 'local'}:${p.name}'),
+                size: 14,
+                color: ws.muted,
+                semanticLabel: p.shared
+                    ? l.playlistOnAllDevices
+                    : l.playlistOnThisDevice,
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Text('${tracks.length}', style: ws.number(12, color: ws.muted)),
-          IconButton(
-            key: Key('playPlaylist:${p.name}'),
-            tooltip: l.playPlaylist,
-            visualDensity: VisualDensity.compact,
-            iconSize: 16,
-            icon: const Icon(WsIcons.play),
-            onPressed: tracks.isEmpty ? null : () => c.playPlaylist(p.id),
-          ),
-        ],
-        menu: (context) => [
-          MenuItemButton(
-            leadingIcon: const Icon(WsIcons.play, size: 16),
-            onPressed: tracks.isEmpty ? null : () => c.playPlaylist(p.id),
-            child: Text(l.playPlaylist),
-          ),
-          MenuItemButton(
-            leadingIcon: const Icon(WsIcons.pencil, size: 16),
-            onPressed: () async {
-              final name = await askName(
-                context,
-                l.renamePlaylist,
-                initial: p.name,
-              );
-              if (name != null) lib.renamePlaylist(p.id, name);
-            },
-            child: Text(l.renameEllipsis),
-          ),
-          _sortMenu(p),
-          CheckboxMenuButton(
-            key: Key('shareAll:${p.name}'),
-            value: p.shared,
-            onChanged: (_) => _setShared(p.id, true),
-            child: Text(l.playlistOnAllDevices),
-          ),
-          CheckboxMenuButton(
-            key: Key('shareLocal:${p.name}'),
-            value: !p.shared,
-            onChanged: (_) => _setShared(p.id, false),
-            child: Text(l.playlistOnThisDevice),
-          ),
-          MenuItemButton(
-            key: Key('deletePlaylist:${p.name}'),
-            leadingIcon: const Icon(WsIcons.trash, size: 16),
-            onPressed: () async {
-              if (await confirm(
-                context,
-                title: l.deleteNamedTitle(p.name),
-                text: l.deletePlaylistText,
-                action: l.deletePlaylist,
-              )) {
-                lib.deletePlaylist(p.id);
-              }
-            },
-            child: Text(l.deletePlaylist),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Text('${tracks.length}', style: ws.number(12, color: ws.muted)),
+            IconButton(
+              key: Key('playPlaylist:${p.name}'),
+              tooltip: l.playPlaylist,
+              visualDensity: VisualDensity.compact,
+              iconSize: 16,
+              icon: const Icon(WsIcons.play),
+              onPressed: tracks.isEmpty ? null : () => c.playPlaylist(p.id),
+            ),
+          ],
+          menu: (context) => [
+            MenuItemButton(
+              leadingIcon: const Icon(WsIcons.play, size: 16),
+              onPressed: tracks.isEmpty ? null : () => c.playPlaylist(p.id),
+              child: Text(l.playPlaylist),
+            ),
+            MenuItemButton(
+              leadingIcon: const Icon(WsIcons.pencil, size: 16),
+              onPressed: () async {
+                final name = await askName(
+                  context,
+                  l.renamePlaylist,
+                  initial: p.name,
+                );
+                if (name != null) lib.renamePlaylist(p.id, name);
+              },
+              child: Text(l.renameEllipsis),
+            ),
+            _sortMenu(p),
+            CheckboxMenuButton(
+              key: Key('shareAll:${p.name}'),
+              value: p.shared,
+              onChanged: (_) => _setShared(p.id, true),
+              child: Text(l.playlistOnAllDevices),
+            ),
+            CheckboxMenuButton(
+              key: Key('shareLocal:${p.name}'),
+              value: !p.shared,
+              onChanged: (_) => _setShared(p.id, false),
+              child: Text(l.playlistOnThisDevice),
+            ),
+            MenuItemButton(
+              key: Key('deletePlaylist:${p.name}'),
+              leadingIcon: const Icon(WsIcons.trash, size: 16),
+              onPressed: () async {
+                if (await confirm(
+                  context,
+                  title: l.deleteNamedTitle(p.name),
+                  text: l.deletePlaylistText,
+                  action: l.deletePlaylist,
+                )) {
+                  lib.deletePlaylist(p.id);
+                }
+              },
+              child: Text(l.deletePlaylist),
+            ),
+          ],
+        ),
       ),
       if (open) ...[
         for (final (i, t) in tracks.indexed)
-          _TrackRow(
-            key: Key('entry:${p.name}:$i'),
-            track: t,
-            artwork: lib.artworkPath(t),
-            selected: q == PlayQueue(p.id, i) && c.player.trackId == t.id,
-            onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
-            onlyInCloud: !lib.hasFile(t.id) && c.sync.inCloud(t.id),
-            fetching: c.fetching == t.id,
-            indent: true,
-            touch: widget.touch,
-            onTap: () {
-              c.playPlaylist(p.id, index: i, play: false);
-              widget.onSelected?.call();
-            },
-            dragData: _EntryDrag(p.id, i, t.id),
-            accepts: (d) =>
-                trackIds(d) != null ||
-                (d is _EntryDrag && (d.playlistId != p.id || d.index != i)),
-            onDrop: (d) => drop(d, i),
-            fileTarget: PlaylistDropTarget(p.id, i),
-            fileHover: _hovered(PlaylistDropTarget(p.id, i)),
-            menu: (context) => [
-              MenuItemButton(
-                key: const Key('removeFromPlaylist'),
-                leadingIcon: const Icon(WsIcons.close, size: 16),
-                onPressed: () => lib.removeFromPlaylist(p.id, i),
-                child: Text(l.removeFromPlaylist),
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(WsIcons.pencil, size: 16),
-                onPressed: () => editTrack(context, lib, t),
-                child: Text(l.editTrackEllipsis),
-              ),
-              trimMenuItem(context, c, t),
-            ],
+          _byId(
+            ('entry', p.id, i),
+            _TrackRow(
+              key: Key('entry:${p.name}:$i'),
+              track: t,
+              artwork: lib.artworkPath(t),
+              selected: q == PlayQueue(p.id, i) && c.player.trackId == t.id,
+              onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
+              onlyInCloud: !lib.hasFile(t.id) && c.sync.inCloud(t.id),
+              fetching: c.fetching == t.id,
+              indent: true,
+              touch: widget.touch,
+              onTap: () {
+                c.playPlaylist(p.id, index: i, play: false);
+                widget.onSelected?.call();
+              },
+              dragData: _EntryDrag(p.id, i, t.id),
+              accepts: (d) =>
+                  trackIds(d) != null ||
+                  (d is _EntryDrag && (d.playlistId != p.id || d.index != i)),
+              onDrop: (d) => drop(d, i),
+              fileTarget: PlaylistDropTarget(p.id, i),
+              fileHover: _hovered(PlaylistDropTarget(p.id, i)),
+              menu: (context) => [
+                MenuItemButton(
+                  key: const Key('removeFromPlaylist'),
+                  leadingIcon: const Icon(WsIcons.close, size: 16),
+                  onPressed: () => lib.removeFromPlaylist(p.id, i),
+                  child: Text(l.removeFromPlaylist),
+                ),
+                MenuItemButton(
+                  leadingIcon: const Icon(WsIcons.pencil, size: 16),
+                  onPressed: () => editTrack(context, lib, t),
+                  child: Text(l.editTrackEllipsis),
+                ),
+                trimMenuItem(context, c, t),
+              ],
+            ),
           ),
         if (tracks.isEmpty)
           _Placeholder(
@@ -568,67 +579,75 @@ class _LibraryViewState extends State<LibraryView> {
     final marked = _selection.contains(t.id);
     // #122/AK3, AK4: the context menu of one of several selected tracks acts on all of them
     final several = marked && _selection.length > 1;
-    return _TrackRow(
-      key: Key('track:${t.title}'),
-      track: t,
-      artwork: lib.artworkPath(t),
-      selected: c.player.trackId == t.id,
-      marked: marked,
-      checked: _selection.mode ? marked : null,
-      onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
-      onlyInCloud: !lib.hasFile(t.id) && c.sync.inCloud(t.id),
-      fetching: c.fetching == t.id,
-      indent: indent,
-      touch: widget.touch,
-      onTap: () => _tap(t),
-      // #122/AK2: a long press released without dragging starts the selection mode
-      onLongPress: widget.touch ? () => _startSelection(t.id) : null,
-      dragData: several ? _picked : t.id,
-      accepts: (d) => trackIds(d)?.contains(t.id) == false,
-      onDrop: (d) =>
-          lib.placeTracks({...?trackIds(d)}, t.folderId, beforeId: t.id),
-      fileTarget: fileTarget,
-      menu: (context) => several
-          ? _tracksMenu(_picked)
-          : [
-              if (widget.touch && !_selection.mode)
+    return _byId(
+      ('track', t.id),
+      _TrackRow(
+        key: Key('track:${t.title}'),
+        track: t,
+        artwork: lib.artworkPath(t),
+        selected: c.player.trackId == t.id,
+        marked: marked,
+        checked: _selection.mode ? marked : null,
+        onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
+        onlyInCloud: !lib.hasFile(t.id) && c.sync.inCloud(t.id),
+        fetching: c.fetching == t.id,
+        indent: indent,
+        touch: widget.touch,
+        onTap: () => _tap(t),
+        // #122/AK2: a long press released without dragging starts the selection mode
+        onLongPress: widget.touch ? () => _startSelection(t.id) : null,
+        dragData: several ? _picked : t.id,
+        accepts: (d) => trackIds(d)?.contains(t.id) == false,
+        onDrop: (d) =>
+            lib.placeTracks({...?trackIds(d)}, t.folderId, beforeId: t.id),
+        fileTarget: fileTarget,
+        menu: (context) => several
+            ? _tracksMenu(_picked)
+            : [
+                if (widget.touch && !_selection.mode)
+                  MenuItemButton(
+                    key: const Key('selectTracks'),
+                    leadingIcon: const Icon(WsIcons.checkCircle, size: 16),
+                    onPressed: () => _startSelection(t.id),
+                    child: Text(l.selectTracks),
+                  ),
                 MenuItemButton(
-                  key: const Key('selectTracks'),
-                  leadingIcon: const Icon(WsIcons.checkCircle, size: 16),
-                  onPressed: () => _startSelection(t.id),
-                  child: Text(l.selectTracks),
+                  key: const Key('editTrack'),
+                  leadingIcon: const Icon(WsIcons.pencil, size: 16),
+                  onPressed: () => editTrack(context, lib, t),
+                  child: Text(l.editTrackEllipsis),
                 ),
-              MenuItemButton(
-                key: const Key('editTrack'),
-                leadingIcon: const Icon(WsIcons.pencil, size: 16),
-                onPressed: () => editTrack(context, lib, t),
-                child: Text(l.editTrackEllipsis),
-              ),
-              trimMenuItem(context, c, t),
-              ?exportMenuItem(context, c, [t.id]),
-              _folderMenu([t.id]),
-              _playlistMenu([t.id]),
-              CheckboxMenuButton(
-                key: const Key('dontUpload'),
-                value: t.noUpload,
-                onChanged: (v) => lib.setNoUpload({t.id}, v ?? false),
-                child: Text(l.dontUpload),
-              ),
-              if (widget.cacheControls)
+                trimMenuItem(context, c, t),
+                ?exportMenuItem(context, c, [t.id]),
+                _folderMenu([t.id]),
+                _playlistMenu([t.id]),
                 CheckboxMenuButton(
-                  key: const Key('keepOffline'),
-                  value: lib.keptOffline(t.id),
-                  onChanged: (v) => lib.setKeepOffline({t.id}, v ?? false),
-                  child: Text(l.keepOffline),
+                  key: const Key('dontUpload'),
+                  value: t.noUpload,
+                  onChanged: (v) => lib.setNoUpload({t.id}, v ?? false),
+                  child: Text(l.dontUpload),
                 ),
-              MenuItemButton(
-                leadingIcon: const Icon(WsIcons.trash, size: 16),
-                onPressed: () => confirmDeleteTrack(context, c, t),
-                child: Text(l.delete),
-              ),
-            ],
+                if (widget.cacheControls)
+                  CheckboxMenuButton(
+                    key: const Key('keepOffline'),
+                    value: lib.keptOffline(t.id),
+                    onChanged: (v) => lib.setKeepOffline({t.id}, v ?? false),
+                    child: Text(l.keepOffline),
+                  ),
+                MenuItemButton(
+                  leadingIcon: const Icon(WsIcons.trash, size: 16),
+                  onPressed: () => confirmDeleteTrack(context, c, t),
+                  child: Text(l.delete),
+                ),
+              ],
+      ),
     );
   }
+
+  /// #143: rows are told apart by [id], since tracks, folders and playlists may share a name; the
+  /// name keys inside stay as handles for tests.
+  static Widget _byId(Object id, Widget row) =>
+      KeyedSubtree(key: ValueKey(id), child: row);
 
   /// #122: what can be done with several selected tracks [ids], in the order of the list.
   List<Widget> _tracksMenu(List<String> ids) => [
