@@ -1,11 +1,14 @@
 // Dienste der App auf Desktop und Handy (#34 trennt sie vom Web): Bibliothek im App-Ordner, Audio-Kern
 // über FFI mit eigenem Audiogerät, Aufnahme auf macOS. Gegenstück im Browser: platform_web.dart.
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:wp_core/wp_core.dart';
 
+import '../l10n/app_localizations.dart';
 import '../library/library.dart';
 import '../metronome/metronome_controller.dart';
 import '../metronome/tap_tempo.dart';
@@ -17,10 +20,13 @@ import '../sync/providers/google_platform_io.dart' deferred as google;
 import '../ui/recording_button.dart';
 import 'app_controller.dart';
 import 'app_start.dart';
+import 'command_line.dart';
+import 'command_server.dart';
 import 'file_platform.dart';
 import 'file_store_io.dart';
 import 'keychain_store.dart';
 import 'library_settings_store.dart';
+import 'recording_controller.dart';
 import 'smoke.dart';
 import 'web_auth_channel.dart';
 
@@ -80,12 +86,51 @@ Future<AppController> createAppController({
   );
   // #54/AK1: the first frame never waits on keychain, network or sync
   startInBackground(controller);
+  // #140: the command line of the desktop app; not in the smoke test (own folder)
+  if (Platform.isMacOS && baseDir == null) {
+    unawaited(startCommandLine(controller));
+  }
   return controller;
 }
 
+/// The recording of [controller], shared by the record button and the command line (#140).
+final _recordings = Expando<RecordingController>();
+RecordingController? recordingFor(AppController controller) =>
+    WpRecorder.available
+    ? _recordings[controller] ??= RecordingController(app: controller)
+    : null;
+
 /// Aufnahme-Knopf, wenn der Kern Aufnahme kann (macOS 14.2+).
-Widget? recordingButtonFor(AppController controller) =>
-    WpRecorder.available ? RecordingButton(controller: controller) : null;
+Widget? recordingButtonFor(AppController controller) => WpRecorder.available
+    ? RecordingButton(
+        controller: controller,
+        recording: recordingFor(controller),
+      )
+    : null;
+
+/// #140: listens for the command line on the socket file the platform names; none, no listening.
+Future<CommandServer?> startCommandLine(AppController controller) async {
+  final path = await controller.files.commandSocket();
+  if (path == null) return null;
+  return CommandServer.start(
+    path,
+    CommandHandler(
+      app: controller,
+      recording: recordingFor(controller),
+      texts: systemTexts,
+    ),
+  );
+}
+
+/// Texts in the first system language the app has, otherwise English (as the app, #43/AK3).
+AppLocalizations systemTexts() {
+  for (final p in PlatformDispatcher.instance.locales) {
+    for (final s in AppLocalizations.supportedLocales) {
+      if (s.languageCode == p.languageCode) return lookupAppLocalizations(s);
+    }
+  }
+  return lookupAppLocalizations(const Locale('en'));
+}
 
 /// The hint «Add to Home Screen» is for the browser only (#39/AK6).
 bool get installHintWanted => false;

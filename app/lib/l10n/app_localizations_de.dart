@@ -234,6 +234,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Schwelle oder Pause der scharfen Aufnahme liegen ausserhalb des erlaubten Bereichs.';
 
   @override
+  String get recordingArmed => 'Scharf';
+
+  @override
+  String get recordingArmedTooltip =>
+      'Scharf über die Kommandozeile: Die Aufnahme beginnt mit dem ersten Ton und endet nach einer Pause. Ein Klick bricht ab; sobald sie aufnimmt, beendet ein Klick sie.';
+
+  @override
   String get recordingSource => 'Aufnahmequelle';
 
   @override

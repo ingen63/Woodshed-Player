@@ -64,6 +64,8 @@
   "recordingTooltip": "Nimmt den Systemton auf (ohne Mikrofon). Die Aufnahme wird nur lokal gespeichert und danach in die Bibliothek übernommen.",
   "recordingErrorNoInput": "Kein Mikrofon gefunden, oder es liess sich nicht öffnen.",
   "recordingErrorInvalidArgument": "Schwelle oder Pause der scharfen Aufnahme liegen ausserhalb des erlaubten Bereichs.",
+  "recordingArmed": "Scharf",
+  "recordingArmedTooltip": "Scharf über die Kommandozeile: Die Aufnahme beginnt mit dem ersten Ton und endet nach einer Pause. Ein Klick bricht ab; sobald sie aufnimmt, beendet ein Klick sie.",
   "recordingSource": "Aufnahmequelle",
   "recordingSourceSystem": "Systemton",
   "recordingSourceMicrophone": "Mikrofon",

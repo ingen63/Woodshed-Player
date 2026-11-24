@@ -231,6 +231,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'The threshold or the pause of the armed recording is out of range.';
 
   @override
+  String get recordingArmed => 'Armed';
+
+  @override
+  String get recordingArmedTooltip =>
+      'Armed from the command line: the recording starts with the first sound and ends after a pause. Click to cancel; once it records, a click stops it.';
+
+  @override
   String get recordingSource => 'Recording source';
 
   @override

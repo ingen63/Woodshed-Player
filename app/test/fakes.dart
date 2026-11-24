@@ -11,6 +11,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/app/file_platform.dart';
 import 'package:woodshed_player/app/file_store_io.dart';
+import 'package:woodshed_player/app/recording_controller.dart';
 import 'package:woodshed_player/l10n/app_localizations.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/metronome/metronome_controller.dart';
@@ -215,6 +216,12 @@ class FakeFiles implements FilePlatform {
   /// #113/AK4: answer of the microphone permission; [microphoneAsked] counts the questions.
   bool microphoneGranted = true;
   int microphoneAsked = 0;
+
+  /// #140: socket file of the command line; null as on iPhone/iPad.
+  String? socket;
+  @override
+  Future<String?> commandSocket() async => socket;
+
   @override
   Future<bool> microphoneAccess() async {
     microphoneAsked++;
@@ -438,4 +445,67 @@ Future<void> eventually(
   if (!done()) {
     fail('hang: «$what» not reached within ${hangGuard.inSeconds} s');
   }
+}
+
+/// Recorder without the core (#4): writes a file on start, values are set by the test.
+/// #140: an armed start keeps its settings; [gate] and [keptSeconds] are set by the test.
+class FakeRecorder implements Recorder {
+  String? path;
+  WpRecSource? source;
+
+  /// Sources this fake platform records (#113); both, as on macOS 14.2+.
+  Set<WpRecSource> sources = {...WpRecSource.values};
+  bool recording = false;
+  WpRecordingException? failWith;
+
+  /// Number of starts.
+  int starts = 0;
+
+  /// #140: settings of the last armed start, null after a start without arming.
+  ({double thresholdDb, double silenceSeconds})? arming;
+  @override
+  double seconds = 0;
+  @override
+  double level = 0;
+  @override
+  bool onlySilence = false;
+  @override
+  WpRecGate gate = WpRecGate.off;
+  @override
+  double keptSeconds = 0;
+
+  @override
+  bool sourceAvailable(WpRecSource source) => sources.contains(source);
+
+  @override
+  void start(String path, WpRecSource source) {
+    final e = failWith;
+    if (e != null) throw e;
+    this.path = path;
+    this.source = source;
+    // #140: each take its own content, so a second take is a new title and not a duplicate
+    File(path).writeAsStringSync(
+      starts++ == 0 ? 'recorded audio' : 'recorded audio $starts',
+    );
+    recording = true;
+    arming = null;
+    gate = WpRecGate.off;
+  }
+
+  @override
+  void startArmed(
+    String path,
+    WpRecSource source, {
+    required double thresholdDb,
+    required double silenceSeconds,
+  }) {
+    start(path, source);
+    arming = (thresholdDb: thresholdDb, silenceSeconds: silenceSeconds);
+    gate = WpRecGate.armed;
+  }
+
+  @override
+  void stop() => recording = false;
+  @override
+  bool get isRecording => recording;
 }

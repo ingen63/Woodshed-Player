@@ -67,6 +67,10 @@ class WebFilePlatform implements FilePlatform {
   @override
   Future<bool> microphoneAccess() async => false;
 
+  /// #140: no command line in the browser.
+  @override
+  Future<String?> commandSocket() async => null;
+
   @override
   void keepAwake(bool on) {} // im Browser erst mit W7 (#39)
 

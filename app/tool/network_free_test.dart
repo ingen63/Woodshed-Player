@@ -201,6 +201,118 @@ void main() {
     });
   });
 
+  group('#140/AK19 local unix socket of the command line', () {
+    const dartServer =
+        "import 'dart:io';\n"
+        '// network-free: local unix socket, a file path\n'
+        'Future<ServerSocket> listen(String p) => ServerSocket.bind(\n'
+        '  InternetAddress(p, type: InternetAddressType.unix),\n'
+        '  0,\n'
+        ');\n'
+        'void serve(Socket s) {}\n';
+
+    test('marked socket lines in a file with a Unix address pass', () {
+      final found = scanAppSource(
+        'app/lib/app/command_server.dart',
+        dartServer,
+      );
+      // the unmarked line with Socket is still a finding
+      expect(_where(found), ['app/lib/app/command_server.dart:7']);
+      final marked = dartServer.replaceFirst(
+        'void serve',
+        '// network-free: local unix socket\nvoid serve',
+      );
+      expect(scanAppSource('app/lib/a.dart', marked), isEmpty);
+    });
+
+    test('the marker does not allow TCP or IP', () {
+      for (final ip in [
+        'InternetAddress.loopbackIPv4',
+        'InternetAddress.anyIPv6',
+        'InternetAddressType.IPv4',
+        "Socket.connect('example.org', 80)",
+        "InternetAddress.lookup('example.org')",
+      ]) {
+        final src =
+            '$dartServer// network-free: local unix socket\nfinal x = $ip;\n';
+        final found = scanAppSource('app/lib/a.dart', src);
+        expect(
+          found.map((f) => f.what).join('\n'),
+          contains('also uses IP'),
+          reason: ip,
+        );
+        expect(
+          found.where((f) => f.what.contains('socket (')),
+          isNotEmpty,
+          reason: ip,
+        );
+      }
+      // marked, but no Unix address at all
+      const tcp =
+          "import 'dart:io';\n"
+          '// network-free: local unix socket\n'
+          'Future<ServerSocket> l() => ServerSocket.bind(host, 80);\n';
+      final found = scanAppSource('app/lib/a.dart', tcp);
+      expect(found.first.what, contains('names no Unix address'));
+      expect(_where(found), ['app/lib/a.dart:0', 'app/lib/a.dart:3']);
+    });
+
+    test('the marker allows only sockets, not HTTP', () {
+      const http =
+          '$dartServer// network-free: local unix socket\nfinal c = HttpClient();\n';
+      expect(
+        scanAppSource('app/lib/a.dart', http).map((f) => f.what),
+        contains(startsWith('HttpClient')),
+      );
+    });
+
+    test('the C++ client: marked AF_UNIX lines pass, AF_INET does not', () {
+      const cpp =
+          '#include <sys/socket.h> // network-free: local unix socket\n'
+          '#include <sys/un.h>\n'
+          'int f() {\n'
+          '  // network-free: local unix socket\n'
+          '  int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);\n'
+          '  // network-free: local unix socket\n'
+          '  return ::connect(fd, nullptr, 0);\n'
+          '}\n';
+      expect(scanCoreSource('core/src/cli_posix.cpp', cpp), isEmpty);
+      final inet = cpp.replaceFirst('AF_UNIX', 'AF_INET');
+      expect(
+        scanCoreSource('core/src/cli_posix.cpp', inet).map((f) => f.what),
+        contains(contains('names no Unix address')),
+      );
+      final both =
+          '$cpp int g() { return ::socket(AF_INET, SOCK_STREAM, 0); }\n';
+      final found = scanCoreSource('core/src/cli_posix.cpp', both);
+      expect(found.first.what, contains('also uses IP (AF_INET)'));
+      // unmarked socket calls stay findings
+      expect(
+        _where(
+          scanCoreSource(
+            'core/src/x.cpp',
+            cpp.replaceAll('network-free: local unix socket', ''),
+          ),
+        ),
+        ['core/src/x.cpp:1', 'core/src/x.cpp:5', 'core/src/x.cpp:7'],
+      );
+    });
+
+    test('the files of the command line in this repository pass', () {
+      for (final path in [
+        'app/lib/app/command_server.dart',
+        'core/src/cli_posix.cpp',
+      ]) {
+        final text = File('$_repo/$path').readAsStringSync();
+        expect(text, contains(localSocketMarker));
+        final found = path.endsWith('.dart')
+            ? scanAppSource(path, text)
+            : scanCoreSource(path, text);
+        expect(found, isEmpty, reason: path);
+      }
+    });
+  });
+
   group('#58/AK2 blocked packages in pubspec.lock', () {
     test('reads the package names', () {
       expect(lockPackages(_lock), {'async', 'crypto'});

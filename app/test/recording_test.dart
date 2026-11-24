@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:woodshed_player/app/recording_controller.dart';
 import 'package:woodshed_player/ui/messages.dart';
 import 'package:woodshed_player/ui/recording_button.dart';
 import 'package:woodshed_player/ui/style.dart';
@@ -12,41 +13,6 @@ import 'package:wp_core/wp_types.dart';
 import 'package:woodshed_player/library/device_settings.dart';
 
 import 'fakes.dart';
-
-/// Recorder without the core: writes a file on start, values are set by the test.
-class FakeRecorder implements Recorder {
-  String? path;
-  WpRecSource? source;
-
-  /// Sources this fake platform records (#113); both, as on macOS 14.2+.
-  Set<WpRecSource> sources = {...WpRecSource.values};
-  bool recording = false;
-  WpRecordingException? failWith;
-  @override
-  double seconds = 0;
-  @override
-  double level = 0;
-  @override
-  bool onlySilence = false;
-
-  @override
-  bool sourceAvailable(WpRecSource source) => sources.contains(source);
-
-  @override
-  void start(String path, WpRecSource source) {
-    final e = failWith;
-    if (e != null) throw e;
-    this.path = path;
-    this.source = source;
-    File(path).writeAsStringSync('recorded audio');
-    recording = true;
-  }
-
-  @override
-  void stop() => recording = false;
-  @override
-  bool get isRecording => recording;
-}
 
 final stamp = DateTime(2026, 11, 19, 14, 5, 9);
 
@@ -450,6 +416,81 @@ void main() {
     },
   );
 
+  testWidgets(
+    '#140/AK5: the button shows the armed state of the command line; a click cancels it',
+    (tester) async {
+      final app = TestApp(Directory('${tmp.path}/lib'));
+      app.files.recordings = (Directory('${tmp.path}/rec')..createSync()).path;
+      await tester.runAsync(app.library.load);
+      final rec = FakeRecorder();
+      final recording = RecordingController(
+        app: app.controller,
+        recorder: rec,
+        now: () => stamp,
+      );
+      addTearDown(recording.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: testLocale,
+          localizationsDelegates: testDelegates,
+          supportedLocales: testLocales,
+          theme: woodshedTheme(Brightness.light),
+          home: Scaffold(
+            body: Center(
+              child: RecordingButton(
+                controller: app.controller,
+                recorder: rec,
+                recording: recording,
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('recordingArmed')), findsNothing);
+      // armed as the command line does it (the clock of the ticker is the test's)
+      await recording.start(de, title: 'Take', arming: const Arming());
+      await tester.pump();
+      expect(find.text(de.recordingArmed), findsOneWidget);
+      expect(de.recordingArmed, 'Scharf');
+      expect(find.byKey(const Key('recordingArmedMark')), findsOneWidget);
+      expect(find.byKey(const Key('recordingDuration')), findsNothing);
+      expect(find.byKey(const Key('recordingSource')), findsNothing);
+      final tooltip = tester.widget<Tooltip>(
+        find.ancestor(
+          of: find.text(de.recordingArmed),
+          matching: find.byType(Tooltip),
+        ),
+      );
+      expect(tooltip.message, de.recordingArmedTooltip);
+      // the first sound: the button shows the recording and its length
+      rec
+        ..gate = WpRecGate.recording
+        ..keptSeconds = 7;
+      await pumpUntil(
+        tester,
+        () => find.text('00:07').evaluate().isNotEmpty,
+        'recording shown',
+      );
+      expect(find.byKey(const Key('recordingArmed')), findsNothing);
+      // armed again; a click cancels without a title
+      rec.gate = WpRecGate.armed;
+      await pumpUntil(
+        tester,
+        () => find.text(de.recordingArmed).evaluate().isNotEmpty,
+        'armed shown',
+      );
+      final path = rec.path!;
+      await tester.runAsync(() => tapRecord(tester));
+      await tester.pump();
+      expect(rec.recording, isFalse);
+      expect(find.text(de.recordingArmed), findsNothing);
+      expect(find.text(de.recording), findsOneWidget);
+      expect(File(path).existsSync(), isFalse);
+      expect(app.library.tracks, isEmpty);
+      expect(await recording.done, isA<RecordingCancelled>());
+    },
+  );
+
   test('#113/AK1: the recording source is stored in device.json', () {
     const d = DeviceSettings(deviceId: '0123456789abcdef');
     expect(d.toJson(), isNot(contains('recordingSource')));
@@ -492,7 +533,10 @@ void main() {
     final stub = File('../core/src/recorder_stub.cpp').readAsStringSync();
     expect(stub, contains('int wp_rec_available(void) { return 0; }'));
     final native = File('lib/app/platform_native.dart').readAsStringSync();
-    expect(native, contains('WpRecorder.available ? RecordingButton('));
+    expect(
+      native,
+      matches(RegExp(r'WpRecorder\.available\s*\?\s*RecordingButton\(')),
+    );
     final web = File('lib/app/platform_web.dart').readAsStringSync();
     expect(
       web,

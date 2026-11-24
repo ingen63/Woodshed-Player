@@ -137,6 +137,10 @@ abstract class FilePlatform {
   /// Bildschirm wach halten (iPhone/iPad, solange das Metronom läuft).
   void keepAwake(bool on);
 
+  /// #140: socket file of the command line, the same path the app's program connects to; null
+  /// where the app has no command line (iPhone/iPad, browser).
+  Future<String?> commandSocket();
+
   /// Files are dragged over the window or dropped on it (macOS, web; #22, #121).
   set onFileDrag(void Function(FileDragEvent event)? handler);
 
@@ -184,6 +188,15 @@ class ChannelFilePlatform implements FilePlatform {
   @override
   Future<String?> recordingsDir() =>
       _channel.invokeMethod<String>('recordingsDir');
+
+  @override
+  Future<String?> commandSocket() async {
+    try {
+      return await _channel.invokeMethod<String>('commandSocket');
+    } on MissingPluginException {
+      return null; // iPhone/iPad: no command line
+    }
+  }
 
   @override
   Future<bool> microphoneAccess() async {

@@ -4,10 +4,15 @@
 //      core/web): only the provider modules in [providerDir] may import HTTP or socket packages or open
 //      connections (HttpClient, WebSocket, sockets, fetch, XMLHttpRequest, ...). Comments do not count.
 //      Loading the app's own files (same origin) is allowed on a line marked with [ownOriginMarker] and a
-//      reason, on that line or one of the two above.
+//      reason, on that line or one of the two above. #140: a local Unix domain socket (the command line
+//      talks to the running app through a socket file) is allowed on lines marked with [localSocketMarker]
+//      in the same way, only in a file that names [InternetAddressType.unix] and nothing of IP (see
+//      [localSocketFileProblem]).
 //   2. app/pubspec.lock contains no package from [blockedPackages] (analytics, crash reports, ads,
 //      remote configuration); exact package names.
 //   3. The C++ core (core/src, core/include) has no network calls or headers. core/third_party is never read.
+//      #140: the command line client connects to the app's Unix domain socket; lines marked with
+//      [localSocketMarker] are allowed in a file that uses AF_UNIX and nothing of IP.
 //   4. The web app (app/web/index.html) has a Content Security Policy whose connect-src is exactly
 //      [allowedConnectSrc], and every inline script is allowed by its hash in script-src.
 //
@@ -24,6 +29,17 @@ const providerDir = 'app/lib/sync/providers/';
 
 /// Marks a line that loads a file of the app's own origin (e.g. the WASM core next to the app).
 const ownOriginMarker = 'network-free: own origin';
+
+/// #140: marks a line that uses a local Unix domain socket (a socket file, never TCP or UDP).
+const localSocketMarker = 'network-free: local unix socket';
+
+/// #140: a file with [localSocketMarker] lines must name the Unix address family and nothing of IP.
+final _unixFamily = RegExp(r'\bInternetAddressType\.unix\b|\bAF_UNIX\b');
+final _ipUse = RegExp(
+  r'\bInternetAddress\.(?:loopback|any|lookup|tryParse)\w*|\bInternetAddressType\.IPv|'
+  r'\b(?:Raw|Secure)?Socket\.(?:connect|startConnect)\b|\bAF_INET6?\b|\bPF_INET6?\b|'
+  r'\bsockaddr_in6?\b|\bgetaddrinfo\b|\bgethostbyname\w*|\binet_\w+',
+);
 
 /// Folders with Dart and JavaScript of the app, relative to the repository.
 const appDirs = ['app/lib', 'app/packages', 'app/web'];
@@ -221,23 +237,51 @@ String stripComments(String text) {
   return out.toString();
 }
 
-/// Whether [ownOriginMarker] is on line [index] or one of the two lines above (a call split by the
-/// formatter).
-bool _marked(List<String> lines, int index) => [
+/// Whether [marker] (default [ownOriginMarker]) is on line [index] or one of the two lines above (a
+/// call split by the formatter).
+bool _marked(
+  List<String> lines,
+  int index, [
+  String marker = ownOriginMarker,
+]) => [
   for (var k = index - 2; k <= index; k++)
     if (k >= 0) lines[k],
-].any((l) => l.contains(ownOriginMarker));
+].any((l) => l.contains(marker));
+
+/// #140: why the [localSocketMarker] lines of [code] (comments removed) are not allowed, null if
+/// they are: the file must use the Unix address family and nothing of IP.
+String? localSocketFileProblem(String code) {
+  if (!_unixFamily.hasMatch(code)) {
+    return 'marked as local unix socket, but the file names no Unix address '
+        '(InternetAddressType.unix or AF_UNIX)';
+  }
+  if (_ipUse.hasMatch(code)) {
+    return 'marked as local unix socket, but the file also uses IP '
+        '(${_ipUse.firstMatch(code)!.group(0)})';
+  }
+  return null;
+}
+
+/// Socket findings marked with [localSocketMarker] are allowed in a file without [problem].
+bool _localSocket(List<String> original, int i, String what, String? problem) =>
+    problem == null &&
+    const {'socket', 'connect', 'includes a network header'}.contains(what) &&
+    _marked(original, i, localSocketMarker);
 
 /// Findings in one Dart or JavaScript file of the app; none in [providerDir].
 List<Finding> scanAppSource(String path, String text) {
   if (path.startsWith(providerDir)) return const [];
   final original = text.split('\n');
-  final code = stripComments(text).split('\n');
-  final found = <Finding>[];
+  final stripped = stripComments(text);
+  final code = stripped.split('\n');
+  final marked = text.contains(localSocketMarker);
+  final problem = marked ? localSocketFileProblem(stripped) : null;
+  final found = <Finding>[if (problem != null) Finding(path, 0, problem)];
   for (var i = 0; i < code.length; i++) {
     for (final (pattern, what) in appPatterns) {
       if (!pattern.hasMatch(code[i])) continue;
       if (what == 'fetch' && _marked(original, i)) continue;
+      if (marked && _localSocket(original, i, what, problem)) continue;
       final hint = what == 'fetch'
           ? ', or mark a load of own files with «$ownOriginMarker, <reason>»'
           : '';
@@ -251,11 +295,16 @@ List<Finding> scanAppSource(String path, String text) {
 
 /// Findings in one C or C++ file of the core.
 List<Finding> scanCoreSource(String path, String text) {
-  final code = stripComments(text).split('\n');
-  final found = <Finding>[];
+  final original = text.split('\n');
+  final stripped = stripComments(text);
+  final code = stripped.split('\n');
+  final marked = text.contains(localSocketMarker);
+  final problem = marked ? localSocketFileProblem(stripped) : null;
+  final found = <Finding>[if (problem != null) Finding(path, 0, problem)];
   for (var i = 0; i < code.length; i++) {
     for (final (pattern, what) in corePatterns) {
-      if (pattern.hasMatch(code[i])) {
+      if (pattern.hasMatch(code[i]) &&
+          !(marked && _localSocket(original, i, what, problem))) {
         found.add(Finding(path, i + 1, '$what (no network in the core)'));
       }
     }

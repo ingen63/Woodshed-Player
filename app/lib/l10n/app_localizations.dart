@@ -482,6 +482,18 @@ abstract class AppLocalizations {
   /// **'The threshold or the pause of the armed recording is out of range.'**
   String get recordingErrorInvalidArgument;
 
+  /// No description provided for @recordingArmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Armed'**
+  String get recordingArmed;
+
+  /// No description provided for @recordingArmedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Armed from the command line: the recording starts with the first sound and ends after a pause. Click to cancel; once it records, a click stops it.'**
+  String get recordingArmedTooltip;
+
   /// No description provided for @recordingSource.
   ///
   /// In en, this message translates to:

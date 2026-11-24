@@ -452,15 +452,25 @@ class AppController extends ChangeNotifier {
 
   /// Adds a finished recording to the library and plays it (#4). [title] replaces the name taken from
   /// the file, e.g. the date and time in the user's locale; it stays editable like any title (#24).
-  Future<void> addRecording(String path, {String? title}) async {
+  /// #140: [artist] is set if given. Returns the new track, null if the library did not take it.
+  Future<Track?> addRecording(
+    String path, {
+    String? title,
+    String? artist,
+  }) async {
     final r = await library.importFiles([path]);
-    if (r.imported.isEmpty) return;
+    if (r.imported.isEmpty) return null;
     var track = r.imported.first;
-    if (title != null &&
-        library.editMetadata(track.id, title: title, artist: track.artist)) {
+    if ((title != null || artist != null) &&
+        library.editMetadata(
+          track.id,
+          title: title ?? track.title,
+          artist: artist ?? track.artist,
+        )) {
       track = library.track(track.id) ?? track;
     }
     if (await select(track)) session.playTitle();
+    return track;
   }
 
   @override
