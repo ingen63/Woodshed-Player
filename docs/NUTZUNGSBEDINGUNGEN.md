@@ -20,8 +20,8 @@ Die App ist Open Source unter der **MIT-Lizenz**. Der Quelltext steht im Reposit
 
 ## 4. Abgleich
 
-- Der Abgleich über Google Drive oder OneDrive ist freiwillig und setzt eine ausdrückliche Anmeldung voraus. Die direkte Verbindung zwischen Geräten setzt ein ausdrückliches Koppeln voraus.
-- Für Deinen Speicherplatz, Deine Konten und die Nutzung des Anbieters gelten dessen Bedingungen: [Google](https://policies.google.com/terms), [Microsoft](https://www.microsoft.com/servicesagreement).
+- Der Abgleich über Google Drive ist freiwillig und setzt eine ausdrückliche Anmeldung voraus. Die direkte Verbindung zwischen Geräten setzt ein ausdrückliches Koppeln voraus.
+- Für Deinen Speicherplatz, Deine Konten und die Nutzung des Anbieters gelten dessen Bedingungen ([Google](https://policies.google.com/terms)).
 - Du bist dafür verantwortlich, dass Du Deine Daten sichern kannst. Der Abgleich ist kein Ersatz für ein Backup.
 
 ## 5. Keine Gewähr
@@ -36,11 +36,11 @@ Wir haften nur nach den gesetzlichen Vorschriften. Bei leichter Fahrlässigkeit 
 
 ## 7. Verfügbarkeit
 
-Wir können die App jederzeit ändern, erweitern oder einstellen. Die Web-Version und der Abgleich hängen von Diensten Dritter ab (GitHub Pages, Google, Microsoft, öffentliche Relays und STUN-Server). Deren Ausfall liegt nicht in unserer Hand.
+Wir können die App jederzeit ändern, erweitern oder einstellen. Die Web-Version und der Abgleich hängen von Diensten Dritter ab (GitHub Pages, Google, öffentliche Relays und STUN-Server). Deren Ausfall liegt nicht in unserer Hand.
 
 ## 8. Drittanbieter
 
-Google und Microsoft sind nicht Partner dieser App. Ihre Marken gehören ihnen. Die Anbindung dient allein dem Abgleich Deiner eigenen Daten.
+Google ist nicht Partner dieser App. Seine Marken gehören ihm. Die Anbindung dient allein dem Abgleich Deiner eigenen Daten.
 
 ## 9. Änderungen
 

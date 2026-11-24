@@ -19,7 +19,7 @@
 //
 // Several sources make a bridge (#53/AK4): a device syncing with the cloud and with a paired device
 // carries the changes of each to the other, because its own file holds everything it merged. Google
-// Drive (#54), OneDrive (#55) and a paired device (#56) are just further CloudProviders.
+// Drive (#54) and a paired device (#56) are just further CloudProviders.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';

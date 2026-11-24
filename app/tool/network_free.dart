@@ -18,8 +18,8 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
-/// The only place for network code: the cloud provider modules (#38: Google Drive #54, OneDrive #55,
-/// direct connection #56).
+/// The only place for network code: the cloud provider modules (#38: Google Drive #54, direct
+/// connection #56).
 const providerDir = 'app/lib/sync/providers/';
 
 /// Marks a line that loads a file of the app's own origin (e.g. the WASM core next to the app).
@@ -137,9 +137,6 @@ const allowedConnectSrc = {
   'https://www.googleapis.com',
   'https://oauth2.googleapis.com',
   'https://accounts.google.com',
-  // Microsoft OneDrive (#55)
-  'https://graph.microsoft.com',
-  'https://login.microsoftonline.com',
 };
 
 /// One finding: repository-relative path, line (1-based, 0 = whole file) and what was found.

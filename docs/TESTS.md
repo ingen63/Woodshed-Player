@@ -177,7 +177,7 @@ zugeordnet.
 | Eine Datei je Gerät, mehrere Quellen, Brücke, Speicher ohne bedingtes Schreiben, Konfliktkopien, Sicherungen je Gerät, verwaiste Gerätedateien, `format.json` | vorhanden: `sync_devices_test.dart` (#53/AK1–AK10), `sync_test.dart` (#53/AK7) | – |
 | Zusammenführen von 10'000 Titeln ≤ 2 s | vorhanden, nächtlich: `app/bench/library_bench_test.dart` (#59/AK3), `make bench` | – |
 | Nur die Anbietermodule (`app/lib/sync/providers/`) öffnen Verbindungen, keine Analyse- oder Werbepakete, kein Netzwerk im Kern | vorhanden: `make network-free`, `app/tool/network_free_test.dart` (#58) | – |
-| Anbieter Google Drive, OneDrive, direkte Verbindung | Lücke (noch nicht umgesetzt) | #54, #55, #56 |
+| Anbieter Google Drive, direkte Verbindung | Lücke (noch nicht umgesetzt) | #54, #56 |
 
 ### Oberfläche und Sprache
 
@@ -723,7 +723,7 @@ jedem Push auf `main`, ohne Pfadfilter.
 **Erlaubter Ordner: `app/lib/sync/providers/`.** Nur dort darf Code Netzwerkpakete importieren (`package:http`,
 `dio`, `web_socket_channel` u. a.) oder Verbindungen öffnen (`HttpClient`, `HttpServer`, `WebSocket`, Sockets,
 `fetch`, `XMLHttpRequest`, `EventSource`, `sendBeacon`, `RTCPeerConnection`). Die Anbietermodule für Google Drive
-(#54), OneDrive (#55) und die direkte Verbindung (#56) legt #38 dort ab, auch den Loopback-Empfänger der Anmeldung
+(#54) und die direkte Verbindung (#56) legt #38 dort ab, auch den Loopback-Empfänger der Anmeldung
 am Desktop. Geprüft werden Dart, JavaScript und HTML in `app/lib/`, `app/packages/`, `app/web/` und die Dateien, die
 `build_web_core.sh` aus `core/web/` in die App kopiert; Kommentare zählen nicht, Build-Ordner und die erzeugte Kopie
 `app/web/wp_core/` werden übersprungen. Jeder Treffer nennt Datei und Zeile.
@@ -743,9 +743,9 @@ Paket dieser Art kommt mit seinem Namen auf die Liste.
 
 **Content Security Policy der Web-App** (`app/web/index.html`, `<meta http-equiv>`, GitHub Pages erlaubt keine
 eigenen Header). `connect-src` enthält genau `'self'` und die API- und Anmelde-Hosts der Anbieter: Google
-(`https://www.googleapis.com`, `https://oauth2.googleapis.com`, `https://accounts.google.com`) und Microsoft (`https://graph.microsoft.com`,
-`https://login.microsoftonline.com`). Dropbox entfällt laut `docs/KONZEPT-SYNC.md`; seine Hosts sind seit #71 nicht
-mehr erlaubt. Ein neuer Host braucht einen Kommentar im Issue und gehört in
+(`https://www.googleapis.com`, `https://oauth2.googleapis.com`, `https://accounts.google.com`).
+Dropbox (seit #71) und OneDrive (seit #55) entfallen laut `docs/KONZEPT-SYNC.md`; ihre Hosts sind nicht mehr erlaubt.
+Ein neuer Host braucht einen Kommentar im Issue und gehört in
 `allowedConnectSrc` und den Test. Die übrigen Direktiven:
 
 | Direktive | Wert | Grund |

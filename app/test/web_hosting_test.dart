@@ -156,7 +156,7 @@ void main() {
       final readme = read('../README.md');
       expect(readme, contains('Plattformen'));
       expect(readme, contains('Google Drive'));
-      expect(readme, contains('OneDrive'));
+      expect(readme, isNot(contains('OneDrive'))); // #55 not planned
       expect(readme, contains('direkte Verbindung'));
       expect(readme, contains('GitHub Pages'));
       expect(
@@ -177,7 +177,7 @@ void main() {
       '#41/AK5 CLAUDE.md has the network exception with relays and STUN',
       () {
         final rules = read('../CLAUDE.md');
-        expect(rules, contains('Google Drive oder OneDrive'));
+        expect(rules, contains('zu Google Drive nach Anmeldung'));
         expect(rules, contains('Relays'));
         expect(rules, contains('STUN'));
         expect(rules, contains('Laden der Web-App'));

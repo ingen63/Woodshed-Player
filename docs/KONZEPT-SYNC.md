@@ -1,39 +1,40 @@
-# Konzept: Sync als Mischform (Google Drive, OneDrive, direkte Verbindung)
+# Konzept: Sync als Mischform (Google Drive, direkte Verbindung)
 
 Stand: 19.11.2026 · Status: **Entwurf, Fragen geklärt am 19.11.2026**, nächster Schritt Machbarkeitstest M0 · Fasst zusammen und ersetzt: `KONZEPT-ORDNER-SYNC.md` (abgelöst), Anbieter-Teil von `PLAN-WEB-UND-SYNC.md` (W6, #38). Die Technik der direkten Verbindung steht weiter in `KONZEPT-SYNC-OHNE-REGISTRIERUNG.md`.
+
+**Nachtrag 24.11.2026: OneDrive gestrichen** (#55, «not planned»). Für die Registrierung bei Microsoft Entra braucht ein privates Microsoft-Konto zuerst ein eigenes Verzeichnis, das es nur über ein Azure-Konto mit Telefonnummer und Kreditkarte gibt. Das ist zu umständlich. Cloud-Anbieter ist nur Google Drive; die OneDrive-Angaben unten bleiben als Stand der Klärung stehen und sind als gestrichen markiert.
 
 ## Idee
 
 | Du hast … | Abgleich über | Zeitversetzt? |
 |---|---|---|
 | ein Google-Konto | **Google Drive**, über die Schnittstelle | ja, Geräte müssen nicht gleichzeitig laufen |
-| ein Microsoft-Konto | **OneDrive**, über die Schnittstelle | ja |
-| keines von beiden (oder willst keines nutzen) | **direkte Verbindung** zwischen gekoppelten Geräten | nein, zwei Geräte müssen gleichzeitig offen sein |
+| keines (oder willst keines nutzen) | **direkte Verbindung** zwischen gekoppelten Geräten | nein, zwei Geräte müssen gleichzeitig offen sein |
 | nichts gewählt | nichts, alles bleibt lokal (`NoSync`) | – |
 
-Eine Bibliothek hat **genau einen** Speicherort: Google Drive, OneDrive oder keinen (entschieden). Beide Clouds gleichzeitig gibt es nicht. Die direkte Verbindung funktioniert zusätzlich immer zwischen gekoppelten Geräten, auch wenn eine Cloud gewählt ist. So kann z. B. ein Gerät ohne Konto über einen gekoppelten Rechner mitmachen, der mit der Cloud abgleicht (siehe «Brücke»).
+Eine Bibliothek hat **genau einen** Cloud-Speicherort: Google Drive oder keinen. Die direkte Verbindung funktioniert zusätzlich immer zwischen gekoppelten Geräten, auch wenn eine Cloud gewählt ist. So kann z. B. ein Gerät ohne Konto über einen gekoppelten Rechner mitmachen, der mit der Cloud abgleicht (siehe «Brücke»).
 
-**Bewusst aufgegeben gegenüber dem Konzept ohne Registrierung:** Für Google und Microsoft registrierst Du die App einmal, kostenlos. Dafür gibt es den zeitversetzten Abgleich.
+**Bewusst aufgegeben gegenüber dem Konzept ohne Registrierung:** Bei Google registrierst Du die App einmal, kostenlos. Dafür gibt es den zeitversetzten Abgleich.
 
 ## Anforderungen und wie sie erfüllt werden
 
-| Anforderung | Cloud (Google, OneDrive) | Direkt |
+| Anforderung | Cloud (Google Drive) | Direkt |
 |---|---|---|
 | Desktop und Handy | ja, alle über die Schnittstelle | ja |
-| Registrierung der App | **ja**, einmal bei Google Cloud und Microsoft Entra, kostenlos | nein |
-| Einmal anmelden | Desktop ja. Handy: Google erneuert still, gelegentlich ein Tippen; OneDrive etwa alle 24 h eine kurze Weiterleitung, meist ohne Eingabe | ja (QR-Code) |
-| Keine Kosten | ja (Gratis-Kontingent des Nutzers: Google 15 GB, OneDrive 5 GB) | ja |
+| Registrierung der App | **ja**, einmal bei Google Cloud, kostenlos | nein |
+| Einmal anmelden | Desktop ja. Handy: Google erneuert still, gelegentlich ein Tippen | ja (QR-Code) |
+| Keine Kosten | ja (Gratis-Kontingent des Nutzers: Google 15 GB) | ja |
 | Stabil | hoch, Cloud speichert zwischen | nur wenn beide offen sind; nicht in jedem Netz |
 
 ## Warum am Desktop die Schnittstelle und nicht der Ordner
 
-Im Ordner-Konzept schrieb der Desktop in den lokalen Google-Drive-Ordner. Die Dateien stammten dann von «Google Drive für Desktop», und ob die App auf dem Handy sie mit dem engen Recht `drive.file` überhaupt sieht, war ungeklärt (dort G1). **Schreiben alle Geräte über die Schnittstelle, ist das kein Thema:** Alle Dateien legt dieselbe App an, `drive.file` deckt sie ab, und eine Ordnerauswahl (Picker) braucht es nicht. Für OneDrive gilt dasselbe mit dem App-Ordner.
+Im Ordner-Konzept schrieb der Desktop in den lokalen Google-Drive-Ordner. Die Dateien stammten dann von «Google Drive für Desktop», und ob die App auf dem Handy sie mit dem engen Recht `drive.file` überhaupt sieht, war ungeklärt (dort G1). **Schreiben alle Geräte über die Schnittstelle, ist das kein Thema:** Alle Dateien legt dieselbe App an, `drive.file` deckt sie ab, und eine Ordnerauswahl (Picker) braucht es nicht.
 
-Der Desktop braucht dafür eine Anmeldung, aber nur einmal: Desktop-Apps bekommen bei Google und Microsoft langlebige Refresh-Tokens (Systembrowser mit lokalem Empfänger, PKCE).
+Der Desktop braucht dafür eine Anmeldung, aber nur einmal: Desktop-Apps bekommen bei Google langlebige Refresh-Tokens (Systembrowser mit lokalem Empfänger, PKCE).
 
 ## Anbieter
 
-| | Google Drive | OneDrive |
+| | Google Drive | OneDrive (gestrichen, #55) |
 |---|---|---|
 | Recht | `drive.file` (nicht sensibel) | `Files.ReadWrite.AppFolder` |
 | Prüfung durch Google (geklärt 19.11.2026) | **Keine Prüfung nötig, keine eigene Domain, keine Kosten.** Bei nur nicht sensiblen Rechten ist die Prüfung nicht Pflicht; die Warnung «Google hat diese App nicht überprüft» und die Grenze von 100 Nutzern gelten nur für sensible oder eingeschränkte Rechte. Die kostenpflichtige Sicherheitsprüfung (CASA) gilt nur für eingeschränkte Rechte (z. B. `drive`). Status «In Produktion», nicht «Test» (Test: nur eingetragene Testnutzer, kurzlebige Refresh-Tokens). Pflicht bleibt eine öffentliche Startseite, die die App beschreibt; dafür genügt GitHub Pages. **Optional** ist die Markenprüfung, damit Name und Logo auf dem Zustimmungsbildschirm erscheinen: Dann müssen Startseite und Datenschutzerklärung auf einer eigenen, in der Search Console verifizierten Domain liegen; `github.io` lässt sich nicht verifizieren (geteilte Domain). Vorbehalt: Google kann die Einstufung eines Rechts ändern. | eigene Prüfung bei Microsoft, siehe #55 |
@@ -64,7 +65,7 @@ WoodshedPlayer/
 - **Konfliktkopien** erkennt die Engine an der Gerät-ID (16 Hex-Zeichen) mit beliebigem Zusatz vor `.json`, der nicht mit einer Hex-Ziffer beginnt: Google Drive für Desktop `<id> (1).json`, OneDrive-Schnittstelle mit `conflictBehavior=rename` `<id> 1.json`, OneDrive-Client `<id>-<Gerätename>.json`, iCloud `<id> 2.json`, `<id> (<Name>'s conflicted copy <Datum>).json`, Syncthing `<id>.sync-conflict-<Datum>-<Zeit>-<Kennung>.json`. Legt die Google-Drive-Schnittstelle zwei Dateien mit gleichem Namen an, muss der Provider (#54) die zweite unter einem solchen Namen zeigen.
 - **Unlesbare Gerätedatei** (beschädigt, unbekannte Felder): wird übersprungen, ohne Meldung, und beim nächsten Abgleich erneut gelesen; sie wird nie gelöscht. Eine Gerätedatei mit neuerem Format stoppt den Abgleich wie `format.json` mit neuerer Version (Meldung «App aktualisieren», `SyncStatus.tooNew`). Fremde Bibliotheks-ID: diese Quelle wird weder gelesen noch geschrieben (`SyncStatus.foreignLibrary`), andere Quellen laufen weiter.
 - **Bekannte Grenze:** Legen zwei Geräte `format.json` im selben Augenblick an, gewinnt die zuletzt gespeicherte; das Gerät liest sie nach dem Schreiben zurück und übernimmt sie. Fällt das Zurücklesen genau zwischen die beiden Schreibvorgänge, sieht ein Gerät danach eine fremde Bibliotheks-ID. Die Oberfläche (M5) muss dann «dieser Bibliothek beitreten» anbieten.
-- **Dasselbe Layout** für Google, OneDrive und die direkte Verbindung. Bei der direkten Verbindung beantwortet die Gegenstelle `list`/`get`/`put` aus ihrer lokalen Kopie.
+- **Dasselbe Layout** für Google Drive und die direkte Verbindung. Bei der direkten Verbindung beantwortet die Gegenstelle `list`/`get`/`put` aus ihrer lokalen Kopie.
 - Audio unveränderlich, nach Hash benannt, nach dem Laden geprüft; «nicht hochladen» je Titel und «synchronisieren» je Ordner wie in #37.
 
 ## Brücke: mehrere Quellen gleichzeitig
@@ -77,18 +78,16 @@ Die Brücke ist kein eigener Mechanismus, sondern ergibt sich aus mehreren `Clou
 
 ## Ablauf aus Deiner Sicht
 
-1. **Erstes Gerät:** Einstellungen → Abgleich → «Google Drive», «OneDrive» oder «Geräte direkt koppeln».
+1. **Erstes Gerät:** Einstellungen → Abgleich → «Google Drive» oder «Geräte direkt koppeln».
 2. **Weitere Geräte mit Cloud:** dasselbe Konto wählen und anmelden. Kein Koppeln nötig.
 3. **Weitere Geräte ohne Konto:** «Koppeln» → QR-Code eines bereits eingebundenen Geräts einlesen.
 4. Die Statuszeile zeigt den Speicherort, je Gerät den letzten Abgleich und ob gekoppelte Geräte gerade verbunden sind.
-5. **Wechsel des Speicherorts** (z. B. von OneDrive zu Google): Die App schreibt den vollständigen Stand samt Audio an den neuen Ort und meldet sich beim alten ab. Die Dateien dort löschst Du in Deinem Konto.
 
 ## Architektur
 
 ```
 Sync-Engine (#37) mit einer Datei je Gerät und mehreren Quellen (#53)
   ├── GoogleDriveProvider   (drive.file, Desktop und Web)
-  ├── OneDriveProvider      (approot, Desktop und Web)
   └── PeerProvider          (WebRTC, je gekoppeltes Gerät)
         └── Rendezvous      (öffentliche Relays, nur Verbindungsaufbau)
 ```
@@ -99,7 +98,7 @@ Sync-Engine (#37) mit einer Datei je Gerät und mehreren Quellen (#53)
 
 ## Datenschutz und Regeln
 
-- **Netzwerk-Regel**, Vorschlag: *«Netzwerkzugriff nur für den Abgleich und nur nach ausdrücklicher Wahl: zum gewählten Cloud-Anbieter (Google Drive oder OneDrive) nach Anmeldung, oder zu gekoppelten Geräten, mit Verbindungsaufbau über öffentliche Relays und STUN-Server. Dazu das Laden der Web-App selbst. Kein Tracking.»*
+- **Netzwerk-Regel**, Vorschlag: *«Netzwerkzugriff nur für den Abgleich und nur nach ausdrücklicher Wahl: zu Google Drive nach Anmeldung, oder zu gekoppelten Geräten, mit Verbindungsaufbau über öffentliche Relays und STUN-Server. Dazu das Laden der Web-App selbst. Kein Tracking.»*
 - `DATENSCHUTZ.md`: Dropbox streichen; Google mit `drive.file` («nur Dateien, die die App selbst anlegt»); Abschnitt zur direkten Verbindung (Relays sehen IP-Adresse und Zeitpunkt, keine Inhalte).
 - Keine eigene Verschlüsselung in der Cloud (wie im Plan). Die direkte Verbindung ist Ende-zu-Ende verschlüsselt.
 - **Neue Abhängigkeiten (Rückfrage nötig):** `http`, `web`, `flutter_secure_storage`, `crypto` (bereits im Plan), dazu `flutter_webrtc` (MIT), eine Kryptografie-Bibliothek (z. B. `cryptography`, Apache-2.0) und ein QR-Paket.
@@ -110,32 +109,32 @@ Sync-Engine (#37) mit einer Datei je Gerät und mehreren Quellen (#53)
 |---|---|---|
 | P1 | Klappt die Anmeldung (Weiterleitung) in der **installierten** Web-App auf dem iPhone, und landet das Token in deren Speicher (nicht in Safari)? | Anmeldung in einem Popup-Fenster versuchen; sonst am iPhone nur direkte Verbindung |
 | P2 | Wie oft verlangt Google auf dem iPhone ein Tippen (Safari schränkt die stille Erneuerung ein)? | anzeigen und beim Start erneuern, nicht mitten im Üben |
-| P3 | Die 24-h-Weiterleitung bei OneDrive auf dem iPhone: ohne Eingabe, solange die Microsoft-Sitzung lebt? | täglich ein Tippen; in der Oberfläche benennen |
-| P4 | App-Ordner bei OneDrive for Business (Geschäftskonten)? | nur private Microsoft-Konten |
+| P3 | **Entfällt (#55).** ~~Die 24-h-Weiterleitung bei OneDrive auf dem iPhone: ohne Eingabe, solange die Microsoft-Sitzung lebt?~~ | – |
+| P4 | **Entfällt (#55).** ~~App-Ordner bei OneDrive for Business (Geschäftskonten)?~~ | – |
 | K0 | Machbarkeit der direkten Verbindung (sieben Prüfpunkte, siehe Konzept ohne Registrierung) | direkte Verbindung nur im selben WLAN oder streichen; Cloud bleibt |
 
 ## Phasen und Issues
 
 | # | Inhalt | Aufwand |
 |---|---|---|
-| M0 | Machbarkeitstest: P1–P4 mit Testkonten und K0 (#52) | 3–4 Tage · **Go/No-Go** je Weg |
+| M0 | Machbarkeitstest: P1 und P2 mit Testkonten und K0 (#52); P3 und P4 entfallen (#55) | 3–4 Tage · **Go/No-Go** je Weg |
 | M1 | Eine Datei je Gerät und mehrere Quellen je Gerät in der Engine (#53, umgesetzt); Tests mit `InMemoryProvider` (zwei, drei Geräte, Brücke, Reihenfolge vertauscht, Abbrüche) | 3–4 Tage |
-| M2 | `OneDriveProvider` (#55): App-Ordner, Upload-Sitzungen, Anmeldung Desktop und Web | 3–4 Tage |
+| M2 | **Gestrichen (#55, 24.11.2026).** ~~`OneDriveProvider`: App-Ordner, Upload-Sitzungen, Anmeldung Desktop und Web~~ | – |
 | M3 | `GoogleDriveProvider` (#54, umgesetzt): `drive.file`, Ordner anlegen und finden, Pfade auf IDs, Anmeldung Desktop und Web | 3–4 Tage |
 | M4 | Direkte Verbindung (#56): Kopplung, Relays, `PeerProvider` (K2/K3 im Konzept ohne Registrierung) | 7–10 Tage |
-| M5 | Oberfläche, parallel in #54, #55, #56 (ersetzt #40): Speicherort wählen und wechseln, Koppeln, Status je Gerät, Texte in allen ARB-Dateien (ersetzt Teile von #40) | 3 Tage |
+| M5 | Oberfläche, parallel in #54 und #56 (ersetzt #40): Speicherort wählen, Koppeln, Status je Gerät, Texte in allen ARB-Dateien (ersetzt Teile von #40) | 3 Tage |
 | M6 | #41: `README.md`, `DATENSCHUTZ.md`, `CLAUDE.md`, `PLAN-WEB-UND-SYNC.md` nachführen | 0,5 Tage |
 
-**Reihenfolge (entschieden):** M0, M1, dann **M3 Google**, M2 OneDrive, M4 direkte Verbindung, M5 wächst mit jedem Weg mit, M6 zum Schluss. Nach M3 ist der erste Abgleich nutzbar. **Gesamt:** ca. 23–30 Arbeitstage.
+**Reihenfolge (entschieden):** M0, M1, dann **M3 Google**, M4 direkte Verbindung, M5 wächst mit jedem Weg mit, M6 zum Schluss. Nach M3 ist der erste Abgleich nutzbar. **Gesamt:** ca. 20–26 Arbeitstage (ohne M2).
 
-**Vorher bei Dir:** Google-Cloud-Projekt (OAuth-Client «Web» und «Desktop», Zustimmungsbildschirm mit `drive.file`, Status «In Produktion», ohne Prüfung), Microsoft-Entra-Registrierung (Plattformen «SPA» und «Mobile/Desktop», `Files.ReadWrite.AppFolder`). Beides kostenlos. Die Weiterleitung zeigt auf die GitHub-Pages-Adresse.
+**Vorher bei Dir:** Google-Cloud-Projekt (OAuth-Client «Web» und «Desktop», Zustimmungsbildschirm mit `drive.file`, Status «In Produktion», ohne Prüfung). Kostenlos. Die Weiterleitung zeigt auf die GitHub-Pages-Adresse.
 
-**Issues (19.11.2026):** #52 M0, #53 M1, #54 M3 Google, #55 M2 OneDrive, #56 M4 direkt, #41 M6. #38 und #40 als «not planned» geschlossen (abgelöst), #39, #41 und #50 kommentiert. Geklärt am 19.11.2026: Google verlangt für `drive.file` keine Prüfung und keine eigene Domain (Tabelle «Anbieter»); eine eigene Domain (#50) braucht es nur für Name und Logo auf dem Zustimmungsbildschirm.
+**Issues (19.11.2026):** #52 M0, #53 M1, #54 M3 Google, #55 M2 OneDrive (am 24.11.2026 als «not planned» geschlossen), #56 M4 direkt, #41 M6. #38 und #40 als «not planned» geschlossen (abgelöst), #39, #41 und #50 kommentiert. Geklärt am 19.11.2026: Google verlangt für `drive.file` keine Prüfung und keine eigene Domain (Tabelle «Anbieter»); eine eigene Domain (#50) braucht es nur für Name und Logo auf dem Zustimmungsbildschirm.
 
 ## Entscheidungen (19.11.2026)
 
 | Frage | Entscheidung |
 |---|---|
-| Reihenfolge | **Google Drive zuerst**, dann OneDrive, zuletzt die direkte Verbindung |
-| Cloud-Anbieter je Bibliothek | **genau einer**; Wechsel möglich, beide gleichzeitig nicht |
+| Reihenfolge | **Google Drive zuerst**, dann die direkte Verbindung (OneDrive gestrichen am 24.11.2026, #55) |
+| Cloud-Anbieter je Bibliothek | **genau einer** (seit #55 nur Google Drive) |
 | Audio bei direkter Verbindung | **alles mitnehmen** wie bei der Cloud (ausser «nicht hochladen» und Ordner ohne «synchronisieren»), damit das Handy die Titel hat, bevor Du unterwegs übst |

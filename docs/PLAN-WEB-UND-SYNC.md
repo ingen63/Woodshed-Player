@@ -2,6 +2,8 @@
 
 Stand: 19.11.2026 · Status: freigegeben, Issues #32 bis #41 · Ergänzt `UMBAUPLAN-FLUTTER.md`
 
+**Nachtrag 24.11.2026:** OneDrive ist gestrichen (#55, «not planned», Begründung in `docs/KONZEPT-SYNC.md`). Erwähnungen von OneDrive und Microsoft in den Abschnitten zu W6 bleiben als Verlauf stehen.
+
 ## Ziel
 
 | Plattform | Form | Aufnahme |
@@ -10,16 +12,16 @@ Stand: 19.11.2026 · Status: freigegeben, Issues #32 bis #41 · Ergänzt `UMBAUP
 | iPhone/iPad, Android | **Web-App (PWA) im Browser**, aus Safari bzw. Chrome auf den Home-Bildschirm installiert | nie |
 
 1. Bibliothek und Konfiguration sind auf allen Plattformen dieselben Daten.
-2. Änderungen gleichen sich **optional** ab: über Google Drive oder OneDrive, oder direkt zwischen gekoppelten Geräten ohne Konto (Mischform, `docs/KONZEPT-SYNC.md`).
+2. Änderungen gleichen sich **optional** ab: über Google Drive oder direkt zwischen gekoppelten Geräten ohne Konto (Mischform, `docs/KONZEPT-SYNC.md`).
 3. **Ohne Konto und ohne Kopplung bleibt alles lokal.** Die App öffnet dann keine Netzverbindung und synchronisiert nichts.
 
 ## Entscheidungen (aus der Klärung vom 19.11.2026)
 
 | Thema | Entscheidung |
 |---|---|
-| Cloud-Anbieter | Google Drive (#54) und OneDrive (#55), dazu die direkte Verbindung ohne Konto (#56); Dropbox gestrichen (`docs/KONZEPT-SYNC.md`). Weitere später über dieselbe Schnittstelle (z. B. WebDAV) |
+| Cloud-Anbieter | Google Drive (#54), dazu die direkte Verbindung ohne Konto (#56); Dropbox und OneDrive gestrichen (`docs/KONZEPT-SYNC.md`). Weitere später über dieselbe Schnittstelle (z. B. WebDAV) |
 | Umfang | Metadaten **und** Audiodateien |
-| Zugriffsrechte | Google `drive.file` (nur Dateien, die die App selbst anlegt), OneDrive «App folder»; die App sieht sonst nichts |
+| Zugriffsrechte | Google `drive.file` (nur Dateien, die die App selbst anlegt); die App sieht sonst nichts |
 | Konflikte | pro Titel und Feld zusammenführen, neuester Zeitstempel gewinnt, kein Dialog |
 | Verschlüsselung | keine eigene; Anmeldung per OAuth mit PKCE im Systembrowser bzw. im Browser |
 | Hosting der Web-App | GitHub Pages unter `/app/`, gebaut aus dem letzten Tag (#41) |
@@ -230,7 +232,7 @@ Abgelöst durch `docs/KONZEPT-SYNC.md` (Mischform): Google Drive #54, OneDrive #
 
 ### W8 – Einstellungen, Oberfläche, Desktop (3–4 Tage)
 Abgelöst durch M5 in `docs/KONZEPT-SYNC.md`: die Oberfläche wächst in #54, #55 und #56 mit (#40 geschlossen).
-- Bereich «Abgleich» in den Einstellungen: Weg wählen (Google Drive, OneDrive, direkte Verbindung), anmelden bzw. koppeln, abmelden bzw. entkoppeln, Status je Gerät, letzter Abgleich, Fehler.
+- Bereich «Abgleich» in den Einstellungen: Weg wählen (Google Drive, direkte Verbindung), anmelden bzw. koppeln, abmelden bzw. entkoppeln, Status je Gerät, letzter Abgleich, Fehler.
 - Abmelden bzw. Entkoppeln entfernt Tokens und Schlüssel, lässt alle lokalen Daten stehen und beendet jeden Netzverkehr.
 - Desktop: Audio aus der Cloud wird in den Datenordner der App geladen; vorhandene lokale Ordner werden nur hochgeladen, nicht verschoben.
 - Beim ersten Anmelden fragt die App, welche Ordner synchronisiert werden (Auswahlliste mit Grösse); später je Ordner umschaltbar. Zeigt vorab die Datenmenge und das freie Kontingent.
@@ -250,7 +252,7 @@ Abgelöst durch M5 in `docs/KONZEPT-SYNC.md`: die Oberfläche wächst in #54, #5
 
 ## Datenschutz und Regeln
 
-- Ausnahme für «Kein Netzwerk» (in `CLAUDE.md` seit #41, Fassung aus `docs/KONZEPT-SYNC.md`): *«Netzwerkzugriff nur für den Abgleich und nur nach ausdrücklicher Wahl: zum gewählten Cloud-Anbieter (Google Drive oder OneDrive) nach Anmeldung, oder zu gekoppelten Geräten, mit Verbindungsaufbau über öffentliche Relays und STUN-Server. Dazu das Laden der Web-App selbst. Kein Tracking.»*
+- Ausnahme für «Kein Netzwerk» (in `CLAUDE.md` seit #41, Fassung aus `docs/KONZEPT-SYNC.md`): *«Netzwerkzugriff nur für den Abgleich und nur nach ausdrücklicher Wahl: zu Google Drive nach Anmeldung, oder zu gekoppelten Geräten, mit Verbindungsaufbau über öffentliche Relays und STUN-Server. Dazu das Laden der Web-App selbst. Kein Tracking.»*
 - Beim Laden der Web-App sieht GitHub die IP-Adresse (wie bei jeder Webseite). Die App selbst sendet nichts ausser an den gewählten Anbieter bzw. an gekoppelte Geräte (über Relays und STUN-Server).
 - **Neue Abhängigkeiten (nur nach Rückfrage, alle MIT-verträglich):** `http` (BSD-3), `web` (BSD-3), `flutter_secure_storage` (BSD-3), `crypto` (BSD-3, SHA-256), ggf. `url_launcher` (BSD-3). Emscripten (MIT/UIQ) ist nur Werkzeug.
 - Testdaten ohne echte Namen, Titel oder Konten. Cloud-Tests laufen gegen den `InMemoryProvider` und aufgezeichnete Antworten, nie gegen echte Konten.
@@ -274,7 +276,7 @@ Abgelöst durch M5 in `docs/KONZEPT-SYNC.md`: die Oberfläche wächst in #54, #5
 | Stummschalter macht Web Audio stumm | Wirkt wie Fehler | Umweg über `<audio>`-Element, in W0 prüfen |
 | COOP/COEP auf GitHub Pages | Kein `SharedArrayBuffer`, Kern läuft nicht | Service-Worker-Verfahren, sonst Wechsel zu Cloudflare Pages/Netlify (gleiche Dateien) |
 | iOS räumt PWA-Speicher | Titel lokal weg | `persist()`, Titel aus der Cloud nachladen, Hinweis bei Löschung |
-| Google ohne Server: nur kurzlebige Tokens | Gelegentliche Neuanmeldung | Stille Erneuerung, klare Anzeige; OneDrive oder direkte Verbindung als Alternativen |
+| Google ohne Server: nur kurzlebige Tokens | Gelegentliche Neuanmeldung | Stille Erneuerung, klare Anzeige; direkte Verbindung als Alternative |
 | Grosse Audiodateien im Browser | Speicher- und Zeitlimits beim Dekodieren | Streaming-Dekodierung im Kern, Dateien in Blöcken hochladen |
 | Cloud-Kontingent knapp (z. B. 15 GB bei Google) | Upload schlägt fehl | Anzeige, Warnung, später Schalter «nicht hochladen» pro Titel |
 | Kernänderungen brechen Web oder Desktop | Doppelte Fehler | `ctest` gegen beide Ziele in CI |

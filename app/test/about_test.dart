@@ -43,7 +43,7 @@ void main() {
         expect(text, isNot(contains('ß')));
         expect(text, isNot(contains('Entwurf')));
         expect(text, contains('Google'));
-        expect(text, contains('Microsoft'));
+        expect(text, isNot(contains('OneDrive'))); // #55 not planned
       });
     }
 

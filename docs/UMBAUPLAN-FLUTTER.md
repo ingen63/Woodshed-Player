@@ -13,7 +13,7 @@ Eine Codebasis für **macOS, Windows, Linux und iPhone/iPad**, dazu die **Web-Ap
 | Loops mit Markern | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Metronom | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Aufnahme laufender Musik (ohne Mikrofon) | ✓ | ✓ | ✓ | **–** | **–** |
-| Abgleich (Google Drive, OneDrive, direkte Verbindung) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Abgleich (Google Drive, direkte Verbindung) | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 Die Web-App liegt auf GitHub Pages unter <https://ingen63.github.io/Woodshed-Player/app/> (#41).
 
@@ -131,7 +131,7 @@ Nachbau der bestehenden Ansichten (`TrackListView`, `PlayerView`):
 ### Phase 8 – Neue Funktionen (je 2–5 Tage)
 - **Metronom** im Audio-Kern (sample-genau, Takt, Betonung, Lautstärke, optional zum Track mitlaufend).
 - **Playlisten** (getrennt von Ordnern, ein Titel kann in mehreren sein).
-- **Abgleich** über Google Drive, OneDrive oder direkte Verbindung: eigener Plan (`docs/KONZEPT-SYNC.md`).
+- **Abgleich** über Google Drive oder direkte Verbindung: eigener Plan (`docs/KONZEPT-SYNC.md`).
 
 ### Phase 9 – Veröffentlichung (3–5 Tage)
 - macOS/iOS: TestFlight, App Store (Apple-Entwicklerkonto nötig).

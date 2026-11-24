@@ -39,16 +39,15 @@ Dateipfade speichert die App nicht. Die App liest nur Dateien, die Du selbst aus
 
 ## 5. Cloud-Abgleich (optional)
 
-Der Cloud-Abgleich ist **freiwillig**. Er ist nur aktiv, wenn Du ein Konto ausdrücklich verbindest. Anbieter sind Google Drive und, sobald umgesetzt, OneDrive. Eine Bibliothek gleicht mit genau einem Anbieter ab.
+Der Cloud-Abgleich ist **freiwillig**. Er ist nur aktiv, wenn Du ein Konto ausdrücklich verbindest. Anbieter ist Google Drive.
 
 Dann gilt:
 
 - Die App legt beim Anbieter je Gerät eine Datei mit dem Stand der Bibliothek an (Bibliothek, Loops, Tempo und geteilte Einstellungen mit Gerät-ID), dazu die letzten Stände als Sicherung und die Audiodateien. Andere Daten überträgt sie nicht.
 - **Google Drive:** Die App fragt nur das Recht `drive.file` an. Damit sieht und bearbeitet sie **nur Dateien, die die App selbst anlegt** (Ordner `WoodshedPlayer` in «Meine Ablage»). Auf Deine übrigen Dateien hat sie keinen Zugriff.
-- **OneDrive:** Die App fragt nur das Recht `Files.ReadWrite.AppFolder` an. Damit arbeitet sie **nur in ihrem App-Ordner** (`Apps/Woodshed Player`). Auf Deine übrigen Dateien hat sie keinen Zugriff.
 - Titel, die Du mit *Nicht hochladen* markierst, und Titel in Ordnern ohne *Synchronisieren* bleiben als Datei auf dem Gerät. Ihre Metadaten wandern trotzdem mit.
 - Die Anmeldung läuft direkt bei Deinem Anbieter, am Mac im Anmeldefenster des Systems über OAuth mit PKCE, im Browser per Weiterleitung. Wir sehen Dein Passwort nicht. Die Zugangstokens speichert die App nur lokal (am Desktop im Schlüsselbund bzw. in der Anmeldeinformationsverwaltung des Systems, im Browser im Speicher der Seite, IndexedDB).
-- Für die Verarbeitung dort gilt die Datenschutzerklärung des Anbieters: [Google](https://policies.google.com/privacy), [Microsoft](https://privacy.microsoft.com/privacystatement).
+- Für die Verarbeitung dort gilt die [Datenschutzerklärung von Google](https://policies.google.com/privacy).
 - **Abmelden** entfernt die Tokens und beendet jeden Netzverkehr zum Anbieter. Lokale Daten bleiben erhalten. Die Dateien beim Anbieter löschst Du in Deinem Konto.
 
 **Zur Nutzung von Google-Daten:** Die Nutzung von Informationen, die Google-APIs an Woodshed Player übermitteln, entspricht der [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), einschliesslich der Anforderungen an die eingeschränkte Nutzung (Limited Use). Woodshed Player verwendet diese Daten nur, um Deine Bibliothek zwischen Deinen Geräten abzugleichen. Nicht verwendet werden sie für Werbung, zum Verkauf oder für Profile.

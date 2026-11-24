@@ -10,7 +10,7 @@
        script-src: own files, 'wasm-unsafe-eval' for CanvasKit and the audio core (WebAssembly), and the
        hash of the inline script below (change it there, the check names the new hash).
        style-src 'unsafe-inline': Flutter's engine writes <style> elements into the page. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-tO1BHbXKqhtyFd7Fz1NeCCGo2Xixq0NOCEzHAuHjYNI='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://graph.microsoft.com https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-tO1BHbXKqhtyFd7Fz1NeCCGo2Xixq0NOCEzHAuHjYNI='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="description" content="Practice player for musicians">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
