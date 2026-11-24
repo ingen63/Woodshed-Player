@@ -37,6 +37,7 @@ class DeviceSettings {
     this.syncProvider,
     this.libraryOpen = false,
     this.sidebarWidth,
+    this.yearsRead = false,
   });
 
   static const fileName = 'device.json';
@@ -96,6 +97,10 @@ class DeviceSettings {
   /// #129/AK3: width of the library sidebar (points) chosen on this device; null: the default width.
   final double? sidebarWidth;
 
+  /// #141/AK3: the years of the tracks already in the library were read from their files here. Written
+  /// only once true.
+  final bool yearsRead;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -112,6 +117,7 @@ class DeviceSettings {
     String? Function()? syncProvider,
     bool? libraryOpen,
     double? Function()? sidebarWidth,
+    bool? yearsRead,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -129,6 +135,7 @@ class DeviceSettings {
     syncProvider: syncProvider == null ? this.syncProvider : syncProvider(),
     libraryOpen: libraryOpen ?? this.libraryOpen,
     sidebarWidth: sidebarWidth == null ? this.sidebarWidth : sidebarWidth(),
+    yearsRead: yearsRead ?? this.yearsRead,
   );
 
   Map<String, Object?> toJson() => {
@@ -148,6 +155,7 @@ class DeviceSettings {
     if (syncProvider != null) 'syncProvider': syncProvider,
     if (libraryOpen) 'libraryOpen': true,
     if (sidebarWidth != null) 'sidebarWidth': sidebarWidth,
+    if (yearsRead) 'yearsRead': true,
   };
 
   static String newDeviceId([Random? random]) {
@@ -207,6 +215,7 @@ class DeviceSettings {
               final num v when v > 0 && v.isFinite => v.toDouble(),
               _ => null,
             },
+            yearsRead: j['yearsRead'] == true,
           );
         }
       }

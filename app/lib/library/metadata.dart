@@ -3,16 +3,30 @@
 // Fehlerhafte oder fehlende Angaben ergeben leere Felder, nie eine Ausnahme.
 // A damaged WAV chunk or FLAC block keeps the fields read before it (#91).
 // A damaged ID3v2 tag keeps its earlier frames, FLAC blocks and ID3v1 (#96).
+// #141: the year as well, also from M4A (`©day`); M4A gives only the year.
 import 'dart:convert';
 import 'dart:typed_data';
 
 class TrackMetadata {
-  const TrackMetadata({this.title, this.artist, this.album, this.artwork});
+  const TrackMetadata({
+    this.title,
+    this.artist,
+    this.album,
+    this.artwork,
+    this.year,
+  });
   final String? title, artist, album;
   final Uint8List? artwork;
 
+  /// #141: year of the recording (four digits), null if there is none.
+  final int? year;
+
   bool get isEmpty =>
-      title == null && artist == null && album == null && artwork == null;
+      title == null &&
+      artist == null &&
+      album == null &&
+      artwork == null &&
+      year == null;
 
   /// Ergänzt fehlende Felder aus [other].
   TrackMetadata fillFrom(TrackMetadata other) => TrackMetadata(
@@ -20,7 +34,17 @@ class TrackMetadata {
     artist: artist ?? other.artist,
     album: album ?? other.album,
     artwork: artwork ?? other.artwork,
+    year: year ?? other.year,
   );
+}
+
+/// #141/AK2: the year at the start of [text] (`1937`, `1937-05-12`, `1937-05-12T20:00`); null without
+/// four digits there or for `0000`.
+int? parseYear(String? text) {
+  final m = RegExp(r'^\s*(\d{4})(?!\d)').firstMatch(text ?? '');
+  if (m == null) return null;
+  final year = int.parse(m.group(1)!);
+  return year > 0 ? year : null;
 }
 
 TrackMetadata readMetadata(Uint8List bytes) {
@@ -35,6 +59,7 @@ TrackMetadata readMetadata(Uint8List bytes) {
     if (_starts(bytes, 0, 'RIFF') && _starts(bytes, 8, 'WAVE')) {
       return _readWav(bytes);
     }
+    if (_starts(bytes, 4, 'ftyp')) return _readMp4(bytes);
     var meta = const TrackMetadata();
     if (_starts(bytes, 0, 'ID3')) meta = _readId3v2(bytes, 0);
     return meta.fillFrom(_readId3v1(bytes));
@@ -148,6 +173,7 @@ TrackMetadata _readId3v2(Uint8List bytes, int at) {
   if (flags & 0x80 != 0 && major < 4) tag = _deunsync(tag);
 
   String? title, artist, album;
+  int? year;
   Uint8List? artwork;
   var artworkIsFront = false;
   final idLen = major == 2 ? 3 : 4;
@@ -192,6 +218,8 @@ TrackMetadata _readId3v2(Uint8List bytes, int at) {
           artist ??= _text(data);
         case 'TALB' || 'TAL':
           album ??= _text(data);
+        case 'TYER' || 'TYE' || 'TDRC':
+          year ??= parseYear(_text(data));
         case 'APIC' || 'PIC':
           final pic = _picture(data, id == 'PIC');
           if (pic != null &&
@@ -209,6 +237,7 @@ TrackMetadata _readId3v2(Uint8List bytes, int at) {
     artist: artist,
     album: album,
     artwork: artwork,
+    year: year,
   );
 }
 
@@ -247,7 +276,12 @@ TrackMetadata _readId3v1(Uint8List b) {
   String? field(int off) => _clean(
     latin1.decode(b.sublist(b.length - 128 + off, b.length - 128 + off + 30)),
   );
-  return TrackMetadata(title: field(3), artist: field(33), album: field(63));
+  return TrackMetadata(
+    title: field(3),
+    artist: field(33),
+    album: field(63),
+    year: parseYear(latin1.decode(b.sublist(b.length - 35, b.length - 31))),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -256,6 +290,7 @@ TrackMetadata _readId3v1(Uint8List b) {
 TrackMetadata _readFlac(Uint8List b, int at) {
   var p = at + 4;
   String? title, artist, album;
+  int? year;
   Uint8List? artwork;
   var artworkIsFront = false;
   while (p + 4 <= b.length) {
@@ -286,6 +321,8 @@ TrackMetadata _readFlac(Uint8List b, int at) {
               artist ??= value;
             case 'ALBUM':
               album ??= value;
+            case 'DATE' || 'YEAR':
+              year ??= parseYear(value);
           }
         }
       } else if (type == 6) {
@@ -314,7 +351,59 @@ TrackMetadata _readFlac(Uint8List b, int at) {
     artist: artist,
     album: album,
     artwork: artwork,
+    year: year,
   );
+}
+
+// ---------------------------------------------------------------------------
+// MP4 / M4A (#141): only the year, from moov/udta/meta/ilst/©day/data.
+
+TrackMetadata _readMp4(Uint8List b) {
+  final day = _mp4Path(b, 0, b.length, const [
+    'moov',
+    'udta',
+    'meta',
+    'ilst',
+    '\u00a9day',
+    'data',
+  ]);
+  if (day == null || day.$2 - day.$1 < 8) return const TrackMetadata();
+  // data: type (4 bytes) and locale (4 bytes), then the text
+  final text = utf8.decode(b.sublist(day.$1 + 8, day.$2), allowMalformed: true);
+  return TrackMetadata(year: parseYear(text));
+}
+
+/// Contents (start, end) of the atom reached by [path] within [start] … [end]; null if it is missing.
+(int, int)? _mp4Path(Uint8List b, int start, int end, List<String> path) {
+  var from = start, to = end;
+  for (final name in path) {
+    final found = _mp4Child(b, from, to, name);
+    if (found == null) return null;
+    (from, to) = found;
+    // `meta` is a full atom: version and flags come before its children
+    if (name == 'meta') from += 4;
+  }
+  return (from, to);
+}
+
+(int, int)? _mp4Child(Uint8List b, int start, int end, String name) {
+  var p = start;
+  while (p + 8 <= end) {
+    var size = _be(b, p, 4);
+    var header = 8;
+    if (size == 1) {
+      if (p + 16 > end) return null;
+      size = _be(b, p + 8, 8);
+      header = 16;
+    } else if (size == 0) {
+      size = end - p; // to the end
+    }
+    if (size < header || p + size > end) return null;
+    final type = latin1.decode(b.sublist(p + 4, p + 8));
+    if (type == name) return (p + header, p + size);
+    p += size;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------

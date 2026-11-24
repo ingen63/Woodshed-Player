@@ -716,6 +716,7 @@ app/lib/app/recording_controller.dart | dart_false_to_true | bool _armed = false
 core/src/cli.cpp | cxx_remove_void_call | options.push_back(&source);
 core/src/cli.cpp | cxx_remove_void_call | options.push_back(&silence);
 core/src/cli.cpp | cxx_remove_void_call | options.push_back(&threshold);
+core/src/cli.cpp | cxx_remove_void_call | options.push_back(&year);
 # Grenzfall: Nur bei einer Teil-Schreibung oder einem Signal während write() bzw. read() anders.
 # Eine Zeile der Kommandozeile (wenige hundert Bytes) schreibt write() in einen lokalen Stream-Socket
 # im Ganzen; ein Signal (Ctrl-C) unterbricht poll(), das in der Wartezeit läuft, nicht write().
@@ -740,3 +741,19 @@ core/src/cli_posix.cpp | cxx_lt_to_le | if (fd < 0)
 # gleichwertig: Gemessen, Mull schaltet diesen Mutanten im Signal-Handler nicht wirksam (Grenze des
 # Werkzeugs): ohne _exit von Hand scheitert secondCtrlCEndsTheCommand (Exit-Code 2 statt 130).
 core/src/cli_posix.cpp | cxx_remove_void_call | ::_exit(WP_CLI_EXIT_CANCELLED);
+
+# ---- app/lib/library/metadata.dart, M4A (#141) ----
+# gleichwertig: Ist der Inhalt von «data» kürzer als 8 Bytes, wirft sublist einen RangeError; mit «+»
+# statt «-» ebenso spät. readMetadata fängt beides ab und gibt leere Angaben zurück, wie die Abfrage.
+app/lib/library/metadata.dart | dart_sub_to_add | if (day == null || day.$2 - day.$1 < 8) return const TrackMetadata();
+# gleichwertig: Die Schleife endet, wenn kein ganzer Kopf (8 Bytes) mehr Platz hat. Mit «-» oder «<»
+# liest sie dort weiter; jeder Kopf, der über das Ende reicht, scheitert an «p + size > end» (null) oder
+# am RangeError (abgefangen, leer). Ein Atom aus nur 8 Bytes am Ende hat keinen Inhalt, den der Leser
+# braucht. Ergebnis in jedem Fall: das Atom fehlt.
+app/lib/library/metadata.dart | dart_add_to_sub | while (p + 8 <= end) {
+app/lib/library/metadata.dart | dart_le_to_lt | while (p + 8 <= end) {
+# gleichwertig: Ein 64-Bit-Kopf, der nicht mehr ganz Platz hat. Ohne die Abfrage liest _be über das Ende
+# (RangeError, abgefangen) oder findet eine Grösse, an der «p + size > end» scheitert; mit «>=» endet
+# ein Kopf ohne Inhalt, der nichts enthält. Ergebnis jeweils: kein Jahr.
+app/lib/library/metadata.dart | dart_add_to_sub | if (p + 16 > end) return null;
+app/lib/library/metadata.dart | dart_gt_to_ge | if (p + 16 > end) return null;

@@ -1337,6 +1337,7 @@ class Library extends ChangeNotifier {
         title: meta.title ?? (dot > 0 ? name.substring(0, dot) : name),
         artist: meta.artist,
         album: meta.album,
+        year: meta.year,
         duration: duration ?? 0,
         hasArtwork: hasArtwork,
         dateAdded: _now().toUtc(),
@@ -1813,6 +1814,46 @@ class Library extends ChangeNotifier {
     save();
     notifyListeners();
     return true;
+  }
+
+  /// #141, #140: sets the year of track [id]; null clears it. False for an unknown track or a year that
+  /// is not four digits (1 … 9999).
+  bool editYear(String id, int? year) {
+    final i = _tracks.indexWhere((t) => t.id == id);
+    if (i < 0 || (year != null && (year < 1 || year > 9999))) return false;
+    if (_tracks[i].year == year) return true;
+    _tracks[i] = _tracks[i].copyWith(year: () => year);
+    save();
+    notifyListeners();
+    return true;
+  }
+
+  /// #141/AK3: once per device, reads the year from the files of the tracks that have none. A year set
+  /// already stays. Tracks whose file is not on this device are skipped; the device that has it reads it.
+  /// Returns how many tracks got a year.
+  Future<int> fillYears() async {
+    if (_device.yearsRead || _readOnly) return 0;
+    var filled = 0;
+    for (final t in [..._tracks]) {
+      if (t.year != null || !hasFile(t.id)) continue;
+      final Uint8List? bytes;
+      try {
+        bytes = await store.read(trackName(t.fileName));
+      } catch (_) {
+        continue;
+      }
+      final year = bytes == null ? null : readMetadata(bytes).year;
+      final i = _tracks.indexWhere((x) => x.id == t.id);
+      if (year == null || i < 0 || _tracks[i].year != null) continue;
+      _tracks[i] = _tracks[i].copyWith(year: () => year);
+      filled++;
+    }
+    if (filled > 0) {
+      save();
+      notifyListeners();
+    }
+    await _updateDevice(_device.copyWith(yearsRead: true));
+    return filled;
   }
 
   /// Stores the duration the audio core found on loading, for tracks imported without one (in the

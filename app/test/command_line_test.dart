@@ -201,6 +201,7 @@ void main() {
     CommandRequest record({
       String? title,
       String? artist,
+      int? year,
       String? source,
       double? silence,
       double? threshold,
@@ -208,6 +209,7 @@ void main() {
       command: 'record',
       title: title,
       artist: artist,
+      year: year,
       source: source,
       silenceSeconds: silence,
       thresholdDb: threshold,
@@ -303,6 +305,51 @@ void main() {
       expect(t.artist, isNull);
       expect(o.stdout.last, 'Saved "Aufnahme 19.11.2026 14:05:09", 00:30.');
     });
+
+    test(
+      '#140/AK12a: --year goes into the metadata of the new title',
+      () async {
+        final o = Lines();
+        final code = await arm(
+          record(title: 'Take', artist: 'Me', year: 1937),
+          o,
+        );
+        rec.gate = WpRecGate.done;
+        expect(await finish(code), CliExit.ok);
+        final t = app.library.tracks.single;
+        expect(t.title, 'Take');
+        expect(t.artist, 'Me');
+        expect(t.year, 1937);
+      },
+    );
+
+    test('#140/AK12a: without --year the year stays empty', () async {
+      final code = await arm(record(title: 'Take'), Lines());
+      rec.gate = WpRecGate.done;
+      expect(await finish(code), CliExit.ok);
+      expect(app.library.tracks.single.year, isNull);
+    });
+
+    test(
+      '#140/AK12a: a year that is not four digits is refused before recording',
+      () async {
+        for (final year in [0, -1937, 10000]) {
+          final o = Lines();
+          expect(await run(record(year: year), o), CliExit.usage);
+          expect(o.stderr.single, 'The year must have four digits, e.g. 1937.');
+          expect(o.stdout, isEmpty);
+        }
+        expect(rec.path, isNull);
+        expect(app.library.tracks, isEmpty);
+        // the limits themselves are allowed
+        for (final year in [1, 9999]) {
+          final code = await arm(record(title: 'Y$year', year: year), Lines());
+          rec.gate = WpRecGate.done;
+          expect(await finish(code), CliExit.ok);
+        }
+        expect([for (final t in app.library.tracks) t.year], [1, 9999]);
+      },
+    );
 
     test(
       '#140/AK6: --source chooses, otherwise the source last chosen in the app',
@@ -544,9 +591,10 @@ void main() {
       final r = CommandRequest.fromJson(
         jsonDecode(
           '{"version":1,"command":"record","title":"T","artist":"A","source":"mic",'
-          '"silence":3,"threshold":-40.5}',
+          '"silence":3,"threshold":-40.5,"year":1937}',
         ),
       )!;
+      expect(r.year, 1937);
       expect(r.command, 'record');
       expect(r.title, 'T');
       expect(r.artist, 'A');
@@ -556,6 +604,7 @@ void main() {
       final p = CommandRequest.fromJson({'version': 1, 'command': 'play'})!;
       expect(p.title, isNull);
       expect(p.silenceSeconds, isNull);
+      expect(p.year, isNull);
     });
 
     test(
@@ -571,6 +620,8 @@ void main() {
           <String, Object?>{'version': 1, 'command': 'play', 'title': 3},
           <String, Object?>{'version': 1, 'command': 'play', 'artist': 3},
           <String, Object?>{'version': 1, 'command': 'record', 'source': 1},
+          <String, Object?>{'version': 1, 'command': 'record', 'year': '1937'},
+          <String, Object?>{'version': 1, 'command': 'record', 'year': 1937.5},
           <String, Object?>{'version': 1, 'command': 'record', 'silence': '3'},
           <String, Object?>{
             'version': 1,

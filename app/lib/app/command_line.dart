@@ -44,6 +44,7 @@ class CommandRequest {
     required this.command,
     this.title,
     this.artist,
+    this.year,
     this.source,
     this.silenceSeconds,
     this.thresholdDb,
@@ -53,6 +54,9 @@ class CommandRequest {
   final String command;
   final String? title;
   final String? artist;
+
+  /// #140/AK12a: year of the new track (1 … 9999).
+  final int? year;
 
   /// `system` or `mic`; null: the source last chosen in the app.
   final String? source;
@@ -66,12 +70,14 @@ class CommandRequest {
     final command = json['command'];
     final title = json['title'];
     final artist = json['artist'];
+    final year = json['year'];
     final source = json['source'];
     final silence = json['silence'];
     final threshold = json['threshold'];
     if (command is! String ||
         (title != null && title is! String) ||
         (artist != null && artist is! String) ||
+        (year != null && year is! int) ||
         (source != null && source is! String) ||
         (silence != null && silence is! num) ||
         (threshold != null && threshold is! num)) {
@@ -81,6 +87,7 @@ class CommandRequest {
       command: command,
       title: title as String?,
       artist: artist as String?,
+      year: year as int?,
       source: source as String?,
       silenceSeconds: (silence as num?)?.toDouble(),
       thresholdDb: (threshold as num?)?.toDouble(),
@@ -224,6 +231,11 @@ class CommandHandler {
       );
       return CliExit.usage;
     }
+    final year = r.year;
+    if (year != null && (year < 1 || year > 9999)) {
+      o.err('The year must have four digits, e.g. 1937.');
+      return CliExit.usage;
+    }
     final title = r.title?.trim();
     final artist = r.artist?.trim();
     final refused = await rec.start(
@@ -231,6 +243,7 @@ class CommandHandler {
       source: from,
       title: title == null || title.isEmpty ? null : title,
       artist: artist == null || artist.isEmpty ? null : artist,
+      year: year,
       arming: arming,
     );
     if (refused != null) return _refused(refused, o);

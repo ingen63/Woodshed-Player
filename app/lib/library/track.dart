@@ -41,6 +41,7 @@ class Track {
     required this.title,
     this.artist,
     this.album,
+    this.year,
     required this.duration,
     required this.hasArtwork,
     required this.dateAdded,
@@ -67,6 +68,9 @@ class Track {
   final String title;
   final String? artist;
   final String? album;
+
+  /// #141: year of the recording (four digits); null if unknown.
+  final int? year;
   final double duration;
   final bool hasArtwork;
   final DateTime dateAdded;
@@ -90,6 +94,7 @@ class Track {
   Track copyWith({
     String? title,
     String? Function()? artist,
+    int? Function()? year,
     double? duration,
     bool? hasArtwork,
     int? customOrder,
@@ -107,6 +112,7 @@ class Track {
     title: title ?? this.title,
     artist: artist != null ? artist() : this.artist,
     album: album,
+    year: year != null ? year() : this.year,
     duration: duration ?? this.duration,
     hasArtwork: hasArtwork ?? this.hasArtwork,
     dateAdded: dateAdded,
@@ -187,6 +193,7 @@ class Track {
       title: title,
       artist: artist,
       album: album,
+      year: year,
       duration: duration,
       hasArtwork: hasArtwork,
       dateAdded: dateAdded,
@@ -243,6 +250,9 @@ class Track {
     'title': title,
     'artist': artist,
     'album': album,
+    // #141: only once known. An unknown year stamped as null would win over a year another device read
+    // earlier, and every track would be stamped anew on the first save.
+    if (year != null) 'year': year,
     'duration': duration,
     'hasArtwork': hasArtwork,
     'dateAdded': dateAdded.toUtc().toIso8601String(),
@@ -296,6 +306,10 @@ class Track {
       title: v['title'] as String? ?? '',
       artist: v['artist'] as String?,
       album: v['album'] as String?,
+      year: switch (v['year']) {
+        final int y when y > 0 && y <= 9999 => y,
+        _ => null,
+      },
       duration: d(v['duration'], 0),
       hasArtwork: v['hasArtwork'] as bool? ?? false,
       dateAdded:

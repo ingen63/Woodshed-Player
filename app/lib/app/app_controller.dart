@@ -457,10 +457,15 @@ class AppController extends ChangeNotifier {
     String path, {
     String? title,
     String? artist,
+    int? year,
   }) async {
     final r = await library.importFiles([path]);
     if (r.imported.isEmpty) return null;
     var track = r.imported.first;
+    // #140/AK12a
+    if (year != null && library.editYear(track.id, year)) {
+      track = library.track(track.id) ?? track;
+    }
     if ((title != null || artist != null) &&
         library.editMetadata(
           track.id,

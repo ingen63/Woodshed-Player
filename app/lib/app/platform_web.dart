@@ -2,6 +2,8 @@
 // System (#35), import through the file picker. No recording. Media Session for the lock screen and
 // headphone buttons (#39/AK2). The screen stays on while a track plays (#109). Desktop and mobile:
 // platform_native.dart.
+import 'dart:async';
+
 import 'dart:js_interop';
 
 import 'package:material_ui/material_ui.dart';
@@ -44,6 +46,8 @@ Future<AppController> createAppController({
   // In the browser only the core knows the duration, once it loads the file.
   final library = Library(store, probe: (_) => null, readSource: files.take);
   await library.load();
+  // #141/AK3: in the background, once per device
+  unawaited(library.fillYears());
   final metronome = MetronomeController(
     core.metronome,
     tapTempo: tapTempo,

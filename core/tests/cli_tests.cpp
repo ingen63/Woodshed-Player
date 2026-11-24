@@ -79,9 +79,9 @@ void helpDescribesCommandsAndOptions() { // #140/AK18
        std::vector<std::vector<std::string>>{{"record", "--help"}, {"help", "record"}}) {
     const Parsed r = p(args);
     CHECK(r.kind == Kind::Help);
-    for (const char *option :
-         {"--title", "--artist", "--source system|mic", "--silence <seconds>", "--threshold <dBFS>",
-          "default: 5", "default: -50", "1 s before", "2 s after", "Ctrl-C"})
+    for (const char *option : {"--title", "--artist", "--year <year>", "four digits",
+                               "--source system|mic", "--silence <seconds>", "--threshold <dBFS>",
+                               "default: 5", "default: -50", "1 s before", "2 s after", "Ctrl-C"})
       CHECK(contains(r.text, option));
   }
   // The program name is the one the shell script runs under.
@@ -150,6 +150,31 @@ void recordUsageErrors() { // #140/AK6, AK11
   err({"record", "--threshold", "inf"}, "--threshold must be");
   err({"record", "--title", ""}, "--title must not be empty.");
   err({"record", "--silence"}, "Option '--silence' needs a value.");
+}
+
+void recordYear() { // #140/AK12a: --year goes to the app as a number, only for record
+  CHECK(p({"record", "--year", "1937"}).request ==
+        R"({"version":1,"command":"record","year":1937})");
+  CHECK(contains(p({"record", "--year=0001"}).request, R"("year":1)"));
+  CHECK(contains(p({"record", "--year", "9999"}).request, R"("year":9999)"));
+  CHECK(contains(p({"record", "--title", "T", "--year", "1928", "--artist", "A"}).request,
+                 R"("title":"T","artist":"A","year":1928)"));
+  for (const char *bad : {"0000", "37", "19370", "19x7", "", " 1937", "-937", "+937", "1e3"}) {
+    const Parsed r = p({"record", "--year", bad});
+    CHECK(r.kind == Kind::Error);
+    CHECK(contains(r.text, "--year must be a year of four digits, e.g. 1937."));
+  }
+  CHECK(contains(p({"record", "--year"}).text, "Option '--year' needs a value."));
+  CHECK(contains(p({"record", "--year", "1937", "--year", "1938"}).text, "given twice"));
+  CHECK(contains(p({"play", "--title", "T", "--year", "1937"}).text, "Unknown option '--year'"));
+  // wrong value: no request, so the recording is never armed (exit code 2)
+  std::ostringstream out, err;
+  int launched = 0;
+  CHECK(wp::cli::run(
+            {"record", "--year", "37"}, "woodshed", "/nonexistent.sock",
+            [](const std::string &) { return std::unique_ptr<Connection>(); }, [&] { ++launched; },
+            [] { return false; }, out, err) == WP_CLI_EXIT_USAGE);
+  CHECK(launched == 0);
 }
 
 void usageErrorExitsTwo() { // #140/AK18
@@ -528,6 +553,7 @@ int main() {
       {"playUsageErrors", playUsageErrors},
       {"recordRequest", recordRequest},
       {"recordUsageErrors", recordUsageErrors},
+      {"recordYear", recordYear},
       {"usageErrorExitsTwo", usageErrorExitsTwo},
       {"conversePrintsTheAnswer", conversePrintsTheAnswer},
       {"converseSendsStopOnceAfterCtrlC", converseSendsStopOnceAfterCtrlC},

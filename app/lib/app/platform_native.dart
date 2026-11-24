@@ -46,6 +46,8 @@ Future<AppController> createAppController({
     readSource: readLocalFile,
   );
   await library.load();
+  // #141/AK3: in the background, once per device
+  unawaited(library.fillYears());
   final metronome = MetronomeController(
     _PlayerMetronome(player),
     tapTempo: tapTempo,

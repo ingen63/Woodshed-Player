@@ -127,8 +127,8 @@ std::string helpPlay(const std::string &program) {
 
 std::string helpRecord(const std::string &program) {
   return "Usage: " + program +
-         " record [--title <title>] [--artist <artist>] [--source system|mic]\n"
-         "       [--silence <seconds>] [--threshold <dBFS>]\n"
+         " record [--title <title>] [--artist <artist>] [--year <year>]\n"
+         "       [--source system|mic] [--silence <seconds>] [--threshold <dBFS>]\n"
          "\n"
          "Arms a recording. The app records the source all the time but keeps nothing until the\n"
          "level rises above the threshold. The new title starts 1 s before the first sound and\n"
@@ -140,6 +140,7 @@ std::string helpRecord(const std::string &program) {
          "Options:\n"
          "  --title <title>       Title of the new track (default: date and time)\n"
          "  --artist <artist>     Artist of the new track\n"
+         "  --year <year>         Year of the new track, four digits (e.g. 1937)\n"
          "  --source system|mic   System audio or microphone (default: the source last chosen\n"
          "                        in the app)\n"
          "  --silence <seconds>   Pause that ends the recording, 0.1 to 60 (default: 5)\n"
@@ -175,10 +176,11 @@ Parsed parse(const std::vector<std::string> &args, const std::string &program) {
     return p;
 
   const bool record = command == "record";
-  Option title("--title"), artist("--artist"), source("--source"), silence("--silence"),
-      threshold("--threshold");
+  Option title("--title"), artist("--artist"), year("--year"), source("--source"),
+      silence("--silence"), threshold("--threshold");
   std::vector<Option *> options{&title, &artist};
   if (record) {
+    options.push_back(&year);
     options.push_back(&source);
     options.push_back(&silence);
     options.push_back(&threshold);
@@ -225,6 +227,14 @@ Parsed parse(const std::vector<std::string> &args, const std::string &program) {
     json += ",\"title\":" + jsonString(title.value);
   if (artist.given)
     json += ",\"artist\":" + jsonString(artist.value);
+  if (year.given) {
+    // #140: four digits, 0001 to 9999, like the year of a track (#141)
+    const std::string &y = year.value;
+    const bool digits = y.size() == 4 && y.find_first_not_of("0123456789") == std::string::npos;
+    if (!digits || y == "0000")
+      return fail("--year must be a year of four digits, e.g. 1937.");
+    json += ",\"year\":" + std::to_string(std::stoi(y));
+  }
   if (source.given) {
     if (source.value != "system" && source.value != "mic")
       return fail("--source must be 'system' or 'mic'.");

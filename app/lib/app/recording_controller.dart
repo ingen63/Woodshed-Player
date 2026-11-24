@@ -175,6 +175,7 @@ class RecordingController extends ChangeNotifier {
   String? _path;
   String? _title;
   String? _artist;
+  int? _year;
   WpRecSource? _recordingSource;
   WpRecordingException? _error;
   bool _micDenied = false;
@@ -232,13 +233,14 @@ class RecordingController extends ChangeNotifier {
   }
 
   /// Starts recording [source] (default: [source]); with [arming] armed (#140). The title is [title]
-  /// or the date and time in the language of [l]; [artist] is set if given. Returns null once it
+  /// or the date and time in the language of [l]; [artist] and [year] (#140) are set if given. Returns null once it
   /// runs ([done] then tells how it ended), otherwise why it did not start.
   Future<RecordingOutcome?> start(
     AppLocalizations l, {
     WpRecSource? source,
     String? title,
     String? artist,
+    int? year,
     Arming? arming,
   }) async {
     if (busy) return const RecordingBusy();
@@ -280,6 +282,7 @@ class RecordingController extends ChangeNotifier {
       _path = path;
       _title = title ?? recordingTitle(l, at);
       _artist = artist;
+      _year = year;
       _seconds = 0;
       _level = 0;
       _silent = false;
@@ -345,7 +348,12 @@ class RecordingController extends ChangeNotifier {
     }
     Track? track;
     if (path != null && File(path).existsSync()) {
-      track = await app.addRecording(path, title: _title, artist: _artist);
+      track = await app.addRecording(
+        path,
+        title: _title,
+        artist: _artist,
+        year: _year,
+      );
     }
     done.complete(RecordingSaved(track, track?.duration ?? seconds));
   }
