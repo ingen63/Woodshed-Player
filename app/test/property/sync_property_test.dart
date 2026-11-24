@@ -414,6 +414,46 @@ void main() {
     },
   );
 
+  test('#137/AK2 regression (found bug 47): a deleted playlist only on this device does not move the purge horizon on loading', () async {
+    // #137 regression (found bug 47, regressions.json seed 1595648482): loading purged the tombstone of a
+    // playlist only on this device into the purge horizon, which the sync keeps out; after a restart the
+    // device had another horizon than the others.
+    clock = DateTime.utc(2026, 11, 1);
+    final cloud = InMemoryProvider();
+    final sources = pool(1);
+    final a = Device('a', cloud, Random(1), sources);
+    final b = Device('b', cloud, Random(2), sources);
+    await a.library.load();
+    await b.library.load();
+    await a.library.importFiles(['p0.mp3']);
+    // shared first, then only on a (new ID, the old one a tombstone for the others), then deleted
+    final shared = a.library.createPlaylist('Etüden').id;
+    clock = clock.add(const Duration(hours: 1));
+    final local = a.library.setPlaylistShared(shared, false);
+    clock = clock.add(const Duration(hours: 1));
+    a.library.deletePlaylist(local);
+    await a.sync.sync();
+    await b.sync.sync();
+    // both tombstones are older than 90 days; the sync purges the shared one into the horizon
+    clock = clock.add(const Duration(days: 91));
+    await a.sync.sync();
+    await b.sync.sync();
+    await a.sync.sync();
+    final horizon = a.library.state.purged;
+    expect(horizon, isNotNull);
+    expect(stateJson(a.library), stateJson(b.library));
+    final again = a.open();
+    await again.load();
+    expect(again.state.purged, horizon);
+    expect(stateJson(again), stateJson(b.library));
+    // the private tombstone itself is gone after loading, as every tombstone after 90 days
+    await again.save();
+    final saved = utf8.decode((await a.store.read(Library.indexName))!);
+    expect(saved, isNot(contains(local)));
+    a.sync.dispose();
+    b.sync.dispose();
+  });
+
   test('#98/AK2, AK3, AK4 a device offline beyond the tombstones does not revive deleted tracks and folders', () async {
     clock = DateTime.utc(2026, 1, 1);
     final cloud = InMemoryProvider();

@@ -1324,6 +1324,7 @@ Stand #127 (23.11.2026), je Fund belegt mit zurückgenommener Korrektur:
 | 43 | `trim/flac_seek_infinity` | «#116 regression (found bug 43) …» (`trim_tests.cpp`, neu) | rot unter `make sanitize` |
 | 44 | `trim/m4a_empty_mvhd_at_end` | «#120 regression (found bug 44) …» (`trim_mp4_tests.cpp`, neu) | rot unter `make sanitize` |
 | 46 | Startwert 1600748318 und 1592956022 | «#136 regression (found bug 46), seed …» (`trim_test.dart`, neu) | rot |
+| 47 | Startwert 1595648482 | «#137/AK2 regression (found bug 47) …» (`sync_property_test.dart`, neu) | rot |
 
 Aus `regressions.json` entfernt (#127/AK3): der Startwert 1819282202 unter «damaged state.json never crashes and never
 loses local data», denn diese Eigenschaft gibt es seit #53 nicht mehr (`state.json` wurde durch Gerätedateien
@@ -1656,3 +1657,16 @@ hinzukommenden Geräts (#104) dürfen den alten Titel behalten.
     und 1592956022 in `regressions.json`, Test «#136 regression (found bug 46), seed …» (`trim_test.dart`, #127):
     Titel von 270 s bzw. 262,5 s, Loop 219,2–208,1 s bzw. 167,4–114,8 s, gekürzt; ohne Behebung rot. Der Zufallstest
     prüft seither nach jedem Schritt, dass jeder Loop in 0 ≤ Anfang < Ende ≤ Dauer liegt (#136/AK2).
+47. 24.11.2026, #137, nächtlicher Zufallstest (Lauf 45159576773, `sync_property_test.dart`, #10/AK6): Nach dem
+    Abgleich waren beide Geräte gleich, aber ein Gerät lud seine Bibliothek mit einem anderen Bereinigungs-Horizont
+    (`purged`) wieder. Folge: Gerät d1 legt eine Playlist an, stellt sie auf «nur auf diesem Gerät» (neue ID, die alte
+    wird Grabstein für die anderen), löscht sie, und die Geräte sind mehr als 90 Tage offline. Der Abgleich bereinigt
+    den geteilten Grabstein in den Horizont, lässt Playlists nur auf diesem Gerät aber aus (#114/AK10). Ursache:
+    `Library.load` bereinigte alle Grabsteine mit `SharedState.purge`, auch den der nur lokalen Playlist, und hob den
+    Horizont auf deren Löschzeit. Der Horizont geht mit dem nächsten Abgleich an die anderen Geräte; dort hätte er
+    eigene Titel, Ordner und Playlists getroffen, die nur vor diesem Stempel geändert wurden (#98, #107). Behoben in
+    `Library._purgeKeepingPrivate`: Grabsteine nur lokaler Playlists fallen nach 90 Tagen weg, ohne den Horizont zu
+    verschieben. Startwert 1595648482 in `regressions.json`, Test «#137/AK2 regression (found bug 47): a deleted
+    playlist only on this device does not move the purge horizon on loading» (`sync_property_test.dart`, #127):
+    geteilte Playlist, eine Stunde später nur lokal, wieder eine Stunde später gelöscht, 91 Tage später Abgleich und
+    Neuladen; ohne Behebung rot (Horizont eine Stunde zu spät).

@@ -292,6 +292,34 @@ class Library extends ChangeNotifier {
   /// its ID ([setPlaylistShared] gives it a new one) and the purge horizon of others never applies to it.
   static bool _isPrivate(StampedRecord r) => r.values['shared'] == false;
 
+  /// Removes old tombstones of [s] (#98). #137: a playlist only on this device never left it, so its
+  /// tombstone goes without moving the purge horizon; that horizon reaches the other devices with [state]
+  /// and would differ from theirs (as in [mergeRemote], where such playlists stay out of the merge).
+  SharedState _purgeKeepingPrivate(SharedState s) {
+    final now = _now();
+    final shared = s
+        .copyWith(
+          playlists: {
+            for (final e in s.playlists.entries)
+              if (!_isPrivate(e.value)) e.key: e.value,
+          },
+        )
+        .purge(now);
+    final private = SharedState(
+      playlists: {
+        for (final e in s.playlists.entries)
+          if (_isPrivate(e.value)) e.key: e.value,
+      },
+    ).purge(now);
+    // in the order of [s], so saving again writes the same file
+    return shared.copyWith(
+      playlists: {
+        for (final k in s.playlists.keys)
+          k: ?(shared.playlists[k] ?? private.playlists[k]),
+      },
+    );
+  }
+
   /// [state] computed for this [_state]; cleared whenever the held records change.
   (SharedState, SharedState)? _shared;
 
@@ -388,7 +416,7 @@ class Library extends ChangeNotifier {
         if (!_device.synced && _state.stampedByOthers(_device.deviceId)) {
           await markSynced();
         }
-        _state = _state.purge(_now());
+        _state = _purgeKeepingPrivate(_state);
         _materialize();
       } else {
         await _migrate(raw);

@@ -43,6 +43,11 @@
       "seed": 1819107984,
       "found": "2026-11-19",
       "note": "the first save of a new device stamped the default sort order and appearance as the newest change; the devices did not converge"
+    },
+    {
+      "seed": 1595648482,
+      "found": "2026-11-24",
+      "note": "loading purged the tombstone of a playlist only on this device into the purge horizon; after a restart the device had another horizon than the others (#137)"
     }
   ]
 }
