@@ -613,6 +613,75 @@ class AppLocalizationsDe extends AppLocalizations {
   String get aboutApp => 'Über Woodshed Player';
 
   @override
+  String get menuServices => 'Dienste';
+
+  @override
+  String get menuHide => 'Woodshed Player ausblenden';
+
+  @override
+  String get menuHideOthers => 'Andere ausblenden';
+
+  @override
+  String get menuShowAll => 'Alle einblenden';
+
+  @override
+  String get menuQuit => 'Woodshed Player beenden';
+
+  @override
+  String get menuEdit => 'Bearbeiten';
+
+  @override
+  String get menuUndo => 'Widerrufen';
+
+  @override
+  String get menuRedo => 'Wiederholen';
+
+  @override
+  String get menuCut => 'Ausschneiden';
+
+  @override
+  String get menuCopy => 'Kopieren';
+
+  @override
+  String get menuPaste => 'Einsetzen';
+
+  @override
+  String get menuDelete => 'Löschen';
+
+  @override
+  String get menuSelectAll => 'Alles auswählen';
+
+  @override
+  String get menuSpeech => 'Sprachausgabe';
+
+  @override
+  String get menuStartSpeaking => 'Sprachausgabe starten';
+
+  @override
+  String get menuStopSpeaking => 'Sprachausgabe stoppen';
+
+  @override
+  String get menuView => 'Darstellung';
+
+  @override
+  String get menuFullScreen => 'Vollbildmodus aktivieren';
+
+  @override
+  String get menuWindow => 'Fenster';
+
+  @override
+  String get menuMinimize => 'Im Dock ablegen';
+
+  @override
+  String get menuZoom => 'Zoomen';
+
+  @override
+  String get menuBringAllToFront => 'Alle nach vorne bringen';
+
+  @override
+  String get menuHelp => 'Hilfe';
+
+  @override
   String aboutVersion(String version) {
     return 'Version $version';
   }

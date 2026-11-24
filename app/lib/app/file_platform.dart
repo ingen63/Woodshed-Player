@@ -1,6 +1,8 @@
 // Dateiauswahl, Ordner und Drag & Drop vom nativen Teil (Kanal «woodshed/files»), austauschbar für Tests.
 // Plus the storage layer (#35): [FileStore] holds the library and audio files, in the file system on desktop
 // and mobile (file_store_io.dart), in the browser's Origin Private File System (file_store_web.dart).
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/services.dart';
 
 /// #121: files dragged from outside the app (Finder, file explorer) over the window.
@@ -153,11 +155,12 @@ abstract class FilePlatform {
   /// Opens [url] in the system browser (#50/AK6); the app itself loads nothing from the network.
   Future<void> openUrl(String url);
 
-  /// The macOS app menu item «About …» was chosen (#50/AK6).
-  set onShowAbout(void Function()? handler);
+  /// The app has a native menu bar (macOS, #144): the UI builds it with PlatformMenuBar.
+  bool get hasMenuBar;
 
-  /// Title of the macOS app menu item «About …» in the UI language (#50/AK6); no-op elsewhere.
-  void setAboutMenuTitle(String title);
+  /// Titles of the standard items of the menu bar in the UI language (#144/AK1), see
+  /// `menuBarTitles` in ui/app_menu_bar.dart; no-op without a menu bar.
+  void localizeMenuBar(Map<String, String> titles);
 }
 
 class ChannelFilePlatform implements FilePlatform {
@@ -165,15 +168,12 @@ class ChannelFilePlatform implements FilePlatform {
     _channel.setMethodCallHandler((call) async {
       if (fileDragEvent(call) case final e?) {
         _onDrag?.call(e);
-      } else if (call.method == 'showAbout') {
-        _onShowAbout?.call();
       }
     });
   }
 
   static const _channel = MethodChannel('woodshed/files');
   void Function(FileDragEvent)? _onDrag;
-  void Function()? _onShowAbout;
 
   @override
   set onFileDrag(void Function(FileDragEvent event)? handler) =>
@@ -223,12 +223,11 @@ class ChannelFilePlatform implements FilePlatform {
       _channel.invokeMethod<void>('openUrl', url).catchError((_) {});
 
   @override
-  set onShowAbout(void Function()? handler) => _onShowAbout = handler;
+  bool get hasMenuBar => defaultTargetPlatform == TargetPlatform.macOS;
 
   @override
-  void setAboutMenuTitle(String title) => _channel
-      .invokeMethod<void>('setAboutMenuTitle', title)
-      .catchError((_) {});
+  void localizeMenuBar(Map<String, String> titles) =>
+      _channel.invokeMethod<void>('localizeMenuBar', titles).catchError((_) {});
 
   @override
   Future<BuildInfo> buildInfo() async {

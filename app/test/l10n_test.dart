@@ -126,6 +126,19 @@ void main() {
     }
   });
 
+  testWidgets('#144/AK3 the app tells the platform the language it shows', (
+    tester,
+  ) async {
+    final app = TestApp(Directory.systemTemp.createTempSync('wp_l10n'));
+    await tester.pumpWidget(
+      WoodshedApp(controller: app.controller, locale: const Locale('de')),
+    );
+    await tester.pumpAndSettle();
+    // in the browser `<html lang>`: test/web/document_language_web_test.dart
+    final material = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(material.builder, showLanguage);
+  });
+
   group('#43/AK5 the UI renders in both languages', () {
     for (final (locale, texts) in [
       (
@@ -185,17 +198,59 @@ void main() {
     });
   });
 
-  group('#43/AK2 no UI text fixed in code', () {
+  group('#43/AK2, #144/AK4 no UI text fixed in code', () {
     // Literal strings with at least two letters in UI positions. Allowed: language-neutral 'mm:ss' and the app name.
     final pattern = RegExp(
-      r'''(Text\(\s*|label:\s*|tooltip:\s*|title:\s*|hintText:\s*|message:\s*|semanticLabel:\s*)'[^'$]*[A-Za-zÄÖÜäöü]{2}''',
+      r'''(Text\(\s*|label:\s*|labelText:\s*|tooltip:\s*|title:\s*|hintText:\s*|helperText:\s*|errorText:\s*|message:\s*|semanticLabel:\s*|semanticsLabel:\s*)['"][^'"$]*[A-Za-zÄÖÜäöü]{2}''',
     );
-    final files = [
-      ...Directory('lib/ui').listSync(),
-      ...Directory('lib/metronome').listSync(),
-      File('lib/main.dart'),
-    ].whereType<File>().where((f) => f.path.endsWith('.dart'));
-    for (final f in files) {
+    // #144/AK4: every Dart file under lib/, without the files gen-l10n writes into lib/l10n.
+    final files =
+        Directory('lib')
+            .listSync(recursive: true)
+            .whereType<File>()
+            .where((f) => f.path.endsWith('.dart'))
+            .where((f) => !f.path.startsWith('lib/l10n/'))
+            .toList()
+          ..sort((a, b) => a.path.compareTo(b.path));
+    // Files left out on purpose, with the reason. None at the moment: the command line (#140,
+    // lib/app/command_line.dart) stays English, but writes its texts to the terminal, not into UI
+    // positions; log and error messages of the code are no UI positions either.
+    const excluded = <String, String>{};
+
+    test('#144/AK4 every folder under lib/ is checked', () {
+      final folders = Directory('lib')
+          .listSync()
+          .whereType<Directory>()
+          .map((d) => d.path)
+          .where((d) => d != 'lib/l10n');
+      for (final d in folders) {
+        expect(
+          files.where((f) => f.path.startsWith('$d/')),
+          isNotEmpty,
+          reason: d,
+        );
+      }
+      expect(files.map((f) => f.path), contains('lib/main.dart'));
+      for (final f in excluded.keys) {
+        expect(File(f).existsSync(), isTrue, reason: 'excluded: $f');
+      }
+    });
+
+    test('#144/AK4 the pattern finds fixed texts in both kinds of quotes', () {
+      for (final hit in [
+        "Text('Library')",
+        'tooltip: "Play"',
+        "label:\n    'Rename'",
+        "semanticsLabel: 'Close'",
+      ]) {
+        expect(pattern.hasMatch(hit), isTrue, reason: hit);
+      }
+      for (final ok in ["Text(l.library)", "Text('\$n')", "title: '–'"]) {
+        expect(pattern.hasMatch(ok), isFalse, reason: ok);
+      }
+    });
+
+    for (final f in files.where((f) => !excluded.containsKey(f.path))) {
       test(f.path, () {
         final hits = pattern
             .allMatches(f.readAsStringSync())
@@ -205,6 +260,27 @@ void main() {
             )
             .toList();
         expect(hits, isEmpty);
+      });
+    }
+  });
+
+  group('#144/AK2 iOS and macOS name the languages of the ARB files', () {
+    final languages = arbFiles.map((n) => n.substring(4, n.length - 4)).toSet();
+    for (final plist in ['ios/Runner/Info.plist', 'macos/Runner/Info.plist']) {
+      test(plist, () {
+        final text = File(plist).readAsStringSync();
+        final list = RegExp(
+          r'<key>CFBundleLocalizations</key>\s*<array>(.*?)</array>',
+          dotAll: true,
+        ).firstMatch(text);
+        expect(list, isNotNull, reason: 'CFBundleLocalizations missing');
+        final named = RegExp(r'<string>([^<]+)</string>')
+            .allMatches(list![1]!)
+            .map((m) => m[1]!.trim())
+            .toList();
+        expect(named.toSet(), languages);
+        expect(named.length, languages.length, reason: 'named twice');
+        expect(named, containsAll(['en', 'de']));
       });
     }
   });

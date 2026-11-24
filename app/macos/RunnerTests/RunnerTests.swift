@@ -215,3 +215,77 @@ struct CommandLineToolTests {
     #expect(!path.contains("://"))
   }
 }
+
+/// #144: the menu bar comes from Flutter (PlatformMenuBar); the standard items copied from MainMenu.xib get
+/// their titles in the UI language from the ARB files.
+@MainActor
+struct MenuBarTests {
+  /// A menu bar as Flutter builds it: copies of the standard items, its own items, Help without items.
+  func flutterMenuBar() -> NSMenu {
+    func item(_ title: String, _ action: Selector?, _ items: [NSMenuItem]? = nil) -> NSMenuItem {
+      let i = NSMenuItem(title: title, action: action, keyEquivalent: "")
+      if let items {
+        let sub = NSMenu(title: title)
+        items.forEach(sub.addItem)
+        i.submenu = sub
+      }
+      return i
+    }
+    let menu = NSMenu()
+    menu.addItem(
+      item(
+        "Woodshed Player", nil,
+        [
+          item("Über Woodshed Player", nil),
+          item("Services", #selector(NSMenu.submenuAction(_:)), []),
+          item("Hide Woodshed Player", #selector(NSApplication.hide(_:))),
+          item("Quit Woodshed Player", #selector(NSApplication.terminate(_:))),
+        ]))
+    menu.addItem(
+      item("Bearbeiten", nil, [item("Kopieren", nil), item("Speech", nil, [item("Start Speaking", #selector(NSTextView.startSpeaking(_:)))])]))
+    menu.addItem(item("Fenster", nil, [item("Minimize", #selector(NSWindow.performMiniaturize(_:)))]))
+    menu.addItem(item("Hilfe", nil))
+    return menu
+  }
+
+  @Test("#144/AK1 standard items get the titles of the UI language, AppKit gets Services, Window and Help")
+  func localizedTitles() {
+    let saved = (NSApp.mainMenu, NSApp.servicesMenu, NSApp.windowsMenu, NSApp.helpMenu)
+    defer { (NSApp.mainMenu, NSApp.servicesMenu, NSApp.windowsMenu, NSApp.helpMenu) = saved }
+    // AppKit reports the Services and Window menus only inside the main menu, as in the app.
+    let menu = flutterMenuBar()
+    NSApp.mainMenu = menu
+    MainFlutterWindow.localizeMenuBar(
+      menu,
+      titles: [
+        "services": "Dienste", "windowsMenu": "Fenster", "helpMenu": "Hilfe",
+        "hide:": "Woodshed Player ausblenden", "terminate:": "Woodshed Player beenden",
+        "startSpeaking:": "Sprachausgabe starten", "performMiniaturize:": "Im Dock ablegen",
+      ])
+    let app = menu.items[0].submenu!
+    #expect(app.items.map(\.title) == [
+      "Über Woodshed Player", "Dienste", "Woodshed Player ausblenden", "Woodshed Player beenden",
+    ])
+    #expect(menu.items[1].submenu!.items[1].submenu!.items[0].title == "Sprachausgabe starten")
+    #expect(menu.items[2].submenu!.items[0].title == "Im Dock ablegen")
+    #expect(app.items[1].submenu === saved.1)  // AppKit's own Services menu, now titled «Dienste»
+    #expect(saved.1?.title == "Dienste")
+    #expect(NSApp.windowsMenu === menu.items[2].submenu)
+    #expect(menu.items[3].submenu != nil)
+    #expect(NSApp.helpMenu === menu.items[3].submenu)
+    // Flutter's own items keep their titles (they come from the ARB files already)
+    #expect(menu.items[1].submenu!.items[0].title == "Kopieren")
+  }
+
+  @Test("#144/AK1 a title missing from the list leaves the item as it is")
+  func missingTitle() {
+    let saved = (NSApp.servicesMenu, NSApp.windowsMenu, NSApp.helpMenu)
+    defer { (NSApp.servicesMenu, NSApp.windowsMenu, NSApp.helpMenu) = saved }
+    let menu = flutterMenuBar()
+    MainFlutterWindow.localizeMenuBar(menu, titles: [:])
+    #expect(menu.items[0].submenu!.items.map(\.title) == [
+      "Über Woodshed Player", "Services", "Hide Woodshed Player", "Quit Woodshed Player",
+    ])
+    #expect(menu.items[3].submenu == nil)
+  }
+}

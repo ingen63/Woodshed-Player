@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/app/file_platform.dart';
@@ -79,24 +81,63 @@ void main() {
           (_) {},
         );
 
-    test('dropped files and «About» reach their handlers', () async {
+    test('dropped files reach their handler', () async {
       final p = ChannelFilePlatform();
       final dropped = <List<String>>[];
-      var about = 0;
       p.onFileDrag = (e) {
         if (e is FileDragDrop) dropped.add(e.paths);
       };
-      p.onShowAbout = () => about++;
       await send(const MethodCall('dropFiles', ['a.mp3', 'b.flac']));
       await send(const MethodCall('dropFiles', 'not a list'));
-      await send(const MethodCall('showAbout'));
       await send(const MethodCall('somethingElse'));
       await send(const MethodCall('somethingElse', ['c.mp3']));
       expect(dropped, [
         ['a.mp3', 'b.flac'],
       ]);
-      expect(about, 1);
     });
+  });
+
+  group('#144/AK1 menu bar through the platform channel', () {
+    test('only macOS has a menu bar', () {
+      final p = ChannelFilePlatform();
+      for (final platform in TargetPlatform.values) {
+        debugDefaultTargetPlatformOverride = platform;
+        expect(
+          p.hasMenuBar,
+          platform == TargetPlatform.macOS,
+          reason: '$platform',
+        );
+      }
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    test(
+      'the titles go to «localizeMenuBar»; without a native side nothing fails',
+      () async {
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        const channel = MethodChannel('woodshed/files');
+        final calls = <MethodCall>[];
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          calls.add(call);
+          return null;
+        });
+        addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+        final p = ChannelFilePlatform();
+        p.localizeMenuBar(const {'terminate:': 'Woodshed Player beenden'});
+        await pumpEventQueue();
+        expect(calls.single.method, 'localizeMenuBar');
+        expect(calls.single.arguments, {
+          'terminate:': 'Woodshed Player beenden',
+        });
+        messenger.setMockMethodCallHandler(
+          channel,
+          (call) async => throw PlatformException(code: 'x'),
+        );
+        p.localizeMenuBar(const {});
+        await pumpEventQueue();
+      },
+    );
   });
 
   group('#34 waveform in the browser', () {

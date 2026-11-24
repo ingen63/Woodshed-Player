@@ -263,13 +263,14 @@ class FakeFiles implements FilePlatform {
   @override
   Future<void> openUrl(String url) async => opened.add(url);
 
-  void Function()? showAbout;
+  /// macOS menu bar (#144); off as on every platform but macOS.
   @override
-  set onShowAbout(void Function()? handler) => showAbout = handler;
+  bool hasMenuBar = false;
 
-  String? aboutMenuTitle;
+  /// Titles of the standard menu items the UI handed over last (#144/AK1).
+  Map<String, String>? menuTitles;
   @override
-  void setAboutMenuTitle(String title) => aboutMenuTitle = title;
+  void localizeMenuBar(Map<String, String> titles) => menuTitles = titles;
 }
 
 /// Kern, Timer, Bibliothek in [dir] und Controller zusammen. Laden wird mit [finishLoads] abgeschlossen.

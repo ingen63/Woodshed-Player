@@ -349,6 +349,52 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get aboutApp => pseudo(super.aboutApp);
   @override
+  String get menuServices => pseudo(super.menuServices);
+  @override
+  String get menuHide => pseudo(super.menuHide);
+  @override
+  String get menuHideOthers => pseudo(super.menuHideOthers);
+  @override
+  String get menuShowAll => pseudo(super.menuShowAll);
+  @override
+  String get menuQuit => pseudo(super.menuQuit);
+  @override
+  String get menuEdit => pseudo(super.menuEdit);
+  @override
+  String get menuUndo => pseudo(super.menuUndo);
+  @override
+  String get menuRedo => pseudo(super.menuRedo);
+  @override
+  String get menuCut => pseudo(super.menuCut);
+  @override
+  String get menuCopy => pseudo(super.menuCopy);
+  @override
+  String get menuPaste => pseudo(super.menuPaste);
+  @override
+  String get menuDelete => pseudo(super.menuDelete);
+  @override
+  String get menuSelectAll => pseudo(super.menuSelectAll);
+  @override
+  String get menuSpeech => pseudo(super.menuSpeech);
+  @override
+  String get menuStartSpeaking => pseudo(super.menuStartSpeaking);
+  @override
+  String get menuStopSpeaking => pseudo(super.menuStopSpeaking);
+  @override
+  String get menuView => pseudo(super.menuView);
+  @override
+  String get menuFullScreen => pseudo(super.menuFullScreen);
+  @override
+  String get menuWindow => pseudo(super.menuWindow);
+  @override
+  String get menuMinimize => pseudo(super.menuMinimize);
+  @override
+  String get menuZoom => pseudo(super.menuZoom);
+  @override
+  String get menuBringAllToFront => pseudo(super.menuBringAllToFront);
+  @override
+  String get menuHelp => pseudo(super.menuHelp);
+  @override
   String aboutVersion(String version) => pseudo(super.aboutVersion(version));
   @override
   String get aboutLicense => pseudo(super.aboutLicense);

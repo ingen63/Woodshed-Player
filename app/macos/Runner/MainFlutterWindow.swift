@@ -179,8 +179,11 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
         // #50/AK6: written by tool/stamp_build_info.sh at build time.
         let info = Bundle.main.infoDictionary ?? [:]
         result(["tag": info["WPGitTag"] as? String ?? "", "date": info["WPBuildDate"] as? String ?? ""])
-      case "setAboutMenuTitle":
-        if let title = call.arguments as? String { self.routeAboutMenu(title: title) }
+      case "localizeMenuBar":
+        // #144/AK1: after the UI has built the menu bar (PlatformMenuBar, app/lib/ui/app_menu_bar.dart)
+        if let titles = call.arguments as? [String: String], let menu = NSApp.mainMenu {
+          Self.localizeMenuBar(menu, titles: titles)
+        }
         result(nil)
       default:
         result(FlutterMethodNotImplemented)
@@ -188,21 +191,45 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
     }
   }
 
-  // MARK: About (#50/AK6): the app menu item «About …» opens the Flutter dialog instead of the standard panel.
+  // MARK: Menu bar (#144/AK1): the UI builds it with PlatformMenuBar, its texts come from the ARB files.
 
-  /// Points the first item of the app menu (the standard «About …») at [showAbout] and sets its localized title.
-  func routeAboutMenu(title: String) {
-    guard let item = NSApp.mainMenu?.items.first?.submenu?.items.first,
-      item.action == #selector(NSApplication.orderFrontStandardAboutPanel(_:))
-        || item.action == #selector(showAbout(_:))
-    else { return }
-    item.title = title
-    item.target = self
-    item.action = #selector(showAbout(_:))
+  /// Flutter copies the standard items (Hide, Quit, Minimize …) with their English titles from
+  /// MainMenu.xib. This gives them the [titles] of the UI language, keyed by their action, and hands the
+  /// Services, Window and Help menus of [mainMenu] to AppKit, which fills them (services, window list,
+  /// help search).
+  static func localizeMenuBar(_ mainMenu: NSMenu, titles: [String: String]) {
+    localizeItems(mainMenu, titles: titles)
+    // The app menu: its only submenu is the Services menu. AppKit keeps filling the one of MainMenu.xib
+    // (NSApp.servicesMenu cannot be replaced), so that one moves into the new menu bar.
+    if let services = mainMenu.items.first?.submenu?.items.first(where: { $0.hasSubmenu }) {
+      services.title = titles["services"] ?? services.title
+      if let filled = NSApp.servicesMenu, filled !== services.submenu {
+        filled.supermenu?.items.first(where: { $0.submenu === filled })?.submenu = nil
+        services.submenu = filled
+      }
+      services.submenu?.title = services.title
+    }
+    for item in mainMenu.items {
+      if item.title == titles["windowsMenu"] {
+        NSApp.windowsMenu = item.submenu
+      } else if item.title == titles["helpMenu"] {
+        // A menu without items comes from Flutter without a submenu.
+        let help = item.submenu ?? NSMenu(title: item.title)
+        item.submenu = help
+        NSApp.helpMenu = help
+      }
+    }
   }
 
-  @objc func showAbout(_ sender: Any?) {
-    channel?.invokeMethod("showAbout", arguments: nil)
+  private static func localizeItems(_ menu: NSMenu, titles: [String: String]) {
+    for item in menu.items {
+      if let submenu = item.submenu {
+        localizeItems(submenu, titles: titles)
+      }
+      if let action = item.action, let title = titles[NSStringFromSelector(action)] {
+        item.title = title
+      }
+    }
   }
 
   // MARK: Keychain (#54/AK1): the refresh token of the cloud sign-in, as a generic password of this app.

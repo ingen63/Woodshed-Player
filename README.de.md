@@ -54,7 +54,7 @@ Ein Stück langsamer abspielen, ohne dass sich die Tonhöhe ändert, die schwere
 - 📚 **Bibliothek.** Ordner, Playlists, Mehrfachauswahl, Ziehen und Ablegen. Jede Datei wird nur einmal gespeichert, erkannt an ihrem Inhalt. Anfang und Ende eines Titels abschneiden (WAV, FLAC, MP3, AAC, M4A).
 - 🎙️ **Aufnahme (Mac).** Systemton oder Mikrofon verlustfrei als FLAC aufnehmen. Die Aufnahme landet direkt in der Bibliothek, bereit für den Loop.
 - ☁️ **Deine Geräte, Deine Wahl.** Abgleich auf Wunsch über Dein eigenes Google Drive, nur mit den Dateien, die die App selbst anlegt. Ohne Konto verlässt nichts Dein Gerät.
-- 🌗 **Zum Üben gemacht.** Die Bereiche Player, Üben und Metronom, Layouts für Desktop, Tablet und Phone, hell und dunkel, Tastenkürzel überall, Deutsch und Englisch.
+- 🌗 **Zum Üben gemacht.** Die Bereiche Player, Üben und Metronom, Layouts für Desktop, Tablet und Phone, hell und dunkel, Tastenkürzel überall, Deutsch und Englisch nach der Systemsprache, auch in der Menüleiste des Mac und in den Rückfragen des Systems.
 
 Alle Funktionen im Detail: [`docs/FUNKTIONEN.md`](docs/FUNKTIONEN.md).
 

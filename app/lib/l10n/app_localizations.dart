@@ -1052,6 +1052,144 @@ abstract class AppLocalizations {
   /// **'About Woodshed Player'**
   String get aboutApp;
 
+  /// macOS menu bar (#144). The menu items follow the standard macOS titles of the language.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get menuServices;
+
+  /// No description provided for @menuHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Woodshed Player'**
+  String get menuHide;
+
+  /// No description provided for @menuHideOthers.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Others'**
+  String get menuHideOthers;
+
+  /// No description provided for @menuShowAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show All'**
+  String get menuShowAll;
+
+  /// No description provided for @menuQuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit Woodshed Player'**
+  String get menuQuit;
+
+  /// No description provided for @menuEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get menuEdit;
+
+  /// No description provided for @menuUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get menuUndo;
+
+  /// No description provided for @menuRedo.
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get menuRedo;
+
+  /// No description provided for @menuCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut'**
+  String get menuCut;
+
+  /// No description provided for @menuCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get menuCopy;
+
+  /// No description provided for @menuPaste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get menuPaste;
+
+  /// No description provided for @menuDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get menuDelete;
+
+  /// No description provided for @menuSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select All'**
+  String get menuSelectAll;
+
+  /// No description provided for @menuSpeech.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech'**
+  String get menuSpeech;
+
+  /// No description provided for @menuStartSpeaking.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Speaking'**
+  String get menuStartSpeaking;
+
+  /// No description provided for @menuStopSpeaking.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Speaking'**
+  String get menuStopSpeaking;
+
+  /// No description provided for @menuView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get menuView;
+
+  /// No description provided for @menuFullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Full Screen'**
+  String get menuFullScreen;
+
+  /// No description provided for @menuWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Window'**
+  String get menuWindow;
+
+  /// No description provided for @menuMinimize.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimize'**
+  String get menuMinimize;
+
+  /// No description provided for @menuZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom'**
+  String get menuZoom;
+
+  /// No description provided for @menuBringAllToFront.
+  ///
+  /// In en, this message translates to:
+  /// **'Bring All to Front'**
+  String get menuBringAllToFront;
+
+  /// No description provided for @menuHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Help'**
+  String get menuHelp;
+
   /// No description provided for @aboutVersion.
   ///
   /// In en, this message translates to:

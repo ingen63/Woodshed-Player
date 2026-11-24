@@ -148,6 +148,9 @@ AppLocalizations systemTexts() {
   return lookupAppLocalizations(const Locale('en'));
 }
 
+/// The page language exists only in the browser (#144/AK3); macOS and iOS take the system language.
+void showDocumentLanguage(Locale locale) {}
+
 /// The hint «Add to Home Screen» is for the browser only (#39/AK6).
 bool get installHintWanted => false;
 

@@ -167,15 +167,7 @@ void main() {
       expect(app.files.opened, [privacyUrl, termsUrl]);
     });
 
-    testWidgets('#50/AK6 macOS app menu opens About with a localized title', (
-      tester,
-    ) async {
-      final app = await pump(tester);
-      expect(app.files.aboutMenuTitle, de.aboutApp);
-      app.files.showAbout!();
-      await tester.pumpAndSettle();
-      expect(find.byType(AboutDialog), findsOneWidget);
-    });
+    // #50/AK6 «About Woodshed Player» in the macOS app menu: menu_bar_test.dart (#144)
 
     test('#50/AK6 build info: empty values mean unknown', () {
       final none = BuildInfo.parse('', '');

@@ -83,6 +83,7 @@ class WoodshedApp extends StatelessWidget {
       theme: _lightTheme,
       darkTheme: _darkTheme,
       themeMode: themeModeFor(appearance),
+      builder: showLanguage,
       home: HomePage(
         controller: controller,
         recordingButton: recordingButton?.call(controller),
@@ -101,6 +102,12 @@ ThemeMode themeModeFor(Appearance a) => switch (a) {
   Appearance.light => ThemeMode.light,
   Appearance.dark => ThemeMode.dark,
 };
+
+/// #144/AK3: tells the platform the language the app shows (in the browser `<html lang>`).
+Widget showLanguage(BuildContext context, Widget? child) {
+  showDocumentLanguage(Localizations.localeOf(context));
+  return child ?? const SizedBox.shrink();
+}
 
 /// #43/AK3: the first system language the app has (by language code), otherwise English.
 Locale resolveLocale(List<Locale>? preferred, Iterable<Locale> supported) {

@@ -607,6 +607,75 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutApp => 'About Woodshed Player';
 
   @override
+  String get menuServices => 'Services';
+
+  @override
+  String get menuHide => 'Hide Woodshed Player';
+
+  @override
+  String get menuHideOthers => 'Hide Others';
+
+  @override
+  String get menuShowAll => 'Show All';
+
+  @override
+  String get menuQuit => 'Quit Woodshed Player';
+
+  @override
+  String get menuEdit => 'Edit';
+
+  @override
+  String get menuUndo => 'Undo';
+
+  @override
+  String get menuRedo => 'Redo';
+
+  @override
+  String get menuCut => 'Cut';
+
+  @override
+  String get menuCopy => 'Copy';
+
+  @override
+  String get menuPaste => 'Paste';
+
+  @override
+  String get menuDelete => 'Delete';
+
+  @override
+  String get menuSelectAll => 'Select All';
+
+  @override
+  String get menuSpeech => 'Speech';
+
+  @override
+  String get menuStartSpeaking => 'Start Speaking';
+
+  @override
+  String get menuStopSpeaking => 'Stop Speaking';
+
+  @override
+  String get menuView => 'View';
+
+  @override
+  String get menuFullScreen => 'Enter Full Screen';
+
+  @override
+  String get menuWindow => 'Window';
+
+  @override
+  String get menuMinimize => 'Minimize';
+
+  @override
+  String get menuZoom => 'Zoom';
+
+  @override
+  String get menuBringAllToFront => 'Bring All to Front';
+
+  @override
+  String get menuHelp => 'Help';
+
+  @override
   String aboutVersion(String version) {
     return 'Version $version';
   }

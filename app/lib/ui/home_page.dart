@@ -14,6 +14,7 @@ import '../app/app_controller.dart';
 import '../app/sidebar_width.dart';
 import '../metronome/practice_shortcuts.dart';
 import 'about_dialog.dart';
+import 'app_menu_bar.dart';
 import 'areas.dart';
 import 'file_drop.dart';
 import 'library_view.dart';
@@ -71,15 +72,6 @@ class _HomePageState extends State<HomePage> {
     c.player.addListener(_signInHint);
     // #121: files dragged in from outside go to the playlist or folder under them
     c.dropTargetAt = fileDropTargetAt;
-    c.files.onShowAbout = () {
-      if (mounted) showAbout(context, c.files);
-    };
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    c.files.setAboutMenuTitle(context.l10n.aboutApp); // #50/AK6: macOS app menu
   }
 
   @override
@@ -87,7 +79,6 @@ class _HomePageState extends State<HomePage> {
     _lifecycle.dispose();
     c.cloud.removeListener(_signInHint);
     c.player.removeListener(_signInHint);
-    c.files.onShowAbout = null;
     c.removeListener(_showMessage);
     c.metronome.removeListener(_updateTicker);
     _metronomeTicker?.cancel();
@@ -203,50 +194,58 @@ class _HomePageState extends State<HomePage> {
     final meta = isApplePlatform(platform);
     SingleActivator command(LogicalKeyboardKey key, {bool shift = false}) =>
         SingleActivator(key, meta: meta, control: !meta, shift: shift);
-    return CallbackShortcuts(
-      bindings: {
-        command(LogicalKeyboardKey.keyO): () => c.pickAndImport(),
-        command(LogicalKeyboardKey.keyN, shift: true): () =>
-            newFolder(context, c.library),
-        // #115: ⌘1, ⌘2, ⌘3 (Ctrl outside Apple) switch the area
-        command(LogicalKeyboardKey.digit1): () => _setArea(AppArea.player),
-        command(LogicalKeyboardKey.digit2): () => _setArea(AppArea.practice),
-        command(LogicalKeyboardKey.digit3): () => _setArea(AppArea.metronome),
-      },
-      child: ListenableBuilder(
-        listenable: Listenable.merge([c, c.player, c.metronome]),
-        builder: (context, _) => LayoutBuilder(
-          builder: (context, box) {
-            final metrics = WsMetrics(WsSize.forWidth(box.maxWidth), platform);
-            final layout = switch (metrics.size) {
-              WsSize.desktop => _desktop(),
-              WsSize.tablet => _tablet(),
-              WsSize.phone => _phone(),
-            };
-            return WsLayout(
-              metrics: metrics,
-              child: _shortcuts(
-                widget.installHint && !c.library.installHintClosed
-                    ? Column(
-                        children: [
-                          _InstallHint(
-                            onClose: () => setState(
-                              () => unawaited(c.library.closeInstallHint()),
+    // #144: the macOS menu bar in the UI language; «About» opens the dialog (#50/AK6)
+    return AppMenuBar(
+      files: c.files,
+      onAbout: () => showAbout(context, c.files),
+      child: CallbackShortcuts(
+        bindings: {
+          command(LogicalKeyboardKey.keyO): () => c.pickAndImport(),
+          command(LogicalKeyboardKey.keyN, shift: true): () =>
+              newFolder(context, c.library),
+          // #115: ⌘1, ⌘2, ⌘3 (Ctrl outside Apple) switch the area
+          command(LogicalKeyboardKey.digit1): () => _setArea(AppArea.player),
+          command(LogicalKeyboardKey.digit2): () => _setArea(AppArea.practice),
+          command(LogicalKeyboardKey.digit3): () => _setArea(AppArea.metronome),
+        },
+        child: ListenableBuilder(
+          listenable: Listenable.merge([c, c.player, c.metronome]),
+          builder: (context, _) => LayoutBuilder(
+            builder: (context, box) {
+              final metrics = WsMetrics(
+                WsSize.forWidth(box.maxWidth),
+                platform,
+              );
+              final layout = switch (metrics.size) {
+                WsSize.desktop => _desktop(),
+                WsSize.tablet => _tablet(),
+                WsSize.phone => _phone(),
+              };
+              return WsLayout(
+                metrics: metrics,
+                child: _shortcuts(
+                  widget.installHint && !c.library.installHintClosed
+                      ? Column(
+                          children: [
+                            _InstallHint(
+                              onClose: () => setState(
+                                () => unawaited(c.library.closeInstallHint()),
+                              ),
                             ),
-                          ),
-                          Expanded(
-                            child: MediaQuery.removePadding(
-                              context: context,
-                              removeTop: true,
-                              child: layout,
+                            Expanded(
+                              child: MediaQuery.removePadding(
+                                context: context,
+                                removeTop: true,
+                                child: layout,
+                              ),
                             ),
-                          ),
-                        ],
-                      )
-                    : layout,
-              ),
-            );
-          },
+                          ],
+                        )
+                      : layout,
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

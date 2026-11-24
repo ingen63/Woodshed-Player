@@ -104,6 +104,11 @@ bool get installHintWanted => wantsInstallHint(
       web.window.matchMedia('(display-mode: standalone)').matches,
 );
 
+/// #144/AK3: the language the app shows, as `<html lang>` of the page (screen readers, hyphenation,
+/// translation offers of the browser).
+void showDocumentLanguage(Locale locale) =>
+    web.document.documentElement?.setAttribute('lang', locale.toLanguageTag());
+
 /// The smoke test of the built app (#13/AK5) exists only on desktop.
 bool get smokeRequested => false;
 

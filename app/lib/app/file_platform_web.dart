@@ -153,10 +153,10 @@ class WebFilePlatform implements FilePlatform {
   }
 
   @override
-  set onShowAbout(void Function()? handler) {}
+  bool get hasMenuBar => false;
 
   @override
-  void setAboutMenuTitle(String title) {}
+  void localizeMenuBar(Map<String, String> titles) {}
 
   /// In the browser from `--dart-define=WP_GIT_TAG=… --dart-define=WP_BUILD_DATE=YYYY-MM-DD` (#50/AK6).
   @override
