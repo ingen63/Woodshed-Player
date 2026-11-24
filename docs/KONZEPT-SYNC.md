@@ -113,6 +113,8 @@ Sync-Engine (#37) mit einer Datei je Gerät und mehreren Quellen (#53)
 | P4 | **Entfällt (#55).** ~~App-Ordner bei OneDrive for Business (Geschäftskonten)?~~ | – |
 | K0 | Machbarkeit der direkten Verbindung (sieben Prüfpunkte, siehe Konzept ohne Registrierung) | direkte Verbindung nur im selben WLAN oder streichen; Cloud bleibt |
 
+**K0, Stand 24.11.2026:** Testseite `web/k0/` (GitHub Pages `k0/`) und Testprogramm `tools/k0/` (macOS) sind gebaut, die Prüfung auf den Geräten steht aus. Wege: öffentliche Nostr-Relays (mit STUN wählbar), Bonjour im WLAN (nur nativ, ohne Internet) und als Ausbaustufe ein Direktcode ohne Relays und ohne STUN. `flutter_webrtc` bietet am Mac weder einen festen Port noch ein festes Zertifikat; die Web-App kann den Mac darum ohne einen Austausch je Verbindung (Relay oder Code) nicht erreichen. Der Direktcode prüft, ob der Weg im WLAN an sich trägt.
+
 ## Phasen und Issues
 
 | # | Inhalt | Aufwand |

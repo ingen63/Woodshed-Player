@@ -1,5 +1,6 @@
 # GitHub Pages (#50, #41): start page, privacy policy and terms (from docs/*.md) at the root, W0 test page (#32)
-# under w0/, M0 sign-in test page (#52) under m0/, the web app (#41) under app/.
+# under w0/, M0 sign-in test page (#52) under m0/, K0 direct connection test page (#52) under k0/, the web app
+# (#41) under app/.
 # Every push to main publishes the whole site; the app in it is built from the latest tag reachable from the
 # pushed commit (git describe), so new app versions only go online with a new tag, while text fixes to the start
 # page and legal texts go online at once. Without any tag the app is left out.

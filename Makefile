@@ -1,7 +1,7 @@
 # Test and hygiene targets for the Flutter app (app/) and the C++ audio core (core/), #7.
 # Strategy and test matrix: docs/TESTS.md. Developer tools: Flutter, CMake, Homebrew llvm
 # (clang-format, clang-tidy), actionlint. core/third_party/ is never formatted, linted or read.
-.PHONY: help lame test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools format format-check lint lint-dart \
+.PHONY: help lame test test-core test-wasm reference-native test-wasm-compare test-app test-hook test-tools test-k0 format format-check lint lint-dart \
         lint-core lint-workflows coverage coverage-run coverage-core coverage-app coverage-diff mutants \
         mutants-diff fuzz fuzz-wasm fuzz-wasm-build fuzz-wasm-findings report sanitize sanitize-thread test-core-debug network-free fuzz fuzz-build property \
         test-ui test-ios test-web test-web-start smoke-app pseudo-l10n bench clean-tmp test-changelog package
@@ -29,11 +29,12 @@ QA_DIRS  = mkdir -p "$(QA_DIR)/junit" "$(QA_DIR)/flutter"
 # Our own sources from git, tracked and new (not ignored); none has a space in its path.
 # Generated l10n files are excluded.
 LS_FILES   = git ls-files --cached --others --exclude-standard
-DART_FILES = $(LS_FILES) -- 'app/*.dart' | grep -v '^app/lib/l10n/app_localizations'
+DART_FILES = $(LS_FILES) -- 'app/*.dart' 'tools/k0/*.dart' | grep -v '^app/lib/l10n/app_localizations'
 CPP_FILES  = $(LS_FILES) -- core | grep -v '^core/third_party/' | grep -E '\.(c|cc|cpp|h|hpp|mm)$$'
 
 help:
 	@echo "make test           core (ctest), app (flutter test) and the hook tests"
+	@echo "make test-k0        K0 (#52): protocol of test page web/k0 and test program tools/k0"
 	@echo "make test-changelog CHANGELOG.md and CHANGELOG.en.md: same versions, sections and issues (#139)"
 	@echo "make package       release packages of TAG (default: latest tag) from the built apps into local/release (#139)"
 	@echo "make clean-tmp      remove what aborted test runs left in the temp directory (unchanged for 60 min)"
@@ -64,7 +65,7 @@ help:
 	@echo "make report         overview page of the test quality: local/test-quality/report/index.html"
 
 # ---- Tests ----
-test: clean-tmp test-changelog test-core test-app test-tools
+test: clean-tmp test-changelog test-core test-app test-tools test-k0
 
 # #139/AK6: the release notes in both languages (tools/changelog.py, Python standard library only)
 test-changelog:
@@ -127,6 +128,12 @@ test-tools:
 	cd app && flutter test --reporter failures-only $(call FLUTTER_JSON,tools) $(TOOL_TESTS)
 test-hook: test-tools
 
+# #52/K0: feasibility test of the direct connection; test page web/k0 (Node.js) and native test program
+# tools/k0 speak the same protocol (tools/k0/test/vectors.json).
+test-k0:
+	$(PIPEFAIL) node tools/k0/test/web_k0_test.mjs | { grep -v '^ok ' || true; }
+	cd tools/k0 && flutter test --reporter failures-only
+
 # ---- Formatting (#7/AK2) ----
 format:
 	$(DART_FILES) | xargs dart format -o write
@@ -142,6 +149,7 @@ lint: lint-dart lint-core lint-workflows
 lint-dart:
 	cd app && flutter analyze --no-pub
 	cd app/packages/wp_core && flutter analyze --no-pub
+	cd tools/k0 && flutter analyze
 
 # The build uses -Wall -Wextra -Werror for our own targets (core/CMakeLists.txt) and writes
 # compile_commands.json for clang-tidy (core/.clang-tidy).

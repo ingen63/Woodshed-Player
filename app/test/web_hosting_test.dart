@@ -118,6 +118,11 @@ void main() {
         isTrue,
         reason: '#52',
       );
+      expect(
+        File('${tmp.path}/out/k0/index.html').existsSync(),
+        isTrue,
+        reason: '#52/K0',
+      );
       expect(File('${tmp.path}/out/datenschutz.html').existsSync(), isTrue);
     });
 
