@@ -277,6 +277,27 @@ struct MenuBarTests {
     #expect(menu.items[1].submenu!.items[0].title == "Kopieren")
   }
 
+  @Test("#148/AK1 the Help menu keeps the help and the shortcuts and stays AppKit's Help menu (search field)")
+  func helpMenuWithItems() {
+    let saved = NSApp.helpMenu
+    defer { NSApp.helpMenu = saved }
+    // only the Help menu: the Services menu of AppKit stays where the other tests expect it
+    let menu = NSMenu()
+    let help = NSMenu(title: "Hilfe")
+    let helpItem = NSMenuItem(title: "Woodshed Player-Hilfe", action: nil, keyEquivalent: "?")
+    helpItem.keyEquivalentModifierMask = .command
+    help.addItem(helpItem)
+    help.addItem(NSMenuItem(title: "Tastenkürzel", action: nil, keyEquivalent: ""))
+    let item = NSMenuItem(title: "Hilfe", action: nil, keyEquivalent: "")
+    item.submenu = help
+    menu.addItem(item)
+    MainFlutterWindow.localizeMenuBar(menu, titles: ["helpMenu": "Hilfe"])
+    #expect(NSApp.helpMenu === help)
+    #expect(help.items.map(\.title) == ["Woodshed Player-Hilfe", "Tastenkürzel"])
+    #expect(help.items[0].keyEquivalent == "?")
+    #expect(help.items[0].keyEquivalentModifierMask == .command)
+  }
+
   @Test("#144/AK1 a title missing from the list leaves the item as it is")
   func missingTitle() {
     let saved = (NSApp.servicesMenu, NSApp.windowsMenu, NSApp.helpMenu)

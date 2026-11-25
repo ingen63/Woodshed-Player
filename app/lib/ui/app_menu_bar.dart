@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../app/file_platform.dart';
 import 'messages.dart';
+import 'shortcut_table.dart';
 
 /// Wraps [child] in the macOS menu bar if [files] has one; elsewhere [child] alone.
 class AppMenuBar extends StatefulWidget {
@@ -15,12 +16,17 @@ class AppMenuBar extends StatefulWidget {
     super.key,
     required this.files,
     required this.onAbout,
+    required this.onHelp,
+    required this.onShortcuts,
     required this.child,
   });
   final FilePlatform files;
 
   /// «About Woodshed Player» was chosen (#50/AK6).
   final VoidCallback onAbout;
+
+  /// «Woodshed Player Help» and «Keyboard Shortcuts» in the Help menu (#148/AK1).
+  final VoidCallback onHelp, onShortcuts;
   final Widget child;
 
   @override
@@ -40,7 +46,12 @@ class _AppMenuBarState extends State<AppMenuBar> {
     final l = context.l10n;
     if (identical(l, _texts)) return;
     _texts = l;
-    _menus = appMenus(l, onAbout: () => widget.onAbout());
+    _menus = appMenus(
+      l,
+      onAbout: () => widget.onAbout(),
+      onHelp: () => widget.onHelp(),
+      onShortcuts: () => widget.onShortcuts(),
+    );
   }
 
   @override
@@ -87,6 +98,8 @@ SingleActivator _command(LogicalKeyboardKey key, {bool shift = false}) =>
 List<PlatformMenuItem> appMenus(
   AppLocalizations l, {
   required VoidCallback onAbout,
+  required VoidCallback onHelp,
+  required VoidCallback onShortcuts,
 }) {
   const cause = SelectionChangedCause.keyboard;
   return [
@@ -186,8 +199,19 @@ List<PlatformMenuItem> appMenus(
         ),
       ],
     ),
-    // macOS fills the Help menu (search field); the native side gives it its menu.
-    PlatformMenu(label: l.menuHelp, menus: const []),
+    // #148/AK1: the help and the shortcuts; macOS adds its search field on top (the native side makes this
+    // menu the app's Help menu).
+    PlatformMenu(
+      label: l.menuHelp,
+      menus: [
+        PlatformMenuItem(
+          label: l.helpTitle,
+          shortcut: helpActivator(TargetPlatform.macOS),
+          onSelected: onHelp,
+        ),
+        PlatformMenuItem(label: l.helpShortcutsTitle, onSelected: onShortcuts),
+      ],
+    ),
   ];
 }
 

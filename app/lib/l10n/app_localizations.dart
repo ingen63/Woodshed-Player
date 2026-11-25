@@ -2161,6 +2161,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Armed, recording {duration}'**
   String armedRecordingLabel(String duration);
+
+  /// #148: the help page and its item in the Help menu of the Mac
+  ///
+  /// In en, this message translates to:
+  /// **'Woodshed Player Help'**
+  String get helpTitle;
+
+  /// #148: the overview of the shortcuts (dialog, menu item, help section)
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard Shortcuts'**
+  String get helpShortcutsTitle;
+
+  /// No description provided for @helpShortcutsShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show keyboard shortcuts'**
+  String get helpShortcutsShow;
+
+  /// #148: group of the shortcuts that work in every area
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get helpShortcutsGeneral;
+
+  /// No description provided for @helpShortcutsPractice.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice and Metronome'**
+  String get helpShortcutsPractice;
+
+  /// #148: names of keys in the shortcut overview
+  ///
+  /// In en, this message translates to:
+  /// **'Esc'**
+  String get helpKeyEscape;
+
+  /// No description provided for @helpKeyDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get helpKeyDelete;
+
+  /// No description provided for @helpKeyBackspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Backspace'**
+  String get helpKeyBackspace;
+
+  /// #148: a click with a modifier, as in ⇧-click
+  ///
+  /// In en, this message translates to:
+  /// **'click'**
+  String get helpKeyClick;
+
+  /// #148: what a shortcut does, one line of the overview each
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Player, Practice, Metronome'**
+  String get helpShortcutSwitchArea;
+
+  /// No description provided for @helpShortcutOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Add tracks'**
+  String get helpShortcutOpen;
+
+  /// No description provided for @helpShortcutSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search the library'**
+  String get helpShortcutSearch;
+
+  /// No description provided for @helpShortcutPlayPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Play / pause'**
+  String get helpShortcutPlayPause;
+
+  /// No description provided for @helpShortcutShuffle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle on / off'**
+  String get helpShortcutShuffle;
+
+  /// No description provided for @helpShortcutRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat: off, list, track'**
+  String get helpShortcutRepeat;
+
+  /// No description provided for @helpShortcutMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute on / off'**
+  String get helpShortcutMute;
+
+  /// No description provided for @helpShortcutPreviousNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous / next track'**
+  String get helpShortcutPreviousNext;
+
+  /// No description provided for @helpShortcutSeek.
+  ///
+  /// In en, this message translates to:
+  /// **'15 s back / forward'**
+  String get helpShortcutSeek;
+
+  /// No description provided for @helpShortcutVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Louder / quieter'**
+  String get helpShortcutVolume;
+
+  /// No description provided for @helpShortcutPracticePlayPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Play / pause the track (Practice), start / stop the metronome (Metronome)'**
+  String get helpShortcutPracticePlayPause;
+
+  /// No description provided for @helpShortcutMetronome.
+  ///
+  /// In en, this message translates to:
+  /// **'Metronome on / off'**
+  String get helpShortcutMetronome;
+
+  /// No description provided for @helpShortcutTap.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap tempo'**
+  String get helpShortcutTap;
+
+  /// No description provided for @helpShortcutSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed slower / faster'**
+  String get helpShortcutSpeed;
+
+  /// No description provided for @helpShortcutBpm.
+  ///
+  /// In en, this message translates to:
+  /// **'Metronome +1 / −1 BPM'**
+  String get helpShortcutBpm;
+
+  /// No description provided for @helpShortcutBpm10.
+  ///
+  /// In en, this message translates to:
+  /// **'Metronome +10 / −10 BPM'**
+  String get helpShortcutBpm10;
+
+  /// No description provided for @helpShortcutLoopStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop start at the playhead'**
+  String get helpShortcutLoopStart;
+
+  /// No description provided for @helpShortcutLoopEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop end at the playhead'**
+  String get helpShortcutLoopEnd;
+
+  /// No description provided for @helpShortcutDeleteTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the loaded track (asks first)'**
+  String get helpShortcutDeleteTrack;
+
+  /// No description provided for @helpShortcutEndSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'End the selection, empty the search'**
+  String get helpShortcutEndSelection;
+
+  /// No description provided for @helpShortcutDeleteSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the selected tracks (asks first)'**
+  String get helpShortcutDeleteSelection;
+
+  /// No description provided for @helpShortcutRangeClick.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the tracks up to here'**
+  String get helpShortcutRangeClick;
+
+  /// No description provided for @helpShortcutToggleClick.
+  ///
+  /// In en, this message translates to:
+  /// **'Select or deselect a track'**
+  String get helpShortcutToggleClick;
+
+  /// #148: the sections of the help; a body has paragraphs separated by an empty line
+  ///
+  /// In en, this message translates to:
+  /// **'Areas'**
+  String get helpAreasTitle;
+
+  /// No description provided for @helpAreasBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Woodshed Player has three areas: Player for your library and simple playback, Practice for the waveform, loop, tempo and speed trainer, and Metronome with all its settings.\n\nSwitch with “Player | Practice | Metronome” at the top of the window, on the phone with the tab bar at the bottom, or with the keyboard. Switching stops neither the track nor the metronome; position, loop and tempo stay. A dot on a tab shows what is playing. If something plays in another area, a mini bar shows it and starts or stops it with a tap.\n\nOn the desktop the library stays beside the player. On the tablet the button “Library” opens it in every area. After a restart the app opens the area you chose last.'**
+  String get helpAreasBody;
+
+  /// No description provided for @helpPlayerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Player'**
+  String get helpPlayerTitle;
+
+  /// No description provided for @helpPlayerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The player shows cover, title, a progress bar and the volume. Below it are the controls: Shuffle, Previous, Play/Pause, Next and Repeat.\n\nShuffle plays every track of the list once per round. Previous goes back to the start of the track, within its first 3 seconds to the track before. Next goes to the next track. Repeat switches between off, the list and the track (shown with a small 1); a dot shows that it is on.\n\nA track plays within the list, folder or playlist you chose it from.'**
+  String get helpPlayerBody;
+
+  /// No description provided for @helpLibraryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get helpLibraryTitle;
+
+  /// No description provided for @helpLibraryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add tracks with + at the top of the library, or drag audio files into the window (Mac and browser); dropped on a folder or a playlist, they go there. Each file is stored only once, recognised by its content.\n\nFolders: “New folder” in the menu with the three dots at the top of the library creates one at the top level, “New subfolder …” in the menu of a folder one inside it, as deep as you like. A click opens or closes a folder. Drag tracks or whole folders onto a folder to move them (on iPhone and iPad press and hold first). “Delete folder” also deletes its subfolders; the tracks stay in the library under “No folder”.\n\nSort the library with the sort button, search it with the search field.\n\nThe menu of a track (right click or the three dots) edits title and artist (only in the library, the audio file stays unchanged), moves it to a folder, adds it to a playlist and deletes it after asking.\n\nSelect several tracks with ⌘-click or ⇧-click (Ctrl-click outside Apple); on iPhone and iPad press and hold a track or choose “Select”. The selected tracks can be dragged, added to a playlist, moved or deleted together.\n\nPlaylists are lists of tracks in their own order. + beside “Playlists” creates one; add tracks by dragging them onto it or with “Add to playlist”. “Play” plays its tracks one after the other.'**
+  String get helpLibraryBody;
+
+  /// No description provided for @helpPracticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice'**
+  String get helpPracticeTitle;
+
+  /// No description provided for @helpPracticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The waveform shows the whole track at the top (a tap jumps there) and below it the part around the loop or the playhead.\n\nLoop: “S here” and “E here” set start and end at the playhead, the keys S and E do the same while it plays. Drag the markers S and E in the waveform, or type the times as mm:ss.d. The loop bar also has “To loop start”, “Whole track” and loop on/off. Every track remembers its loop and tempo.\n\nTempo: from 0.1× to 2× with the slider or the quick choices. The pitch stays the same.\n\nTrim start and end: “Trim start and end …” in the menu of a track. Drag the two handles or type the times, check with “Listen”, then “Trim …”. The audio file really gets shorter; this cannot be undone.'**
+  String get helpPracticeBody;
+
+  /// No description provided for @helpMetronomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Metronome'**
+  String get helpMetronomeTitle;
+
+  /// No description provided for @helpMetronomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The metronome runs from 20 to 300 BPM: −/+ (hold to repeat), the slider, or tap the tempo with “Tap”. Choose the time signature (4/4, 3/4, 2/4, 6/8) and the subdivision (quarters, eighths, triplets, sixteenths); a change takes effect at once. The track and the metronome never play at the same time.\n\nAutomatic tempo increase: by bars (start and target BPM, step, every how many bars) or by time (start and target BPM over 1 to 60 minutes). At the target it starts again at the start BPM.\n\nRamp-up by passes, in Practice: the speed of the track rises step by step with the passes through the loop, for example from 60 % to 100 %, +5 % every 10 passes. A pass counts at the jump from the loop end to the start. The slider symbol opens its settings.'**
+  String get helpMetronomeBody;
+
+  /// No description provided for @helpSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get helpSyncTitle;
+
+  /// No description provided for @helpSyncBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync is off until you choose it. Then it keeps library, settings and audio files the same on your devices: through Google Drive with your Google account, where the app sees only the files it creates itself, or directly between your paired devices without an account. The direct connection comes with a later version.\n\nThe line “Sync: …” at the bottom of the library opens the settings: Off or Google Drive, sign in or out, sync now, restore a backup.\n\nWithout an account and without paired devices, the app makes no connection: everything stays on this device.'**
+  String get helpSyncBody;
+
+  /// No description provided for @helpAppearanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance and language'**
+  String get helpAppearanceTitle;
+
+  /// No description provided for @helpAppearanceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose System, Light or Dark under “Appearance” in the menu with the three dots at the top of the library. System follows the setting of your device, also while the app runs.\n\nThe app follows the language of your system: English or German, with any other language English. Numbers and sizes are written the way of the language, and on the Mac the menu bar changes with it.'**
+  String get helpAppearanceBody;
+
+  /// No description provided for @helpRecordingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get helpRecordingTitle;
+
+  /// No description provided for @helpRecordingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'“Record” at the top right starts and stops a recording. The menu beside it chooses the source for this device: system audio (macOS 14.2 or later; the player and the metronome are left out) or the microphone. The recording is saved losslessly as FLAC and appears in the library as a new track, named after date and time. The first time, macOS asks for permission.\n\nArmed: in Practice and Metronome, the switch “Armed” records from the microphone by itself. As soon as the level rises above the threshold, a recording starts, 1 second early; after a pause of the set length it ends. Space plays or pauses as usual and also ends a running recording. Each recording lands in the library in the folder Recordings › date. The arrow beside the switch sets threshold and pause. While “Armed” is on, “Record” is locked.'**
+  String get helpRecordingBody;
+
+  /// No description provided for @helpExportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as MP3'**
+  String get helpExportTitle;
+
+  /// No description provided for @helpExportBody.
+  ///
+  /// In en, this message translates to:
+  /// **'“Export as MP3 …” in the menu of a track, or of several selected tracks, writes them as MP3 files into a folder you choose, named “Title - Artist - Year.mp3”, with title, artist, album and year as tags. Nothing is overwritten.\n\nMP3 files are taken over without new encoding; WAV, FLAC, M4A and recordings are encoded at 192 kbit/s. The original file is exported; tempo and loop do not change it.'**
+  String get helpExportBody;
+
+  /// No description provided for @helpCommandLineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Command line'**
+  String get helpCommandLineTitle;
+
+  /// No description provided for @helpCommandLineBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The program of the app is also its command line. Copy the script tools/woodshed from the source code into a folder of your search path, for example ~/bin/woodshed.\n\nwoodshed play --title \"<title>\" plays a track of the library. woodshed record waits for the first sound, records and stops by itself after a pause. woodshed --help lists every command and option.\n\nThe command talks only to the app on the same Mac, never over the network.'**
+  String get helpCommandLineBody;
+
+  /// No description provided for @helpWebTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Web app'**
+  String get helpWebTitle;
+
+  /// No description provided for @helpWebBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Install: on iPhone and iPad tap Share, then “Add to Home Screen”; on Android use the menu of the browser. The app then starts like any other.\n\nWithout a connection: after the first visit the app also starts offline. A new version replaces the old one at the next start with a connection.\n\nAudio cache: with sync, the audio files on this device have a limit, 2 GB unless you change it; a tap on the storage line at the bottom of the library sets it. Above it, the tracks not played for the longest time lose their file on this device if it is in the cloud. They stay in the library as “Only in the cloud” and load again when played. “Keep offline” in the menu of a track keeps its file.'**
+  String get helpWebBody;
+
+  /// No description provided for @helpShortcutsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Most functions have a keyboard shortcut. The overview lists them all, grouped by area; the key ? opens it at any time, except while you type in a text field. Shortcuts with ⌘ use Ctrl outside Apple.'**
+  String get helpShortcutsBody;
 }
 
 class _AppLocalizationsDelegate

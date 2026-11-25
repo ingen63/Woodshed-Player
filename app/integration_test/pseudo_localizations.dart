@@ -737,6 +737,118 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String armedRecordingLabel(String duration) =>
       pseudo(super.armedRecordingLabel(duration));
+  @override
+  String get helpTitle => pseudo(super.helpTitle);
+  @override
+  String get helpShortcutsTitle => pseudo(super.helpShortcutsTitle);
+  @override
+  String get helpShortcutsShow => pseudo(super.helpShortcutsShow);
+  @override
+  String get helpShortcutsGeneral => pseudo(super.helpShortcutsGeneral);
+  @override
+  String get helpShortcutsPractice => pseudo(super.helpShortcutsPractice);
+  @override
+  String get helpKeyEscape => pseudo(super.helpKeyEscape);
+  @override
+  String get helpKeyDelete => pseudo(super.helpKeyDelete);
+  @override
+  String get helpKeyBackspace => pseudo(super.helpKeyBackspace);
+  @override
+  String get helpKeyClick => pseudo(super.helpKeyClick);
+  @override
+  String get helpShortcutSwitchArea => pseudo(super.helpShortcutSwitchArea);
+  @override
+  String get helpShortcutOpen => pseudo(super.helpShortcutOpen);
+  @override
+  String get helpShortcutSearch => pseudo(super.helpShortcutSearch);
+  @override
+  String get helpShortcutPlayPause => pseudo(super.helpShortcutPlayPause);
+  @override
+  String get helpShortcutShuffle => pseudo(super.helpShortcutShuffle);
+  @override
+  String get helpShortcutRepeat => pseudo(super.helpShortcutRepeat);
+  @override
+  String get helpShortcutMute => pseudo(super.helpShortcutMute);
+  @override
+  String get helpShortcutPreviousNext => pseudo(super.helpShortcutPreviousNext);
+  @override
+  String get helpShortcutSeek => pseudo(super.helpShortcutSeek);
+  @override
+  String get helpShortcutVolume => pseudo(super.helpShortcutVolume);
+  @override
+  String get helpShortcutPracticePlayPause =>
+      pseudo(super.helpShortcutPracticePlayPause);
+  @override
+  String get helpShortcutMetronome => pseudo(super.helpShortcutMetronome);
+  @override
+  String get helpShortcutTap => pseudo(super.helpShortcutTap);
+  @override
+  String get helpShortcutSpeed => pseudo(super.helpShortcutSpeed);
+  @override
+  String get helpShortcutBpm => pseudo(super.helpShortcutBpm);
+  @override
+  String get helpShortcutBpm10 => pseudo(super.helpShortcutBpm10);
+  @override
+  String get helpShortcutLoopStart => pseudo(super.helpShortcutLoopStart);
+  @override
+  String get helpShortcutLoopEnd => pseudo(super.helpShortcutLoopEnd);
+  @override
+  String get helpShortcutDeleteTrack => pseudo(super.helpShortcutDeleteTrack);
+  @override
+  String get helpShortcutEndSelection => pseudo(super.helpShortcutEndSelection);
+  @override
+  String get helpShortcutDeleteSelection =>
+      pseudo(super.helpShortcutDeleteSelection);
+  @override
+  String get helpShortcutRangeClick => pseudo(super.helpShortcutRangeClick);
+  @override
+  String get helpShortcutToggleClick => pseudo(super.helpShortcutToggleClick);
+  @override
+  String get helpAreasTitle => pseudo(super.helpAreasTitle);
+  @override
+  String get helpAreasBody => pseudo(super.helpAreasBody);
+  @override
+  String get helpPlayerTitle => pseudo(super.helpPlayerTitle);
+  @override
+  String get helpPlayerBody => pseudo(super.helpPlayerBody);
+  @override
+  String get helpLibraryTitle => pseudo(super.helpLibraryTitle);
+  @override
+  String get helpLibraryBody => pseudo(super.helpLibraryBody);
+  @override
+  String get helpPracticeTitle => pseudo(super.helpPracticeTitle);
+  @override
+  String get helpPracticeBody => pseudo(super.helpPracticeBody);
+  @override
+  String get helpMetronomeTitle => pseudo(super.helpMetronomeTitle);
+  @override
+  String get helpMetronomeBody => pseudo(super.helpMetronomeBody);
+  @override
+  String get helpSyncTitle => pseudo(super.helpSyncTitle);
+  @override
+  String get helpSyncBody => pseudo(super.helpSyncBody);
+  @override
+  String get helpAppearanceTitle => pseudo(super.helpAppearanceTitle);
+  @override
+  String get helpAppearanceBody => pseudo(super.helpAppearanceBody);
+  @override
+  String get helpRecordingTitle => pseudo(super.helpRecordingTitle);
+  @override
+  String get helpRecordingBody => pseudo(super.helpRecordingBody);
+  @override
+  String get helpExportTitle => pseudo(super.helpExportTitle);
+  @override
+  String get helpExportBody => pseudo(super.helpExportBody);
+  @override
+  String get helpCommandLineTitle => pseudo(super.helpCommandLineTitle);
+  @override
+  String get helpCommandLineBody => pseudo(super.helpCommandLineBody);
+  @override
+  String get helpWebTitle => pseudo(super.helpWebTitle);
+  @override
+  String get helpWebBody => pseudo(super.helpWebBody);
+  @override
+  String get helpShortcutsBody => pseudo(super.helpShortcutsBody);
 }
 
 /// Loads [PseudoLocalizations] for any locale.

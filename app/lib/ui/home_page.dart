@@ -6,6 +6,7 @@
 // (#115/AK3).
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -18,10 +19,12 @@ import 'about_dialog.dart';
 import 'app_menu_bar.dart';
 import 'areas.dart';
 import 'file_drop.dart';
+import 'help_page.dart';
 import 'library_view.dart';
 import 'messages.dart';
 import 'player_screen.dart';
 import 'player_view.dart';
+import 'shortcut_table.dart';
 import 'style.dart';
 import 'sync_settings.dart';
 
@@ -180,9 +183,58 @@ class _HomePageState extends State<HomePage> {
 
   void _setArea(AppArea a) => c.setArea(a);
 
-  /// #115/AK11: ⌘K in the area Player: the search field (on the tablet in the drawer, on the phone in the
-  /// library instead of the full player).
+  /// #148: the help or the shortcuts are open; a second call does not open them again.
+  bool _helpOpen = false;
+
+  /// #148/AK10: what this platform has, asked as the features ask it.
+  Future<HelpTopics> _helpTopics() async {
+    final platform = Theme.of(context).platform;
+    final recording =
+        (widget.recordingButton != null || widget.practiceRecording != null) &&
+        isDesktopPlatform(platform);
+    final keyboard = KeyboardPresence.available(platform);
+    return HelpTopics(
+      recording: recording,
+      export: c.mp3 != null,
+      commandLine: await c.files.commandSocket() != null,
+      web: kIsWeb,
+      keyboard: keyboard,
+    );
+  }
+
+  Future<void> _openHelp() async {
+    if (_helpOpen) return;
+    _helpOpen = true;
+    try {
+      final topics = await _helpTopics();
+      if (mounted) await showHelp(context, topics);
+    } finally {
+      _helpOpen = false;
+    }
+  }
+
+  Future<void> _openShortcuts() async {
+    if (_helpOpen) return;
+    _helpOpen = true;
+    try {
+      await showShortcuts(context);
+    } finally {
+      _helpOpen = false;
+    }
+  }
+
+  /// #148/AK3: «?» outside a text field.
+  static bool _typing() {
+    final ctx = FocusManager.instance.primaryFocus?.context;
+    return ctx != null &&
+        (ctx.widget is EditableText ||
+            ctx.findAncestorWidgetOfExactType<EditableText>() != null);
+  }
+
+  /// #115/AK11: ⌘K: the search field (on the tablet in the drawer, on the phone in the library instead of
+  /// the full player); #148: from every area, which switches to Player.
   void _search() {
+    if (c.area != AppArea.player) _setArea(AppArea.player);
     final state = _scaffold.currentState;
     if (state != null && state.hasDrawer && !state.isDrawerOpen) {
       state.openDrawer();
@@ -203,8 +255,13 @@ class _HomePageState extends State<HomePage> {
     return AppMenuBar(
       files: c.files,
       onAbout: () => showAbout(context, c.files),
+      onHelp: _openHelp,
+      onShortcuts: _openShortcuts,
       child: CallbackShortcuts(
         bindings: {
+          command(LogicalKeyboardKey.keyK): _search,
+          // #148/AK1: on the Mac the Help menu has ⌘?
+          if (!c.files.hasMenuBar) helpActivator(platform): _openHelp,
           command(LogicalKeyboardKey.keyO): () => c.pickAndImport(),
           command(LogicalKeyboardKey.keyN, shift: true): () =>
               newFolder(context, c.library),
@@ -228,25 +285,29 @@ class _HomePageState extends State<HomePage> {
               };
               return WsLayout(
                 metrics: metrics,
-                child: _shortcuts(
-                  widget.installHint && !c.library.installHintClosed
-                      ? Column(
-                          children: [
-                            _InstallHint(
-                              onClose: () => setState(
-                                () => unawaited(c.library.closeInstallHint()),
+                child: HelpActions(
+                  onHelp: _openHelp,
+                  onShortcuts: _openShortcuts,
+                  child: _shortcuts(
+                    widget.installHint && !c.library.installHintClosed
+                        ? Column(
+                            children: [
+                              _InstallHint(
+                                onClose: () => setState(
+                                  () => unawaited(c.library.closeInstallHint()),
+                                ),
                               ),
-                            ),
-                            Expanded(
-                              child: MediaQuery.removePadding(
-                                context: context,
-                                removeTop: true,
-                                child: layout,
+                              Expanded(
+                                child: MediaQuery.removePadding(
+                                  context: context,
+                                  removeTop: true,
+                                  child: layout,
+                                ),
                               ),
-                            ),
-                          ],
-                        )
-                      : layout,
+                            ],
+                          )
+                        : layout,
+                  ),
                 ),
               );
             },
@@ -262,11 +323,7 @@ class _HomePageState extends State<HomePage> {
   Widget _shortcuts(Widget child) {
     final p = c.player;
     final area = c.area;
-    final player = PlayerShortcuts(
-      controller: c,
-      onSearch: _search,
-      child: const SizedBox(),
-    );
+    final player = PlayerShortcuts(controller: c, child: const SizedBox());
     final practice = PracticeShortcuts(
       metronome: c.metronome,
       onPlayPause: area == AppArea.metronome
@@ -283,6 +340,12 @@ class _HomePageState extends State<HomePage> {
       key: const Key('shortcuts'),
       autofocus: true,
       onKeyEvent: (node, event) {
+        // #148/AK3: «?» opens the shortcuts in every area, whatever key types it
+        if (!_typing() &&
+            shortcutsActivator.accepts(event, HardwareKeyboard.instance)) {
+          if (event is KeyDownEvent) unawaited(_openShortcuts());
+          return KeyEventResult.handled;
+        }
         final result = onKey(node, event);
         // #147/AK4: Space plays or pauses as before and ends a running take of «Armed».
         if (result == KeyEventResult.handled &&

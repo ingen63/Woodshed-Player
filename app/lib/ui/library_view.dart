@@ -19,6 +19,7 @@ import '../time_format.dart';
 import 'about_dialog.dart';
 import 'export_dialog.dart';
 import 'file_drop.dart';
+import 'help_page.dart';
 import 'sync_settings.dart';
 import 'messages.dart';
 import 'style.dart';
@@ -127,6 +128,11 @@ class _LibraryViewState extends State<LibraryView> {
   /// question of «Delete»; not while typing in a field of the library (the search).
   KeyEventResult _key(FocusNode node, KeyEvent e) {
     if (e is! KeyDownEvent) return KeyEventResult.ignored;
+    // #148/AK12: ⌘ and Ctrl belong to the shortcuts of the app (shortcut_table.dart)
+    final keys = HardwareKeyboard.instance;
+    if (keys.isMetaPressed || keys.isControlPressed) {
+      return KeyEventResult.ignored;
+    }
     final key = e.logicalKey;
     if (key == LogicalKeyboardKey.escape &&
         (!_selection.isEmpty || _selection.mode)) {
@@ -1013,7 +1019,7 @@ Future<String?> askName(
   );
 }
 
-enum _HeaderAction { newFolder, about }
+enum _HeaderAction { newFolder, help, shortcuts, about }
 
 class _Header extends StatelessWidget {
   const _Header({required this.controller});
@@ -1024,6 +1030,8 @@ class _Header extends StatelessWidget {
     final lib = controller.library;
     final l = context.l10n;
     final platform = Theme.of(context).platform;
+    // #148/AK2: help and shortcuts where the window offers them
+    final help = HelpActions.maybeOf(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
       child: Row(
@@ -1074,6 +1082,10 @@ class _Header extends StatelessWidget {
               switch (v) {
                 case _HeaderAction.newFolder:
                   newFolder(context, lib);
+                case _HeaderAction.help:
+                  help?.onHelp();
+                case _HeaderAction.shortcuts:
+                  help?.onShortcuts();
                 case _HeaderAction.about:
                   showAbout(context, controller.files);
                 case Appearance a:
@@ -1104,6 +1116,20 @@ class _Header extends StatelessWidget {
                   child: Text(appearanceLabel(l, a)),
                 ),
               const PopupMenuDivider(),
+              if (help != null) ...[
+                PopupMenuItem(
+                  key: const Key('helpButton'),
+                  value: _HeaderAction.help,
+                  child: Text(l.menuHelp),
+                ),
+                // the same rule as the shortcut badges
+                if (KeyboardPresence.available(platform))
+                  PopupMenuItem(
+                    key: const Key('shortcutsButton'),
+                    value: _HeaderAction.shortcuts,
+                    child: Text(l.helpShortcutsTitle),
+                  ),
+              ],
               PopupMenuItem(
                 key: const Key('aboutButton'),
                 value: _HeaderAction.about,

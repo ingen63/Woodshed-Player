@@ -1364,4 +1364,183 @@ class AppLocalizationsEn extends AppLocalizations {
   String armedRecordingLabel(String duration) {
     return 'Armed, recording $duration';
   }
+
+  @override
+  String get helpTitle => 'Woodshed Player Help';
+
+  @override
+  String get helpShortcutsTitle => 'Keyboard Shortcuts';
+
+  @override
+  String get helpShortcutsShow => 'Show keyboard shortcuts';
+
+  @override
+  String get helpShortcutsGeneral => 'General';
+
+  @override
+  String get helpShortcutsPractice => 'Practice and Metronome';
+
+  @override
+  String get helpKeyEscape => 'Esc';
+
+  @override
+  String get helpKeyDelete => 'Delete';
+
+  @override
+  String get helpKeyBackspace => 'Backspace';
+
+  @override
+  String get helpKeyClick => 'click';
+
+  @override
+  String get helpShortcutSwitchArea => 'Switch to Player, Practice, Metronome';
+
+  @override
+  String get helpShortcutOpen => 'Add tracks';
+
+  @override
+  String get helpShortcutSearch => 'Search the library';
+
+  @override
+  String get helpShortcutPlayPause => 'Play / pause';
+
+  @override
+  String get helpShortcutShuffle => 'Shuffle on / off';
+
+  @override
+  String get helpShortcutRepeat => 'Repeat: off, list, track';
+
+  @override
+  String get helpShortcutMute => 'Mute on / off';
+
+  @override
+  String get helpShortcutPreviousNext => 'Previous / next track';
+
+  @override
+  String get helpShortcutSeek => '15 s back / forward';
+
+  @override
+  String get helpShortcutVolume => 'Louder / quieter';
+
+  @override
+  String get helpShortcutPracticePlayPause =>
+      'Play / pause the track (Practice), start / stop the metronome (Metronome)';
+
+  @override
+  String get helpShortcutMetronome => 'Metronome on / off';
+
+  @override
+  String get helpShortcutTap => 'Tap tempo';
+
+  @override
+  String get helpShortcutSpeed => 'Speed slower / faster';
+
+  @override
+  String get helpShortcutBpm => 'Metronome +1 / −1 BPM';
+
+  @override
+  String get helpShortcutBpm10 => 'Metronome +10 / −10 BPM';
+
+  @override
+  String get helpShortcutLoopStart => 'Loop start at the playhead';
+
+  @override
+  String get helpShortcutLoopEnd => 'Loop end at the playhead';
+
+  @override
+  String get helpShortcutDeleteTrack => 'Delete the loaded track (asks first)';
+
+  @override
+  String get helpShortcutEndSelection => 'End the selection, empty the search';
+
+  @override
+  String get helpShortcutDeleteSelection =>
+      'Delete the selected tracks (asks first)';
+
+  @override
+  String get helpShortcutRangeClick => 'Select the tracks up to here';
+
+  @override
+  String get helpShortcutToggleClick => 'Select or deselect a track';
+
+  @override
+  String get helpAreasTitle => 'Areas';
+
+  @override
+  String get helpAreasBody =>
+      'Woodshed Player has three areas: Player for your library and simple playback, Practice for the waveform, loop, tempo and speed trainer, and Metronome with all its settings.\n\nSwitch with “Player | Practice | Metronome” at the top of the window, on the phone with the tab bar at the bottom, or with the keyboard. Switching stops neither the track nor the metronome; position, loop and tempo stay. A dot on a tab shows what is playing. If something plays in another area, a mini bar shows it and starts or stops it with a tap.\n\nOn the desktop the library stays beside the player. On the tablet the button “Library” opens it in every area. After a restart the app opens the area you chose last.';
+
+  @override
+  String get helpPlayerTitle => 'Player';
+
+  @override
+  String get helpPlayerBody =>
+      'The player shows cover, title, a progress bar and the volume. Below it are the controls: Shuffle, Previous, Play/Pause, Next and Repeat.\n\nShuffle plays every track of the list once per round. Previous goes back to the start of the track, within its first 3 seconds to the track before. Next goes to the next track. Repeat switches between off, the list and the track (shown with a small 1); a dot shows that it is on.\n\nA track plays within the list, folder or playlist you chose it from.';
+
+  @override
+  String get helpLibraryTitle => 'Library';
+
+  @override
+  String get helpLibraryBody =>
+      'Add tracks with + at the top of the library, or drag audio files into the window (Mac and browser); dropped on a folder or a playlist, they go there. Each file is stored only once, recognised by its content.\n\nFolders: “New folder” in the menu with the three dots at the top of the library creates one at the top level, “New subfolder …” in the menu of a folder one inside it, as deep as you like. A click opens or closes a folder. Drag tracks or whole folders onto a folder to move them (on iPhone and iPad press and hold first). “Delete folder” also deletes its subfolders; the tracks stay in the library under “No folder”.\n\nSort the library with the sort button, search it with the search field.\n\nThe menu of a track (right click or the three dots) edits title and artist (only in the library, the audio file stays unchanged), moves it to a folder, adds it to a playlist and deletes it after asking.\n\nSelect several tracks with ⌘-click or ⇧-click (Ctrl-click outside Apple); on iPhone and iPad press and hold a track or choose “Select”. The selected tracks can be dragged, added to a playlist, moved or deleted together.\n\nPlaylists are lists of tracks in their own order. + beside “Playlists” creates one; add tracks by dragging them onto it or with “Add to playlist”. “Play” plays its tracks one after the other.';
+
+  @override
+  String get helpPracticeTitle => 'Practice';
+
+  @override
+  String get helpPracticeBody =>
+      'The waveform shows the whole track at the top (a tap jumps there) and below it the part around the loop or the playhead.\n\nLoop: “S here” and “E here” set start and end at the playhead, the keys S and E do the same while it plays. Drag the markers S and E in the waveform, or type the times as mm:ss.d. The loop bar also has “To loop start”, “Whole track” and loop on/off. Every track remembers its loop and tempo.\n\nTempo: from 0.1× to 2× with the slider or the quick choices. The pitch stays the same.\n\nTrim start and end: “Trim start and end …” in the menu of a track. Drag the two handles or type the times, check with “Listen”, then “Trim …”. The audio file really gets shorter; this cannot be undone.';
+
+  @override
+  String get helpMetronomeTitle => 'Metronome';
+
+  @override
+  String get helpMetronomeBody =>
+      'The metronome runs from 20 to 300 BPM: −/+ (hold to repeat), the slider, or tap the tempo with “Tap”. Choose the time signature (4/4, 3/4, 2/4, 6/8) and the subdivision (quarters, eighths, triplets, sixteenths); a change takes effect at once. The track and the metronome never play at the same time.\n\nAutomatic tempo increase: by bars (start and target BPM, step, every how many bars) or by time (start and target BPM over 1 to 60 minutes). At the target it starts again at the start BPM.\n\nRamp-up by passes, in Practice: the speed of the track rises step by step with the passes through the loop, for example from 60 % to 100 %, +5 % every 10 passes. A pass counts at the jump from the loop end to the start. The slider symbol opens its settings.';
+
+  @override
+  String get helpSyncTitle => 'Sync';
+
+  @override
+  String get helpSyncBody =>
+      'Sync is off until you choose it. Then it keeps library, settings and audio files the same on your devices: through Google Drive with your Google account, where the app sees only the files it creates itself, or directly between your paired devices without an account. The direct connection comes with a later version.\n\nThe line “Sync: …” at the bottom of the library opens the settings: Off or Google Drive, sign in or out, sync now, restore a backup.\n\nWithout an account and without paired devices, the app makes no connection: everything stays on this device.';
+
+  @override
+  String get helpAppearanceTitle => 'Appearance and language';
+
+  @override
+  String get helpAppearanceBody =>
+      'Choose System, Light or Dark under “Appearance” in the menu with the three dots at the top of the library. System follows the setting of your device, also while the app runs.\n\nThe app follows the language of your system: English or German, with any other language English. Numbers and sizes are written the way of the language, and on the Mac the menu bar changes with it.';
+
+  @override
+  String get helpRecordingTitle => 'Recording';
+
+  @override
+  String get helpRecordingBody =>
+      '“Record” at the top right starts and stops a recording. The menu beside it chooses the source for this device: system audio (macOS 14.2 or later; the player and the metronome are left out) or the microphone. The recording is saved losslessly as FLAC and appears in the library as a new track, named after date and time. The first time, macOS asks for permission.\n\nArmed: in Practice and Metronome, the switch “Armed” records from the microphone by itself. As soon as the level rises above the threshold, a recording starts, 1 second early; after a pause of the set length it ends. Space plays or pauses as usual and also ends a running recording. Each recording lands in the library in the folder Recordings › date. The arrow beside the switch sets threshold and pause. While “Armed” is on, “Record” is locked.';
+
+  @override
+  String get helpExportTitle => 'Export as MP3';
+
+  @override
+  String get helpExportBody =>
+      '“Export as MP3 …” in the menu of a track, or of several selected tracks, writes them as MP3 files into a folder you choose, named “Title - Artist - Year.mp3”, with title, artist, album and year as tags. Nothing is overwritten.\n\nMP3 files are taken over without new encoding; WAV, FLAC, M4A and recordings are encoded at 192 kbit/s. The original file is exported; tempo and loop do not change it.';
+
+  @override
+  String get helpCommandLineTitle => 'Command line';
+
+  @override
+  String get helpCommandLineBody =>
+      'The program of the app is also its command line. Copy the script tools/woodshed from the source code into a folder of your search path, for example ~/bin/woodshed.\n\nwoodshed play --title \"<title>\" plays a track of the library. woodshed record waits for the first sound, records and stops by itself after a pause. woodshed --help lists every command and option.\n\nThe command talks only to the app on the same Mac, never over the network.';
+
+  @override
+  String get helpWebTitle => 'Web app';
+
+  @override
+  String get helpWebBody =>
+      'Install: on iPhone and iPad tap Share, then “Add to Home Screen”; on Android use the menu of the browser. The app then starts like any other.\n\nWithout a connection: after the first visit the app also starts offline. A new version replaces the old one at the next start with a connection.\n\nAudio cache: with sync, the audio files on this device have a limit, 2 GB unless you change it; a tap on the storage line at the bottom of the library sets it. Above it, the tracks not played for the longest time lose their file on this device if it is in the cloud. They stay in the library as “Only in the cloud” and load again when played. “Keep offline” in the menu of a track keeps its file.';
+
+  @override
+  String get helpShortcutsBody =>
+      'Most functions have a keyboard shortcut. The overview lists them all, grouped by area; the key ? opens it at any time, except while you type in a text field. Shortcuts with ⌘ use Ctrl outside Apple.';
 }

@@ -265,6 +265,8 @@ void main() {
           body: AppMenuBar(
             files: (FakeFiles()..hasMenuBar = true),
             onAbout: () {},
+            onHelp: () {},
+            onShortcuts: () {},
             child: TextField(controller: field, focusNode: focus),
           ),
         ),

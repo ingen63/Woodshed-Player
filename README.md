@@ -54,7 +54,7 @@ Slow a track down without changing its pitch, loop the hard bars, practise with 
 - 📚 **Library.** Folders, playlists, multi-select, drag and drop. Each file is stored once, recognised by its content. Trim the start and end of a track (WAV, FLAC, MP3, AAC, M4A).
 - 🎙️ **Recording (Mac).** Record the system audio or the microphone as lossless FLAC. The recording goes straight into the library, ready to loop. Switch on **Armed** while practising and every time you play becomes a recording of its own, filed under `Recordings › date`.
 - ☁️ **Your devices, your choice.** Optional sync through your own Google Drive, using only the files the app creates itself. Without an account, nothing leaves your device.
-- 🌗 **Made to practise with.** Player, Practice and Metronome areas, layouts for desktop, tablet and phone, light and dark, keyboard shortcuts everywhere, English and German following the system language, including the Mac menu bar and the questions the system asks.
+- 🌗 **Made to practise with.** Player, Practice and Metronome areas, layouts for desktop, tablet and phone, light and dark, keyboard shortcuts everywhere (press **?** for the overview), built-in help that works offline, English and German following the system language, including the Mac menu bar and the questions the system asks.
 
 All features in detail (in German): [`docs/FUNKTIONEN.md`](docs/FUNKTIONEN.md).
 

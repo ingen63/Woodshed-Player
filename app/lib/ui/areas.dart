@@ -407,18 +407,17 @@ class MetronomeScreen extends StatelessWidget {
 }
 
 /// #115/AK11: shortcuts of the area Player, like Spotify (Windows and Linux with Ctrl or Alt): Space
-/// Play/Pause, ⌥S shuffle, ⌥R repeat, M mute, ⌘K search, ⌘→/⌘← next/previous track, ⇧⌘→/⇧⌘← seek,
-/// ⌘↑/⌘↓ volume. Off in text fields, except ⌘K.
+/// Play/Pause, ⌥S shuffle, ⌥R repeat, M mute, ⌘→/⌘← next/previous track, ⇧⌘→/⇧⌘← seek, ⌘↑/⌘↓ volume.
+/// Off in text fields. ⌘K (search) works in every area (HomePage, #148); all of them are listed in
+/// shortcut_table.dart.
 class PlayerShortcuts extends StatelessWidget {
   const PlayerShortcuts({
     super.key,
     required this.controller,
-    required this.onSearch,
     required this.child,
   });
 
   final AppController controller;
-  final VoidCallback onSearch;
   final Widget child;
 
   /// Seconds one ⇧⌘→ or ⇧⌘← seeks, like the ±15 s buttons of the area Practice.
@@ -440,10 +439,6 @@ class PlayerShortcuts extends StatelessWidget {
     final keys = HardwareKeyboard.instance;
     final command = keys.isMetaPressed || keys.isControlPressed;
     final key = event.logicalKey;
-    if (command && key == LogicalKeyboardKey.keyK) {
-      onSearch();
-      return KeyEventResult.handled;
-    }
     if (_typing()) return KeyEventResult.ignored;
     final c = controller;
     final p = c.player;
