@@ -862,24 +862,44 @@ Version gibt einen neuen Schlüssel und wird beim nächsten Lauf neu installiert
 - **Lokal geprüft** werden die Workflows mit `actionlint` und ShellCheck (`make lint`, #64) und über
   `test_quality_workflow_test.dart`. Ob alle Jobs auf den Runnern laufen, zeigen erst die Läufe nach dem Push.
 
-**Verbrauch an Minuten** (#13/AK10, Schätzung vom 20.11.2026, `contract` gemessen am 22.11.2026, die übrigen Jobs nach den ersten Läufen nachführen). Annahmen: ungefähr
-20 Nächte im Monat mit neuem Commit, 60 Pushes mit Code-Änderung, davon 20 mit Web-Änderung, 2 Läufe von Hand mit
-`nightly=true`. Lokal gemessen: Oberflächentests 0:45 min, Release-Build 0:50 min (warm); auf dem Runner ohne Cache
-deutlich länger angesetzt.
+**Verbrauch an Minuten** (#13/AK10, Schätzung vom 20.11.2026, #74: nachgeführt am 25.11.2026 mit den 16 Läufen von
+`test-quality.yml` seit 21.11.2026, das sind rund 4 Tage und nicht eine volle Woche). Annahmen für den Monat: ungefähr
+20 Nächte im Monat mit neuem Commit, 60 Pushes mit Code-Änderung (80 Pushes insgesamt), davon 20 mit Web-Änderung,
+2 Läufe von Hand mit `nightly=true`. Gemessen wird je Job von Start bis Ende laut GitHub; abgerechnet wird je Job auf
+ganze Minuten aufgerundet. Die Läufe: 12 Pushes, 3 nächtliche (`schedule`) und 1 von Hand. **Die nächtlichen Läufe
+sind bisher alle gescheitert**, weil der Job «Mutation tests» (#11) scheiterte; die übrigen nächtlichen Jobs liefen
+erfolgreich, ihre Zeiten sind darum gültig, aber nur drei Messwerte je Job. Eine Woche mit erfolgreichen nächtlichen
+Läufen steht noch aus (#74/AK1).
 
-| Job | Minuten je Lauf | Läufe im Monat | Minuten im Monat |
-|---|---|---|---|
-| `macos` (Flutter einrichten 2, macOS-Build 4, iOS-Build 4, Oberflächentests 4, iOS-Simulator 6 (#99), Release-Build und Rauchtest 4) | ≈ 24 | 22 | ≈ 530 **macOS** |
-| `checks` | ≈ 15 | 60 | ≈ 900 Linux |
-| `web` | ≈ 10 | 20 | ≈ 200 Linux |
-| `sanitize`, `network-free` | ≈ 8 und 3 | 30 und 80 | ≈ 480 Linux |
-| `contract` (gemessen am 21. und 22.11.2026 auf GitHub, #80: emsdk aus dem Zwischenspeicher 8 s und 7 s, #89; nativ 21 s und 16 s, WASM 38 s und 34 s; gesamt 1:14 und 1:04 min, je Job auf ganze Minuten aufgerundet) | ≈ 2 | 30 | ≈ 60 Linux |
-| `sanitize-thread`, `fuzz` (2 × 20 min, dazu emsdk 3, aus dem Zwischenspeicher unter 1, und WASM 2, #67, #89), `property` | ≈ 10, 50, 10 | 22 | ≈ 1540 Linux |
+| Job | Schätzung min je Lauf | Gemessen min (Mittel, Bereich, Läufe) | Läufe im Monat | Minuten im Monat |
+|---|---|---|---|---|
+| `macos` (nur nächtlich und von Hand, nicht bei Pushes) | ≈ 24 | 15,8 (9,1–20,8; 3 nächtlich), 17,1 (von Hand) → 17 | 22 | ≈ 380 **macOS** |
+| `checks` | ≈ 15 | 6,3 (3,7–15,2; 10 Pushes, 2 gescheiterte 6,5) → 7 | 60 | ≈ 420 Linux |
+| `web` | ≈ 10 | 2,9 (2,4–3,4; 8 Pushes) → 3 | 20 | ≈ 60 Linux |
+| `sanitize`, `network-free` | ≈ 8 und 3 | 1,7 (1,1–2,2; 9 Pushes) → 2 und 1,0 (0,8–1,3; 11 Pushes) → 1 | 30 und 80 | ≈ 140 Linux |
+| `contract` | ≈ 2 | 1,4 (0,9–1,7; 9 Pushes) → 2 | 30 | ≈ 60 Linux |
+| `changes` (Vorjob, alle Pushes) | – | 0,1 → 1 | 80 | ≈ 80 Linux |
+| `fuzz` (2 × 20 min plus Aufbau) | ≈ 50 | 55,5 (41,6–62,5; 3 nächtlich), 41,5 (von Hand) → 56 | 22 | ≈ 1230 Linux |
+| `sanitize-thread` | ≈ 10 | 3,0 (1,3–5,3; 3 nächtlich) → 4 | 22 | ≈ 90 Linux |
+| `property` | ≈ 10 | 1,1 (1,0–1,3; 3 nächtlich) → 2 | 22 | ≈ 45 Linux |
+| `bench` (#59, in der ersten Schätzung nicht enthalten) | – | 1,6 (1,5–1,7; 3 nächtlich) → 2 | 22 | ≈ 45 Linux |
+| `nightly-gate` | – | 0,1 → 1 | 22 | ≈ 20 Linux |
+| `mutants` (#11, in der ersten Schätzung nicht enthalten) | – | 12,5 (erfolgreich), 11,6 (von Hand), 37,6 und 101,5 (gescheitert, wohl Zeitüberschreitung oder viele Mutanten) → 13 | 22 | ≈ 290 Linux, bei 100 min bis ≈ 2200 |
 
-Das sind rund **530 macOS-Minuten** und rund **3200 Linux-Minuten** im Monat (900 + 200 + 480 + 60 + 1540 = 3180). Bei einem privaten Repository zählt
-GitHub macOS-Minuten zehnfach: 530 × 10 = 5300 von 2000 Gratis-Minuten (GitHub Free), also über dem Kontingent; dann
-müssten die macOS-Läufe seltener werden (z. B. nur wöchentlich). Das Repository ist öffentlich (GitHub Pages), dort
-sind Standard-Runner kostenlos; die Grenze entfällt, die Schätzung bleibt als Richtwert.
+Das sind rund **380 macOS-Minuten** und rund **2500 Linux-Minuten** im Monat (420 + 60 + 140 + 60 + 80 + 1230 + 90 +
+45 + 45 + 20 + 290 = 2480, ohne langsame Mutationsläufe). Gegenüber der Schätzung vom 20.11.2026 (530 macOS, 3200 Linux)
+ist das weniger: Fast alle Jobs laufen deutlich kürzer als angesetzt (`checks` 7 statt 15, `web` 3 statt 10,
+`sanitize` 2 statt 8, `sanitize-thread` und `property` 4 und 2 statt je 10, `macos` 17 statt 24).
+
+**Länger als geschätzt** (#74/AK3): `fuzz` mit 56 statt 50 Minuten (bis 62,5), und der Job `mutants`, der in der
+Schätzung fehlte und mit 12 bis 100 Minuten sehr schwankt; die gescheiterten nächtlichen Läufe gehen auf ihn zurück
+(#11). Alle anderen Jobs sind kürzer als geschätzt. Der Mutationsjob ist damit der grösste Unsicherheitsfaktor der
+Monatssumme; sie ist nach einer Woche erfolgreicher nächtlicher Läufe neu zu rechnen.
+
+Bei einem privaten Repository zählt GitHub macOS-Minuten zehnfach: 380 × 10 = 3800 von 2000 Gratis-Minuten
+(GitHub Free), also über dem Kontingent; dann müssten die macOS-Läufe seltener werden (z. B. nur wöchentlich). Das
+Repository ist öffentlich (GitHub Pages), dort sind Standard-Runner kostenlos; die Grenze entfällt, die Schätzung
+bleibt als Richtwert.
 
 ## Leistungs- und Lasttests (#59)
 
