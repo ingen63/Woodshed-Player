@@ -1299,4 +1299,69 @@ class AppLocalizationsEn extends AppLocalizations {
   String exportFailed(String title) {
     return '«$title» could not be exported.';
   }
+
+  @override
+  String get armedSwitch => 'Armed';
+
+  @override
+  String get armedSwitchTooltip =>
+      'Records the microphone by itself while you practise: each time you play, a recording starts, and it ends after a pause or with the space bar. The recordings go to the library into Recordings › date.';
+
+  @override
+  String get armedWaiting => 'Armed, waiting for sound';
+
+  @override
+  String get armedSettings => 'Threshold and pause';
+
+  @override
+  String get armedThreshold => 'Starts above';
+
+  @override
+  String get armedSilence => 'Ends after a pause of';
+
+  @override
+  String get armedLevel => 'Microphone level';
+
+  @override
+  String get armedLevelOff => 'The level shows while «Armed» is on.';
+
+  @override
+  String get armedBusy =>
+      'Another recording is running. Stop it, then switch «Armed» on.';
+
+  @override
+  String get armedMicrophoneDenied =>
+      'Woodshed Player may not use the microphone, so «Armed» is off again. Grant access in System Settings › Privacy & Security › Microphone, then switch it on again.';
+
+  @override
+  String get armedFailed =>
+      '«Armed» could not start the microphone and is off again.';
+
+  @override
+  String get recordingLockedByArmed =>
+      '«Armed» is on: the microphone records by itself while you practise. Switch «Armed» off to record with this button.';
+
+  @override
+  String armedThresholdValue(int db) {
+    final intl.NumberFormat dbNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String dbString = dbNumberFormat.format(db);
+
+    return '$dbString dBFS';
+  }
+
+  @override
+  String armedSilenceValue(int seconds) {
+    final intl.NumberFormat secondsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String secondsString = secondsNumberFormat.format(seconds);
+
+    return '$secondsString s';
+  }
+
+  @override
+  String armedRecordingLabel(String duration) {
+    return 'Armed, recording $duration';
+  }
 }

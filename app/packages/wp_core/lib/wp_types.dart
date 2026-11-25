@@ -110,6 +110,11 @@ abstract final class WpRecArming {
   static const maxThresholdDb = 0.0;
   static const minSilenceSeconds = 0.1;
   static const maxSilenceSeconds = 60.0;
+
+  /// #147: kept after the last sound unless another tail is given (the command line).
+  static const defaultTailSeconds = 2.0;
+  static const minTailSeconds = 0.0;
+  static const maxTailSeconds = 10.0;
 }
 
 /// Source of a recording (#113), the values of `WP_REC_SOURCE_*` in wp_core.h.

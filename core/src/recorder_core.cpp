@@ -111,8 +111,15 @@ int Capture::open(const char *path, double sampleRate, FileFormat format, const 
 
 void Capture::close() {
   writerRun_.store(false);
-  if (writer_.joinable())
+  if (writer_.joinable()) {
     writer_.join();
+    // #147: stopped during a pause: the file ends where it was stopped. After the writer, before
+    // the file closes.
+    if (gated_) {
+      FileSink sink(*this);
+      gate_.finish(sink);
+    }
+  }
   wav_.close();
   flac_.close();
   ring_.uninit();

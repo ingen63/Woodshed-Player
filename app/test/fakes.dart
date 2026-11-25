@@ -476,6 +476,9 @@ class FakeRecorder implements Recorder {
 
   /// #140: settings of the last armed start, null after a start without arming.
   ({double thresholdDb, double silenceSeconds})? arming;
+
+  /// #147: tail of the last armed start; null: the core's default.
+  double? tailSeconds;
   @override
   double seconds = 0;
   @override
@@ -511,9 +514,11 @@ class FakeRecorder implements Recorder {
     WpRecSource source, {
     required double thresholdDb,
     required double silenceSeconds,
+    double? tailSeconds,
   }) {
     start(path, source);
     arming = (thresholdDb: thresholdDb, silenceSeconds: silenceSeconds);
+    this.tailSeconds = tailSeconds;
     gate = WpRecGate.armed;
   }
 

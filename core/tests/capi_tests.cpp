@@ -245,6 +245,16 @@ void recorderStartsIdle() {
   CHECK(wp_rec_start_armed("x.flac", WP_REC_SOURCE_MIC, -50.0, 0.0) == WP_REC_ERR_INVALID_ARGUMENT);
   CHECK(std::strcmp(wp_rec_error(), "Threshold or pause out of range") == 0);
   CHECK(wp_rec_start_armed("x.flac", 7, -50.0, 5.0) == WP_REC_ERR_UNSUPPORTED);
+  // #147: the tail of the practice recording is checked as well.
+  CHECK(wp_rec_start_armed_tail(nullptr, WP_REC_SOURCE_MIC, -30.0, 5.0, 1.0) ==
+        WP_REC_ERR_INVALID_PATH);
+  CHECK(wp_rec_start_armed_tail("x.flac", WP_REC_SOURCE_MIC, -30.0, 5.0, 10.5) ==
+        WP_REC_ERR_INVALID_ARGUMENT);
+  CHECK(wp_rec_start_armed_tail("x.flac", WP_REC_SOURCE_MIC, -30.0, 5.0, -1.0) ==
+        WP_REC_ERR_INVALID_ARGUMENT);
+  CHECK(wp_rec_start_armed_tail("x.flac", WP_REC_SOURCE_MIC, 3.0, 5.0, 1.0) ==
+        WP_REC_ERR_INVALID_ARGUMENT);
+  CHECK(wp_rec_start_armed_tail("x.flac", 7, -30.0, 5.0, 1.0) == WP_REC_ERR_UNSUPPORTED);
 #else
   CHECK(wp_rec_available() == 0);
   CHECK(wp_rec_start("x.wav") == WP_REC_ERR_UNSUPPORTED);

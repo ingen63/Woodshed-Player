@@ -2071,6 +2071,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'«{title}» could not be exported.'**
   String exportFailed(String title);
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Armed'**
+  String get armedSwitch;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Records the microphone by itself while you practise: each time you play, a recording starts, and it ends after a pause or with the space bar. The recordings go to the library into Recordings › date.'**
+  String get armedSwitchTooltip;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Armed, waiting for sound'**
+  String get armedWaiting;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Threshold and pause'**
+  String get armedSettings;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Starts above'**
+  String get armedThreshold;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Ends after a pause of'**
+  String get armedSilence;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone level'**
+  String get armedLevel;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'The level shows while «Armed» is on.'**
+  String get armedLevelOff;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Another recording is running. Stop it, then switch «Armed» on.'**
+  String get armedBusy;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Woodshed Player may not use the microphone, so «Armed» is off again. Grant access in System Settings › Privacy & Security › Microphone, then switch it on again.'**
+  String get armedMicrophoneDenied;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'«Armed» could not start the microphone and is off again.'**
+  String get armedFailed;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'«Armed» is on: the microphone records by itself while you practise. Switch «Armed» off to record with this button.'**
+  String get recordingLockedByArmed;
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'{db} dBFS'**
+  String armedThresholdValue(int db);
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s'**
+  String armedSilenceValue(int seconds);
+
+  /// #147
+  ///
+  /// In en, this message translates to:
+  /// **'Armed, recording {duration}'**
+  String armedRecordingLabel(String duration);
 }
 
 class _AppLocalizationsDelegate

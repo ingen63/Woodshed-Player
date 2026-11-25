@@ -469,11 +469,15 @@ class AppController extends ChangeNotifier {
   /// Adds a finished recording to the library and plays it (#4). [title] replaces the name taken from
   /// the file, e.g. the date and time in the user's locale; it stays editable like any title (#24).
   /// #140: [artist] is set if given. Returns the new track, null if the library did not take it.
+  /// #147: the track goes into the folder path [folders] (missing folders are created); with [select]
+  /// false it is neither loaded nor played.
   Future<Track?> addRecording(
     String path, {
     String? title,
     String? artist,
     int? year,
+    List<String> folders = const [],
+    bool select = true,
   }) async {
     final r = await library.importFiles([path]);
     if (r.imported.isEmpty) return null;
@@ -490,7 +494,11 @@ class AppController extends ChangeNotifier {
         )) {
       track = library.track(track.id) ?? track;
     }
-    if (await select(track)) session.playTitle();
+    if (folders.isNotEmpty) {
+      library.moveTracks({track.id}, library.folderPath(folders));
+      track = library.track(track.id) ?? track;
+    }
+    if (select && await this.select(track)) session.playTitle();
     return track;
   }
 

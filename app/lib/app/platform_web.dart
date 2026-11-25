@@ -24,6 +24,7 @@ import 'file_platform_web.dart';
 import 'file_store_web.dart';
 import 'install_hint.dart';
 import 'library_settings_store.dart';
+import 'practice_arming.dart';
 import 'media_session.dart';
 import 'media_session_web.dart';
 import 'wake_lock.dart';
@@ -91,6 +92,9 @@ Future<AppController> createAppController({
 
 /// #39/AK5: there is no recording in the browser, so never a recording button.
 Widget? recordingButtonFor(AppController controller) => null;
+
+/// #147: no armed practice recording in the browser.
+ArmedSwitchSlot? armedSwitchFor(AppController controller) => null;
 
 @JS('navigator.standalone')
 external bool? get _iosStandalone;

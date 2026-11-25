@@ -3,6 +3,8 @@
 // remembered on this device. Finished recordings go to the library (#17), titled with date and time in the user's locale.
 // #140: the command line arms a recording; the button shows «Armed» and cancels it when pressed.
 // The state lives in a RecordingController, shared with the command line.
+// #147/AK11: while «Armed» (practice recording) holds the recording, the button stays idle and a click
+// only explains why.
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
@@ -60,6 +62,10 @@ class _RecordingButtonState extends State<RecordingButton> {
   }
 
   Future<void> _toggle() async {
+    if (_rec.reserved) {
+      _explain(context.l10n.recordingLockedByArmed);
+      return;
+    }
     if (_rec.busy) {
       await _rec.stop();
     } else {
@@ -92,7 +98,9 @@ class _RecordingButtonState extends State<RecordingButton> {
     final m = WsLayout.of(context);
     final l = context.l10n;
     final error = rec.error;
-    final running = rec.phase != RecordingPhase.idle;
+    // #147/AK11: the takes of «Armed» show at the switch, not here.
+    final locked = rec.reserved;
+    final running = !locked && rec.phase != RecordingPhase.idle;
     final armed = rec.phase == RecordingPhase.armed;
     final source = running ? (rec.recordingSource ?? rec.source) : rec.source;
     final mic = source == WpRecSource.microphone;
@@ -110,7 +118,7 @@ class _RecordingButtonState extends State<RecordingButton> {
         mainAxisSize: MainAxisSize.min,
         spacing: WsSpace.s,
         children: [
-          if (problem != null)
+          if (problem != null && !locked)
             IconButton(
               key: const Key('recordingProblem'),
               tooltip: problem,
@@ -146,7 +154,9 @@ class _RecordingButtonState extends State<RecordingButton> {
               ],
             ),
           Tooltip(
-            message: armed
+            message: locked
+                ? l.recordingLockedByArmed
+                : armed
                 ? l.recordingArmedTooltip
                 : mic
                 ? l.recordingTooltipMicrophone

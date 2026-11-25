@@ -4,6 +4,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'app/app_controller.dart';
+import 'app/practice_arming.dart';
 import 'l10n/app_localizations.dart';
 import 'library/library.dart';
 import 'app/platform_native.dart'
@@ -32,6 +33,7 @@ Future<void> main() async {
     WoodshedApp(
       controller: controller,
       recordingButton: recordingButtonFor,
+      practiceRecording: armedSwitchFor,
       installHint: installHintWanted,
     ),
   );
@@ -42,6 +44,7 @@ class WoodshedApp extends StatelessWidget {
     super.key,
     required this.controller,
     this.recordingButton,
+    this.practiceRecording,
     this.installHint = false,
     this.locale,
     this.localizationsDelegate = AppLocalizations.delegate,
@@ -56,6 +59,9 @@ class WoodshedApp extends StatelessWidget {
 
   /// Aufnahme-Knopf, wo es Aufnahme gibt (nur macOS); null sonst.
   final Widget? Function(AppController controller)? recordingButton;
+
+  /// #147: the switch «Armed» where the microphone records (only macOS); null elsewhere.
+  final ArmedSwitchSlot? Function(AppController controller)? practiceRecording;
 
   /// Shows the hint «Add to Home Screen» (iPhone/iPad in the browser, #39/AK6).
   final bool installHint;
@@ -87,6 +93,7 @@ class WoodshedApp extends StatelessWidget {
       home: HomePage(
         controller: controller,
         recordingButton: recordingButton?.call(controller),
+        practiceRecording: practiceRecording?.call(controller),
         installHint: installHint,
       ),
     );

@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app/app_controller.dart';
+import '../app/practice_arming.dart';
 import '../app/sidebar_width.dart';
 import '../metronome/practice_shortcuts.dart';
 import 'about_dialog.dart';
@@ -29,9 +30,13 @@ class HomePage extends StatefulWidget {
     super.key,
     required this.controller,
     this.recordingButton,
+    this.practiceRecording,
     this.installHint = false,
   });
   final AppController controller;
+
+  /// #147: the switch «Armed» of the armed practice recording; only on the Mac, null elsewhere.
+  final ArmedSwitchSlot? practiceRecording;
 
   /// #39/AK6: hint «Add to Home Screen» on top until it is closed (iPhone/iPad in the browser); once
   /// closed it stays away on this device (#110).
@@ -273,20 +278,49 @@ class _HomePageState extends State<HomePage> {
       onDelete: _deleteCurrent,
       child: const SizedBox(),
     );
+    final onKey = area == AppArea.player ? player.onKey : practice.onKey;
     return Focus(
       key: const Key('shortcuts'),
       autofocus: true,
-      onKeyEvent: area == AppArea.player ? player.onKey : practice.onKey,
+      onKeyEvent: (node, event) {
+        final result = onKey(node, event);
+        // #147/AK4: Space plays or pauses as before and ends a running take of «Armed».
+        if (result == KeyEventResult.handled &&
+            event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.space) {
+          widget.practiceRecording?.arming.endTake();
+        }
+        return result;
+      },
       child: child,
     );
   }
 
+  /// #147: keeps the switch «Armed» across layout changes.
+  final _armedKey = GlobalKey();
+
   Widget? _recording() {
     final button = widget.recordingButton;
-    if (button == null || !isDesktopPlatform(Theme.of(context).platform)) {
+    final armed = widget.practiceRecording;
+    if ((button == null && armed == null) ||
+        !isDesktopPlatform(Theme.of(context).platform)) {
       return null;
     }
-    return KeyedSubtree(key: _recordingKey, child: button);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: WsSpace.m,
+      children: [
+        // #147/AK1, AK6: in Practice and Metronome; in Player only while it is on.
+        if (armed != null)
+          ListenableBuilder(
+            listenable: armed.arming,
+            builder: (context, _) => c.area != AppArea.player || armed.arming.on
+                ? KeyedSubtree(key: _armedKey, child: armed.widget)
+                : const SizedBox.shrink(),
+          ),
+        if (button != null) KeyedSubtree(key: _recordingKey, child: button),
+      ],
+    );
   }
 
   Set<AppArea> get _running => runningAreas(c);

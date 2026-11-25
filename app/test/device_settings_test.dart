@@ -1,5 +1,5 @@
 // #54/AK7: the storage chosen for the sync is kept per device in device.json, never in the shared state.
-// #129/AK3: the width of the library sidebar, too.
+// #129/AK3: the width of the library sidebar, too. #147/AK9: threshold and pause of «Armed».
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -78,4 +78,40 @@ void main() {
       expect((await DeviceSettings.load(store)).sidebarWidth, 300);
     },
   );
+
+  test('#147/AK9 device.json: threshold and pause of «Armed» are kept, odd values ignored', () async {
+    final store = MemoryFileStore();
+    const d = DeviceSettings(
+      deviceId: '0123456789abcdef',
+      synced: true,
+      armThresholdDb: -42,
+      armSilenceSeconds: 7.5,
+    );
+    await d.save(store);
+    final j =
+        jsonDecode(utf8.decode(store.files[DeviceSettings.fileName]!)) as Map;
+    expect(j['synced'], isTrue);
+    final back = await DeviceSettings.load(store, random: Random(1));
+    expect(back.synced, isTrue);
+    expect(back.armThresholdDb, -42);
+    expect(back.armSilenceSeconds, 7.5);
+    expect(back.libraryOpen, isFalse);
+    expect(back.copyWith(area: 'player').armThresholdDb, -42);
+    final none = const DeviceSettings(deviceId: '0123456789abcdef');
+    expect(none.libraryOpen, isFalse);
+    expect(none.synced, isFalse);
+    expect(none.toJson(), isNot(contains('armThresholdDb')));
+    expect(none.toJson(), isNot(contains('armSilenceSeconds')));
+    expect(none.toJson(), isNot(contains('synced')));
+    for (final odd in ['"loud"', 'null', '[]']) {
+      store.files[DeviceSettings.fileName] = Uint8List.fromList(
+        utf8.encode(
+          '{"deviceId":"0123456789abcdef","armThresholdDb":$odd,"armSilenceSeconds":$odd}',
+        ),
+      );
+      final o = await DeviceSettings.load(store);
+      expect(o.armThresholdDb, isNull, reason: odd);
+      expect(o.armSilenceSeconds, isNull, reason: odd);
+    }
+  });
 }

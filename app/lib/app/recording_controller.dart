@@ -3,6 +3,10 @@
 // An armed recording (#140) records the source all the time but keeps only 1 s before the first
 // sound up to 2 s after the last; the core detects sound and silence (sound_gate.cpp), this class
 // stops the recording once the core reports the end and adds it to the library.
+// #147: the armed practice recording (practice_recording.dart) reserves the recording while it is on;
+// then the record button and the command line are refused. Its takes are named and placed when the
+// sound comes ([RecordingNaming]), and the next take can be armed while the last one is still being
+// added to the library.
 import 'dart:async';
 import 'dart:io';
 
@@ -29,6 +33,7 @@ abstract class Recorder {
     WpRecSource source, {
     required double thresholdDb,
     required double silenceSeconds,
+    double? tailSeconds,
   });
   void stop();
   bool get isRecording;
@@ -62,11 +67,13 @@ class CoreRecorder implements Recorder {
     WpRecSource source, {
     required double thresholdDb,
     required double silenceSeconds,
+    double? tailSeconds,
   }) => WpRecorder.startArmed(
     path,
     source,
     thresholdDb: thresholdDb,
     silenceSeconds: silenceSeconds,
+    tailSeconds: tailSeconds,
   );
   @override
   void stop() => WpRecorder.stop();
@@ -98,6 +105,7 @@ class Arming {
   const Arming({
     this.thresholdDb = WpRecArming.defaultThresholdDb,
     this.silenceSeconds = WpRecArming.defaultSilenceSeconds,
+    this.tailSeconds,
   });
 
   /// A sample louder than this (dBFS) is sound.
@@ -105,7 +113,16 @@ class Arming {
 
   /// This much silence ends the recording.
   final double silenceSeconds;
+
+  /// #147: kept after the last sound; null: the core's default (2 s, the command line).
+  final double? tailSeconds;
 }
+
+/// #147: title and folder path (from the top level) of a recording that started at [started] (the
+/// first frame of the file).
+typedef RecordingNaming = ({String title, List<String> folders}) Function(
+  DateTime started,
+);
 
 /// How a recording ended, or why it did not start.
 sealed class RecordingOutcome {
@@ -177,10 +194,16 @@ class RecordingController extends ChangeNotifier {
   String? _artist;
   int? _year;
   WpRecSource? _recordingSource;
+  RecordingNaming? _naming;
+  List<String> _folders = const [];
+  bool _select = true;
+  DateTime? _startedAt;
+  Object? _owner;
+  Object? _reservedBy;
+  Future<void>? _saving;
   WpRecordingException? _error;
   bool _micDenied = false;
   Completer<RecordingOutcome>? _done;
-  Future<void>? _stopping;
 
   RecordingPhase get phase => _phase;
 
@@ -204,6 +227,33 @@ class RecordingController extends ChangeNotifier {
 
   /// Source of the running recording.
   WpRecSource? get recordingSource => _recordingSource;
+
+  /// #147: the owner given to [start] for the current recording (null: the record button or the
+  /// command line).
+  Object? get owner => _owner;
+
+  /// #147/AK11: the recording is reserved (by the armed practice recording); others are refused.
+  bool get reserved => _reservedBy != null;
+
+  /// #147/AK11: reserves the recording for [owner]; starts of others return [RecordingBusy]. False if
+  /// another recording runs or another owner holds it.
+  bool reserve(Object owner) {
+    if (identical(_reservedBy, owner)) return true;
+    if (_reservedBy != null || busy) return false;
+    _reservedBy = owner;
+    notifyListeners();
+    return true;
+  }
+
+  /// #147: gives the recording free again.
+  void release(Object owner) {
+    if (!identical(_reservedBy, owner)) return;
+    _reservedBy = null;
+    notifyListeners();
+  }
+
+  /// #147: when the current recording began (its first frame); null before the sound came.
+  DateTime? get startedAt => _startedAt;
 
   /// What became of the current recording; completes once it is stopped. Null before the first.
   Future<RecordingOutcome>? get done => _done?.future;
@@ -235,6 +285,8 @@ class RecordingController extends ChangeNotifier {
   /// Starts recording [source] (default: [source]); with [arming] armed (#140). The title is [title]
   /// or the date and time in the language of [l]; [artist] and [year] (#140) are set if given. Returns null once it
   /// runs ([done] then tells how it ended), otherwise why it did not start.
+  /// #147: [owner] must hold the reservation if there is one; [naming] gives title and folders once the
+  /// recording begins; with [select] false the new title is neither loaded nor played.
   Future<RecordingOutcome?> start(
     AppLocalizations l, {
     WpRecSource? source,
@@ -242,8 +294,11 @@ class RecordingController extends ChangeNotifier {
     String? artist,
     int? year,
     Arming? arming,
+    Object? owner,
+    RecordingNaming? naming,
+    bool select = true,
   }) async {
-    if (busy) return const RecordingBusy();
+    if (busy || !identical(_reservedBy, owner)) return const RecordingBusy();
     _starting = true;
     try {
       final from = source ?? this.source;
@@ -251,14 +306,17 @@ class RecordingController extends ChangeNotifier {
       final files = app.files;
       // #113/AK4: macOS asks the first time; refused, there is a hint and no file, so no empty title.
       if (from == WpRecSource.microphone && !await files.microphoneAccess()) {
-        _micDenied = true;
+        // #147/AK12: «Armed» gives its own hint; the record button stays without one.
+        _micDenied = owner == null;
         notifyListeners();
         return const RecordingMicrophoneDenied();
       }
       final dir = await files.recordingsDir();
       if (dir == null) return const RecordingNoFolder();
-      final path =
-          '$dir/${l.recordingFileName(fileStamp(at))}.${from.extension}';
+      final path = freePath(
+        '$dir/${l.recordingFileName(fileStamp(at))}',
+        from.extension,
+      );
       try {
         if (arming == null) {
           recorder.start(path, from);
@@ -268,6 +326,7 @@ class RecordingController extends ChangeNotifier {
             from,
             thresholdDb: arming.thresholdDb,
             silenceSeconds: arming.silenceSeconds,
+            tailSeconds: arming.tailSeconds,
           );
         }
       } on WpRecordingException catch (e) {
@@ -283,6 +342,12 @@ class RecordingController extends ChangeNotifier {
       _title = title ?? recordingTitle(l, at);
       _artist = artist;
       _year = year;
+      _owner = owner;
+      _naming = naming;
+      _folders = const [];
+      _select = select;
+      _startedAt = null;
+      if (!_armed) _began(at, 0);
       _seconds = 0;
       _level = 0;
       _silent = false;
@@ -309,6 +374,7 @@ class RecordingController extends ChangeNotifier {
           _phase = RecordingPhase.armed;
         case WpRecGate.recording:
           _phase = RecordingPhase.recording;
+          if (_startedAt == null) _began(now(), _seconds);
         case WpRecGate.done:
           // #140/AK9: silence long enough, the core has written the end of the file.
           unawaited(stop());
@@ -321,26 +387,47 @@ class RecordingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// #147: the recording began at [at] minus [kept] seconds (the first frame of the file); [naming]
+  /// now gives its title and folders.
+  void _began(DateTime at, double kept) {
+    final started = at.subtract(
+      Duration(microseconds: (kept * Duration.microsecondsPerSecond).round()),
+    );
+    _startedAt = started;
+    final naming = _naming;
+    if (naming == null) return;
+    final n = naming(started);
+    _title = n.title;
+    _folders = n.folders;
+  }
+
   /// Stops the recording. Still armed (#140/AK14): nothing is kept, the empty file is removed and no
-  /// title appears. Otherwise the file becomes a new title of the library and plays (#4).
-  Future<void> stop() => _stopping ??= _stop().whenComplete(() {
-    _stopping = null;
-  });
+  /// title appears. Otherwise the file becomes a new title of the library and plays (#4). #147: the
+  /// recording is idle at once, so the next one can start while this one is added to the library;
+  /// the future completes once it is added.
+  Future<void> stop() {
+    if (_phase == RecordingPhase.idle) return _saving ?? Future.value();
+    return _saving = _stop();
+  }
 
   Future<void> _stop() async {
-    if (_phase == RecordingPhase.idle) return;
     // Armed and nothing kept yet: cancelled. Read before stopping, the core resets on the next start.
     final cancelled = _armed && recorder.gate == WpRecGate.armed;
     final seconds = _armed ? recorder.keptSeconds : recorder.seconds;
     recorder.stop();
+    if (!cancelled && _startedAt == null) _began(now(), seconds);
     _ticker?.cancel();
     _ticker = null;
+    // Everything of this recording is read before the listeners hear of the end: one of them may
+    // start the next recording (#147).
+    final done = _done!;
+    final path = _path;
+    final title = _title, artist = _artist, year = _year;
+    final folders = _folders, select = _select;
     _phase = RecordingPhase.idle;
     _seconds = seconds;
     _silent = false;
     notifyListeners();
-    final done = _done!;
-    final path = _path;
     if (cancelled) {
       if (path != null) _delete(path);
       done.complete(const RecordingCancelled());
@@ -350,12 +437,24 @@ class RecordingController extends ChangeNotifier {
     if (path != null && File(path).existsSync()) {
       track = await app.addRecording(
         path,
-        title: _title,
-        artist: _artist,
-        year: _year,
+        title: title,
+        artist: artist,
+        year: year,
+        folders: folders,
+        select: select,
       );
     }
     done.complete(RecordingSaved(track, track?.duration ?? seconds));
+  }
+
+  /// #147: `[base].[extension]`, or with « 2», « 3» … if that file exists already (two takes in the
+  /// same second).
+  static String freePath(String base, String extension) {
+    var path = '$base.$extension';
+    for (var n = 2; File(path).existsSync(); n++) {
+      path = '$base $n.$extension';
+    }
+    return path;
   }
 
   static void _delete(String path) {

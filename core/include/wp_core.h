@@ -188,7 +188,7 @@ WP_API int wp_rec_start(const char *path);
 #define WP_REC_GATE_OFF 0       /* no recording, or one started without arming */
 #define WP_REC_GATE_ARMED 1     /* recording the source, nothing written until the first sound */
 #define WP_REC_GATE_RECORDING 2 /* sound came: written from 1 s before the first sound */
-#define WP_REC_GATE_DONE 3      /* long enough silence: the file ends 2 s after the last sound */
+#define WP_REC_GATE_DONE 3 /* long enough silence: the file ends the tail after the last sound */
 /* #140: like wp_rec_start_source, but armed: the file holds only 1 s before the first sample above
  * threshold_db (dBFS, -120 to 0) up to 2 s after the last one; silence_seconds (0.1 to 60) of
  * uninterrupted silence ends it (WP_REC_GATE_DONE, the caller then calls wp_rec_stop). Shorter
@@ -196,6 +196,11 @@ WP_API int wp_rec_start(const char *path);
  * WP_REC_ERR_INVALID_ARGUMENT). */
 WP_API int wp_rec_start_armed(const char *path, int source, double threshold_db,
                               double silence_seconds);
+/* #147: like wp_rec_start_armed, but the file ends tail_seconds (0 to 10) after the last sample
+ * above the threshold instead of 2 s (WP_REC_ERR_INVALID_ARGUMENT outside). Stopped during a pause
+ * (wp_rec_stop), every armed recording keeps that pause: the file ends where it was stopped. */
+WP_API int wp_rec_start_armed_tail(const char *path, int source, double threshold_db,
+                                   double silence_seconds, double tail_seconds);
 /* #140: WP_REC_GATE_* of the current or last recording. */
 WP_API int wp_rec_gate_state(void);
 /* #140: seconds written to the file so far (armed: from 1 s before the first sound; otherwise the

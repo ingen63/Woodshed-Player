@@ -286,6 +286,12 @@ int wp_rec_start_armed(const char *path, int source, double threshold_db, double
   return start(path, source, &gate);
 }
 
+int wp_rec_start_armed_tail(const char *path, int source, double threshold_db,
+                            double silence_seconds, double tail_seconds) {
+  const wp::rec::GateConfig gate{threshold_db, silence_seconds, tail_seconds};
+  return start(path, source, &gate);
+}
+
 int wp_rec_gate_state(void) {
   const auto &capture = rec().capture;
   return capture.gated() ? static_cast<int>(capture.gate().state()) : WP_REC_GATE_OFF;

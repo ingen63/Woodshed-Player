@@ -7,6 +7,9 @@ int wp_rec_source_available(int) { return 0; }
 int wp_rec_start(const char *) { return WP_REC_ERR_UNSUPPORTED; }
 int wp_rec_start_source(const char *, int) { return WP_REC_ERR_UNSUPPORTED; }
 int wp_rec_start_armed(const char *, int, double, double) { return WP_REC_ERR_UNSUPPORTED; }
+int wp_rec_start_armed_tail(const char *, int, double, double, double) {
+  return WP_REC_ERR_UNSUPPORTED;
+}
 int wp_rec_gate_state(void) { return WP_REC_GATE_OFF; }
 double wp_rec_kept_seconds(void) { return 0.0; }
 void wp_rec_stop(void) {}

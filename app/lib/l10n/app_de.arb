@@ -328,5 +328,20 @@
   "exportFailedFormat": "«{title}»: Diese Datei lässt sich nicht lesen.",
   "exportFailedEncoder": "«{title}»: MP3 ist nicht verfügbar, der Encoder fehlt.",
   "exportFailedWrite": "«{title}»: Die Datei liess sich nicht schreiben.",
-  "exportFailed": "«{title}» liess sich nicht exportieren."
+  "exportFailed": "«{title}» liess sich nicht exportieren.",
+  "armedSwitch": "Scharf",
+  "armedSwitchTooltip": "Nimmt beim Üben von selbst über das Mikrofon auf: Jedes Mal, wenn Du spielst, beginnt eine Aufnahme; sie endet nach einer Pause oder mit der Leertaste. Die Aufnahmen kommen in die Bibliothek nach Recordings › Datum.",
+  "armedWaiting": "Scharf, wartet auf einen Ton",
+  "armedSettings": "Schwelle und Pause",
+  "armedThreshold": "Beginnt über",
+  "armedSilence": "Endet nach einer Pause von",
+  "armedLevel": "Pegel des Mikrofons",
+  "armedLevelOff": "Der Pegel erscheint, solange «Scharf» an ist.",
+  "armedBusy": "Es läuft schon eine Aufnahme. Beende sie und schalte «Scharf» dann ein.",
+  "armedMicrophoneDenied": "Woodshed Player darf das Mikrofon nicht verwenden, darum ist «Scharf» wieder aus. Erteile den Zugriff unter Systemeinstellungen › Datenschutz & Sicherheit › Mikrofon und schalte es dann wieder ein.",
+  "armedFailed": "«Scharf» konnte das Mikrofon nicht starten und ist wieder aus.",
+  "recordingLockedByArmed": "«Scharf» ist an: Das Mikrofon nimmt beim Üben von selbst auf. Schalte «Scharf» aus, um mit diesem Knopf aufzunehmen.",
+  "armedThresholdValue": "{db} dBFS",
+  "armedSilenceValue": "{seconds} s",
+  "armedRecordingLabel": "Scharf, nimmt auf {duration}"
 }

@@ -405,6 +405,85 @@ void thresholdIsLinear() { // #140/AK7: -50 dBFS
   CHECK(std::fabs(SoundGate::linear(-20.0) - 0.1f) < 1e-6f);
 }
 
+void tailOfOneSecond() { // #147/AK3: the practice recording ends 1 s after the last sound
+  Signal s;
+  s.silence(1.0).tone(2.0).silence(3.0).tone(1.0).silence(8.0);
+  SoundGate gate;
+  const Collect c = run(gate, s, 4096, {-50.0, 5.0, 1.0});
+  CHECK(gate.state() == GateState::Done);
+  const long long last = lastAbove(c, kThreshold);
+  CHECK(c.frames() - 1 - last == Signal::frames(1.0));
+  // Shorter pauses stay in: 1 s lead-in + 2 + 3 + 1 s tone + 1 s tail.
+  CHECK(c.frames() == Signal::frames(1.0 + 2.0 + 3.0 + 1.0 + 1.0));
+}
+
+void tailEndsAfterTheSilenceNotBefore() { // #147/AK3: done after the whole silence, not the tail
+  Signal s;
+  s.tone(1.0).silence(5.0);
+  SoundGate gate;
+  Collect sink;
+  CHECK(gate.init(kRate, 2, {-50.0, 5.0, 1.0}));
+  const auto total = s.frameCount();
+  gate.feed(s.samples().data(), total - 1, sink);
+  CHECK(gate.state() == GateState::Recording);
+  // The silence after the tail is held, not yet written.
+  CHECK(sink.frames() == Signal::frames(2.0));
+  gate.feed(s.samples().data() + static_cast<size_t>(total - 1) * 2, 1, sink);
+  CHECK(gate.state() == GateState::Done);
+  CHECK(sink.frames() == Signal::frames(2.0));
+}
+
+void finishKeepsThePause() { // #147/AK4: stopped in a pause, the file ends at the stop
+  Signal s;
+  s.tone(1.0).silence(3.0);
+  SoundGate gate;
+  Collect c = run(gate, s, 4096, {-50.0, 5.0, 1.0});
+  CHECK(gate.state() == GateState::Recording);
+  CHECK(c.frames() == Signal::frames(2.0));
+  gate.finish(c);
+  CHECK(c.frames() == Signal::frames(4.0));
+  CHECK(gate.keptFrames() == Signal::frames(4.0));
+  gate.finish(c); // nothing held any more
+  CHECK(c.frames() == Signal::frames(4.0));
+}
+
+void finishWithinTheTailAddsNothing() { // #147/AK4: within the tail everything is written already
+  Signal s;
+  s.tone(1.0).silence(0.5);
+  SoundGate gate;
+  Collect c = run(gate, s, 4096, {-50.0, 5.0, 1.0});
+  CHECK(c.frames() == Signal::frames(1.5));
+  const int writes = c.writes;
+  gate.finish(c);
+  CHECK(c.frames() == Signal::frames(1.5));
+  CHECK(c.writes == writes);
+}
+
+void finishWhileArmedOrDoneKeepsNothing() { // #147/AK6: nothing without a running recording
+  Signal quiet;
+  quiet.silence(2.0);
+  SoundGate gate;
+  Collect armed = run(gate, quiet);
+  gate.finish(armed);
+  CHECK(armed.frames() == 0);
+  CHECK(gate.state() == GateState::Armed);
+  Signal s;
+  s.tone(1.0).silence(6.0).silence(1.0);
+  Collect done = run(gate, s);
+  const long long frames = done.frames();
+  gate.finish(done);
+  CHECK(done.frames() == frames);
+}
+
+void initRejectsTailOutOfRange() { // #147: the tail lies within 0 to 10 s
+  SoundGate gate;
+  CHECK(gate.init(kRate, 2, {-50.0, 5.0, 0.0}));
+  CHECK(gate.init(kRate, 2, {-50.0, 5.0, 10.0}));
+  CHECK(!gate.init(kRate, 2, {-50.0, 5.0, -0.01}));
+  CHECK(!gate.init(kRate, 2, {-50.0, 5.0, 10.01}));
+  CHECK(!gate.init(kRate, 2, {-50.0, 5.0, std::nan("")}));
+}
+
 // ---- Inside a Capture (writer thread, FLAC file) ----
 
 struct TempFile {
@@ -486,6 +565,20 @@ void captureRejectsGateOutOfRange() { // #140/AK11
   CHECK(!fs::exists(f.path));
 }
 
+void captureStoppedInAPauseEndsThere() { // #147/AK4: the FLAC file ends where it was stopped
+  Signal s;
+  s.silence(1.0).tone(1.0).silence(3.0);
+  TempFile f;
+  Capture c;
+  const GateConfig gate{-50.0, 5.0, 1.0};
+  CHECK(c.open(f.path.string().c_str(), kRate, FileFormat::Flac, &gate) == 0);
+  push(c, s);
+  c.close();
+  CHECK(c.gate().state() == GateState::Recording);
+  CHECK(c.gate().keptFrames() == Signal::frames(5.0));
+  CHECK(std::fabs(wp::fileDuration(f.path.string()) - 5.0) <= 0.01);
+}
+
 } // namespace
 
 int main() {
@@ -512,6 +605,13 @@ int main() {
       {"armedCaptureWithoutSoundStaysEmpty", armedCaptureWithoutSoundStaysEmpty},
       {"captureWithoutGateIsNotArmed", captureWithoutGateIsNotArmed},
       {"captureRejectsGateOutOfRange", captureRejectsGateOutOfRange},
+      {"#147/AK3 tailOfOneSecond", tailOfOneSecond},
+      {"#147/AK3 tailEndsAfterTheSilenceNotBefore", tailEndsAfterTheSilenceNotBefore},
+      {"#147/AK4 finishKeepsThePause", finishKeepsThePause},
+      {"#147/AK4 finishWithinTheTailAddsNothing", finishWithinTheTailAddsNothing},
+      {"#147/AK6 finishWhileArmedOrDoneKeepsNothing", finishWhileArmedOrDoneKeepsNothing},
+      {"#147 initRejectsTailOutOfRange", initRejectsTailOutOfRange},
+      {"#147/AK4 captureStoppedInAPauseEndsThere", captureStoppedInAPauseEndsThere},
   };
   for (const auto &[name, fn] : tests) {
     const int before = failures;

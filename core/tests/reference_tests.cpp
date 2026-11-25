@@ -850,6 +850,8 @@ void recordingUnavailableOffline() {
   CHECK(wp_rec_start_source("unused.wav", WP_REC_SOURCE_SYSTEM) == WP_REC_ERR_UNSUPPORTED);
   // #140: no armed recording either.
   CHECK(wp_rec_start_armed("unused.flac", WP_REC_SOURCE_MIC, -50.0, 5.0) == WP_REC_ERR_UNSUPPORTED);
+  CHECK(wp_rec_start_armed_tail("unused.flac", WP_REC_SOURCE_MIC, -30.0, 5.0, 1.0) ==
+        WP_REC_ERR_UNSUPPORTED); // #147
   CHECK(wp_rec_gate_state() == WP_REC_GATE_OFF);
   CHECK(wp_rec_kept_seconds() == 0.0);
   wp_rec_stop();

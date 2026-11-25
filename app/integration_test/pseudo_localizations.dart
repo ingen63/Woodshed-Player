@@ -705,6 +705,38 @@ class PseudoLocalizations extends AppLocalizationsEn {
       pseudo(super.exportFailedWrite(title));
   @override
   String exportFailed(String title) => pseudo(super.exportFailed(title));
+  @override
+  String get armedSwitch => pseudo(super.armedSwitch);
+  @override
+  String get armedSwitchTooltip => pseudo(super.armedSwitchTooltip);
+  @override
+  String get armedWaiting => pseudo(super.armedWaiting);
+  @override
+  String get armedSettings => pseudo(super.armedSettings);
+  @override
+  String get armedThreshold => pseudo(super.armedThreshold);
+  @override
+  String get armedSilence => pseudo(super.armedSilence);
+  @override
+  String get armedLevel => pseudo(super.armedLevel);
+  @override
+  String get armedLevelOff => pseudo(super.armedLevelOff);
+  @override
+  String get armedBusy => pseudo(super.armedBusy);
+  @override
+  String get armedMicrophoneDenied => pseudo(super.armedMicrophoneDenied);
+  @override
+  String get armedFailed => pseudo(super.armedFailed);
+  @override
+  String get recordingLockedByArmed => pseudo(super.recordingLockedByArmed);
+  @override
+  String armedThresholdValue(int db) => pseudo(super.armedThresholdValue(db));
+  @override
+  String armedSilenceValue(int seconds) =>
+      pseudo(super.armedSilenceValue(seconds));
+  @override
+  String armedRecordingLabel(String duration) =>
+      pseudo(super.armedRecordingLabel(duration));
 }
 
 /// Loads [PseudoLocalizations] for any locale.

@@ -17,6 +17,7 @@ import '../player/player_service.dart';
 import '../sync/cloud_account.dart';
 // #54/AK6: the provider module is loaded only once Google Drive is chosen
 import '../sync/providers/google_platform_io.dart' deferred as google;
+import '../ui/armed_switch.dart';
 import '../ui/recording_button.dart';
 import 'app_controller.dart';
 import 'app_start.dart';
@@ -26,6 +27,8 @@ import 'file_platform.dart';
 import 'file_store_io.dart';
 import 'keychain_store.dart';
 import 'library_settings_store.dart';
+import 'practice_arming.dart';
+import 'practice_recording.dart';
 import 'recording_controller.dart';
 import 'smoke.dart';
 import 'web_auth_channel.dart';
@@ -115,6 +118,28 @@ RecordingController? recordingFor(AppController controller) =>
     WpRecorder.available
     ? _recordings[controller] ??= RecordingController(app: controller)
     : null;
+
+/// #147: the armed practice recording of [controller], where the microphone records (macOS).
+final _practice = Expando<PracticeRecording>();
+PracticeRecording? practiceRecordingFor(AppController controller) {
+  final recording = recordingFor(controller);
+  if (recording == null ||
+      !WpRecorder.sourceAvailable(WpRecSource.microphone)) {
+    return null;
+  }
+  return _practice[controller] ??= PracticeRecording(
+    app: controller,
+    recording: recording,
+  );
+}
+
+/// #147: the switch «Armed» for the main window, where the microphone records.
+ArmedSwitchSlot? armedSwitchFor(AppController controller) {
+  final practice = practiceRecordingFor(controller);
+  return practice == null
+      ? null
+      : (arming: practice, widget: ArmedSwitch(practice: practice));
+}
 
 /// Aufnahme-Knopf, wenn der Kern Aufnahme kann (macOS 14.2+).
 Widget? recordingButtonFor(AppController controller) => WpRecorder.available

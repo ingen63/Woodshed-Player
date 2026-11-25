@@ -710,6 +710,14 @@ app/lib/app/command_server.dart | dart_remove_void_call | File(path).deleteSync(
 # nichts (phase idle).
 app/lib/app/recording_controller.dart | dart_false_to_true | bool _armed = false;
 
+# ---- core/src/recorder_core.cpp, app/lib/app/recording_controller.dart (#147) ----
+# Mull-Grenze: Von Hand gemessen (Aufruf im Quelltext abgeschaltet, nativ und mit ASan gebaut):
+# captureStoppedInAPauseEndsThere in sound_gate_tests scheitert (3 statt 5 s in der Datei). Mit
+# gesetzter Mutanten-Variable läuft der Mutationsbau unverändert durch (docs/TESTS.md).
+core/src/recorder_core.cpp | cxx_remove_void_call | gate_.finish(sink);
+# gleichwertig: start() setzt _select vor jeder Aufnahme; _stop() liest es nur nach einem start().
+app/lib/app/recording_controller.dart | dart_true_to_false | bool _select = true;
+
 # ---- core/src/cli.cpp, core/src/cli_posix.cpp (#140) ----
 # gleichwertig: Gemessen, Mull schaltet diese Mutanten nicht wirksam (Grenze des Werkzeugs, siehe
 # oben): ohne push_back von Hand scheitern recordRequest und recordUsageErrors (Exit-Code 1).

@@ -222,6 +222,11 @@ final _recStartArmed = _lib
       Int32 Function(Pointer<Utf8>, Int32, Double, Double),
       int Function(Pointer<Utf8>, int, double, double)
     >('wp_rec_start_armed');
+final _recStartArmedTail = _lib
+    .lookupFunction<
+      Int32 Function(Pointer<Utf8>, Int32, Double, Double, Double),
+      int Function(Pointer<Utf8>, int, double, double, double)
+    >('wp_rec_start_armed_tail');
 final _recGateState = _lib.lookupFunction<Int32 Function(), int Function()>(
   'wp_rec_gate_state',
 );
@@ -469,16 +474,26 @@ abstract final class WpRecorder {
       _check(path, (c) => _recStartSource(c, source.code));
 
   /// #140: starts an armed recording of [source] into [path]: only from 1 s before the first
-  /// sample above [thresholdDb] up to 2 s after the last; [silenceSeconds] of silence end it
-  /// ([gate] becomes [WpRecGate.done]). Throws [WpRecordingException] if it fails.
+  /// sample above [thresholdDb] up to 2 s (#147: [tailSeconds]) after the last; [silenceSeconds]
+  /// of silence end it ([gate] becomes [WpRecGate.done]). Throws [WpRecordingException] if it
+  /// fails.
   static void startArmed(
     String path,
     WpRecSource source, {
     double thresholdDb = WpRecArming.defaultThresholdDb,
     double silenceSeconds = WpRecArming.defaultSilenceSeconds,
+    double? tailSeconds,
   }) => _check(
     path,
-    (c) => _recStartArmed(c, source.code, thresholdDb, silenceSeconds),
+    (c) => tailSeconds == null
+        ? _recStartArmed(c, source.code, thresholdDb, silenceSeconds)
+        : _recStartArmedTail(
+            c,
+            source.code,
+            thresholdDb,
+            silenceSeconds,
+            tailSeconds,
+          ),
   );
 
   /// #140: state of the current or last armed recording.

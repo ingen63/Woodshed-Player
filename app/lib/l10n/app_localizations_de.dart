@@ -1308,4 +1308,69 @@ class AppLocalizationsDe extends AppLocalizations {
   String exportFailed(String title) {
     return '«$title» liess sich nicht exportieren.';
   }
+
+  @override
+  String get armedSwitch => 'Scharf';
+
+  @override
+  String get armedSwitchTooltip =>
+      'Nimmt beim Üben von selbst über das Mikrofon auf: Jedes Mal, wenn Du spielst, beginnt eine Aufnahme; sie endet nach einer Pause oder mit der Leertaste. Die Aufnahmen kommen in die Bibliothek nach Recordings › Datum.';
+
+  @override
+  String get armedWaiting => 'Scharf, wartet auf einen Ton';
+
+  @override
+  String get armedSettings => 'Schwelle und Pause';
+
+  @override
+  String get armedThreshold => 'Beginnt über';
+
+  @override
+  String get armedSilence => 'Endet nach einer Pause von';
+
+  @override
+  String get armedLevel => 'Pegel des Mikrofons';
+
+  @override
+  String get armedLevelOff => 'Der Pegel erscheint, solange «Scharf» an ist.';
+
+  @override
+  String get armedBusy =>
+      'Es läuft schon eine Aufnahme. Beende sie und schalte «Scharf» dann ein.';
+
+  @override
+  String get armedMicrophoneDenied =>
+      'Woodshed Player darf das Mikrofon nicht verwenden, darum ist «Scharf» wieder aus. Erteile den Zugriff unter Systemeinstellungen › Datenschutz & Sicherheit › Mikrofon und schalte es dann wieder ein.';
+
+  @override
+  String get armedFailed =>
+      '«Scharf» konnte das Mikrofon nicht starten und ist wieder aus.';
+
+  @override
+  String get recordingLockedByArmed =>
+      '«Scharf» ist an: Das Mikrofon nimmt beim Üben von selbst auf. Schalte «Scharf» aus, um mit diesem Knopf aufzunehmen.';
+
+  @override
+  String armedThresholdValue(int db) {
+    final intl.NumberFormat dbNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String dbString = dbNumberFormat.format(db);
+
+    return '$dbString dBFS';
+  }
+
+  @override
+  String armedSilenceValue(int seconds) {
+    final intl.NumberFormat secondsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String secondsString = secondsNumberFormat.format(seconds);
+
+    return '$secondsString s';
+  }
+
+  @override
+  String armedRecordingLabel(String duration) {
+    return 'Scharf, nimmt auf $duration';
+  }
 }

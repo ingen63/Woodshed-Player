@@ -947,6 +947,25 @@ class Library extends ChangeNotifier {
     await _updateDevice(_device.copyWith(recordingSource: name));
   }
 
+  /// #147/AK9: threshold (dBFS) and pause (seconds) of the armed practice recording chosen on this device;
+  /// null: not chosen.
+  double? get armThresholdDb => _device.armThresholdDb;
+  double? get armSilenceSeconds => _device.armSilenceSeconds;
+
+  /// #147/AK9: remembers the settings of the armed practice recording on this device (device-local, never
+  /// synced); a failed write keeps them for this run only.
+  Future<void> setArmSettings({double? thresholdDb, double? silenceSeconds}) {
+    final next = _device.copyWith(
+      armThresholdDb: thresholdDb,
+      armSilenceSeconds: silenceSeconds,
+    );
+    if (next.armThresholdDb == _device.armThresholdDb &&
+        next.armSilenceSeconds == _device.armSilenceSeconds) {
+      return Future.value();
+    }
+    return _updateDevice(next);
+  }
+
   /// #123: the section «Library» (all tracks) is open in the library list on this device; closed by default.
   bool get libraryOpen => _device.libraryOpen;
 
@@ -1470,6 +1489,22 @@ class Library extends ChangeNotifier {
     save();
     notifyListeners();
     return f;
+  }
+
+  /// #147/AK7: ID of the folder reached by [names] from the top level (e.g. `Recordings`, `2026-11-25`).
+  /// An existing folder of that name (the first in the list order) is used again, a missing one is
+  /// created. Empty [names]: null (top level).
+  String? folderPath(List<String> names) {
+    String? parent;
+    for (final name in names) {
+      final existing = _folders.where(
+        (f) => f.parentId == parent && f.name == name,
+      );
+      parent = existing.isEmpty
+          ? createFolder(name, parentId: parent).id
+          : existing.first.id;
+    }
+    return parent;
   }
 
   /// Renames the folder; a blank [name] keeps the old one.

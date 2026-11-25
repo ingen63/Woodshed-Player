@@ -11,6 +11,7 @@
 // #54: the storage chosen for the sync on this device (the tokens are in the keychain or IndexedDB, never here).
 // #123: whether the section with all tracks («Library») is open in the library list; closed by default.
 // #129: the width of the library sidebar chosen on this device.
+// #147: threshold and pause of the armed practice recording chosen on this device.
 // #107: own tracks and folders (#114: and playlists) held back from the sync until the user keeps or removes
 // them.
 import 'dart:convert';
@@ -39,6 +40,8 @@ class DeviceSettings {
     this.closedFolders = const {},
     this.sidebarWidth,
     this.yearsRead = false,
+    this.armThresholdDb,
+    this.armSilenceSeconds,
   });
 
   static const fileName = 'device.json';
@@ -72,7 +75,8 @@ class DeviceSettings {
   /// The hint «Add to Home Screen» was closed here and stays away (#110). Written only once true.
   final bool installHintClosed;
 
-  /// #107: own tracks and folders, never synced, that a merge would remove because they were last changed
+  /// #147: threshold and pause of the armed practice recording chosen on this device.
+  // #107: own tracks and folders, never synced, that a merge would remove because they were last changed
   /// before the purge horizon of the other devices. They stay here and are not synced until the user
   /// keeps or removes them.
   final Set<String> heldTracks;
@@ -105,6 +109,12 @@ class DeviceSettings {
   /// only once true.
   final bool yearsRead;
 
+  /// #147/AK9: threshold (dBFS) of the armed practice recording chosen here; null: the default.
+  final double? armThresholdDb;
+
+  /// #147/AK9: pause (seconds) that ends a take of the armed practice recording; null: the default.
+  final double? armSilenceSeconds;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -123,6 +133,8 @@ class DeviceSettings {
     Set<String>? closedFolders,
     double? Function()? sidebarWidth,
     bool? yearsRead,
+    double? armThresholdDb,
+    double? armSilenceSeconds,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -142,6 +154,8 @@ class DeviceSettings {
     closedFolders: closedFolders ?? this.closedFolders,
     sidebarWidth: sidebarWidth == null ? this.sidebarWidth : sidebarWidth(),
     yearsRead: yearsRead ?? this.yearsRead,
+    armThresholdDb: armThresholdDb ?? this.armThresholdDb,
+    armSilenceSeconds: armSilenceSeconds ?? this.armSilenceSeconds,
   );
 
   Map<String, Object?> toJson() => {
@@ -163,6 +177,8 @@ class DeviceSettings {
     if (closedFolders.isNotEmpty) 'closedFolders': [...closedFolders]..sort(),
     if (sidebarWidth != null) 'sidebarWidth': sidebarWidth,
     if (yearsRead) 'yearsRead': true,
+    if (armThresholdDb != null) 'armThresholdDb': armThresholdDb,
+    if (armSilenceSeconds != null) 'armSilenceSeconds': armSilenceSeconds,
   };
 
   static String newDeviceId([Random? random]) {
@@ -224,6 +240,8 @@ class DeviceSettings {
               _ => null,
             },
             yearsRead: j['yearsRead'] == true,
+            armThresholdDb: _finite(j['armThresholdDb']),
+            armSilenceSeconds: _finite(j['armSilenceSeconds']),
           );
         }
       }
@@ -234,6 +252,10 @@ class DeviceSettings {
     } catch (_) {}
     return d;
   }
+
+  /// A finite number of [v]; null for anything else.
+  static double? _finite(Object? v) =>
+      v is num && v.isFinite ? v.toDouble() : null;
 
   static Set<String> _ids(Object? v) => {
     if (v is List)

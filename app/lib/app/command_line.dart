@@ -205,6 +205,13 @@ class CommandHandler {
       o.err('Recording is not available on this platform.');
       return CliExit.failed;
     }
+    // #147/AK11: «Armed» holds the microphone while it is on.
+    if (rec.reserved) {
+      o.err(
+        'The armed practice recording («Armed») is on. Switch it off in the app first.',
+      );
+      return CliExit.failed;
+    }
     // #140/AK17
     if (rec.busy) {
       o.err('A recording is already running.');

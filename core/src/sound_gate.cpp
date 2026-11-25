@@ -15,7 +15,7 @@ bool SoundGate::init(double sampleRate, uint32_t channels, const GateConfig &con
   channels_ = channels;
   threshold_ = linear(config.thresholdDb);
   preroll_ = std::llround(kPrerollSeconds * sampleRate);
-  postroll_ = std::llround(kPostrollSeconds * sampleRate);
+  postroll_ = std::llround(config.postrollSeconds * sampleRate);
   silence_ = std::max(postroll_, std::llround(config.silenceSeconds * sampleRate));
   pre_.assign(static_cast<size_t>(preroll_) * channels_, 0.0f);
   pending_.assign(static_cast<size_t>(silence_ - postroll_) * channels_, 0.0f);
@@ -110,6 +110,13 @@ void SoundGate::feedRecording(const float *frames, uint32_t count, FrameSink &si
   }
   if (pendingFrames_ == 0)
     emit(frames + static_cast<size_t>(run) * channels_, count - run, sink);
+}
+
+void SoundGate::finish(FrameSink &sink) {
+  if (state_.load() != GateState::Recording || pendingFrames_ == 0)
+    return;
+  emit(pending_.data(), static_cast<uint32_t>(pendingFrames_), sink);
+  pendingFrames_ = 0;
 }
 
 } // namespace wp::rec

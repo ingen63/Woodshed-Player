@@ -1101,5 +1101,82 @@
         "type": "String"
       }
     }
+  },
+  "armedSwitch": "Armed",
+  "@armedSwitch": {
+    "description": "#147"
+  },
+  "armedSwitchTooltip": "Records the microphone by itself while you practise: each time you play, a recording starts, and it ends after a pause or with the space bar. The recordings go to the library into Recordings › date.",
+  "@armedSwitchTooltip": {
+    "description": "#147"
+  },
+  "armedWaiting": "Armed, waiting for sound",
+  "@armedWaiting": {
+    "description": "#147"
+  },
+  "armedSettings": "Threshold and pause",
+  "@armedSettings": {
+    "description": "#147"
+  },
+  "armedThreshold": "Starts above",
+  "@armedThreshold": {
+    "description": "#147"
+  },
+  "armedSilence": "Ends after a pause of",
+  "@armedSilence": {
+    "description": "#147"
+  },
+  "armedLevel": "Microphone level",
+  "@armedLevel": {
+    "description": "#147"
+  },
+  "armedLevelOff": "The level shows while «Armed» is on.",
+  "@armedLevelOff": {
+    "description": "#147"
+  },
+  "armedBusy": "Another recording is running. Stop it, then switch «Armed» on.",
+  "@armedBusy": {
+    "description": "#147"
+  },
+  "armedMicrophoneDenied": "Woodshed Player may not use the microphone, so «Armed» is off again. Grant access in System Settings › Privacy & Security › Microphone, then switch it on again.",
+  "@armedMicrophoneDenied": {
+    "description": "#147"
+  },
+  "armedFailed": "«Armed» could not start the microphone and is off again.",
+  "@armedFailed": {
+    "description": "#147"
+  },
+  "recordingLockedByArmed": "«Armed» is on: the microphone records by itself while you practise. Switch «Armed» off to record with this button.",
+  "@recordingLockedByArmed": {
+    "description": "#147"
+  },
+  "armedThresholdValue": "{db} dBFS",
+  "@armedThresholdValue": {
+    "description": "#147",
+    "placeholders": {
+      "db": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "armedSilenceValue": "{seconds} s",
+  "@armedSilenceValue": {
+    "description": "#147",
+    "placeholders": {
+      "seconds": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "armedRecordingLabel": "Armed, recording {duration}",
+  "@armedRecordingLabel": {
+    "description": "#147",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
   }
 }
