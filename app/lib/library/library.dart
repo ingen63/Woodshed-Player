@@ -185,7 +185,7 @@ class Library extends ChangeNotifier {
   /// #114: playlists shown on this device (the alive ones).
   List<Playlist> _playlists = [];
   TrackSortOrder _sortOrder = TrackSortOrder.dateAdded;
-  Appearance _appearance = Appearance.system;
+  Appearance _appearance = Appearance.standard;
   Map<String, Object?>? _metronome;
   bool _importing = false;
   int _droppedMissing = 0;
@@ -596,7 +596,8 @@ class Library extends ChangeNotifier {
   }
 
   /// #10 (found by the random sync tests): shared settings without a stamp that are still at their default
-  /// (sort order «date added», appearance «system») were never chosen on this device and are not stamped.
+  /// (sort order «date added», appearance [Appearance.standard]) were never chosen on this device and are
+  /// not stamped.
   /// Before, the first save of a new device stamped its defaults as the newest change, and its first sync
   /// reset the sort order and appearance chosen on all other devices.
   Map<String, Object?> _chosenSettings() {
@@ -610,7 +611,7 @@ class Library extends ChangeNotifier {
 
   static bool _isDefault(String key, Object? value) =>
       (key == 'sortOrder' && value == TrackSortOrder.dateAdded.name) ||
-      (key == 'appearance' && value == Appearance.system.name);
+      (key == 'appearance' && value == Appearance.standard.name);
 
   Future<void> _afterLoad() async {
     if (_tracks.isNotEmpty) await _askPersistence();

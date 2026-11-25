@@ -533,7 +533,8 @@ void main() {
       final base = Directory('${tmp.path}/lib');
       final l = await loaded(IoFileStore(base));
       l.sortOrder = TrackSortOrder.alphabetical;
-      l.appearance = Appearance.dark;
+      // not the default dark (#149), so it is saved
+      l.appearance = Appearance.light;
       l.metronomePreset = {'meter': 3, 'rampEnabled': true};
       l.flush();
       final shared = ((fileJson(base)['settings'] as Map)['values'] as Map).keys

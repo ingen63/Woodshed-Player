@@ -499,7 +499,10 @@ enum Appearance {
   light,
   dark;
 
-  /// #31/AK5: missing or unknown values mean [system].
+  /// #149/AK1: the appearance without a saved choice (first start, new library); before #149 [system].
+  static const standard = Appearance.dark;
+
+  /// #149/AK2: missing, unknown or wrongly typed values mean [standard]. A saved [system] stays (#149/AK4).
   static Appearance parse(Object? s) =>
-      values.firstWhere((v) => v.name == s, orElse: () => Appearance.system);
+      values.firstWhere((v) => v.name == s, orElse: () => standard);
 }

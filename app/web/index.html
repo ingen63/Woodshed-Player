@@ -19,6 +19,10 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
   <title>Woodshed Player</title>
   <link rel="manifest" href="manifest.json">
+  <!-- #149/AK5: dark until Flutter draws its first frame (WsTheme.dark.bg); the saved appearance is only
+       known once the app has loaded, with Light chosen the page changes then. -->
+  <meta name="theme-color" content="#121214">
+  <style>html, body { background-color: #121214; }</style>
 </head>
 <body>
   <script>

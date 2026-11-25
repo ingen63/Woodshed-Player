@@ -42,6 +42,13 @@ Future<void> saved(String key, String value) => eventually(() {
   }
 }, 'library.json: $key = $value');
 
+/// The shared settings in library.json.
+Map<Object?, Object?> settings() =>
+    ((jsonDecode(File('${tmp.path}/library.json').readAsStringSync())
+                as Map)['settings']
+            as Map)['values']
+        as Map;
+
 void main() {
   setUp(() => tmp = Directory.systemTemp.createTempSync('wp_appearance'));
   tearDown(() => tmp.deleteSync(recursive: true));
@@ -52,21 +59,25 @@ void main() {
       expect((l.store as IoFileStore).base.path, startsWith(tmp.path));
     });
 
-    test(
-      '#31/AK5 without preferences.json (first start) the appearance is system',
-      () async {
-        final l = await loaded(tmp);
-        expect(l.appearance, Appearance.system);
-      },
-    );
+    test('#149/AK1 without a saved appearance (first start, new library) it is dark', () async {
+      final l = await loaded(tmp);
+      expect(Appearance.standard, Appearance.dark);
+      expect(l.appearance, Appearance.dark);
+      // #10: the default is never chosen on this device, so it is not saved (and does not win a sync)
+      l.sortOrder = TrackSortOrder.alphabetical;
+      await saved('sortOrder', 'alphabetical');
+      expect(settings().containsKey('appearance'), isFalse);
+      expect((await loaded(tmp)).appearance, Appearance.dark);
+    });
 
     test(
-      '#31/AK4 #31/AK7 the choice is saved and loaded after a restart',
+      '#31/AK4 #31/AK7 #149/AK3 the choice is saved and loaded after a restart',
       () async {
+        // dark last: on a new library it is the default already and nothing would be saved
         for (final a in [
-          Appearance.dark,
           Appearance.light,
           Appearance.system,
+          Appearance.dark,
         ]) {
           final l = await loaded(tmp);
           l.appearance = a;
@@ -80,45 +91,73 @@ void main() {
       final l = await loaded(tmp);
       l.sortOrder = TrackSortOrder.alphabetical;
       await saved('sortOrder', 'alphabetical');
-      l.appearance = Appearance.dark;
-      await saved('appearance', 'dark');
+      l.appearance = Appearance.light;
+      await saved('appearance', 'light');
       // #36/AK5: both are shared settings in library.json.
-      final shared =
-          ((jsonDecode(File('${tmp.path}/library.json').readAsStringSync())
-                      as Map)['settings']
-                  as Map)['values']
-              as Map;
-      expect(shared['appearance'], 'dark');
+      final shared = settings();
+      expect(shared['appearance'], 'light');
       expect(shared['sortOrder'], 'alphabetical');
       final again = await loaded(tmp);
       expect(again.sortOrder, TrackSortOrder.alphabetical);
-      expect(again.appearance, Appearance.dark);
+      expect(again.appearance, Appearance.light);
     });
 
-    test('#31/AK5 old preferences.json without the key means system', () async {
-      prefs(tmp).writeAsStringSync('{"sortOrder":"alphabetical"}');
+    test('#149/AK4 an existing library with a saved System keeps it, also after the next save', () async {
       final l = await loaded(tmp);
-      expect(l.appearance, Appearance.system);
-      expect(l.sortOrder, TrackSortOrder.alphabetical);
-    });
-
-    test('#31/AK5 unknown or wrongly typed value means system', () async {
-      for (final v in ['"sepia"', '42', 'null', '""']) {
-        prefs(tmp).writeAsStringSync('{"appearance":$v}');
-        expect((await loaded(tmp)).appearance, Appearance.system, reason: v);
-      }
-    });
-
-    test('#31/AK5 unreadable preferences.json means system', () async {
-      prefs(tmp).writeAsStringSync('{kaputt');
+      l.appearance = Appearance.light;
+      await saved('appearance', 'light');
+      l.appearance = Appearance.system;
+      await saved('appearance', 'system');
+      final existing = await loaded(tmp);
+      expect(existing.appearance, Appearance.system);
+      existing.sortOrder = TrackSortOrder.alphabetical;
+      await saved('sortOrder', 'alphabetical');
+      expect(settings()['appearance'], 'system');
       expect((await loaded(tmp)).appearance, Appearance.system);
     });
 
-    test('#31/AK5 parse falls back to system', () {
-      expect(Appearance.parse(null), Appearance.system);
-      expect(Appearance.parse('dark'), Appearance.dark);
-      expect(Appearance.parse('light'), Appearance.light);
-      expect(Appearance.parse('DARK'), Appearance.system);
+    test('#149/AK4 an old preferences.json with System keeps it and moves it into library.json', () async {
+      prefs(tmp).writeAsStringSync('{"appearance":"system"}');
+      final l = await loaded(tmp);
+      expect(l.appearance, Appearance.system);
+      l.sortOrder = TrackSortOrder.alphabetical;
+      await saved('appearance', 'system');
+      prefs(tmp).deleteSync();
+      expect((await loaded(tmp)).appearance, Appearance.system);
+    });
+
+    test(
+      '#31/AK5 #149/AK1 old preferences.json without the key means dark',
+      () async {
+        prefs(tmp).writeAsStringSync('{"sortOrder":"alphabetical"}');
+        final l = await loaded(tmp);
+        expect(l.appearance, Appearance.dark);
+        expect(l.sortOrder, TrackSortOrder.alphabetical);
+      },
+    );
+
+    test('#149/AK2 unknown or wrongly typed value means dark', () async {
+      for (final v in ['"sepia"', '42', 'null', '""', '"DARK"']) {
+        prefs(tmp).writeAsStringSync('{"appearance":$v}');
+        expect((await loaded(tmp)).appearance, Appearance.dark, reason: v);
+      }
+    });
+
+    test('#149/AK2 unknown value in library.json means dark', () async {
+      final l = await loaded(tmp);
+      l.appearance = Appearance.light;
+      await saved('appearance', 'light');
+      final file = File('${tmp.path}/library.json');
+      file.writeAsStringSync(
+        file.readAsStringSync().replaceFirst('"light"', '"sepia"'),
+      );
+      expect(settings()['appearance'], 'sepia');
+      expect((await loaded(tmp)).appearance, Appearance.dark);
+    });
+
+    test('#149/AK2 unreadable preferences.json means dark', () async {
+      prefs(tmp).writeAsStringSync('{kaputt');
+      expect((await loaded(tmp)).appearance, Appearance.dark);
     });
 
     test('#31/AK2 #31/AK3 theme mode for each choice', () {
@@ -132,12 +171,13 @@ void main() {
     Future<TestApp> pump(
       WidgetTester tester, {
       Size size = const Size(1100, 900),
+      String folder = 'lib',
     }) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-      final app = TestApp(Directory('${tmp.path}/lib'));
+      final app = TestApp(Directory('${tmp.path}/$folder'));
       await tester.runAsync(app.library.load);
       await tester.pumpWidget(
         WoodshedApp(controller: app.controller, locale: testLocale),
@@ -159,6 +199,19 @@ void main() {
       await tester.tap(find.byKey(Key('appearance-${a.name}')));
       await tester.pumpAndSettle();
     }
+
+    testWidgets(
+      '#149/AK1 the first start is dark, whatever the system setting',
+      (tester) async {
+        for (final system in Brightness.values) {
+          tester.platformDispatcher.platformBrightnessTestValue = system;
+          final app = await pump(tester, folder: 'new-${system.name}');
+          expect(app.library.appearance, Appearance.dark);
+          expect(brightness(tester), Brightness.dark, reason: '$system');
+          expect(ws(tester).bg, WsTheme.dark.bg);
+        }
+      },
+    );
 
     testWidgets('#31/AK1 menu offers System, Light and Dark', (tester) async {
       await pump(tester);
@@ -218,6 +271,7 @@ void main() {
       '#31/AK3 System follows a change of the system setting while running',
       (tester) async {
         final app = await pump(tester);
+        await choose(tester, Appearance.system);
         expect(app.library.appearance, Appearance.system);
         tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
         await tester.pumpAndSettle();
@@ -246,5 +300,59 @@ void main() {
         },
       );
     }
+  });
+
+  // #149/AK5: before Flutter draws its first frame the platform shows its own background. The saved
+  // appearance is not known there yet, so it is the dark background of the app (WsTheme.dark.bg).
+  group('#149/AK5 no light state at the start', () {
+    final bg = WsTheme.dark.bg.toARGB32() & 0xFFFFFF;
+    final hex = '#${bg.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+    final (r, g, b) = (bg >> 16, (bg >> 8) & 0xFF, bg & 0xFF);
+
+    test('web: page background and manifest', () {
+      final index = File('web/index.html').readAsStringSync();
+      expect(index, contains('background-color: $hex'));
+      expect(index, contains('<meta name="theme-color" content="$hex">'));
+      final m = jsonDecode(File('web/manifest.json').readAsStringSync()) as Map;
+      expect(m['background_color'], hex);
+      expect(m['theme_color'], hex);
+    });
+
+    /// The sRGB components of a storyboard colour as 0…255.
+    (int, int, int) storyboardColor(String xml) {
+      final c = RegExp(
+        r'<color key="backgroundColor" red="([\d.]+)" green="([\d.]+)" blue="([\d.]+)"',
+      ).firstMatch(xml)!;
+      int v(int i) => (double.parse(c.group(i)!) * 255).round();
+      return (v(1), v(2), v(3));
+    }
+
+    test('iPhone/iPad: launch screen and the view of Flutter', () {
+      for (final f in ['LaunchScreen', 'Main']) {
+        final xml = File('ios/Runner/Base.lproj/$f.storyboard')
+            .readAsStringSync();
+        expect(storyboardColor(xml), (r, g, b), reason: f);
+      }
+    });
+
+    test('macOS: the window and the Flutter view (MainFlutterWindow)', () {
+      final swift = File('macos/Runner/MainFlutterWindow.swift')
+          .readAsStringSync();
+      expect(
+        swift,
+        contains(
+          'NSColor(srgbRed: 0x${hex.substring(1, 3)} / 255, '
+          'green: 0x${hex.substring(3, 5)} / 255, '
+          'blue: 0x${hex.substring(5, 7)} / 255, alpha: 1)',
+        ),
+      );
+      expect(swift, contains('backgroundColor = Self.launchBackground'));
+      expect(
+        swift,
+        contains(
+          'flutterViewController.backgroundColor = Self.launchBackground',
+        ),
+      );
+    });
   });
 }

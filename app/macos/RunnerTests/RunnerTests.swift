@@ -310,3 +310,18 @@ struct MenuBarTests {
     #expect(menu.items[3].submenu == nil)
   }
 }
+
+// #149/AK5: until the first frame of Flutter the window shows the dark background of the app.
+struct LaunchBackgroundTests {
+  @Test("#149/AK5 window and Flutter view are dark before the first frame")
+  @MainActor
+  func darkBeforeFirstFrame() throws {
+    let window = try #require(NSApp.windows.compactMap { $0 as? MainFlutterWindow }.first)
+    let controller = try #require(window.contentViewController as? FlutterViewController)
+    #expect(window.backgroundColor == MainFlutterWindow.launchBackground)
+    #expect(controller.backgroundColor == MainFlutterWindow.launchBackground)
+    let rgb = try #require(MainFlutterWindow.launchBackground.usingColorSpace(.sRGB))
+    let expected: [CGFloat] = [0x12, 0x12, 0x14].map { CGFloat($0) / 255 }
+    #expect([rgb.redComponent, rgb.greenComponent, rgb.blueComponent] == expected)
+  }
+}

@@ -31,7 +31,13 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
     return false
   }
 
+  /// #149/AK5: the background of the window and the Flutter view until the first frame, the dark
+  /// background of the app (WsTheme.dark.bg in app/lib/ui/style.dart). The saved appearance is not known
+  /// before Dart runs, so the start is dark; with Light chosen the app changes after loading.
+  static let launchBackground = NSColor(srgbRed: 0x12 / 255, green: 0x12 / 255, blue: 0x14 / 255, alpha: 1)
+
   override func awakeFromNib() {
+    backgroundColor = Self.launchBackground
     let flutterViewController: FlutterViewController
     if Self.isTestHost() {
       let engine = FlutterEngine(name: "test-host", project: nil, allowHeadlessExecution: true)
@@ -40,6 +46,7 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
       flutterViewController = FlutterViewController()
       dartStarted = true
     }
+    flutterViewController.backgroundColor = Self.launchBackground
     let windowFrame = self.frame
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)

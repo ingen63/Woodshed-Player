@@ -395,7 +395,7 @@ void main() {
       await a.library.load();
       await b.library.load();
       a.library.sortOrder = TrackSortOrder.alphabetical;
-      a.library.appearance = Appearance.dark;
+      a.library.appearance = Appearance.light; // not the default dark (#149)
       await a.sync.sync();
       clock = clock.add(const Duration(hours: 1));
       await b.library.importFiles([
@@ -406,7 +406,7 @@ void main() {
       for (final d in [a, b]) {
         expect(
           (d.library.sortOrder, d.library.appearance),
-          (TrackSortOrder.alphabetical, Appearance.dark),
+          (TrackSortOrder.alphabetical, Appearance.light),
         );
       }
       a.sync.dispose();

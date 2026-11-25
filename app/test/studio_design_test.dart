@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:woodshed_player/app/app_controller.dart';
+import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/main.dart';
 import 'package:woodshed_player/ui/home_page.dart';
 import 'package:woodshed_player/time_format.dart';
@@ -89,6 +90,8 @@ void main() {
     testWidgets('Hell/Dunkel folgt der Systemeinstellung', (tester) async {
       final app = TestApp(Directory.systemTemp.createTempSync('wp_theme'));
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      // #149: the default is Dark; this test is about the choice System
+      app.library.appearance = Appearance.system;
       for (final (b, bg) in [
         (Brightness.dark, const Color(0xFF121214)),
         (Brightness.light, const Color(0xFFECECEF)),
