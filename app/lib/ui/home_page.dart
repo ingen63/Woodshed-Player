@@ -186,7 +186,7 @@ class _HomePageState extends State<HomePage> {
   /// #148: the help or the shortcuts are open; a second call does not open them again.
   bool _helpOpen = false;
 
-  /// #148/AK10: what this platform has, asked as the features ask it.
+  /// #148/AK13: what this platform has, asked as the features ask it.
   Future<HelpTopics> _helpTopics() async {
     final platform = Theme.of(context).platform;
     final recording =

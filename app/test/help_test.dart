@@ -1,6 +1,6 @@
 // #148: the help in the app (page with contents and sections) and the overview of the keyboard shortcuts
 // (dialog), opened from the Help menu of the Mac, the menu «⋯» of the library and the key «?». AKn = n-th
-// acceptance criterion of #148. Language fixed (German unless the test is about the language), cores are
+// acceptance criterion of #148 (20 in all; AK19 is this file). Language fixed (German unless the test is about the language), cores are
 // fakes, widgets found by key.
 import 'dart:convert';
 import 'dart:io';
@@ -305,7 +305,7 @@ void main() {
     }, variant: _mac);
   });
 
-  group('#148/AK4–AK9 content of the help (German)', () {
+  group('#148/AK4–AK12 content of the help (German)', () {
     /// The text of [s] as the page shows it, after a tap on its entry in the contents.
     Future<String> sectionText(WidgetTester tester, HelpSection s) async {
       await tester.tap(byKey('helpTopic:${s.name}'));
@@ -376,7 +376,9 @@ void main() {
           'Google Drive',
           'Ohne Konto und ohne gekoppelte Geräte',
         ],
+        // AK10
         HelpSection.appearance: ['Hell', 'Dunkel', 'System', 'Sprache'],
+        // AK11
         HelpSection.recording: ['Systemton', 'Mikrofon', 'Scharf'],
         HelpSection.export: ['MP3'],
         HelpSection.commandLine: ['woodshed'],
@@ -395,7 +397,9 @@ void main() {
       expect(byKey('shortcutsDialog'), findsOneWidget);
     }, variant: _mac);
 
-    testWidgets('AK9 web: install, offline start, audio cache', (tester) async {
+    testWidgets('AK12 web: install, offline start, audio cache', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           locale: testLocale,
@@ -429,7 +433,7 @@ void main() {
     }, variant: _iOS);
   });
 
-  group('#148/AK10 sections only where the platform has the feature', () {
+  group('#148/AK13 sections only where the platform has the feature', () {
     testWidgets('Mac: recording, export and command line, no web', (
       tester,
     ) async {
@@ -489,7 +493,7 @@ void main() {
     });
   });
 
-  group('#148/AK11 overview of the shortcuts', () {
+  group('#148/AK14 overview of the shortcuts', () {
     for (final (platform, command) in [
       (TargetPlatform.macOS, '⌘'),
       (TargetPlatform.iOS, '⌘'),
@@ -619,7 +623,7 @@ void main() {
     });
   });
 
-  group('#148/AK12 the overview and the keys that work agree', () {
+  group('#148/AK15 the overview and the keys that work agree', () {
     /// Keys pressed in every area: letters, digits and the keys of the table and around them.
     List<(LogicalKeyboardKey, String?, PhysicalKeyboardKey?)> keys() => [
       for (var c = 0x61; c <= 0x7a; c++)
@@ -834,7 +838,7 @@ void main() {
     }, variant: _mac);
   });
 
-  group('#148/AK13 every ARB file has every help text', () {
+  group('#148/AK16 every ARB file has every help text', () {
     Map<String, Object?> arb(String name) =>
         jsonDecode(File('lib/l10n/$name').readAsStringSync())
             as Map<String, Object?>;
@@ -874,7 +878,7 @@ void main() {
     });
   });
 
-  group('#148/AK14 the help in the UI language', () {
+  group('#148/AK17 the help in the UI language', () {
     for (final (system, title) in [
       (const Locale('de', 'CH'), 'Woodshed Player-Hilfe'),
       (const Locale('en', 'US'), 'Woodshed Player Help'),
@@ -898,7 +902,7 @@ void main() {
     }
   });
 
-  test('#148/AK15 the help loads nothing from the network', () {
+  test('#148/AK18 the help loads nothing from the network', () {
     for (final f in ['lib/ui/help_page.dart', 'lib/ui/shortcut_table.dart']) {
       final source = File(f).readAsStringSync();
       for (final banned in [
@@ -915,7 +919,7 @@ void main() {
     }
   });
 
-  test('#148/AK17 FUNKTIONEN.md and both READMEs name the help', () {
+  test('#148/AK20 FUNKTIONEN.md and both READMEs name the help', () {
     final functions = File('../docs/FUNKTIONEN.md').readAsStringSync();
     final practice = functions
         .split('\n')

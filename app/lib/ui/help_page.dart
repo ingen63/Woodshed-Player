@@ -24,7 +24,7 @@ enum HelpSection {
   shortcuts,
 }
 
-/// What this platform has, asked the same way as the features themselves (#148/AK10).
+/// What this platform has, asked the same way as the features themselves (#148/AK13).
 class HelpTopics {
   const HelpTopics({
     this.recording = false,

@@ -1,6 +1,6 @@
 // #148: every keyboard shortcut of the app in one table, grouped by area. The overview (help_page.dart)
 // shows it; a test presses every key of the table in the app and every other key, so a shortcut that
-// works but is missing here, or one listed here that does not work, fails it (#148/AK12).
+// works but is missing here, or one listed here that does not work, fails it (#148/AK15).
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 

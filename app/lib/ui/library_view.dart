@@ -128,7 +128,7 @@ class _LibraryViewState extends State<LibraryView> {
   /// question of «Delete»; not while typing in a field of the library (the search).
   KeyEventResult _key(FocusNode node, KeyEvent e) {
     if (e is! KeyDownEvent) return KeyEventResult.ignored;
-    // #148/AK12: ⌘ and Ctrl belong to the shortcuts of the app (shortcut_table.dart)
+    // #148/AK15: ⌘ and Ctrl belong to the shortcuts of the app (shortcut_table.dart)
     final keys = HardwareKeyboard.instance;
     if (keys.isMetaPressed || keys.isControlPressed) {
       return KeyEventResult.ignored;
