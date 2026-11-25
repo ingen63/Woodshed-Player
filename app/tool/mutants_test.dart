@@ -5,6 +5,7 @@
 // Run: cd app && flutter test tool/mutants_test.dart   (or `make test-tools`)
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -389,6 +390,145 @@ void main() {
       );
       expect(dartOutcome(compile).$1, Outcome.unviable);
     });
+  });
+
+  group('#142: baselines of parallel copies and errors of the environment', () {
+    // what flutter test printed when copies of app/ started at the same time (#142)
+    const toolError =
+        'Waiting for another flutter command to release the startup lock...\n'
+        'Flutter failed to copy file from "ws1/app/build/native_assets/macos/native_assets.json" '
+        'to "ws1/app/build/unit_test_assets/NativeAssetsManifest.json". '
+        'The file or directory could not be found.';
+    RunResult res(RunEnd end, [String output = '']) =>
+        RunResult(end, output, const Duration(seconds: 1), 0);
+
+    test(
+      '#142/AK2: a failure before any test is an error of the environment',
+      () {
+        expect(dartEnvironmentError(res(RunEnd.failed, toolError)), isTrue);
+        expect(dartEnvironmentError(res(RunEnd.failed)), isTrue);
+        expect(
+          dartEnvironmentError(
+            res(
+              RunEnd.failed,
+              '+3 -1: test/a_test.dart: x [E]\nSome tests failed.',
+            ),
+          ),
+          isFalse,
+        );
+        // a mutant that does not compile fails while loading: a test result, not the environment
+        expect(
+          dartEnvironmentError(
+            res(
+              RunEnd.failed,
+              '+0 -1: loading test/a_test.dart [E]\nFailed to load "x"',
+            ),
+          ),
+          isFalse,
+        );
+        expect(dartEnvironmentError(res(RunEnd.passed)), isFalse);
+        expect(dartEnvironmentError(res(RunEnd.timeout)), isFalse);
+        expect(dartEnvironmentError(res(RunEnd.memory)), isFalse);
+      },
+    );
+
+    test('#142/AK2: the message tells the environment from failing tests', () {
+      final env = dartBaselineError(
+        res(RunEnd.failed, toolError),
+        'app/lib/x.dart',
+        'ws1',
+      );
+      expect(env, contains('environment error'));
+      expect(env, contains('ws1'));
+      expect(env, isNot(contains('fail without a mutant')));
+      expect(
+        dartBaselineError(
+          res(RunEnd.failed, '+0 -1: Some tests failed.'),
+          'app/lib/x.dart',
+          'ws1',
+        ),
+        'mutants: the tests of app/lib/x.dart fail without a mutant',
+      );
+    });
+
+    test('#142/AK1: a copy whose baseline failed in its environment runs again alone', () async {
+      final ws = ['ws0', 'ws1', 'ws2', 'ws3'];
+      final calls = <String, int>{};
+      var running = 0, maxRunning = 0;
+      var retryRunning = 0, maxRetryRunning = 0;
+      Future<RunResult> run(String w) async {
+        final n = calls[w] = (calls[w] ?? 0) + 1;
+        final retry = n > 1;
+        running++;
+        if (retry) retryRunning++;
+        maxRunning = max(maxRunning, running);
+        if (retry) maxRetryRunning = max(maxRetryRunning, retryRunning);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        running--;
+        if (retry) retryRunning--;
+        // ws1 and ws3 fail like #142 at first, ws3 also on its first retry
+        if ((w == 'ws1' && n == 1) || (w == 'ws3' && n <= 2)) {
+          return res(RunEnd.failed, toolError);
+        }
+        return res(RunEnd.passed, '+5: All tests passed!');
+      }
+
+      final retried = <String>[];
+      final bases = await dartBaselines(
+        ws,
+        run,
+        onRetry: (w, r) {
+          expect(dartEnvironmentError(r), isTrue);
+          retried.add(w);
+        },
+      );
+      expect(bases.map((b) => b.end), everyElement(RunEnd.passed));
+      expect(calls, {'ws0': 1, 'ws1': 2, 'ws2': 1, 'ws3': 3});
+      expect(retried, ['ws1', 'ws3', 'ws3']);
+      expect(maxRunning, 4); // the first runs together, under load (#138/AK3)
+      expect(maxRetryRunning, 1); // the repeated ones one after the other
+    });
+
+    test(
+      '#142/AK1: failing tests do not run again, a lasting tool error stops',
+      () async {
+        final calls = <String, int>{};
+        Future<RunResult> run(String w) async {
+          calls[w] = (calls[w] ?? 0) + 1;
+          return w == 'ws0'
+              ? res(RunEnd.failed, '+2 -1: Some tests failed.')
+              : res(RunEnd.failed, toolError);
+        }
+
+        final bases = await dartBaselines(['ws0', 'ws1'], run);
+        expect(calls, {'ws0': 1, 'ws1': 3});
+        expect(dartEnvironmentError(bases[0]), isFalse);
+        expect(dartEnvironmentError(bases[1]), isTrue);
+      },
+    );
+
+    test(
+      '#142/AK1: a mutant run repeats only errors of the environment',
+      () async {
+        var n = 0;
+        final r = await retryEnvironmentErrors(() async {
+          n++;
+          return n == 1
+              ? res(RunEnd.failed, toolError)
+              : res(RunEnd.failed, '+0 -1: Some tests failed.');
+        });
+        expect(n, 2);
+        expect(dartOutcome(r).$1, Outcome.killed);
+        n = 0;
+        var notes = 0;
+        await retryEnvironmentErrors(() async {
+          n++;
+          return res(RunEnd.failed, toolError);
+        }, onRetry: (_) => notes++);
+        expect(n, 3);
+        expect(notes, 2);
+      },
+    );
   });
 
   group('#138/AK3: Dart time limit under load', () {

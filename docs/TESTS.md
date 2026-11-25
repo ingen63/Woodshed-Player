@@ -1040,6 +1040,12 @@ Plugin). Im Workflow: die Debian-Pakete für Ubuntu 24.04 und LLVM 18 (`clang-18
   `app/` als Links) mit `flutter test --no-pub --concurrency 2 --fail-fast <Testdateien>`: Der erste scheiternde
   Test erkennt den Mutanten, die übrigen Testdateien laufen nicht mehr (#138).
 - Ein Mutant, der nicht übersetzt, zählt als «nicht übersetzbar», nicht als erkannt.
+- **Fehler der Umgebung (#142):** Scheitert `flutter test` vor dem ersten Test (keine Zeile `+<n>` des Testläufers,
+  z. B. «Flutter failed to copy file … native_assets.json», wenn mehrere Kopien gleichzeitig starten), ist das kein
+  Testergebnis. Der Basislauf wiederholt so eine Kopie bis zu zweimal, allein und nacheinander; ein Mutantenlauf
+  wiederholt sich bis zu zweimal. Bleibt der Fehler, bricht der Lauf mit Code 2 und «environment error … (Flutter tool
+  or file system, no test ran)» ab, getrennt von «the tests of … fail without a mutant» (scheiternde Tests ohne
+  Mutant). Dann den Lauf neu starten.
 
 **Grenzen: Zeit, Speicher, Parallelität (AK3, AK4).**
 

@@ -675,15 +675,18 @@ Future<List<Mutant>> runDart(
       }
     }
     if (toRun.isEmpty) continue;
-    final bases = await Future.wait(
-      workspaces.map(
-        (ws) => flutterTest(ws, selected, const Duration(minutes: 10)),
+    final bases = await dartBaselines(
+      workspaces,
+      (ws) => flutterTest(ws, selected, const Duration(minutes: 10)),
+      onRetry: (ws, r) => stdout.writeln(
+        'dart: baseline of $rel in ${ws.split('/').last} failed before any test '
+        '(${_firstLine(r.output)}), running it again alone',
       ),
     );
-    for (final base in bases) {
+    for (final (i, base) in bases.indexed) {
       if (base.end != RunEnd.passed) {
         stderr.writeln(base.output.split('\n').take(40).join('\n'));
-        stderr.writeln('mutants: the tests of $rel fail without a mutant');
+        stderr.writeln(dartBaselineError(base, rel, 'ws$i'));
         exit(2);
       }
     }
@@ -716,8 +719,24 @@ Future<List<Mutant>> runDart(
       final file = File('$ws/app/$path');
       final original = sources[path]!;
       file.writeAsStringSync(site.apply(original));
-      final r = await flutterTest(ws, selected, limitTime, mutant: true);
+      // #142: a run that fails before any test (Flutter tool, file system) does not detect the
+      // mutant; it runs again, and if it keeps failing like that the whole run stops
+      final r = await retryEnvironmentErrors(
+        () => flutterTest(ws, selected, limitTime, mutant: true),
+        onRetry: (r) => stdout.writeln(
+          'dart: a mutant of app/$path in ${ws.split('/').last} failed before any test '
+          '(${_firstLine(r.output)}), running it again',
+        ),
+      );
       file.writeAsStringSync(original);
+      if (dartEnvironmentError(r)) {
+        stderr.writeln(r.output.split('\n').take(40).join('\n'));
+        stderr.writeln(
+          'mutants: environment error with a mutant of app/$path in '
+          '${ws.split('/').last} (Flutter tool or file system, no test ran)',
+        );
+        exit(2);
+      }
       final (outcome, note) = dartOutcome(r);
       final lines = original.split('\n');
       result.add(
@@ -745,3 +764,9 @@ Future<List<Mutant>> runDart(
   await Future.wait(workspaces.map(worker));
   return mergeMutants(result);
 }
+
+/// The first non-empty line of [output], for a short note.
+String _firstLine(String output) => output
+    .split('\n')
+    .map((l) => l.trim())
+    .firstWhere((l) => l.isNotEmpty, orElse: () => 'no output');

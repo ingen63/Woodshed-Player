@@ -901,6 +901,61 @@ final _compileError = RegExp(
   r'(lib/\S+\.dart:\d+:\d+: Error:|Error: Compilation failed|Failed to load ")',
 );
 
+/// A line of the test runner («+3 -1: …»): the tests started. Without one the run failed before
+/// any test, in the Flutter tool or the file system (#142).
+final _testRunnerLine = RegExp(r'^\+\d+', multiLine: true);
+
+/// The run failed in its environment (Flutter tool, file system) before any test ran, not in a
+/// test (#142/AK2). Example: copies of app/ that start `flutter test` at the same time and miss
+/// build/native_assets/macos/native_assets.json of their own copy.
+bool dartEnvironmentError(RunResult r) =>
+    r.end == RunEnd.failed && !_testRunnerLine.hasMatch(r.output);
+
+/// Runs [run] again while it fails in its environment ([dartEnvironmentError]), at most [attempts]
+/// times in all; the last result (#142/AK1).
+Future<RunResult> retryEnvironmentErrors(
+  Future<RunResult> Function() run, {
+  int attempts = 3,
+  void Function(RunResult failed)? onRetry,
+}) async {
+  var r = await run();
+  for (var i = 1; i < attempts && dartEnvironmentError(r); i++) {
+    onRetry?.call(r);
+    r = await run();
+  }
+  return r;
+}
+
+/// The baseline of a file: [run] in every copy at once (#138/AK3), then each copy whose run failed
+/// in its environment again, one after the other, so that no other copy starts the Flutter tool
+/// at the same time (#142/AK1). The results in the order of [workspaces].
+Future<List<RunResult>> dartBaselines(
+  List<String> workspaces,
+  Future<RunResult> Function(String ws) run, {
+  int attempts = 3,
+  void Function(String ws, RunResult failed)? onRetry,
+}) async {
+  final bases = await Future.wait(workspaces.map(run));
+  for (var i = 0; i < bases.length; i++) {
+    if (!dartEnvironmentError(bases[i])) continue;
+    onRetry?.call(workspaces[i], bases[i]);
+    bases[i] = await retryEnvironmentErrors(
+      () => run(workspaces[i]),
+      attempts: attempts - 1,
+      onRetry: (r) => onRetry?.call(workspaces[i], r),
+    );
+  }
+  return bases;
+}
+
+/// The message for a failed baseline of [rel] in the copy [ws]: an error of the environment or
+/// failing tests (#142/AK2).
+String dartBaselineError(RunResult r, String rel, String ws) =>
+    dartEnvironmentError(r)
+    ? 'mutants: environment error in the baseline of $rel in $ws '
+          '(Flutter tool or file system, no test ran); not a test failure, run again'
+    : 'mutants: the tests of $rel fail without a mutant';
+
 /// The outcome of a Dart mutant from its test run.
 (Outcome, String?) dartOutcome(RunResult r) => switch (r.end) {
   RunEnd.passed => (Outcome.survived, null),
