@@ -17,6 +17,7 @@ Release notes of Woodshed Player, newest version first. This file translates [`C
 - Mutation tests report environment failures in the baseline run separately and retry it alone (#142); LAME in the nightly mutation job, time limit for the iOS smoke test (#153).
 - Swift tests without starting the Dart app, without keychain and microphone (#151).
 - Workflow minutes estimate with measured run times (#74).
+- The coverage check counts files with `typedef` as declarations only (#154).
 
 ## Version 1.0.0-beta.1
 

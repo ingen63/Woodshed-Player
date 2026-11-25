@@ -109,6 +109,8 @@ bool declarationsOnly(String source) {
   for (final l in lines) {
     if (l.startsWith('import ') || l == '}' || l.startsWith('@')) continue;
     if (abstractClass.hasMatch(l)) continue;
+    // #154: a one-line typedef (also of a record or function type) declares a type, no code.
+    if (l.startsWith('typedef ') && l.endsWith(';')) continue;
     if (l.contains('{') ||
         l.contains('=>') ||
         l.contains('=') ||

@@ -132,6 +132,32 @@ void main() {
       );
     });
 
+    test('#154/AK1: a one-line typedef is a declaration', () {
+      expect(
+        declarationsOnly(
+          "import 'package:flutter/widgets.dart';\n\n"
+          'abstract interface class A implements Listenable {\n'
+          '  bool get on;\n  Future<void> f();\n}\n\n'
+          'typedef Slot = ({A a, Widget widget});\n'
+          'typedef Cb = void Function(int x);\n',
+        ),
+        isTrue,
+      );
+    });
+
+    test('#154/AK2: a typedef next to code is not declarations only', () {
+      expect(
+        declarationsOnly('typedef Cb = void Function(int x);\nint f() => 1;\n'),
+        isFalse,
+      );
+      expect(
+        declarationsOnly(
+          'typedef Slot = ({int a, int b});\nfinal s = (a: 1, b: g());\n',
+        ),
+        isFalse,
+      );
+    });
+
     test('the report shows UI, web and generated files apart from the parts with a minimum', () {
       final e = evaluate(
         min: 80,

@@ -17,6 +17,7 @@ Release Notes von Woodshed Player, neueste Version zuerst. Diese Datei ist massg
 - Mutationstests melden Fehler der Umgebung im Basislauf getrennt und wiederholen ihn allein (#142); LAME im nächtlichen Mutationsjob, Zeitgrenze für den iOS-Rauchtest (#153).
 - Swift-Tests ohne Start der Dart-App, ohne Schlüsselbund und Mikrofon (#151).
 - Minutenschätzung der Workflows mit gemessenen Laufzeiten (#74).
+- Die Abdeckungsprüfung zählt Dateien mit `typedef` als reine Deklarationen (#154).
 
 ## Version 1.0.0-beta.1
 
