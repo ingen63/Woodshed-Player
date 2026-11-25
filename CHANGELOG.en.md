@@ -2,6 +2,22 @@
 
 Release notes of Woodshed Player, newest version first. This file translates [`CHANGELOG.md`](CHANGELOG.md) (German), which is authoritative. Every entry starts with `## Version X.Y.Z` and has the sections «New, changed, fixed» and «Tests and development» (at least one, in this order); every bullet names its issues. `python3 tools/changelog.py check` checks both files (#139).
 
+## Version 1.0.0-beta.2
+
+### New, changed, fixed
+
+- **Subfolders (#146):** Library folders can have subfolders of any depth («New subfolder» in the context menu); folders can be moved by dragging, without cycles, also across the sync. Deleting a folder moves its titles to «No folder».
+- **Armed recording while practising (Mac only, #147):** «Armed» switch in *Practice* and *Metronome*: every time you play, a separate recording is captured (1 s before and after) and filed under `Recordings › <date>`; threshold and pause in the popover at the switch.
+- **Help in the app (#148):** Help page for all areas, offline and in every language of the app, plus an overview of the keyboard shortcuts (key «?»); on the Mac in the «Help» menu, elsewhere in the library's «⋯» menu.
+- **Dark appearance by default (#149):** Without a chosen appearance the app starts dark, including the launch screen; a chosen appearance is kept.
+- **Repair of the cloud library (#90):** no longer needed, since every device writes only its own file (#53, #111).
+
+### Tests and development
+
+- Mutation tests report environment failures in the baseline run separately and retry it alone (#142); LAME in the nightly mutation job, time limit for the iOS smoke test (#153).
+- Swift tests without starting the Dart app, without keychain and microphone (#151).
+- Workflow minutes estimate with measured run times (#74).
+
 ## Version 1.0.0-beta.1
 
 ### New, changed, fixed

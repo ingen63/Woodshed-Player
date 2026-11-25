@@ -2,6 +2,22 @@
 
 Release Notes von Woodshed Player, neueste Version zuerst. Diese Datei ist massgebend; [`CHANGELOG.en.md`](CHANGELOG.en.md) übersetzt jede Version. Jeder Eintrag beginnt mit `## Version X.Y.Z` und hat die Abschnitte «Neu, geändert, behoben» und «Tests und Entwicklung» (mindestens einen, in dieser Reihenfolge); jeder Punkt nennt seine Issues. `python3 tools/changelog.py check` prüft beide Dateien (#139).
 
+## Version 1.0.0-beta.2
+
+### Neu, geändert, behoben
+
+- **Unterordner (#146):** Ordner der Bibliothek können beliebig tiefe Unterordner haben («Neuer Unterordner» im Kontextmenü); Ordner lassen sich per Ziehen verschieben, ohne Zyklen, auch über den Abgleich. Beim Löschen eines Ordners kommen seine Titel unter «Ohne Ordner».
+- **Scharfe Aufnahme beim Üben (nur Mac, #147):** Schalter «Scharf» in *Üben* und *Metronom*: Jedes Spielen wird als eigene Aufnahme mitgeschnitten (1 s Vor- und Nachlauf) und unter `Recordings › <Datum>` abgelegt; Schwelle und Pause im Popover am Schalter.
+- **Hilfe in der App (#148):** Hilfe-Seite für alle Bereiche, offline und in allen Sprachen der App, dazu eine Übersicht der Tastenkürzel (Taste «?»); am Mac im Menü «Hilfe», sonst im Menü «⋯» der Bibliothek.
+- **Dunkle Darstellung als Standard (#149):** Ohne gewählte Darstellung startet die App dunkel, auch der Startbildschirm; eine gewählte Darstellung bleibt erhalten.
+- **Reparatur der Cloud-Bibliothek (#90):** nicht mehr nötig, seit jedes Gerät nur seine eigene Datei schreibt (#53, #111).
+
+### Tests und Entwicklung
+
+- Mutationstests melden Fehler der Umgebung im Basislauf getrennt und wiederholen ihn allein (#142); LAME im nächtlichen Mutationsjob, Zeitgrenze für den iOS-Rauchtest (#153).
+- Swift-Tests ohne Start der Dart-App, ohne Schlüsselbund und Mikrofon (#151).
+- Minutenschätzung der Workflows mit gemessenen Laufzeiten (#74).
+
 ## Version 1.0.0-beta.1
 
 ### Neu, geändert, behoben
