@@ -170,6 +170,24 @@ abstract class AppLocalizations {
   /// **'Delete folder'**
   String get deleteFolder;
 
+  /// #146/AK1: title of the name dialog for a folder inside a folder
+  ///
+  /// In en, this message translates to:
+  /// **'New subfolder'**
+  String get newSubfolder;
+
+  /// #146/AK1: context menu of a folder
+  ///
+  /// In en, this message translates to:
+  /// **'New subfolder …'**
+  String get newSubfolderEllipsis;
+
+  /// #146/AK5: question before deleting a folder with subfolders: folders deleted (with this one), tracks moved to “No folder”
+  ///
+  /// In en, this message translates to:
+  /// **'{folders, plural, =1{1 folder is deleted.} other{{folders} folders are deleted: this one and its subfolders.}} {tracks, plural, =0{There are no tracks in them.} =1{1 track moves to “No folder”, its audio file stays.} other{{tracks} tracks move to “No folder”, their audio files stay.}}'**
+  String deleteFolderTreeText(int folders, int tracks);
+
   /// No description provided for @emptyFolder.
   ///
   /// In en, this message translates to:

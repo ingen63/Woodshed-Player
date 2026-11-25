@@ -36,6 +36,7 @@ class DeviceSettings {
     this.recordingSource,
     this.syncProvider,
     this.libraryOpen = false,
+    this.closedFolders = const {},
     this.sidebarWidth,
     this.yearsRead = false,
   });
@@ -94,6 +95,9 @@ class DeviceSettings {
   /// it, so the playlists show without scrolling. Written only while true.
   final bool libraryOpen;
 
+  /// #146/AK2: folders closed in the library list on this device; the others are open.
+  final Set<String> closedFolders;
+
   /// #129/AK3: width of the library sidebar (points) chosen on this device; null: the default width.
   final double? sidebarWidth;
 
@@ -116,6 +120,7 @@ class DeviceSettings {
     String? recordingSource,
     String? Function()? syncProvider,
     bool? libraryOpen,
+    Set<String>? closedFolders,
     double? Function()? sidebarWidth,
     bool? yearsRead,
   }) => DeviceSettings(
@@ -134,6 +139,7 @@ class DeviceSettings {
     recordingSource: recordingSource ?? this.recordingSource,
     syncProvider: syncProvider == null ? this.syncProvider : syncProvider(),
     libraryOpen: libraryOpen ?? this.libraryOpen,
+    closedFolders: closedFolders ?? this.closedFolders,
     sidebarWidth: sidebarWidth == null ? this.sidebarWidth : sidebarWidth(),
     yearsRead: yearsRead ?? this.yearsRead,
   );
@@ -154,6 +160,7 @@ class DeviceSettings {
     if (recordingSource != null) 'recordingSource': recordingSource,
     if (syncProvider != null) 'syncProvider': syncProvider,
     if (libraryOpen) 'libraryOpen': true,
+    if (closedFolders.isNotEmpty) 'closedFolders': [...closedFolders]..sort(),
     if (sidebarWidth != null) 'sidebarWidth': sidebarWidth,
     if (yearsRead) 'yearsRead': true,
   };
@@ -211,6 +218,7 @@ class DeviceSettings {
               _ => null,
             },
             libraryOpen: j['libraryOpen'] == true,
+            closedFolders: _ids(j['closedFolders']),
             sidebarWidth: switch (j['sidebarWidth']) {
               final num v when v > 0 && v.isFinite => v.toDouble(),
               _ => null,

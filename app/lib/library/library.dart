@@ -19,6 +19,7 @@ import 'package:wp_core/wp_types.dart' show WpCode, WpTrimmed;
 
 import '../app/file_platform.dart';
 import 'device_settings.dart';
+import 'folder_tree.dart';
 import 'metadata.dart';
 import 'migration.dart';
 import 'natural_compare.dart';
@@ -494,10 +495,11 @@ class Library extends ChangeNotifier {
 
   /// Builds the live lists from the alive records. A track in a deleted folder shows without folder.
   void _materialize() {
-    _folders = [
+    // #146/AK8: missing parents and cycles from moves on two devices end in a valid tree
+    _folders = validFolderTree([
       for (final e in _state.folders.entries)
         if (e.value.alive) TrackFolder.fromShared(e.key, e.value.values),
-    ];
+    ], (id) => _state.folders[id]?.stamps[TrackFolder.parentField]);
     final folderIds = {for (final f in _folders) f.id};
     _tracks = [
       for (final e in _state.tracks.entries)
@@ -569,8 +571,19 @@ class Library extends ChangeNotifier {
     _replacements.clear();
     _state = SharedState(
       tracks: tracks,
+      // #146: a folder back on the top level clears its stamped parent; one that never had a parent is
+      // written as before
       folders: records(_state.folders, {
-        for (final f in _folders) f.id: f.toShared(),
+        for (final f in _folders)
+          f.id: {
+            ...f.toShared(),
+            if (f.parentId == null &&
+                (_state.folders[f.id]?.values.containsKey(
+                      TrackFolder.parentField,
+                    ) ??
+                    false))
+              TrackFolder.parentField: null,
+          },
       }),
       // #114/AK10: a deleted playlist goes out without its name and tracks: a playlist made «only on this
       // device» before it was ever synced leaves nothing of itself behind
@@ -946,6 +959,20 @@ class Library extends ChangeNotifier {
     await saving;
   }
 
+  /// #146/AK2: the folder is closed in the library list on this device; folders are open by default.
+  bool folderClosed(String id) => _device.closedFolders.contains(id);
+
+  /// #146/AK2: opens or closes a folder in the list; kept per device (a failed write keeps it for this run
+  /// only).
+  Future<void> setFolderClosed(String id, bool closed) async {
+    if (folderClosed(id) == closed) return;
+    final ids = {..._device.closedFolders};
+    closed ? ids.add(id) : ids.remove(id);
+    final saving = _updateDevice(_device.copyWith(closedFolders: ids));
+    notifyListeners();
+    await saving;
+  }
+
   /// #129/AK3: width of the library sidebar chosen on this device; null: the default width.
   double? get sidebarWidth => _device.sidebarWidth;
 
@@ -1218,8 +1245,16 @@ class Library extends ChangeNotifier {
     return list;
   }
 
-  List<TrackFolder> get sortedFolders =>
-      sortedNaturally(_folders, (f) => f.name);
+  /// The folders in the order of the list (#146: each followed by its subfolders, siblings by name).
+  List<TrackFolder> get sortedFolders => [for (final e in folderTree) e.folder];
+
+  /// #146/AK2: the folders in the order of the list with their depth (0: top level).
+  List<({TrackFolder folder, int depth})> get folderTree =>
+      folderTreeOrder(sortedNaturally(_folders, (f) => f.name));
+
+  /// #146: the folder with this ID, if any.
+  TrackFolder? folder(String id) =>
+      _folders.where((f) => f.id == id).firstOrNull;
 
   /// #122/AK3: the tracks as the library lists them: without a folder first, then folder by folder.
   List<Track> get listedTracks {
@@ -1418,10 +1453,19 @@ class Library extends ChangeNotifier {
 
   // ---- Ordner ----
 
-  /// New folder; a blank [name] becomes [fallback] (the UI passes the localized «New folder»).
-  TrackFolder createFolder(String name, {String fallback = ''}) {
+  /// New folder; a blank [name] becomes [fallback] (the UI passes the localized «New folder»). #146/AK1:
+  /// with [parentId] it lies in that folder (top level if there is no such folder).
+  TrackFolder createFolder(
+    String name, {
+    String fallback = '',
+    String? parentId,
+  }) {
     final t = name.trim();
-    final f = TrackFolder(id: newUuid(_random), name: t.isEmpty ? fallback : t);
+    final f = TrackFolder(
+      id: newUuid(_random),
+      name: t.isEmpty ? fallback : t,
+      parentId: folder(parentId ?? '') == null ? null : parentId,
+    );
     _folders.add(f);
     save();
     notifyListeners();
@@ -1438,12 +1482,43 @@ class Library extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Entfernt den Ordner; seine Titel bleiben ohne Ordner in der Bibliothek.
+  /// #146/AK4: [id] may go into [parentId] (null: top level): both exist and [parentId] is neither the
+  /// folder itself nor one of its subfolders.
+  bool canMoveFolder(String id, String? parentId) =>
+      folder(id) != null &&
+      (parentId == null ||
+          (folder(parentId) != null &&
+              !folderSubtree(_folders, id).contains(parentId)));
+
+  /// #146/AK3: moves the folder with everything in it into [parentId] (null: top level). Returns false and
+  /// changes nothing if that would make a cycle ([canMoveFolder]).
+  bool moveFolder(String id, String? parentId) {
+    if (!canMoveFolder(id, parentId)) return false;
+    final i = _folders.indexWhere((f) => f.id == id);
+    if (_folders[i].parentId == parentId) return true;
+    _folders[i] = _folders[i].copyWith(parentId: () => parentId);
+    save();
+    notifyListeners();
+    return true;
+  }
+
+  /// #146/AK5: what deleting [id] affects: the tracks in it and its subfolders, and the subfolders.
+  ({int tracks, int folders}) folderContents(String id) {
+    final ids = folderSubtree(_folders, id);
+    return (
+      tracks: _tracks.where((t) => ids.contains(t.folderId)).length,
+      folders: ids.length - 1,
+    );
+  }
+
+  /// Removes the folder and (#146/AK5) all its subfolders; the tracks in them stay in the library
+  /// without a folder.
   void deleteFolder(String id) {
-    _folders.removeWhere((f) => f.id == id);
+    final ids = folderSubtree(_folders, id);
+    _folders.removeWhere((f) => ids.contains(f.id));
     _tracks = [
       for (final t in _tracks)
-        t.folderId == id ? t.copyWith(folderId: () => null) : t,
+        ids.contains(t.folderId) ? t.copyWith(folderId: () => null) : t,
     ];
     save();
     notifyListeners();

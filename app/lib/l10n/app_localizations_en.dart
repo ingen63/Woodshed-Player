@@ -49,6 +49,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteFolder => 'Delete folder';
 
   @override
+  String get newSubfolder => 'New subfolder';
+
+  @override
+  String get newSubfolderEllipsis => 'New subfolder …';
+
+  @override
+  String deleteFolderTreeText(int folders, int tracks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      folders,
+      locale: localeName,
+      other: '$folders folders are deleted: this one and its subfolders.',
+      one: '1 folder is deleted.',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      tracks,
+      locale: localeName,
+      other: '$tracks tracks move to “No folder”, their audio files stay.',
+      one: '1 track moves to “No folder”, its audio file stays.',
+      zero: 'There are no tracks in them.',
+    );
+    return '$_temp0 $_temp1';
+  }
+
+  @override
   String get emptyFolder => 'Empty – drag tracks here';
 
   @override

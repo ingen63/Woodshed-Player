@@ -58,8 +58,6 @@ class LibraryView extends StatefulWidget {
 }
 
 class _LibraryViewState extends State<LibraryView> {
-  final _collapsed = <String>{};
-
   /// #114: playlists are collapsed until opened (a library may have many).
   final _openPlaylists = <String>{};
 
@@ -154,7 +152,7 @@ class _LibraryViewState extends State<LibraryView> {
         for (final t in _matches(query)) t.id
       else if (lib.libraryOpen)
         for (final t in listed)
-          if (t.folderId == null || !_collapsed.contains(t.folderId)) t.id,
+          if (_folderShownOpen(t.folderId)) t.id,
     ];
     final shown = _shown.toSet();
     _order = [
@@ -163,6 +161,15 @@ class _LibraryViewState extends State<LibraryView> {
         if (!shown.contains(t.id)) t.id,
     ];
     _picked = _selection.isEmpty ? const [] : _selection.inOrder(_order);
+  }
+
+  /// #146/AK2: the contents of folder [id] show: it and every folder above it are open (null: no folder).
+  bool _folderShownOpen(String? id) {
+    final seen = <String>{};
+    for (var f = id; f != null && seen.add(f); f = lib.folder(f)?.parentId) {
+      if (lib.folderClosed(f)) return false;
+    }
+    return true;
   }
 
   /// #115/AK9: a track chosen in the library plays within its folder.
@@ -315,7 +322,9 @@ class _LibraryViewState extends State<LibraryView> {
         key: const Key('section:none'),
         label: context.l10n.noFolder,
         icon: WsIcons.tray,
-        onDrop: (d) => lib.placeTracks({...?trackIds(d)}, null),
+        // #146/AK3: a folder dropped here goes to the top level
+        accepts: _takesTracksOrFolderAt(null),
+        onDrop: (d) => _dropOn(d, null),
         fileTarget: const FolderDropTarget(null),
         fileHover: _hovered(const FolderDropTarget(null)),
       ),
@@ -327,15 +336,32 @@ class _LibraryViewState extends State<LibraryView> {
         fileTarget: const FolderDropTarget(null),
         fileHover: _hovered(const FolderDropTarget(null)),
       ),
-    for (final f in folders) ..._folder(f),
+    for (final e in lib.folderTree)
+      if (_folderShownOpen(e.folder.parentId)) ..._folder(e.folder, e.depth),
   ];
+
+  /// #146/AK3, AK4: a folder header (or «No folder» for [folderId] null, the top level) takes tracks, and
+  /// folders that may move there without a cycle.
+  bool Function(Object) _takesTracksOrFolderAt(String? folderId) =>
+      (d) => switch (d) {
+        _FolderDrag(:final id) =>
+          id != folderId &&
+              lib.folder(id)?.parentId != folderId &&
+              lib.canMoveFolder(id, folderId),
+        _ => trackIds(d) != null,
+      };
+
+  void _dropOn(Object d, String? folderId) => switch (d) {
+    _FolderDrag(:final id) => lib.moveFolder(id, folderId),
+    _ => lib.placeTracks({...?trackIds(d)}, folderId),
+  };
 
   /// #121/AK4: files dragged in from outside are over [target].
   bool _hovered(FileDropTarget target) => c.fileDropHover.value == target;
 
-  List<Widget> _folder(TrackFolder f) {
+  List<Widget> _folder(TrackFolder f, int depth) {
     final l = context.l10n;
-    final open = !_collapsed.contains(f.id);
+    final open = !lib.folderClosed(f.id);
     final tracks = lib.sortedTracksIn(f.id);
     final files = FolderDropTarget(f.id);
     return [
@@ -346,10 +372,12 @@ class _LibraryViewState extends State<LibraryView> {
           label: f.name,
           icon: WsIcons.folder,
           expanded: open,
-          onToggle: () => setState(
-            () => open ? _collapsed.add(f.id) : _collapsed.remove(f.id),
-          ),
-          onDrop: (d) => lib.placeTracks({...?trackIds(d)}, f.id),
+          onToggle: () => lib.setFolderClosed(f.id, open),
+          depth: depth,
+          dragData: _FolderDrag(f.id),
+          touch: widget.touch,
+          accepts: _takesTracksOrFolderAt(f.id),
+          onDrop: (d) => _dropOn(d, f.id),
           fileTarget: files,
           fileHover: _hovered(files),
           menu: (context) => [
@@ -357,6 +385,19 @@ class _LibraryViewState extends State<LibraryView> {
               leadingIcon: const Icon(WsIcons.add, size: 16),
               onPressed: () => c.pickAndImport(folderId: f.id),
               child: Text(l.addMp3Ellipsis),
+            ),
+            // #146/AK1: a new folder inside this one
+            MenuItemButton(
+              key: Key('newSubfolder:${f.name}'),
+              leadingIcon: const Icon(WsIcons.folder, size: 16),
+              onPressed: () async {
+                final name = await askName(context, l.newSubfolder);
+                if (name != null) {
+                  lib.createFolder(name, fallback: l.newFolder, parentId: f.id);
+                  lib.setFolderClosed(f.id, false);
+                }
+              },
+              child: Text(l.newSubfolderEllipsis),
             ),
             MenuItemButton(
               leadingIcon: const Icon(WsIcons.pencil, size: 16),
@@ -379,10 +420,14 @@ class _LibraryViewState extends State<LibraryView> {
             MenuItemButton(
               leadingIcon: const Icon(WsIcons.trash, size: 16),
               onPressed: () async {
+                // #146/AK5: the question names what goes with it
+                final n = lib.folderContents(f.id);
                 if (await confirm(
                   context,
                   title: l.deleteNamedTitle(f.name),
-                  text: l.deleteFolderText,
+                  text: n.folders == 0
+                      ? l.deleteFolderText
+                      : l.deleteFolderTreeText(n.folders + 1, n.tracks),
                   action: l.deleteFolder,
                 )) {
                   lib.deleteFolder(f.id);
@@ -394,8 +439,8 @@ class _LibraryViewState extends State<LibraryView> {
         ),
       ),
       if (open) ...[
-        for (final t in tracks) _row(t, indent: true, fileTarget: files),
-        if (tracks.isEmpty)
+        for (final t in tracks) _row(t, depth: depth + 1, fileTarget: files),
+        if (tracks.isEmpty && !lib.folders.any((s) => s.parentId == f.id))
           _Placeholder(
             l.emptyFolder,
             onDrop: (ids) => lib.placeTracks(ids.toSet(), f.id),
@@ -533,7 +578,7 @@ class _LibraryViewState extends State<LibraryView> {
               onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
               onlyInCloud: !lib.hasFile(t.id) && c.sync.inCloud(t.id),
               fetching: c.fetching == t.id,
-              indent: true,
+              depth: 1,
               touch: widget.touch,
               onTap: () {
                 c.playPlaylist(p.id, index: i, play: false);
@@ -574,7 +619,7 @@ class _LibraryViewState extends State<LibraryView> {
   }
 
   /// [fileTarget]: where files dropped on the row go (#121), the row's folder; none in the search.
-  Widget _row(Track t, {bool indent = false, FileDropTarget? fileTarget}) {
+  Widget _row(Track t, {int depth = 0, FileDropTarget? fileTarget}) {
     final l = context.l10n;
     final marked = _selection.contains(t.id);
     // #122/AK3, AK4: the context menu of one of several selected tracks acts on all of them
@@ -591,7 +636,7 @@ class _LibraryViewState extends State<LibraryView> {
         onlyElsewhere: !lib.hasFile(t.id) && !c.sync.inCloud(t.id),
         onlyInCloud: !lib.hasFile(t.id) && c.sync.inCloud(t.id),
         fetching: c.fetching == t.id,
-        indent: indent,
+        depth: depth,
         touch: widget.touch,
         onTap: () => _tap(t),
         // #122/AK2: a long press released without dragging starts the selection mode
@@ -692,13 +737,17 @@ class _LibraryViewState extends State<LibraryView> {
               : () => move(null),
           child: Text(l.noFolder),
         ),
-        for (final f in lib.sortedFolders)
+        for (final (:folder, :depth) in lib.folderTree)
           MenuItemButton(
-            key: Key('moveTo:${f.name}'),
-            onPressed: folders.length == 1 && folders.first == f.id
+            key: Key('moveTo:${folder.name}'),
+            onPressed: folders.length == 1 && folders.first == folder.id
                 ? null
-                : () => move(f.id),
-            child: Text(f.name),
+                : () => move(folder.id),
+            // #146: subfolders indented under their folder
+            child: Padding(
+              padding: EdgeInsets.only(left: 12.0 * depth),
+              child: Text(folder.name),
+            ),
           ),
         const Divider(height: 1),
         MenuItemButton(
@@ -1282,10 +1331,20 @@ class _SectionHeader extends StatelessWidget {
     this.trailing = const [],
     this.fileTarget,
     this.fileHover = false,
+    this.depth = 0,
+    this.dragData,
+    this.touch = false,
   });
 
   final String label;
   final IconData icon;
+
+  /// #146/AK2: nesting of a subfolder (0: top level), shown as indentation.
+  final int depth;
+
+  /// #146/AK3: the header can be dragged with this data (a folder); on touch devices after a long press.
+  final Object? dragData;
+  final bool touch;
 
   /// Called with the dragged data: a track ID (String), or a playlist row (#114) where [accepts] allows it.
   final void Function(Object data) onDrop;
@@ -1314,46 +1373,49 @@ class _SectionHeader extends StatelessWidget {
       onAcceptWithDetails: (d) => onDrop(d.data),
       builder: (context, candidates, _) => _WithMenu(
         menu: menu,
-        builder: (context, openMenu) => Material(
-          type: candidates.isNotEmpty || fileHover
-              ? MaterialType.canvas
-              : MaterialType.transparency,
-          color: WsTheme.of(context).amberSoft,
-          child: InkWell(
-            onTap: onToggle,
-            onSecondaryTapUp: openMenu == null
-                ? null
-                : (e) => openMenu(e.localPosition),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 4, 4),
-              child: Row(
-                children: [
-                  if (expanded != null)
-                    Icon(
-                      expanded! ? WsIcons.chevronDown : WsIcons.chevronRight,
-                      size: 12,
-                    ),
-                  const SizedBox(width: 6),
-                  Icon(icon, size: 16, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+        builder: (context, openMenu) => _draggable(
+          context,
+          (dimmed) => Material(
+            type: !dimmed && (candidates.isNotEmpty || fileHover)
+                ? MaterialType.canvas
+                : MaterialType.transparency,
+            color: WsTheme.of(context).amberSoft,
+            child: InkWell(
+              onTap: onToggle,
+              onSecondaryTapUp: openMenu == null
+                  ? null
+                  : (e) => openMenu(e.localPosition),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(12.0 + 16 * depth, 10, 4, 4),
+                child: Row(
+                  children: [
+                    if (expanded != null)
+                      Icon(
+                        expanded! ? WsIcons.chevronDown : WsIcons.chevronRight,
+                        size: 12,
+                      ),
+                    const SizedBox(width: 6),
+                    Icon(icon, size: 16, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                  ),
-                  ...trailing,
-                  if (openMenu != null)
-                    IconButton(
-                      tooltip: menuTooltip ?? context.l10n.folderActions,
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 16,
-                      icon: const Icon(WsIcons.ellipsis),
-                      onPressed: () => openMenu(null),
-                    ),
-                ],
+                    ...trailing,
+                    if (openMenu != null)
+                      IconButton(
+                        tooltip: menuTooltip ?? context.l10n.folderActions,
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 16,
+                        icon: const Icon(WsIcons.ellipsis),
+                        onPressed: () => openMenu(null),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1362,6 +1424,47 @@ class _SectionHeader extends StatelessWidget {
     );
     return FileDropRegion(target: fileTarget, child: target);
   }
+
+  /// #146/AK3: with [dragData] the header can be dragged, by mouse at once, by touch after a long press.
+  Widget _draggable(BuildContext context, Widget Function(bool dimmed) tile) {
+    final data = dragData;
+    if (data == null) return tile(false);
+    final feedback = Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16),
+            const SizedBox(width: 8),
+            Text(label),
+          ],
+        ),
+      ),
+    );
+    final dimmed = Opacity(opacity: 0.4, child: tile(true));
+    return touch
+        ? LongPressDraggable<Object>(
+            data: data,
+            feedback: feedback,
+            childWhenDragging: dimmed,
+            child: tile(false),
+          )
+        : Draggable<Object>(
+            data: data,
+            feedback: feedback,
+            childWhenDragging: dimmed,
+            child: tile(false),
+          );
+  }
+}
+
+/// #146/AK3: a folder being dragged; folders and the top level take it where no cycle results.
+class _FolderDrag {
+  const _FolderDrag(this.id);
+  final String id;
 }
 
 /// #54/AK8: the sync status in the library footer, e.g. «Sync: Up to date»; a tap opens the settings.
@@ -1660,7 +1763,7 @@ class _TrackRow extends StatelessWidget {
     this.onlyElsewhere = false,
     this.onlyInCloud = false,
     this.fetching = false,
-    required this.indent,
+    required this.depth,
     required this.touch,
     required this.onTap,
     required this.onDrop,
@@ -1673,7 +1776,10 @@ class _TrackRow extends StatelessWidget {
 
   final Track track;
   final String? artwork;
-  final bool selected, indent, touch;
+  final bool selected, touch;
+
+  /// #146/AK2: nesting (0: top level, 1: in a folder or playlist, more in subfolders).
+  final int depth;
 
   /// #122/AK1: one of the tracks selected together.
   final bool marked;
@@ -1740,7 +1846,7 @@ class _TrackRow extends StatelessWidget {
                 : null,
           ),
           constraints: BoxConstraints(minHeight: touch ? 48 : 0),
-          padding: EdgeInsets.fromLTRB(indent ? 28 : 12, 6, 4, 6),
+          padding: EdgeInsets.fromLTRB(12.0 + 16 * depth, 6, 4, 6),
           child: Row(
             children: [
               if (checked case final on?) ...[

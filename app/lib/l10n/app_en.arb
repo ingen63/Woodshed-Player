@@ -19,6 +19,26 @@
   },
   "deleteFolderText": "The tracks stay in the library and appear under “No folder”.",
   "deleteFolder": "Delete folder",
+  "newSubfolder": "New subfolder",
+  "@newSubfolder": {
+    "description": "#146/AK1: title of the name dialog for a folder inside a folder"
+  },
+  "newSubfolderEllipsis": "New subfolder …",
+  "@newSubfolderEllipsis": {
+    "description": "#146/AK1: context menu of a folder"
+  },
+  "deleteFolderTreeText": "{folders, plural, =1{1 folder is deleted.} other{{folders} folders are deleted: this one and its subfolders.}} {tracks, plural, =0{There are no tracks in them.} =1{1 track moves to “No folder”, its audio file stays.} other{{tracks} tracks move to “No folder”, their audio files stay.}}",
+  "@deleteFolderTreeText": {
+    "description": "#146/AK5: question before deleting a folder with subfolders: folders deleted (with this one), tracks moved to “No folder”",
+    "placeholders": {
+      "folders": {
+        "type": "int"
+      },
+      "tracks": {
+        "type": "int"
+      }
+    }
+  },
   "emptyFolder": "Empty – drag tracks here",
   "newFolder": "New folder",
   "newFolderEllipsis": "New folder …",

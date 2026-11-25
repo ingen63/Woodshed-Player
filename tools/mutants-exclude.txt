@@ -775,3 +775,12 @@ app/lib/app/track_export.dart | dart_remove_void_call | _remove(target);
 # Grenzfall: lame_encode_flush schreibt immer die letzten Frames (mindestens eines), gibt also nie 0
 # zurück; nur dann unterschiede sich «<=» von «<».
 core/src/mp3_export.cpp | cxx_lt_to_le | if (tail < 0)
+
+# ---- app/lib/library/folder_tree.dart ----
+# gleichwertig: «done» spart in validFolderTree() nur Wege. Ohne den Eintrag läuft ein späterer Weg
+# über schon besuchte Ordner bis zur obersten Ebene weiter; einen Zyklus findet er dort nicht mehr,
+# denn jeder gefundene Zyklus ist schon aufgelöst (parent[oldest] = null). Das Ergebnis ist dasselbe.
+app/lib/library/folder_tree.dart | dart_remove_void_call | done.addAll(path);
+# gleichwertig: _older() vergleicht nur Ordner desselben Zyklus, und die haben verschiedene IDs;
+# compareTo() ist also nie 0, «< 0» und «<= 0» geben dasselbe.
+app/lib/library/folder_tree.dart | dart_lt_to_le | return a.compareTo(b) < 0;

@@ -35,6 +35,13 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get deleteFolder => pseudo(super.deleteFolder);
   @override
+  String get newSubfolder => pseudo(super.newSubfolder);
+  @override
+  String get newSubfolderEllipsis => pseudo(super.newSubfolderEllipsis);
+  @override
+  String deleteFolderTreeText(int folders, int tracks) =>
+      pseudo(super.deleteFolderTreeText(folders, tracks));
+  @override
   String get emptyFolder => pseudo(super.emptyFolder);
   @override
   String get newFolder => pseudo(super.newFolder);

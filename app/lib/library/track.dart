@@ -375,9 +375,15 @@ class LoopRange {
   int get hashCode => Object.hash(start, end);
 }
 
-/// Ordner der Bibliothek (`TrackFolder` in Swift).
+/// Folder of the library (`TrackFolder` in Swift). #146: folders nest; [parentId] names the folder this
+/// one lies in, null for the top level.
 class TrackFolder {
-  const TrackFolder({required this.id, required this.name, this.sync = true});
+  const TrackFolder({
+    required this.id,
+    required this.name,
+    this.sync = true,
+    this.parentId,
+  });
   final String id;
   final String name;
 
@@ -385,8 +391,19 @@ class TrackFolder {
   /// metadata are synced anyway.
   final bool sync;
 
-  TrackFolder copyWith({String? name, bool? sync}) =>
-      TrackFolder(id: id, name: name ?? this.name, sync: sync ?? this.sync);
+  /// #146: the folder this one lies in; null: top level.
+  final String? parentId;
+
+  TrackFolder copyWith({
+    String? name,
+    bool? sync,
+    String? Function()? parentId,
+  }) => TrackFolder(
+    id: id,
+    name: name ?? this.name,
+    sync: sync ?? this.sync,
+    parentId: parentId == null ? this.parentId : parentId(),
+  );
 
   /// Entry of the former `library.json` (format 1).
   factory TrackFolder.fromLegacyJson(Map<String, Object?> j) => TrackFolder(
@@ -394,14 +411,23 @@ class TrackFolder {
     name: j['name'] as String? ?? '',
   );
 
-  /// Shared fields (#36/AK5).
-  Map<String, Object?> toShared() => {'name': name, 'sync': sync};
+  /// Shared fields (#36/AK5). #146: `parent` only for a subfolder, so a library without subfolders is
+  /// written as before.
+  Map<String, Object?> toShared() => {
+    'name': name,
+    'sync': sync,
+    if (parentId != null) parentField: parentId,
+  };
+
+  /// #146: the shared field holding [parentId].
+  static const parentField = 'parent';
 
   factory TrackFolder.fromShared(String id, Map<String, Object?> v) =>
       TrackFolder(
         id: id,
         name: v['name'] as String? ?? '',
         sync: v['sync'] as bool? ?? true,
+        parentId: v[parentField] as String?,
       );
 }
 

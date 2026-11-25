@@ -49,6 +49,31 @@ class AppLocalizationsDe extends AppLocalizations {
   String get deleteFolder => 'Ordner löschen';
 
   @override
+  String get newSubfolder => 'Neuer Unterordner';
+
+  @override
+  String get newSubfolderEllipsis => 'Neuer Unterordner …';
+
+  @override
+  String deleteFolderTreeText(int folders, int tracks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      folders,
+      locale: localeName,
+      other: '$folders Ordner werden gelöscht: dieser und seine Unterordner.',
+      one: '1 Ordner wird gelöscht.',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      tracks,
+      locale: localeName,
+      other:
+          '$tracks Titel kommen unter «Ohne Ordner», ihre Audiodateien bleiben.',
+      one: '1 Titel kommt unter «Ohne Ordner», seine Audiodatei bleibt.',
+      zero: 'Darin sind keine Titel.',
+    );
+    return '$_temp0 $_temp1';
+  }
+
+  @override
   String get emptyFolder => 'Leer – Titel hierher ziehen';
 
   @override
