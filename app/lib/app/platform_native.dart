@@ -32,6 +32,7 @@ import 'practice_recording.dart';
 import 'recording_controller.dart';
 import 'smoke.dart';
 import 'web_auth_channel.dart';
+import 'test_host.dart';
 
 /// App services. [baseDir] replaces the app folder (library, metronome settings), e.g. in the smoke
 /// test, so the real library is never touched. [tapTempo] lets UI tests set the tap clock (#13).
@@ -227,6 +228,9 @@ class _PlayerMetronome implements MetronomeBackend {
     seconds: seconds,
   );
 }
+
+/// #151: the app is only the host of the Swift tests; the Dart app does not start.
+bool get swiftTestHost => isSwiftTestHost(Platform.environment);
 
 /// #13/AK5: WP_SMOKE=1 starts the smoke test of the built app (smoke.dart, tools/smoke_app.sh).
 bool get smokeRequested => Platform.environment['WP_SMOKE'] == '1';

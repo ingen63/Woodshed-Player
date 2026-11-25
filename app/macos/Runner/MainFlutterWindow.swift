@@ -7,8 +7,39 @@ import UniformTypeIdentifiers
 // NSDraggingDestination ausdrücklich angeben (#22): Ohne die Konformität sind die Drag-Methoden unten
 // für AppKit unsichtbar (kein @objc), und es greift die Standard-Implementierung von NSWindow, die nichts tut.
 class MainFlutterWindow: NSWindow, NSDraggingDestination {
+  /// #151: true while the app is only the host of the Swift tests (`xcodebuild … test`). xcodebuild sets
+  /// these variables for a hosted test bundle; a normal start never has them.
+  static func isTestHost(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+    return ["XCTestConfigurationFilePath", "XCTestBundlePath", "XCTestSessionIdentifier"].contains {
+      environment[$0] != nil
+    }
+  }
+
+  /// #151: the engine of the window. As test host it is never run: the Dart app does not start, so no
+  /// sync, keychain, microphone or library of the installed app is touched. The window, its Flutter view
+  /// and the channels are there all the same for the tests.
+  private(set) var dartStarted = false
+
+  /// #151: calls from Dart on the app's channels while the app is test host. Stays 0 as long as the Dart
+  /// app does not start; a test checks it.
+  static var dartCallsInTestHost = 0
+
+  /// #151: counts a call from Dart; true if it may go on (no test host).
+  private static func dartCallAllowed() -> Bool {
+    guard isTestHost() else { return true }
+    dartCallsInTestHost += 1
+    return false
+  }
+
   override func awakeFromNib() {
-    let flutterViewController = FlutterViewController()
+    let flutterViewController: FlutterViewController
+    if Self.isTestHost() {
+      let engine = FlutterEngine(name: "test-host", project: nil, allowHeadlessExecution: true)
+      flutterViewController = FlutterViewController(engine: engine, nibName: nil, bundle: nil)
+    } else {
+      flutterViewController = FlutterViewController()
+      dartStarted = true
+    }
     let windowFrame = self.frame
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
@@ -155,6 +186,11 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
         // #140: the socket file of the command line, the same path the app's program connects to.
         result(CommandLineTool.socketPath)
       case "microphoneAccess":
+        // #151: never ask for the microphone as test host.
+        guard Self.dartCallAllowed() else {
+          result(false)
+          return
+        }
         // #113/AK4: macOS asks once (NSMicrophoneUsageDescription); afterwards the answer stands until
         // the user changes it in System Settings › Privacy & Security › Microphone.
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -240,6 +276,11 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
     let channel = FlutterMethodChannel(name: "woodshed/keychain", binaryMessenger: messenger)
     keychainChannel = channel
     channel.setMethodCallHandler { call, result in
+      // #151: never touch the keychain as test host.
+      guard Self.dartCallAllowed() else {
+        result(FlutterError(code: "testHost", message: "no keychain in the test host", details: nil))
+        return
+      }
       guard let args = call.arguments as? [String: Any], let key = args["key"] as? String else {
         result(FlutterError(code: "args", message: "key missing", details: nil))
         return
@@ -258,7 +299,11 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
 
   /// One keychain call; the reply for the channel. A refused or cancelled password prompt is an error
   /// (Dart: the stored sign-in is not readable, the user signs in again).
-  private static func keychain(_ method: String, key: String, value: String?) -> Any? {
+  static func keychain(_ method: String, key: String, value: String?) -> Any? {
+    // #151: a test run never reads or writes the keychain of the installed app.
+    if isTestHost() {
+      return FlutterError(code: "testHost", message: "no keychain in the test host", details: nil)
+    }
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: Bundle.main.bundleIdentifier ?? "WoodshedPlayer",
@@ -309,6 +354,11 @@ extension MainFlutterWindow: ASWebAuthenticationPresentationContextProviding {
     let channel = FlutterMethodChannel(name: "woodshed/webauth", binaryMessenger: messenger)
     MainFlutterWindow.webAuthChannel = channel
     channel.setMethodCallHandler { [weak self] call, result in
+      // #151: no sign-in window as test host.
+      guard Self.dartCallAllowed() else {
+        result(FlutterError(code: "testHost", message: "no sign-in in the test host", details: nil))
+        return
+      }
       switch call.method {
       case "start":
         guard let args = call.arguments as? [String: Any],

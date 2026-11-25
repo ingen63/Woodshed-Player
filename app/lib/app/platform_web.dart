@@ -113,6 +113,9 @@ bool get installHintWanted => wantsInstallHint(
 void showDocumentLanguage(Locale locale) =>
     web.document.documentElement?.setAttribute('lang', locale.toLanguageTag());
 
+/// #151: the Swift tests exist only on macOS.
+bool get swiftTestHost => false;
+
 /// The smoke test of the built app (#13/AK5) exists only on desktop.
 bool get smokeRequested => false;
 

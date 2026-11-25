@@ -19,6 +19,9 @@ export 'app/platform_native.dart'
     show createAppController;
 
 Future<void> main() async {
+  // #151: as host of the Swift tests the app shows nothing and touches nothing (keychain, microphone,
+  // sync, library); the tests only need the window of the runner.
+  if (swiftTestHost) return;
   WidgetsFlutterBinding.ensureInitialized();
   registerFontLicenses();
   registerCoreLicenses();
