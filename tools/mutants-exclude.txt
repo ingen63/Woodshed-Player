@@ -690,6 +690,12 @@ core/src/sound_gate.cpp | cxx_lt_to_le | if (i < count && state_.load() == GateS
 # firstSound() und lastSound() sind davon unabhängig).
 core/src/sound_gate.cpp | cxx_add_assign_to_sub_assign | pos_ += count - i;
 core/src/sound_gate.cpp | cxx_sub_to_add | pos_ += count - i;
+# gleichwertig: Beim Ende nach der Pause ist run entweder 0 (0 / channels_ ist auch 0) oder gleich i,
+# dann schreibt emit() null Frames und liest den Zeiger nicht. run wird nur nach dem Halten eines
+# stillen Frames (run = i + 1, der nächste Frame ist dann dieser i) oder vor einem lauten Frame
+# (run = i, danach kommt erst das Nachlaufen) grösser als 0; bis «quiet >= silence_» ist dann jeder
+# Frame gehalten worden.
+core/src/sound_gate.cpp | cxx_mul_to_div | emit(frames + static_cast<size_t>(run) * channels_, i - run, sink);
 
 # ---- app/lib/app (#140) ----
 # gleichwertig: gone() tut beim zweiten Aufruf nichts; ohne cancelOnError folgt dem Fehler nur noch
@@ -754,6 +760,10 @@ core/src/cli_posix.cpp | cxx_remove_void_call | ::_exit(WP_CLI_EXIT_CANCELLED);
 # gleichwertig: Ist der Inhalt von «data» kürzer als 8 Bytes, wirft sublist einen RangeError; mit «+»
 # statt «-» ebenso spät. readMetadata fängt beides ab und gibt leere Angaben zurück, wie die Abfrage.
 app/lib/library/metadata.dart | dart_sub_to_add | if (day == null || day.$2 - day.$1 < 8) return const TrackMetadata();
+# gleichwertig: Mit «<=» endet auch ein «data» aus genau 8 Bytes (Typ und Gebietsschema, kein Text)
+# hier. Mit «<» liest der Leser den leeren Text, parseYear('') ist null; beide Wege geben leere Angaben
+# zurück.
+app/lib/library/metadata.dart | dart_lt_to_le | if (day == null || day.$2 - day.$1 < 8) return const TrackMetadata();
 # gleichwertig: Die Schleife endet, wenn kein ganzer Kopf (8 Bytes) mehr Platz hat. Mit «-» oder «<»
 # liest sie dort weiter; jeder Kopf, der über das Ende reicht, scheitert an «p + size > end» (null) oder
 # am RangeError (abgefangen, leer). Ein Atom aus nur 8 Bytes am Ende hat keinen Inhalt, den der Leser

@@ -396,9 +396,13 @@ jobs:
         run: flutter test integration_test -d macos --reporter expanded
       - name: UI smoke test on the iOS simulator (#99/AK1, AK3, AK4)
         # the real core on an iOS simulator (booted by the script, null device as above), including the
-        # check that recording is missing on iPhone/iPad (#4/AK6)
+        # check that recording is missing on iPhone/iPad (#4/AK6). Usually 3 min; a simulator that hangs
+        # after the build fails this step instead of cancelling the whole job (#153).
+        timeout-minutes: 15
         run: make test-ios
       - name: Smoke test of the built app (#13/AK5)
+        # also after a failed iOS step: the macOS app does not depend on it (#153)
+        if: ${{ !cancelled() }}
         run: |
           (cd app && flutter build macos --release)
           tools/smoke_app.sh
@@ -554,6 +558,7 @@ jobs:
       MULL_VERSION: 0.39.1
       MULL_CC: clang-18
       MULL_CXX: clang++-18
+      WP_LAME_REQUIRED: '1'  # built below; a missing LAME fails the tests instead of skipping them
     steps:
       - uses: actions/checkout@v7
         with:
@@ -566,6 +571,9 @@ jobs:
         run: flutter pub get >/dev/null
       - name: Address space layout for the sanitizers (the mutation build uses ASan and UBSan)
         run: sudo sysctl -w vm.mmap_rnd_bits=28
+      # without LAME the MP3 export tests skip the encoding and miss every mutant there (#141, #153)
+      - name: LAME for the MP3 export tests, from its source (#141/AK15)
+        run: tools/build-lame.sh
       - name: Install Mull (Apache-2.0, a tool only)
         env:
           GH_TOKEN: ${{ github.token }}

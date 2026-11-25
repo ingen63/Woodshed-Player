@@ -278,10 +278,18 @@ void main() {
         'Saved "Take 1" by Me, 00:30.',
       ); // the fake probe says 30 s
       expect(o.stderr, isEmpty);
-      // The command no longer listens: a later recording prints nothing here.
+      // The command no longer listens: a later recording prints nothing here, not even the
+      // silence hint (it has not been given in this command yet, #153/AK3).
       final lines = o.stdout.length;
       expect(await recording.start(de, arming: const Arming()), isNull);
-      rec.gate = WpRecGate.recording;
+      rec
+        ..seconds = 4
+        ..onlySilence = true;
+      await eventually(() => recording.silent, 'silent while armed');
+      expect(o.stderr, isEmpty);
+      rec
+        ..onlySilence = false
+        ..gate = WpRecGate.recording;
       await eventually(
         () => recording.phase == RecordingPhase.recording,
         'next recording',
