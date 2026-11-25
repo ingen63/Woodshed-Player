@@ -64,7 +64,8 @@ package_macos() {
   [ -d "$app" ] || die "$app missing, first: cd app && flutter build macos --release"
   plist="$app/Contents/Info.plist"
   value=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")
-  [ "$value" = "$version" ] || die "macos: app version $value, tag $tag"
+  # Flutter keeps only digits and dots in the version of an Apple app: 1.0.0-beta.1 becomes 1.0.0.1
+  [ "$value" = "$(printf %s "$version" | tr -cd '0-9.')" ] || die "macos: app version $value, tag $tag"
   value=$(/usr/libexec/PlistBuddy -c 'Print :WPGitTag' "$plist" 2>/dev/null || true)
   [ "$value" = "$tag" ] || die "macos: tag in the app '$value', expected $tag (git describe of the build)"
   # every Mach-O file of the bundle for both architectures

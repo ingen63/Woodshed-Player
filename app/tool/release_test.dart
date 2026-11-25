@@ -327,13 +327,16 @@ void main() {
       return bundle;
     }
 
-    ProcessResult pack(String bundle, {Map<String, String>? environment}) =>
-        package([
-          'macos',
-          'v0.9.0',
-          '${work.path}/out',
-          bundle,
-        ], environment: environment);
+    ProcessResult pack(
+      String bundle, {
+      Map<String, String>? environment,
+      String tag = 'v0.9.0',
+    }) => package([
+      'macos',
+      tag,
+      '${work.path}/out',
+      bundle,
+    ], environment: environment);
 
     test('the dmg carries the universal app, Applications, LICENSE and the licence texts with LAME', () {
       if (!Platform.isMacOS) {
@@ -396,6 +399,27 @@ void main() {
       expect(tag.exitCode, 1);
       expect(tag.stderr, contains("tag in the app 'v0.8.2', expected v0.9.0"));
     });
+
+    test(
+      '#139/AK4 a pre-release: the app carries the version with digits only',
+      () {
+        // Flutter turns 1.0.0-beta.1 into 1.0.0.1 in CFBundleShortVersionString
+        if (!Platform.isMacOS) return markTestSkipped('macOS only');
+        final tag = 'v1.0.0-beta.1';
+        final ok = pack(
+          app('beta', version: '1.0.0.1', tag: tag),
+          tag: tag,
+        );
+        expect(ok.exitCode, 0, reason: '${ok.stderr}');
+        expect(ok.stdout, endsWith('WoodshedPlayer-1.0.0-beta.1-macos.dmg\n'));
+        final other = pack(
+          app('beta2', version: '1.0.0.2', tag: tag),
+          tag: tag,
+        );
+        expect(other.exitCode, 1);
+        expect(other.stderr, contains('app version 1.0.0.2, tag $tag'));
+      },
+    );
 
     test('refuses a broken signature', () {
       if (!Platform.isMacOS) return markTestSkipped('macOS only');
