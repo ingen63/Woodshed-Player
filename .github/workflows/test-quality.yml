@@ -397,7 +397,8 @@ jobs:
       - name: UI smoke test on the iOS simulator (#99/AK1, AK3, AK4)
         # the real core on an iOS simulator (booted by the script, null device as above), including the
         # check that recording is missing on iPhone/iPad (#4/AK6). Usually 3 min; a simulator that hangs
-        # after the build fails this step instead of cancelling the whole job (#153).
+        # after the build fails this step instead of cancelling the whole job (#153); the script stops it
+        # itself after 10 min with the state of the simulator and the app in the log (#155).
         timeout-minutes: 15
         run: make test-ios
       - name: Smoke test of the built app (#13/AK5)

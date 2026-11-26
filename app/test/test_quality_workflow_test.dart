@@ -591,6 +591,28 @@ void main() {
         );
       });
 
+      test(
+        '#155/AK1 the script stops a hanging run before the CI step times out',
+        () {
+          final mac = job(workflow, 'macos');
+          final step = mac.substring(
+            mac.indexOf('- name: UI smoke test on the iOS simulator'),
+            mac.indexOf('run: make test-ios\n'),
+          );
+          final minutes = int.parse(
+            RegExp(r'timeout-minutes: (\d+)').firstMatch(step)!.group(1)!,
+          );
+          final script = read('../tools/ios_sim_test.sh');
+          final limit = int.parse(
+            RegExp(r'limit=\$\{WP_IOS_TEST_LIMIT:-(\d+)\}')
+                .firstMatch(script)!
+                .group(1)!,
+          );
+          // room for the diagnosis (bounded to 4 min) before the step's limit
+          expect(limit + 240, lessThanOrEqualTo(minutes * 60));
+        },
+      );
+
       test('mutation tests on the diff run as a nightly job (#11)', () {
         expect(workflow, contains('# - mutants-diff: mutation tests'));
         expect(job(workflow, 'mutants-diff'), contains('needs: nightly-gate'));

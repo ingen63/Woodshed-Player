@@ -809,6 +809,10 @@ ohne Vorsatz weiter). `setSize` setzt die Sicherheitsabstände des Geräts (Notc
 Pixelverhältnis 1 das Layout ab. Nicht auf dem Simulator prüfbar und deshalb Gerätetests von Hand: Stummschalter,
 Anrufe und andere Unterbrechungen, Rückkehr aus dem Hintergrund (#3/AK21, #3/AK22), Kopfhörerwechsel und der
 Lautsprecher des Geräts; der Simulator spielt über das Audiogerät des Macs.
+Ein Lauf, der hängt, endet nach `WP_IOS_TEST_LIMIT` Sekunden (Standard 600, ab Start des Skripts, unter den 15 Minuten
+des CI-Schritts) mit Exit-Code 124 (#155). Vorher gibt das Skript den Zustand des Simulators aus (App installiert,
+App läuft), die Prozesse des hängenden `flutter test` und das Systemlog des App-Prozesses. In CI (`CI=true`) läuft
+`flutter test` mit `-v`. Geprüft mit falschen `xcrun` und `flutter` in `app/tool/ios_sim_test_test.dart` (`make test-tools`).
 
 **Pseudo-Sprache** (#13/AK7): `app/integration_test/pseudo.dart` setzt jeden Text zwischen `⟦ ⟧`, ersetzt Buchstaben
 durch Akzentbuchstaben und verlängert um 40 %. Die Test-Lokalisierung `pseudo_localizations.dart` erzeugt
