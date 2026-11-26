@@ -462,7 +462,7 @@ Future<void> eventually(
 
 /// Recorder without the core (#4): writes a file on start, values are set by the test.
 /// #140: an armed start keeps its settings; [gate] and [keptSeconds] are set by the test.
-class FakeRecorder implements Recorder {
+class FakeRecorder with RecordingFiles implements Recorder {
   String? path;
   WpRecSource? source;
 

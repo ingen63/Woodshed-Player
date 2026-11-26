@@ -548,6 +548,18 @@ abstract class AppLocalizations {
   /// **'Only silence is coming from the microphone. Check the input device in System Settings › Sound › Input.'**
   String get recordingMicrophoneSilent;
 
+  /// No description provided for @recordingMicrophoneDeniedBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'The browser does not let this website use the microphone. Allow the microphone for this website in the browser\'s site settings, then start the recording again.'**
+  String get recordingMicrophoneDeniedBrowser;
+
+  /// No description provided for @recordingMicrophoneSilentBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Only silence is coming from the microphone. Check which microphone the browser uses for this website and that it is not muted.'**
+  String get recordingMicrophoneSilentBrowser;
+
   /// No description provided for @noTrackSelected.
   ///
   /// In en, this message translates to:

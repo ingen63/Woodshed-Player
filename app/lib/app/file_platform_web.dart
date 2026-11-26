@@ -14,8 +14,23 @@ class WebFilePlatform implements FilePlatform {
   final _files = <String, Uint8List>{};
   int _count = 0;
 
-  /// Takes the picked bytes for [key] (for the import); afterwards they are dropped here.
-  Future<Uint8List?> take(String key) async => _files.remove(key);
+  /// #157: opens the microphone for a recording (WebRecorder.acquire); null where the browser cannot
+  /// record.
+  Future<bool> Function()? microphone;
+
+  /// #157: the bytes of a finished recording (WebRecorder.take), for paths under [recordingsDir].
+  Future<Uint8List?> Function(String path)? recording;
+
+  /// #157: the folder name of recordings; their paths are names of the recorder, not files.
+  static const recordings = 'recordings';
+
+  /// Takes the picked bytes for [key] (for the import); afterwards they are dropped here. #157: a
+  /// recording comes from the recorder.
+  Future<Uint8List?> take(String key) async {
+    final rec = recording;
+    if (rec != null && key.startsWith('$recordings/')) return rec(key);
+    return _files.remove(key);
+  }
 
   /// Holds bytes for pickup and returns their key (file picker, check pages).
   String register(String name, Uint8List bytes) {
@@ -60,16 +75,19 @@ class WebFilePlatform implements FilePlatform {
   @override
   Future<String?> supportDir() async => null;
 
+  /// #157: recordings exist only where the browser can record.
   @override
-  Future<String?> recordingsDir() async => null;
+  Future<String?> recordingsDir() async =>
+      microphone == null ? null : recordings;
 
   /// #141: no export in the browser.
   @override
   Future<String?> pickFolder(String prompt) async => null;
 
-  /// #113/AK6: no microphone recording in the browser.
+  /// #157: opens the microphone (the browser asks the first time); false if refused or the browser
+  /// cannot record.
   @override
-  Future<bool> microphoneAccess() async => false;
+  Future<bool> microphoneAccess() async => await microphone?.call() ?? false;
 
   /// #140: no command line in the browser.
   @override

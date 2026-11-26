@@ -287,6 +287,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Vom Mikrofon kommt nur Stille. Prüfe das Eingabegerät unter Systemeinstellungen › Ton › Eingang.';
 
   @override
+  String get recordingMicrophoneDeniedBrowser =>
+      'Der Browser lässt diese Website das Mikrofon nicht verwenden. Erlaube das Mikrofon für diese Website in den Website-Einstellungen des Browsers und starte die Aufnahme dann neu.';
+
+  @override
+  String get recordingMicrophoneSilentBrowser =>
+      'Vom Mikrofon kommt nur Stille. Prüfe, welches Mikrofon der Browser für diese Website verwendet und ob es stummgeschaltet ist.';
+
+  @override
   String get noTrackSelected => 'Kein Titel ausgewählt';
 
   @override

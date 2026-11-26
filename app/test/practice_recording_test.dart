@@ -695,11 +695,18 @@ void main() {
 
     test('#147/AK7: freePath counts up past taken names', () {
       final base = '${tmp.path}/rec/Take';
-      expect(RecordingController.freePath(base, 'flac'), '$base.flac');
+      bool exists(String p) => File(p).existsSync();
+      expect(RecordingController.freePath(base, 'flac', exists), '$base.flac');
       File('$base.flac').writeAsStringSync('a');
-      expect(RecordingController.freePath(base, 'flac'), '$base 2.flac');
+      expect(
+        RecordingController.freePath(base, 'flac', exists),
+        '$base 2.flac',
+      );
       File('$base 2.flac').writeAsStringSync('b');
-      expect(RecordingController.freePath(base, 'flac'), '$base 3.flac');
+      expect(
+        RecordingController.freePath(base, 'flac', exists),
+        '$base 3.flac',
+      );
     });
   });
 

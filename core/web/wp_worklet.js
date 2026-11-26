@@ -114,3 +114,59 @@ class WpCoreProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('wp-core', WpCoreProcessor);
+
+// #157: processor «wp-mic»: hands the microphone (its input) to the recording worker (wp_recorder.js). The
+// main thread sends { port } (a MessagePort to the worker); from then on the input goes there as interleaved
+// Float32Array blocks of `block` frames (processorOptions, default 2048), transferred. { end: true } on the
+// port answers { stop: true }: the rest of the block first, then nothing more until the next port.
+// Its single output stays silent; it is connected only so every browser keeps calling process().
+class WpMicProcessor extends AudioWorkletProcessor {
+  constructor(options) {
+    super();
+    const { channels = 2, block = 2048 } = options.processorOptions || {};
+    this.channels = channels;
+    this.block = block;
+    this.out = null;
+    this.fresh();
+    this.port.onmessage = ({ data }) => {
+      if (data.port) {
+        this.out = data.port;
+        this.fresh();
+      } else if (data.stop && this.out) {
+        this.flush();
+        this.out.postMessage({ end: true });
+        this.out = null;
+      }
+    };
+  }
+
+  fresh() {
+    this.buf = new Float32Array(this.block * this.channels);
+    this.n = 0;
+  }
+
+  flush() {
+    if (!this.n) return;
+    const part = this.buf.slice(0, this.n * this.channels);
+    this.out.postMessage({ frames: part }, [part.buffer]);
+    this.fresh();
+  }
+
+  process(inputs) {
+    const input = inputs[0];
+    if (!this.out || !input || input.length === 0) return true;
+    const ch = this.channels;
+    const frames = input[0].length;
+    for (let i = 0; i < frames; i++) {
+      for (let c = 0; c < ch; c++) this.buf[this.n * ch + c] = input[Math.min(c, input.length - 1)][i];
+      if (++this.n === this.block) {
+        const full = this.buf;
+        this.out.postMessage({ frames: full }, [full.buffer]);
+        this.fresh();
+      }
+    }
+    return true;
+  }
+}
+
+registerProcessor('wp-mic', WpMicProcessor);

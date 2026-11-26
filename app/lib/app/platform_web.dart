@@ -1,7 +1,7 @@
 // App services in the browser: WASM core in the AudioWorklet (#34), library in the Origin Private File
-// System (#35), import through the file picker. No recording. Media Session for the lock screen and
-// headphone buttons (#39/AK2). The screen stays on while a track plays (#109). Desktop and mobile:
-// platform_native.dart.
+// System (#35), import through the file picker. Recording through the microphone where the browser can
+// (#157, recorder_web.dart). Media Session for the lock screen and headphone buttons (#39/AK2). The screen
+// stays on while a track plays (#109). Desktop and mobile: platform_native.dart.
 import 'dart:async';
 
 import 'dart:js_interop';
@@ -26,6 +26,9 @@ import 'install_hint.dart';
 import 'library_settings_store.dart';
 import 'practice_arming.dart';
 import 'media_session.dart';
+import 'recorder_web.dart';
+import 'recording_controller.dart';
+import '../ui/recording_button.dart';
 import 'media_session_web.dart';
 import 'wake_lock.dart';
 import 'wake_lock_web.dart';
@@ -44,6 +47,13 @@ Future<AppController> createAppController({
   final files = WebFilePlatform();
   final store = await OpfsFileStore.open(libraryDir);
   final core = await WebAudioCore.create(bytesOf: store.read);
+  // #157: the microphone, where the browser can record (getUserMedia, i.e. HTTPS)
+  final recorder = await WebRecorder.create(core);
+  if (recorder != null) {
+    files
+      ..microphone = recorder.acquire
+      ..recording = recorder.take;
+  }
   // In the browser only the core knows the duration, once it loads the file.
   final library = Library(store, probe: (_) => null, readSource: files.take);
   await library.load();
@@ -79,6 +89,12 @@ Future<AppController> createAppController({
     files: files,
     trimmer: core.trim, // #116: in the core's loader worker
   );
+  if (recorder != null) {
+    _recordings[controller] = RecordingController(
+      app: controller,
+      recorder: recorder,
+    );
+  }
   if (WebMediaSession.create() case final api?) {
     MediaSessionLink(api, controller); // lives as long as the page
   }
@@ -90,8 +106,19 @@ Future<AppController> createAppController({
   return controller;
 }
 
-/// #39/AK5: there is no recording in the browser, so never a recording button.
-Widget? recordingButtonFor(AppController controller) => null;
+final _recordings = Expando<RecordingController>();
+
+/// #157: the recording of [controller]; null where the browser cannot record.
+RecordingController? recordingFor(AppController controller) =>
+    _recordings[controller];
+
+/// #157/AK1: the record button with the microphone as its only source; none without getUserMedia.
+Widget? recordingButtonFor(AppController controller) {
+  final recording = recordingFor(controller);
+  return recording == null
+      ? null
+      : RecordingButton(controller: controller, recording: recording);
+}
 
 /// #147: no armed practice recording in the browser.
 ArmedSwitchSlot? armedSwitchFor(AppController controller) => null;

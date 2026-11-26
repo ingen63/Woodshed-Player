@@ -27,7 +27,14 @@ external JSPromise<JSObject> _wasmCompile(JSArrayBuffer bytes);
 typedef WebFileBytes = Future<Uint8List?> Function(String path);
 
 class WebAudioCore implements AudioCore {
-  WebAudioCore._(this._ctx, this._node, this._loader, this._bytesOf) {
+  WebAudioCore._(
+    this._ctx,
+    this._node,
+    this._loader,
+    this._bytesOf,
+    this.wasmModule,
+    this.base,
+  ) {
     _node.port.onmessage = ((web.MessageEvent e) => _onMessage(e.data)).toJS;
     _loader.onmessage = ((web.MessageEvent e) => _onLoaderMessage(e.data)).toJS;
   }
@@ -88,13 +95,20 @@ class WebAudioCore implements AudioCore {
       '${base}wp_loader.js'.toJS,
       web.WorkerOptions(type: 'module'),
     );
-    final core = WebAudioCore._(ctx, node, loader, bytesOf);
+    final core = WebAudioCore._(ctx, node, loader, bytesOf, module, base);
     await core._ask('init', [module]);
     return core;
   }
 
   final web.AudioContext _ctx;
   final web.AudioWorkletNode _node;
+
+  /// #157: the compiled core (for the recording worker), and the folder of the core's files.
+  final JSObject wasmModule;
+  final String base;
+
+  /// #157: the AudioContext of the core; its worklet module also holds the microphone processor «wp-mic».
+  web.AudioContext get context => _ctx;
   final web.Worker _loader;
   final WebFileBytes _bytesOf;
 
@@ -124,11 +138,11 @@ class WebAudioCore implements AudioCore {
     final msg = JSObject()
       ..['id'] = id.toJS
       ..['cmd'] = cmd.toJS
-      ..['args'] = _plain(args);
+      ..['args'] = plainArray(args);
     if (transfer.isEmpty) {
       _node.port.postMessage(msg);
     } else {
-      _node.port.postMessage(msg, _plain(transfer));
+      _node.port.postMessage(msg, plainArray(transfer));
     }
     return reply.future;
   }
@@ -152,8 +166,8 @@ class WebAudioCore implements AudioCore {
     final msg = JSObject()
       ..['id'] = id.toJS
       ..['cmd'] = cmd.toJS
-      ..['args'] = _plain(args);
-    _loader.postMessage(msg, _plain(transfer));
+      ..['args'] = plainArray(args);
+    _loader.postMessage(msg, plainArray(transfer));
     return reply.future;
   }
 
@@ -478,7 +492,8 @@ class _WebMetronome implements MetronomeBackend {
 /// [items] as a new, plain JS array for postMessage. In debug builds (DDC) `toJS` hands over the Dart
 /// list itself, and a constant list (e.g. the default `const []`) carries Dart data that postMessage
 /// cannot clone (DataCloneError). Found by the web tests in Chrome (#13/AK4).
-JSArray<T> _plain<T extends JSAny?>(List<T> items) {
+/// A plain JS array (a const Dart list is no array postMessage can clone, #157).
+JSArray<T> plainArray<T extends JSAny?>(List<T> items) {
   final a = JSArray<T>.withLength(items.length);
   for (var i = 0; i < items.length; i++) {
     a[i] = items[i];

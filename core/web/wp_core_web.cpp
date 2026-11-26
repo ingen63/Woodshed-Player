@@ -9,12 +9,20 @@
 #include <vector>
 
 #include "player_core.hpp"
+#include "stream_recorder.hpp"
 
 struct wp_player {
   std::unique_ptr<wp::Player> core;
   std::vector<float> out;
   std::unique_ptr<wp::Source> pending; // title being taken over piece by piece (#42)
   long long pendingFrames = 0;
+};
+
+struct wp_web_rec {
+  wp::rec::StreamRecorder rec;
+  std::vector<float> in;
+  int sampleRate = 0;
+  int channels = 0;
 };
 
 struct wp_web_track {
@@ -176,6 +184,77 @@ int wp_web_pcm_commit(wp_player *p) {
     return WP_ERR_INVALID_ARGUMENT;
   return p->core->setSource(std::move(source), false);
 }
+
+wp_web_rec *wp_web_rec_create(int sampleRate, int channels, int armed, double thresholdDb,
+                              double silenceSeconds, double tailSeconds, int *err) {
+  int code = WP_REC_ERR_INVALID_ARGUMENT;
+  wp_web_rec *r = nullptr;
+  if (sampleRate >= WP_MIN_SAMPLE_RATE && sampleRate <= WP_MAX_SAMPLE_RATE && channels >= 1 &&
+      channels <= 8) {
+    try {
+      auto rec = std::make_unique<wp_web_rec>();
+      rec->in.assign(static_cast<size_t>(WP_WEB_MAX_BLOCK) * static_cast<size_t>(channels), 0.0f);
+      rec->sampleRate = sampleRate;
+      rec->channels = channels;
+      const wp::rec::GateConfig gate{thresholdDb, silenceSeconds, tailSeconds};
+      if (rec->rec.start(static_cast<uint32_t>(sampleRate), static_cast<uint32_t>(channels),
+                         armed ? &gate : nullptr)) {
+        r = rec.release();
+        code = WP_OK;
+      }
+    } catch (const std::bad_alloc &) {
+      code = WP_REC_ERR_OUT_OF_MEMORY;
+    }
+  }
+  if (err)
+    *err = code;
+  return r;
+}
+
+float *wp_web_rec_input(wp_web_rec *r) { return r ? r->in.data() : nullptr; }
+
+int wp_web_rec_feed(wp_web_rec *r, int frames) {
+  if (!r || frames < 1 || frames > WP_WEB_MAX_BLOCK)
+    return WP_REC_ERR_INVALID_ARGUMENT;
+  try {
+    return r->rec.feed(r->in.data(), static_cast<uint32_t>(frames)) ? WP_OK : WP_REC_ERR_FILE;
+  } catch (const std::bad_alloc &) {
+    return WP_REC_ERR_OUT_OF_MEMORY;
+  }
+}
+
+int wp_web_rec_finish(wp_web_rec *r) {
+  if (!r)
+    return WP_REC_ERR_INVALID_ARGUMENT;
+  try {
+    return r->rec.finish() ? WP_OK : WP_REC_ERR_FILE;
+  } catch (const std::bad_alloc &) {
+    return WP_REC_ERR_OUT_OF_MEMORY;
+  }
+}
+
+const void *wp_web_rec_out(wp_web_rec *r) { return r ? r->rec.out() : nullptr; }
+size_t wp_web_rec_out_size(wp_web_rec *r) { return r ? r->rec.outSize() : 0; }
+double wp_web_rec_out_offset(wp_web_rec *r) {
+  return r ? static_cast<double>(r->rec.outOffset()) : 0.0;
+}
+void wp_web_rec_take(wp_web_rec *r) {
+  if (r)
+    r->rec.take();
+}
+double wp_web_rec_cut(wp_web_rec *r) { return r ? static_cast<double>(r->rec.cut()) : 0.0; }
+const void *wp_web_rec_header(wp_web_rec *r) { return r ? r->rec.header() : nullptr; }
+size_t wp_web_rec_header_size(wp_web_rec *r) { return r ? r->rec.headerSize() : 0; }
+int wp_web_rec_gate(wp_web_rec *r) { return r ? r->rec.gate() : WP_REC_GATE_OFF; }
+double wp_web_rec_seconds(wp_web_rec *r) {
+  return r ? static_cast<double>(r->rec.frames()) / r->sampleRate : 0.0;
+}
+double wp_web_rec_kept_seconds(wp_web_rec *r) {
+  return r ? static_cast<double>(r->rec.keptFrames()) / r->sampleRate : 0.0;
+}
+float wp_web_rec_level(wp_web_rec *r) { return r ? r->rec.takeLevel() : 0.0f; }
+int wp_web_rec_only_silence(wp_web_rec *r) { return r && r->rec.onlySilence() ? 1 : 0; }
+void wp_web_rec_free(wp_web_rec *r) { delete r; }
 
 float *wp_web_render(wp_player *p, int frames) {
   if (!p)

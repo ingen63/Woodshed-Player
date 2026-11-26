@@ -265,6 +265,86 @@ export class WpDecoder {
   }
 }
 
+// Recording without a player (#157), e.g. in a Worker next to the AudioWorklet that delivers the microphone.
+export async function createRecordingCore(wasm) {
+  const module = wasm instanceof WebAssembly.Module ? wasm : await WebAssembly.compile(wasm);
+  const instance = await WebAssembly.instantiate(module, imports);
+  instance.exports._initialize();
+  return new WpRecordingCore(instance.exports);
+}
+
+// One recording at a time through wp_web_rec_* (wp_core_web.h): feed interleaved frames, take the encoded
+// FLAC in pieces { offset, bytes }, finally write header() over the start of the file.
+export class WpRecordingCore {
+  constructor(x) {
+    this.x = x;
+    this.r = 0;
+    this.channels = 0;
+  }
+
+  // { sampleRate, channels, armed, thresholdDb, silenceSeconds, tailSeconds }. 0 or WP_REC_ERR_*; ends a
+  // recording still open here.
+  start({ sampleRate, channels = 2, armed = false, thresholdDb = 0, silenceSeconds = 0, tailSeconds = 0 }) {
+    this.free();
+    const err = this.x.wp_web_alloc(4);
+    try {
+      this.r = this.x.wp_web_rec_create(sampleRate, channels, armed ? 1 : 0, thresholdDb, silenceSeconds,
+        tailSeconds, err);
+      this.channels = this.r ? channels : 0;
+      return this.r ? WP_OK : new Int32Array(this.x.memory.buffer, err, 1)[0];
+    } finally {
+      this.x.wp_web_free(err);
+    }
+  }
+
+  // Feeds interleaved frames (Float32Array of channels × frames). 0 or WP_REC_ERR_*.
+  feed(interleaved) {
+    const ch = this.channels;
+    const frames = Math.floor(interleaved.length / ch);
+    for (let done = 0; done < frames;) {
+      const n = Math.min(MAX_BLOCK, frames - done);
+      new Float32Array(this.x.memory.buffer, this.x.wp_web_rec_input(this.r), n * ch)
+        .set(interleaved.subarray(done * ch, (done + n) * ch));
+      const r = this.x.wp_web_rec_feed(this.r, n);
+      if (r !== WP_OK) return r;
+      done += n;
+    }
+    return WP_OK;
+  }
+
+  // The encoded bytes not taken yet (own buffer) and their offset in the file; null if there are none.
+  // They count as taken: if storing them fails, call cut().
+  take() {
+    const size = this.x.wp_web_rec_out_size(this.r);
+    if (!size) return null;
+    const offset = this.x.wp_web_rec_out_offset(this.r);
+    const bytes = new Uint8Array(this.x.memory.buffer, this.x.wp_web_rec_out(this.r), size).slice();
+    this.x.wp_web_rec_take(this.r);
+    return { offset, bytes };
+  }
+
+  finish() { return this.x.wp_web_rec_finish(this.r); }
+  // The last piece of take() was not stored: returns the length the file must be cut to.
+  cut() { return this.x.wp_web_rec_cut(this.r); }
+  header() {
+    return new Uint8Array(this.x.memory.buffer, this.x.wp_web_rec_header(this.r),
+      this.x.wp_web_rec_header_size(this.r)).slice();
+  }
+
+  get gate() { return this.x.wp_web_rec_gate(this.r); }
+  get seconds() { return this.x.wp_web_rec_seconds(this.r); }
+  get keptSeconds() { return this.x.wp_web_rec_kept_seconds(this.r); }
+  // Peak since the last call.
+  takeLevel() { return this.x.wp_web_rec_level(this.r); }
+  get onlySilence() { return this.x.wp_web_rec_only_silence(this.r) !== 0; }
+
+  free() {
+    if (this.r) this.x.wp_web_rec_free(this.r);
+    this.r = 0;
+    this.channels = 0;
+  }
+}
+
 // Lädt eine Datei: zuerst der Kern (MP3, WAV, FLAC), sonst der Browser (AAC/M4A u. a.) über
 // `decodeAudioData` (z. B. ctx.decodeAudioData.bind(ctx); im Worklet nicht verfügbar, dort übernimmt
 // der Hauptthread diesen Schritt und schickt das PCM). WP_OK oder Fehlercode.

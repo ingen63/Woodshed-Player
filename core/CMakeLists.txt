@@ -192,11 +192,22 @@ wp_mutate(wp_trim)
 # #68: platform-independent part of the recording (ring buffer, writer thread, WAV or FLAC file,
 # level, #113: microphone through miniaudio), tested without an audio device; recorder_mac.mm only
 # drives Core Audio.
-add_library(wp_reccore STATIC src/recorder_core.cpp src/sound_gate.cpp)
+# #140: sound and silence detection of an armed recording (#157: also in the browser)
+add_library(wp_soundgate STATIC src/sound_gate.cpp)
+target_include_directories(wp_soundgate PUBLIC src)
+wp_strict_warnings(wp_soundgate)
+wp_mutate(wp_soundgate)
+add_library(wp_reccore STATIC src/recorder_core.cpp)
 target_include_directories(wp_reccore PUBLIC include)
-target_link_libraries(wp_reccore PUBLIC wp_miniaudio wp_flacwriter Threads::Threads)
+target_link_libraries(wp_reccore PUBLIC wp_miniaudio wp_flacwriter wp_soundgate Threads::Threads)
 wp_strict_warnings(wp_reccore)
 wp_mutate(wp_reccore)
+# #157: recording without threads, device or file system (the browser core, wp_web_rec_*)
+add_library(wp_streamrec STATIC src/stream_recorder.cpp)
+target_include_directories(wp_streamrec PUBLIC include)
+target_link_libraries(wp_streamrec PUBLIC wp_soundgate wp_flacwriter)
+wp_strict_warnings(wp_streamrec)
+wp_mutate(wp_streamrec)
 
 # #140: command line of the desktop app (wp_cli.h): arguments, help, the conversation with the
 # running app; the transport is a Unix domain socket on macOS and Linux (Windows follows with #60).
@@ -300,6 +311,12 @@ target_link_libraries(sound_gate_tests PRIVATE wp_reccore wp_playercore)
 wp_strict_warnings(sound_gate_tests)
 add_test(NAME sound_gate_tests COMMAND sound_gate_tests)
 
+# #157: recording in the browser (StreamRecorder) with generated audio, FLAC decoded by the core
+add_executable(stream_recorder_tests tests/stream_recorder_tests.cpp)
+target_link_libraries(stream_recorder_tests PRIVATE wp_streamrec wp_playercore)
+wp_strict_warnings(stream_recorder_tests)
+add_test(NAME stream_recorder_tests COMMAND stream_recorder_tests)
+
 # #140: command line: arguments, help, conversation with a fake app over a real Unix domain socket
 if(NOT WIN32)
   add_executable(cli_tests tests/cli_tests.cpp)
@@ -377,7 +394,7 @@ include(tests/fuzz/fuzz.cmake)
 # memory ends as killed or timeout (#11/AK4).
 if(WP_MULL_PLUGIN)
   set(WP_MUTANT_TESTS engine_tests metronome_tests waveform_tests player_tests recorder_tests
-    sound_gate_tests cli_tests capi_tests mp3_export_tests
+    sound_gate_tests stream_recorder_tests cli_tests capi_tests mp3_export_tests
     device_tests realtime_tests reference_tests trim_tests fuzz_decoder_replay fuzz_capi_replay
     fuzz_trim_replay)
   foreach(t IN LISTS WP_MUTANT_TESTS)

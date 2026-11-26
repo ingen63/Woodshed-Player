@@ -777,15 +777,18 @@ void main() {
   });
 
   group('#39/AK5 no recording button in the browser', () {
-    test('the web platform never creates one', () {
+    // #157/AK1: since #157 the browser has the button where it can record (getUserMedia); without, none.
+    test('the web platform creates one only where the browser can record', () {
       final web = read('lib/app/platform_web.dart');
+      expect(web, contains('final recorder = await WebRecorder.create(core);'));
       expect(
         web,
-        contains(
-          'Widget? recordingButtonFor(AppController controller) => null;',
+        matches(
+          RegExp(
+            r'return recording == null\s*\?\s*null\s*:\s*RecordingButton\(',
+          ),
         ),
       );
-      expect(web, isNot(contains('recording_button.dart')));
     });
 
     testWidgets('without a button the phone and desktop layouts show none', (

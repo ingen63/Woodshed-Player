@@ -73,6 +73,55 @@ WP_API int wp_web_pcm_append(wp_player *p, const float *stereo, int frames);
  * error code; an error keeps the previous title playable. */
 WP_API int wp_web_pcm_commit(wp_player *p);
 
+/* Recording in the browser (#157): no device, threads or files. A Worker feeds the microphone block
+ * by block (wp_web_rec_input, wp_web_rec_feed), stores the encoded FLAC piece by piece
+ * (wp_web_rec_out at wp_web_rec_out_offset, then wp_web_rec_take) and finally writes
+ * wp_web_rec_header over the start of the file. Armed, the same sound gate as natively decides what
+ * is kept (WP_REC_GATE_*, see wp_rec_start_armed). FLAC with 24 bits, like every native recording.
+ */
+typedef struct wp_web_rec wp_web_rec;
+
+/* Starts a recording of `channels` (1–8) at `sample_rate`. With `armed` != 0 only sound is kept: 1
+ * s before the first sample above threshold_db up to tail_seconds after the last; silence_seconds
+ * of silence ends it (WP_REC_GATE_DONE). NULL on failure, the code goes to *err:
+ * WP_REC_ERR_INVALID_ARGUMENT (rate, channels or settings out of range), WP_REC_ERR_OUT_OF_MEMORY.
+ */
+WP_API wp_web_rec *wp_web_rec_create(int sample_rate, int channels, int armed, double threshold_db,
+                                     double silence_seconds, double tail_seconds, int *err);
+/* Buffer for up to WP_WEB_MAX_BLOCK interleaved frames, filled by the caller before
+ * wp_web_rec_feed. */
+WP_API float *wp_web_rec_input(wp_web_rec *r);
+/* Records `frames` (1–WP_WEB_MAX_BLOCK) frames from the input buffer. 0 = ok, WP_REC_ERR_FILE if
+ * the encoder failed or the recording is over (cut), WP_REC_ERR_INVALID_ARGUMENT for a bad count.
+ */
+WP_API int wp_web_rec_feed(wp_web_rec *r, int frames);
+/* Ends the recording (a held pause stays, the rest is encoded, the header gets length and MD5). 0 =
+ * ok or WP_REC_ERR_FILE. */
+WP_API int wp_web_rec_finish(wp_web_rec *r);
+/* Encoded bytes not taken yet, and their offset in the file. */
+WP_API const void *wp_web_rec_out(wp_web_rec *r);
+WP_API size_t wp_web_rec_out_size(wp_web_rec *r);
+WP_API double wp_web_rec_out_offset(wp_web_rec *r);
+/* The bytes of wp_web_rec_out are stored; drops them. */
+WP_API void wp_web_rec_take(wp_web_rec *r);
+/* The bytes of the last wp_web_rec_take could not be stored (storage full): ends the recording, the
+ * header counts only what was stored before. Returns the length the file must be cut to. */
+WP_API double wp_web_rec_cut(wp_web_rec *r);
+/* Start of the file as it must stand at offset 0 (final after wp_web_rec_finish or wp_web_rec_cut).
+ */
+WP_API const void *wp_web_rec_header(wp_web_rec *r);
+WP_API size_t wp_web_rec_header_size(wp_web_rec *r);
+/* WP_REC_GATE_* (WP_REC_GATE_OFF without arming). */
+WP_API int wp_web_rec_gate(wp_web_rec *r);
+/* Seconds fed so far, and seconds kept for the file. */
+WP_API double wp_web_rec_seconds(wp_web_rec *r);
+WP_API double wp_web_rec_kept_seconds(wp_web_rec *r);
+/* Peak level since the last call, 0–1. */
+WP_API float wp_web_rec_level(wp_web_rec *r);
+/* 1 while only silence came so far. */
+WP_API int wp_web_rec_only_silence(wp_web_rec *r);
+WP_API void wp_web_rec_free(wp_web_rec *r);
+
 /* Rendert frames (1–WP_WEB_MAX_BLOCK) Frames Titel und Metronom, interleaved Stereo. Der Zeiger
  * zeigt in einen Puffer des Players, gültig bis zum nächsten Aufruf. Reserviert keinen Speicher. */
 WP_API float *wp_web_render(wp_player *p, int frames);

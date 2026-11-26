@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  createCore, createDecoder, loadFile, WP_OK, WP_ERR_UNSUPPORTED_FORMAT, WP_ERR_INVALID_ARGUMENT,
+  createCore, createDecoder, createRecordingCore, loadFile, WP_OK, WP_ERR_UNSUPPORTED_FORMAT, WP_ERR_INVALID_ARGUMENT,
   WP_ERR_OUT_OF_MEMORY,
 } from './wp_core_web.mjs';
 
@@ -260,6 +260,71 @@ const tests = {
     near(core.duration, 2.0, 1e-9, 'previous title stays playable');
     check(core.loadPcm([new Float32Array(SR).fill(0.25)], SR) === WP_OK, 'loading works again');
     near(core.duration, 1.0, 1e-9, 'new title loaded');
+  },
+  // #157/AK5: the recording through the JS wrapper as the worker uses it: armed (lead-in 1 s, pause kept, tail
+  // 1 s, end after the pause), the file put together from its pieces and decoded by the core; plain and the
+  // storage running full (cut) as well.
+  async recordingCore() {
+    const rec = await createRecordingCore(wasm);
+    const decoder = await createDecoder(wasm);
+    const mono = [];
+    const part = (seconds, amp) => {
+      for (let i = 0; i < seconds * SR; i++) mono.push(amp * Math.cos((2 * Math.PI * 440 * i) / SR));
+    };
+    part(1.5, 0); part(0.5, 0.5); part(0.8, 0); part(0.5, 0.5); part(2.5, 0); part(0.5, 0.5);
+    const record = (samples, channels, store = (p, file) => file.set(p.bytes, p.offset)) => {
+      const file = new Uint8Array(2 * 1024 * 1024);
+      let size = 0;
+      for (let done = 0; done < samples.length; done += 2048) {
+        const n = Math.min(2048, samples.length - done);
+        const block = new Float32Array(n * channels);
+        for (let i = 0; i < n; i++) for (let c = 0; c < channels; c++) block[i * channels + c] = samples[done + i];
+        check(rec.feed(block) === WP_OK, 'block fed');
+        const p = rec.take();
+        if (p && store(p, file) !== false) size = p.offset + p.bytes.length;
+        else if (p) return { file, size: rec.cut(), cut: true };
+      }
+      check(rec.finish() === WP_OK, 'finished');
+      const p = rec.take();
+      if (p) { file.set(p.bytes, p.offset); size = p.offset + p.bytes.length; }
+      file.set(rec.header(), 0);
+      return { file, size };
+    };
+    check(rec.start({ sampleRate: SR, channels: 2, armed: true, thresholdDb: -30, silenceSeconds: 2, tailSeconds: 1 })
+      === WP_OK, 'armed start');
+    check(rec.gate === 1, 'armed');
+    const armed = record(mono, 2);
+    check(rec.gate === 3, 'done after the pause');
+    near(rec.keptSeconds, 3.8, 0.01, 'kept: lead-in, tone, pause, tone, tail');
+    near(rec.seconds, mono.length / SR, 1e-9, 'seconds fed');
+    near(rec.takeLevel(), 0.5, 1e-6, 'peak level');
+    check(rec.takeLevel() === 0, 'level taken');
+    check(!rec.onlySilence, 'sound came');
+    const d = decoder.decode(armed.file.subarray(0, armed.size), SR);
+    check(d.code === WP_OK, 'FLAC decodes');
+    near(d.duration, 3.8, 0.01, 'file length');
+    let first = -1;
+    for (let i = 0; i < d.pcm.length / 2 && first < 0; i++) if (Math.abs(d.pcm[2 * i]) > 0.0316) first = i;
+    near(first, SR, SR / 100, 'first sound 1 s into the file');
+
+    check(rec.start({ sampleRate: SR, channels: 1 }) === WP_OK, 'plain start');
+    check(rec.gate === 0, 'not armed');
+    const plain = record(mono.slice(0, SR), 1);
+    near(decoder.decode(plain.file.subarray(0, plain.size), SR).duration, 1.0, 1e-9, 'every frame kept');
+
+    check(rec.start({ sampleRate: SR, channels: 2 }) === WP_OK, 'start again');
+    let pieces = 0;
+    const full = record(mono, 2, (p, file) => {
+      if (++pieces >= 4) return false; // the fourth piece does not fit any more
+      file.set(p.bytes, p.offset);
+      return true;
+    });
+    check(full.cut && full.size > 0, 'cut before the piece that did not fit');
+    full.file.set(rec.header(), 0);
+    const kept = decoder.decode(full.file.subarray(0, full.size), SR);
+    check(kept.code === WP_OK && kept.duration > 0 && kept.duration < 1, 'what was stored plays');
+    check(rec.start({ sampleRate: SR, channels: 2, armed: true, silenceSeconds: 0 }) === -12, 'bad settings');
+    rec.free();
   },
 };
 

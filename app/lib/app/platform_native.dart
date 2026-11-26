@@ -28,6 +28,7 @@ import 'file_store_io.dart';
 import 'keychain_store.dart';
 import 'library_settings_store.dart';
 import 'practice_arming.dart';
+import 'core_recorder.dart';
 import 'practice_recording.dart';
 import 'recording_controller.dart';
 import 'smoke.dart';
@@ -117,7 +118,10 @@ String bundledLamePath() =>
 final _recordings = Expando<RecordingController>();
 RecordingController? recordingFor(AppController controller) =>
     WpRecorder.available
-    ? _recordings[controller] ??= RecordingController(app: controller)
+    ? _recordings[controller] ??= RecordingController(
+        app: controller,
+        recorder: const CoreRecorder(),
+      )
     : null;
 
 /// #147: the armed practice recording of [controller], where the microphone records (macOS).

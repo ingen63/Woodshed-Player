@@ -283,6 +283,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only silence is coming from the microphone. Check the input device in System Settings › Sound › Input.';
 
   @override
+  String get recordingMicrophoneDeniedBrowser =>
+      'The browser does not let this website use the microphone. Allow the microphone for this website in the browser\'s site settings, then start the recording again.';
+
+  @override
+  String get recordingMicrophoneSilentBrowser =>
+      'Only silence is coming from the microphone. Check which microphone the browser uses for this website and that it is not muted.';
+
+  @override
   String get noTrackSelected => 'No track selected';
 
   @override

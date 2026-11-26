@@ -326,7 +326,10 @@ void main() {
 
   test('#147/AK12: the failure of the core has its own text', () {
     final app = TestApp(Directory.systemTemp.createTempSync('wp_armed_msg'));
-    final recording = RecordingController(app: app.controller);
+    final recording = RecordingController(
+      app: app.controller,
+      recorder: FakeRecorder(),
+    );
     final practice = PracticeRecording(
       app: app.controller,
       recording: recording,

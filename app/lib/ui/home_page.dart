@@ -191,7 +191,7 @@ class _HomePageState extends State<HomePage> {
     final platform = Theme.of(context).platform;
     final recording =
         (widget.recordingButton != null || widget.practiceRecording != null) &&
-        isDesktopPlatform(platform);
+        (kIsWeb || isDesktopPlatform(platform));
     final keyboard = KeyboardPresence.available(platform);
     return HelpTopics(
       recording: recording,
@@ -365,8 +365,9 @@ class _HomePageState extends State<HomePage> {
   Widget? _recording() {
     final button = widget.recordingButton;
     final armed = widget.practiceRecording;
+    // #157/AK1: in the browser also on iPhone, iPad and Android, where the browser can record
     if ((button == null && armed == null) ||
-        !isDesktopPlatform(Theme.of(context).platform)) {
+        !(kIsWeb || isDesktopPlatform(Theme.of(context).platform))) {
       return null;
     }
     return Row(
@@ -650,6 +651,19 @@ class _HomePageState extends State<HomePage> {
           bottom: false,
           child: Column(
             children: [
+              // #157/AK1: a slim bar for «Record» and «Armed» (the web app on a phone)
+              if (_recording() case final recording?)
+                Container(
+                  key: const Key('phoneRecordingBar'),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.fromLTRB(
+                    WsSpace.l,
+                    WsSpace.s,
+                    WsSpace.l,
+                    0,
+                  ),
+                  child: recording,
+                ),
               Expanded(child: content),
               ?mini,
               AreaTabBar(

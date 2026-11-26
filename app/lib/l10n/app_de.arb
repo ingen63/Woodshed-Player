@@ -75,6 +75,8 @@
   "recordingTooltipMicrophone": "Nimmt über das Mikrofon auf (das Standard-Eingabegerät). Die Aufnahme wird nur lokal gespeichert und danach in die Bibliothek übernommen.",
   "recordingMicrophoneDenied": "Woodshed Player darf das Mikrofon nicht verwenden. Erteile den Zugriff unter Systemeinstellungen › Datenschutz & Sicherheit › Mikrofon und starte die Aufnahme dann neu.",
   "recordingMicrophoneSilent": "Vom Mikrofon kommt nur Stille. Prüfe das Eingabegerät unter Systemeinstellungen › Ton › Eingang.",
+  "recordingMicrophoneDeniedBrowser": "Der Browser lässt diese Website das Mikrofon nicht verwenden. Erlaube das Mikrofon für diese Website in den Website-Einstellungen des Browsers und starte die Aufnahme dann neu.",
+  "recordingMicrophoneSilentBrowser": "Vom Mikrofon kommt nur Stille. Prüfe, welches Mikrofon der Browser für diese Website verwendet und ob es stummgeschaltet ist.",
   "noTrackSelected": "Kein Titel ausgewählt",
   "openFileHintDrop": "Öffne eine MP3-, WAV- oder FLAC-Datei oder zieh sie ins Fenster.",
   "openFileHintFiles": "Öffne eine MP3-, WAV- oder FLAC-Datei aus «Dateien».",

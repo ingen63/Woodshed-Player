@@ -505,28 +505,31 @@ void main() {
     expect(WpRecSource.system.extension, 'flac'); // #118/AK1
   });
 
-  test(
-    '#113/AK6: no microphone recording on iPhone/iPad and in the browser',
-    () async {
-      final stub = File('../core/src/recorder_stub.cpp').readAsStringSync();
-      expect(stub, contains('int wp_rec_source_available(int) { return 0; }'));
-      expect(
-        stub,
-        contains(
-          'int wp_rec_start_source(const char *, int) { return WP_REC_ERR_UNSUPPORTED; }',
-        ),
-      );
-      final ios = File('packages/wp_core/ios/Classes/wp_recorder.cpp')
-          .readAsStringSync();
-      expect(ios, contains('recorder_stub.cpp'));
-      final web = File('lib/app/file_platform_web.dart').readAsStringSync();
-      expect(web, contains('Future<bool> microphoneAccess() async => false;'));
-      final iosPlist = File('ios/Runner/Info.plist').readAsStringSync();
-      expect(iosPlist, isNot(contains('NSMicrophoneUsageDescription')));
-    },
-  );
+  test('#113/AK6: no microphone recording on iPhone/iPad (#157: the browser records)', () async {
+    final stub = File('../core/src/recorder_stub.cpp').readAsStringSync();
+    expect(stub, contains('int wp_rec_source_available(int) { return 0; }'));
+    expect(
+      stub,
+      contains(
+        'int wp_rec_start_source(const char *, int) { return WP_REC_ERR_UNSUPPORTED; }',
+      ),
+    );
+    final ios = File('packages/wp_core/ios/Classes/wp_recorder.cpp')
+        .readAsStringSync();
+    expect(ios, contains('recorder_stub.cpp'));
+    // #157: the browser asks the recorder of the web core
+    final web = File('lib/app/file_platform_web.dart').readAsStringSync();
+    expect(
+      web,
+      contains(
+        'Future<bool> microphoneAccess() async => await microphone?.call() ?? false;',
+      ),
+    );
+    final iosPlist = File('ios/Runner/Info.plist').readAsStringSync();
+    expect(iosPlist, isNot(contains('NSMicrophoneUsageDescription')));
+  });
 
-  test('#4/AK6: no recording on iPhone/iPad and in the browser', () {
+  test('#4/AK6: no recording on iPhone/iPad (#157: in the browser where it can)', () {
     final ios = File('packages/wp_core/ios/Classes/wp_recorder.cpp')
         .readAsStringSync();
     expect(ios, contains('recorder_stub.cpp'));
@@ -537,10 +540,8 @@ void main() {
       native,
       matches(RegExp(r'WpRecorder\.available\s*\?\s*RecordingButton\(')),
     );
+    // #157/AK1: the browser has the button only with a recorder (getUserMedia)
     final web = File('lib/app/platform_web.dart').readAsStringSync();
-    expect(
-      web,
-      contains('Widget? recordingButtonFor(AppController controller) => null;'),
-    );
+    expect(web, contains('final recorder = await WebRecorder.create(core);'));
   });
 }

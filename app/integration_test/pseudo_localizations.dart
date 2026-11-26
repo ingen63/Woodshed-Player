@@ -175,6 +175,12 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get recordingMicrophoneSilent =>
       pseudo(super.recordingMicrophoneSilent);
   @override
+  String get recordingMicrophoneDeniedBrowser =>
+      pseudo(super.recordingMicrophoneDeniedBrowser);
+  @override
+  String get recordingMicrophoneSilentBrowser =>
+      pseudo(super.recordingMicrophoneSilentBrowser);
+  @override
   String get noTrackSelected => pseudo(super.noTrackSelected);
   @override
   String get openFileHintDrop => pseudo(super.openFileHintDrop);

@@ -11,7 +11,7 @@ add_library(wp_core_offline STATIC web/wp_core_web.cpp src/recorder_stub.cpp src
   src/mp3_api_stub.cpp)
 target_include_directories(wp_core_offline PUBLIC include web)
 target_compile_definitions(wp_core_offline PUBLIC WP_WEB_FILES)
-target_link_libraries(wp_core_offline PUBLIC wp_playercore wp_trim)
+target_link_libraries(wp_core_offline PUBLIC wp_playercore wp_trim wp_streamrec)
 wp_strict_warnings(wp_core_offline)
 wp_mutate(wp_core_offline)
 

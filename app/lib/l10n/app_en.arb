@@ -148,6 +148,8 @@
   "recordingTooltipMicrophone": "Records through the microphone (the default input device). The recording is only stored locally and then added to the library.",
   "recordingMicrophoneDenied": "Woodshed Player may not use the microphone. Grant access in System Settings › Privacy & Security › Microphone, then start the recording again.",
   "recordingMicrophoneSilent": "Only silence is coming from the microphone. Check the input device in System Settings › Sound › Input.",
+  "recordingMicrophoneDeniedBrowser": "The browser does not let this website use the microphone. Allow the microphone for this website in the browser's site settings, then start the recording again.",
+  "recordingMicrophoneSilentBrowser": "Only silence is coming from the microphone. Check which microphone the browser uses for this website and that it is not muted.",
   "noTrackSelected": "No track selected",
   "openFileHintDrop": "Open an MP3, WAV or FLAC file or drag it into the window.",
   "openFileHintFiles": "Open an MP3, WAV or FLAC file from “Files”.",

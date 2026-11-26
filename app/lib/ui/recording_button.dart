@@ -1,5 +1,5 @@
 // Recording as a button in the header (#30): the system audio (#4, macOS 14.2+) or the
-// microphone (#113, macOS), both as FLAC (#118), chosen in the menu next to the button and
+// microphone (#113, macOS; #157: the only source in the browser), both as FLAC (#118), chosen in the menu next to the button and
 // remembered on this device. Finished recordings go to the library (#17), titled with date and time in the user's locale.
 // #140: the command line arms a recording; the button shows «Armed» and cancels it when pressed.
 // The state lives in a RecordingController, shared with the command line.
@@ -7,8 +7,9 @@
 // only explains why.
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
-import 'package:wp_core/wp_core.dart';
+import 'package:wp_core/wp_types.dart';
 
 import '../app/app_controller.dart';
 import '../app/recording_controller.dart';
@@ -16,18 +17,20 @@ import '../time_format.dart';
 import 'messages.dart';
 import 'style.dart';
 
-export '../app/recording_controller.dart' show CoreRecorder, Recorder;
+export '../app/recording_controller.dart' show Recorder;
 
 class RecordingButton extends StatefulWidget {
   const RecordingButton({
     super.key,
     required this.controller,
-    this.recorder = const CoreRecorder(),
+    this.recorder,
     this.now = DateTime.now,
     this.recording,
   });
   final AppController controller;
-  final Recorder recorder;
+
+  /// The recorder of the button's own recording; needed without [recording].
+  final Recorder? recorder;
 
   /// Clock for the name of the recording.
   final DateTime Function() now;
@@ -49,7 +52,7 @@ class _RecordingButtonState extends State<RecordingButton> {
     if (widget.recording == null) {
       _own = RecordingController(
         app: widget.controller,
-        recorder: widget.recorder,
+        recorder: widget.recorder!,
         now: widget.now,
       );
     }
@@ -108,9 +111,16 @@ class _RecordingButtonState extends State<RecordingButton> {
     final problem = error != null
         ? l.recordingFailed(recordingErrorMessage(l, error))
         : rec.microphoneDenied
-        ? l.recordingMicrophoneDenied
+        // #157/AK6: in the browser the website's permission, not a macOS setting
+        ? (kIsWeb
+              ? l.recordingMicrophoneDeniedBrowser
+              : l.recordingMicrophoneDenied)
         : rec.silent
-        ? (mic ? l.recordingMicrophoneSilent : l.recordingSilent)
+        ? (!mic
+              ? l.recordingSilent
+              : kIsWeb
+              ? l.recordingMicrophoneSilentBrowser
+              : l.recordingMicrophoneSilent)
         : null;
     return ExcludeFocus(
       child: Row(

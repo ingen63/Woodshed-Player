@@ -808,3 +808,32 @@ app/lib/library/folder_tree.dart | dart_lt_to_le | return a.compareTo(b) < 0;
 # wahr wird; reserve() meldet den Wechsel, und _changed() setzt _wasRunning dabei auf takeRunning
 # (falsch), solange _on noch falsch ist. Der Anfangswert erreicht so nie die Prüfung auf ein Ende.
 app/lib/app/practice_recording.dart | dart_false_to_true | bool _wasRunning = false;
+
+# ---- core/src/stream_recorder.cpp ----
+# gleichwertig: Eine Rückschreibung (Stream-Info beim Schliessen) liegt immer im Dateikopf. Der Kopf
+# entsteht beim Start vor dem ersten Frame und geht mit dem ersten take() ganz hinaus; danach ist
+# outOffset_ mindestens die Kopfgrösse, die Schleife läuft dann nicht. Läuft sie, ist outOffset_ 0,
+# und «i - 0» ist «i + 0».
+core/src/stream_recorder.cpp | cxx_sub_to_add | out_[static_cast<size_t>(i - outOffset_)] = data[i - offset];
+# gleichwertig: Nach dem Start enthält der Kopf neben «fLaC» und STREAMINFO (42 Bytes) immer den
+# VORBIS_COMMENT-Block von libFLAC, ist also grösser als 42; vorher ist er leer. Genau 42 Bytes kommen
+# nicht vor.
+core/src/stream_recorder.cpp | cxx_lt_to_le | if (header_.size() < kStreamInfoEnd)
+# gleichwertig: Eine Rückschreibung kommt nur beim Schliessen und beginnt vor dem Ende des Stroms
+# (der Fall offset == end_ ist der Zweig davor), also nie bei end_. Sie betrifft nur STREAMINFO (endet
+# bei Byte 42), der Kopf ist wegen des VORBIS_COMMENT-Blocks immer länger; «to == header_.size()»
+# kommt nicht vor.
+core/src/stream_recorder.cpp | cxx_gt_to_ge | if (offset > end_ || to > header_.size()) | 14
+core/src/stream_recorder.cpp | cxx_gt_to_ge | if (offset > end_ || to > header_.size()) | 27
+
+# ---- core/src/flac_writer.cpp (#157) ----
+# gleichwertig: libFLAC sucht beim Schreiben in einen Sink nur zurück an den Anfang der Stream-Info
+# (beim Schliessen), nie an das Ende des Stroms; «offset == sinkEnd_» kommt nicht vor.
+core/src/flac_writer.cpp | cxx_gt_to_ge | if (offset > (w->sink_ ? w->sinkEnd_ : w->memory_->size()))
+
+# ---- core/web/wp_core_web.cpp (#157) ----
+# gleichwertig: Gemessen, Mull schaltet diesen Mutanten im try-Block nicht wirksam (Grenze des
+# Werkzeugs, docs/TESTS.md): mit aktivem Mutanten bleiben alle Tests grün. Von Hand entfernt ist der
+# Eingabepuffer leer, wp_web_rec_input liefert nullptr und reference_tests endet mit einem Absturz
+# (Exit-Code 139) in webRecordingArmed.
+core/web/wp_core_web.cpp | cxx_remove_void_call | rec->in.assign(static_cast<size_t>(WP_WEB_MAX_BLOCK) * static_cast<size_t>(channels), 0.0f);

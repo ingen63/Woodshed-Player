@@ -46,6 +46,20 @@ bool FlacWriter::openMemory(std::vector<uint8_t> *out, uint32_t sampleRate, uint
   return false;
 }
 
+bool FlacWriter::openSink(FlacSink *sink, uint32_t sampleRate, uint32_t channels,
+                          uint32_t bitsPerSample) {
+  close();
+  if (!sink || (bitsPerSample != 16 && bitsPerSample != 24))
+    return false;
+  sink_ = sink;
+  memoryPos_ = 0;
+  sinkEnd_ = 0;
+  if (start(sampleRate, channels, bitsPerSample, nullptr))
+    return true;
+  sink_ = nullptr;
+  return false;
+}
+
 bool FlacWriter::start(uint32_t sampleRate, uint32_t channels, uint32_t bitsPerSample,
                        const char *path) {
   if (channels < 1 || channels > kMaxChannels || sampleRate < 1 || sampleRate > kMaxRate)
@@ -60,9 +74,9 @@ bool FlacWriter::start(uint32_t sampleRate, uint32_t channels, uint32_t bitsPerS
   // Rates outside the streamable subset (e.g. 192 kHz with large blocks) are still valid FLAC.
   FLAC__stream_encoder_set_streamable_subset(e, false);
   const FLAC__StreamEncoderInitStatus status =
-      path
-          ? FLAC__stream_encoder_init_file(e, path, nullptr, nullptr)
-          : FLAC__stream_encoder_init_stream(e, writeMemory, seekMemory, tellMemory, nullptr, this);
+      path ? FLAC__stream_encoder_init_file(e, path, nullptr, nullptr)
+           : FLAC__stream_encoder_init_stream(e, sink_ ? writeSink : writeMemory, seekMemory,
+                                              tellMemory, nullptr, this);
   if (status != FLAC__STREAM_ENCODER_INIT_STATUS_OK) {
     FLAC__stream_encoder_delete(e);
     return false;
@@ -89,10 +103,21 @@ FLAC__StreamEncoderWriteStatus FlacWriter::writeMemory(const FLAC__StreamEncoder
   return FLAC__STREAM_ENCODER_WRITE_STATUS_OK;
 }
 
+FLAC__StreamEncoderWriteStatus FlacWriter::writeSink(const FLAC__StreamEncoder *,
+                                                     const FLAC__byte buffer[], size_t bytes,
+                                                     uint32_t samples, uint32_t, void *self) {
+  auto *w = static_cast<FlacWriter *>(self);
+  if (!w->sink_->write(w->memoryPos_, buffer, bytes, samples))
+    return FLAC__STREAM_ENCODER_WRITE_STATUS_FATAL_ERROR;
+  w->memoryPos_ += bytes;
+  w->sinkEnd_ = std::max(w->sinkEnd_, w->memoryPos_);
+  return FLAC__STREAM_ENCODER_WRITE_STATUS_OK;
+}
+
 FLAC__StreamEncoderSeekStatus FlacWriter::seekMemory(const FLAC__StreamEncoder *,
                                                      FLAC__uint64 offset, void *self) {
   auto *w = static_cast<FlacWriter *>(self);
-  if (offset > w->memory_->size())
+  if (offset > (w->sink_ ? w->sinkEnd_ : w->memory_->size()))
     return FLAC__STREAM_ENCODER_SEEK_STATUS_ERROR;
   w->memoryPos_ = static_cast<size_t>(offset);
   return FLAC__STREAM_ENCODER_SEEK_STATUS_OK;
@@ -127,6 +152,7 @@ bool FlacWriter::close() {
   FLAC__stream_encoder_delete(encoder_);
   encoder_ = nullptr;
   memory_ = nullptr;
+  sink_ = nullptr;
   return ok;
 }
 

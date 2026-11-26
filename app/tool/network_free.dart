@@ -48,6 +48,7 @@ const appDirs = ['app/lib', 'app/packages', 'app/web'];
 const shippedWebFiles = [
   'core/web/wp_core_web.mjs',
   'core/web/wp_loader.js',
+  'core/web/wp_recorder.js',
   'core/web/wp_worklet.js',
 ];
 

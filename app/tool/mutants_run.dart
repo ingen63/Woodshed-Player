@@ -48,6 +48,8 @@ List<(String, List<String>)> coreTestPrograms(String core) => [
   ('recorder_tests', []),
   // #140: armed recording (sound and silence)
   ('sound_gate_tests', []),
+  // #157: recording in the browser
+  ('stream_recorder_tests', []),
   // #140: command line
   ('cli_tests', []),
   // #141: MP3 export (LAME from local/lame)

@@ -54,6 +54,11 @@ target_include_directories(wp_trim PUBLIC include src)
 target_link_libraries(wp_trim PUBLIC wp_miniaudio wp_flacwriter)
 target_link_options(wp_trim PUBLIC ${WP_TEST_LINK})
 wp_strict_warnings(wp_trim)
+# #157: recording in the browser: sound gate (as natively) and the stream recorder
+add_library(wp_streamrec STATIC src/sound_gate.cpp src/stream_recorder.cpp)
+target_include_directories(wp_streamrec PUBLIC src include)
+target_link_libraries(wp_streamrec PUBLIC wp_flacwriter)
+wp_strict_warnings(wp_streamrec)
 
 enable_testing()
 foreach(t engine metronome waveform)
@@ -78,6 +83,10 @@ target_link_libraries(trim_mp4_tests PRIVATE wp_trim)
 target_compile_definitions(trim_mp4_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
 wp_strict_warnings(trim_mp4_tests)
 add_test(NAME trim_mp4_tests COMMAND trim_mp4_tests)
+add_executable(stream_recorder_tests tests/stream_recorder_tests.cpp) # #157
+target_link_libraries(stream_recorder_tests PRIVATE wp_streamrec wp_playercore)
+wp_strict_warnings(stream_recorder_tests)
+add_test(NAME stream_recorder_tests COMMAND stream_recorder_tests)
 
 # #9: the same reference cases as natively; compared against the native outputs (#9/AK7)
 include(tests/reference.cmake)
@@ -87,9 +96,11 @@ include(tests/reference.cmake)
 include(tests/fuzz/fuzz.cmake)
 
 # ---- Kern fürs AudioWorklet ----
-# #116: trimming (src/trim*.cpp, the FLAC writer and libFLAC) is part of the web core.
+# #116: trimming (src/trim*.cpp, the FLAC writer and libFLAC) is part of the web core; #157: recording
+# (sound gate and stream recorder).
 set(WP_WEB_OWN web/wp_core_web.cpp src/recorder_stub.cpp src/player_core.cpp src/trim.cpp src/trim_mp4.cpp
-  src/trim_api.cpp src/mp3_api_stub.cpp src/flac_writer.cpp ${WP_ENGINE_SOURCES})
+  src/trim_api.cpp src/mp3_api_stub.cpp src/flac_writer.cpp src/sound_gate.cpp src/stream_recorder.cpp
+  ${WP_ENGINE_SOURCES})
 add_executable(wp_core_web ${WP_WEB_OWN} src/miniaudio_impl.c ${WP_FLAC_SOURCES})
 target_include_directories(wp_core_web PRIVATE include web ${WP_ENGINE_INCLUDES})
 target_include_directories(wp_core_web SYSTEM PRIVATE ${WP_ENGINE_SYSTEM_INCLUDES} ${WP_THIRD_PARTY}/miniaudio

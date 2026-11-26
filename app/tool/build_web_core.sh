@@ -7,5 +7,6 @@ cd "$(dirname "$0")/../.."
 [ -f core/build-wasm/CMakeCache.txt ] || emcmake cmake -S core -B core/build-wasm -DCMAKE_BUILD_TYPE=Release >/dev/null
 cmake --build core/build-wasm --target wp_core_web 2>&1 | tail -3
 mkdir -p app/web/wp_core
-cp core/build-wasm/wp_core_web.wasm core/web/wp_core_web.mjs core/web/wp_worklet.js core/web/wp_loader.js app/web/wp_core/
+cp core/build-wasm/wp_core_web.wasm core/web/wp_core_web.mjs core/web/wp_worklet.js core/web/wp_loader.js \
+  core/web/wp_recorder.js app/web/wp_core/
 echo "Core is in app/web/wp_core/"

@@ -478,6 +478,36 @@ void main() {
         });
       }
     }
+
+    // #157/AK1: the phone layout has a bar for the button where there is recording (the web app on a
+    // phone); none without a button.
+    testWidgets('Phone: Leiste mit dem Knopf, ohne Knopf keine', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final app = await pumpApp(tester, size: phone);
+      expect(find.byKey(const Key('phoneRecordingBar')), findsNothing);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: testLocale,
+          localizationsDelegates: testDelegates,
+          supportedLocales: testLocales,
+          theme: woodshedTheme(Brightness.dark),
+          home: HomePage(
+            controller: app.controller,
+            recordingButton: const Text('REC', key: Key('rec')),
+          ),
+        ),
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('phoneRecordingBar')),
+          matching: find.byKey(const Key('rec')),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 
   group('#30/AK11 Wellenform', () {

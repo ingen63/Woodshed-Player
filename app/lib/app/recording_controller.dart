@@ -7,11 +7,13 @@
 // then the record button and the command line are refused. Its takes are named and placed when the
 // sound comes ([RecordingNaming]), and the next take can be armed while the last one is still being
 // added to the library.
+// #157: in the browser the recorder of the web core (recorder_web.dart) records the microphone; files are
+// then names in the page's storage, so existence and deletion go through the [Recorder].
 import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:wp_core/wp_core.dart';
+import 'package:wp_core/wp_types.dart';
 
 import '../library/track.dart';
 import '../time_format.dart';
@@ -50,45 +52,25 @@ abstract class Recorder {
 
   /// Only silence so far: no permission, or nothing is playing.
   bool get onlySilence;
+
+  /// #157: a recording file at [path] exists (natively a file, in the browser one of the recorder).
+  bool exists(String path);
+
+  /// #157: removes the recording file at [path] (a cancelled armed recording); gone already is fine.
+  void delete(String path);
 }
 
-/// [Recorder] of the audio core.
-class CoreRecorder implements Recorder {
-  const CoreRecorder();
-  @override
-  bool sourceAvailable(WpRecSource source) =>
-      WpRecorder.sourceAvailable(source);
-  @override
-  void start(String path, WpRecSource source) =>
-      WpRecorder.startSource(path, source);
-  @override
-  void startArmed(
-    String path,
-    WpRecSource source, {
-    required double thresholdDb,
-    required double silenceSeconds,
-    double? tailSeconds,
-  }) => WpRecorder.startArmed(
-    path,
-    source,
-    thresholdDb: thresholdDb,
-    silenceSeconds: silenceSeconds,
-    tailSeconds: tailSeconds,
-  );
-  @override
-  void stop() => WpRecorder.stop();
-  @override
-  bool get isRecording => WpRecorder.isRecording;
-  @override
-  double get seconds => WpRecorder.seconds;
-  @override
-  WpRecGate get gate => WpRecorder.gate;
-  @override
-  double get keptSeconds => WpRecorder.keptSeconds;
-  @override
-  double get level => WpRecorder.level;
-  @override
-  bool get onlySilence => WpRecorder.onlySilence;
+/// #157: [Recorder.exists] and [Recorder.delete] for files of the file system (desktop, tests).
+mixin RecordingFiles {
+  bool exists(String path) => File(path).existsSync();
+
+  void delete(String path) {
+    try {
+      File(path).deleteSync();
+    } on FileSystemException {
+      // already gone
+    }
+  }
 }
 
 /// What the recording is doing.
@@ -166,7 +148,7 @@ class RecordingNoFolder extends RecordingOutcome {
 class RecordingController extends ChangeNotifier {
   RecordingController({
     required this.app,
-    this.recorder = const CoreRecorder(),
+    required this.recorder,
     this.now = DateTime.now,
     this.tick = const Duration(milliseconds: 33),
   });
@@ -316,6 +298,7 @@ class RecordingController extends ChangeNotifier {
       final path = freePath(
         '$dir/${l.recordingFileName(fileStamp(at))}',
         from.extension,
+        recorder.exists,
       );
       try {
         if (arming == null) {
@@ -429,12 +412,12 @@ class RecordingController extends ChangeNotifier {
     _silent = false;
     notifyListeners();
     if (cancelled) {
-      if (path != null) _delete(path);
+      if (path != null) recorder.delete(path);
       done.complete(const RecordingCancelled());
       return;
     }
     Track? track;
-    if (path != null && File(path).existsSync()) {
+    if (path != null && recorder.exists(path)) {
       track = await app.addRecording(
         path,
         title: title,
@@ -447,22 +430,18 @@ class RecordingController extends ChangeNotifier {
     done.complete(RecordingSaved(track, track?.duration ?? seconds));
   }
 
-  /// #147: `[base].[extension]`, or with « 2», « 3» … if that file exists already (two takes in the
+  /// #147: `[base].[extension]`, or with « 2», « 3» … if that file [exists] already (two takes in the
   /// same second).
-  static String freePath(String base, String extension) {
+  static String freePath(
+    String base,
+    String extension,
+    bool Function(String path) exists,
+  ) {
     var path = '$base.$extension';
-    for (var n = 2; File(path).existsSync(); n++) {
+    for (var n = 2; exists(path); n++) {
       path = '$base $n.$extension';
     }
     return path;
-  }
-
-  static void _delete(String path) {
-    try {
-      File(path).deleteSync();
-    } on FileSystemException {
-      // already gone
-    }
   }
 
   @override

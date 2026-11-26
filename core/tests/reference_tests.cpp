@@ -30,6 +30,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "flac_writer.hpp"
@@ -1077,6 +1078,150 @@ void webEntryPointsAtTheirLimits() {
   wp_destroy(p);
 }
 
+// #157/AK5: the recording of the browser through wp_web_rec_* on generated audio, fed in render
+// quanta of 128 frames as the AudioWorklet delivers them and stored piece by piece as the worker
+// does. Armed with threshold -30 dBFS, pause 2 s and tail 1 s (as «Armed»): 1.5 s silence, 0.5 s
+// sine, 0.8 s pause (kept), 0.5 s sine, 2.5 s silence (ends it), 0.5 s sine (not kept). The file
+// holds 1 s lead-in + 0.5 + 0.8 + 0.5
+// + 1 s tail = 3.8 s. The gate state per block and the decoded file are compared native against
+// WASM.
+std::vector<uint8_t> webRecording(wp_web_rec *r, const std::vector<float> &mono, int channels,
+                                  std::vector<float> &gates) {
+  std::vector<uint8_t> file;
+  const auto total = static_cast<int>(mono.size());
+  for (int done = 0; done < total; done += 128) {
+    const int n = std::min(128, total - done);
+    float *in = wp_web_rec_input(r);
+    CHECK(in != nullptr);
+    if (!in)
+      break;
+    for (int i = 0; i < n; ++i)
+      for (int c = 0; c < channels; ++c)
+        in[i * channels + c] = mono[static_cast<size_t>(done) + static_cast<size_t>(i)];
+    CHECK(wp_web_rec_feed(r, n) == WP_OK);
+    gates.push_back(static_cast<float>(wp_web_rec_gate(r)));
+    const auto *out = static_cast<const uint8_t *>(wp_web_rec_out(r));
+    CHECK(wp_web_rec_out_offset(r) == static_cast<double>(file.size()));
+    file.insert(file.end(), out, out + wp_web_rec_out_size(r));
+    wp_web_rec_take(r);
+  }
+  CHECK(wp_web_rec_finish(r) == WP_OK);
+  const auto *out = static_cast<const uint8_t *>(wp_web_rec_out(r));
+  file.insert(file.end(), out, out + wp_web_rec_out_size(r));
+  wp_web_rec_take(r);
+  const auto *head = static_cast<const uint8_t *>(wp_web_rec_header(r));
+  std::copy(head, head + wp_web_rec_header_size(r), file.begin());
+  return file;
+}
+
+void webRecordingArmed() {
+  constexpr int rate = 48000;
+  std::vector<float> mono;
+  auto silence = [&](double s) { mono.insert(mono.end(), static_cast<size_t>(s * rate), 0.0f); };
+  auto tone = [&](double s) {
+    for (int i = 0; i < static_cast<int>(s * rate); ++i)
+      mono.push_back(static_cast<float>(0.5 * std::cos(2.0 * kPi * 440.0 * i / rate)));
+  };
+  silence(1.5);
+  tone(0.5);
+  silence(0.8);
+  tone(0.5);
+  silence(2.5);
+  tone(0.5);
+  int err = 1;
+  wp_web_rec *r = wp_web_rec_create(rate, 2, 1, -30.0, 2.0, 1.0, &err);
+  CHECK(r != nullptr && err == WP_OK);
+  if (!r)
+    return;
+  CHECK(wp_web_rec_gate(r) == WP_REC_GATE_ARMED);
+  std::vector<float> gates;
+  const std::vector<uint8_t> file = webRecording(r, mono, 2, gates);
+  CHECK(wp_web_rec_gate(r) == WP_REC_GATE_DONE);
+  CHECK(std::fabs(wp_web_rec_seconds(r) - static_cast<double>(mono.size()) / rate) < 1e-9);
+  CHECK(std::fabs(wp_web_rec_kept_seconds(r) - 3.8) < 0.01);
+  CHECK(std::fabs(wp_web_rec_level(r) - 0.5f) < 1e-6f); // peak since the start, then reset
+  CHECK(wp_web_rec_level(r) == 0.0f);
+  wp_web_rec_free(r);
+  // Gate: armed for the first 1.5 s, then recording, done 2 s into the long silence.
+  CHECK(gates.front() == WP_REC_GATE_ARMED && gates.back() == WP_REC_GATE_DONE);
+  const auto firstRecording = std::find(gates.begin(), gates.end(), WP_REC_GATE_RECORDING);
+  CHECK(std::abs((firstRecording - gates.begin()) - (rate * 3 / 2) / 128) <= 1);
+  wp_web_track *t = wp_web_track_decode(file.data(), file.size(), rate, &err);
+  CHECK(t != nullptr && err == WP_OK);
+  if (!t)
+    return;
+  const int frames = wp_web_track_frames(t);
+  CHECK(std::abs(frames - static_cast<int>(3.8 * rate)) <= rate / 100);
+  const float *pcm = wp_web_track_data(t);
+  int first = -1;
+  for (int i = 0; i < frames && first < 0; ++i)
+    if (std::fabs(pcm[2 * i]) > 0.0316f)
+      first = i;
+  CHECK(std::abs(first - rate) <= rate / 100); // 1 s lead-in
+  record("web_rec_armed_gate", gates);
+  record("web_rec_armed_file", std::vector<float>(pcm, pcm + 2 * frames));
+  wp_web_track_free(t);
+
+  // Without arming (the record button), mono: every frame, and the error cases.
+  r = wp_web_rec_create(rate, 1, 0, 0.0, 0.0, 0.0, &err);
+  CHECK(r != nullptr && err == WP_OK && wp_web_rec_gate(r) == WP_REC_GATE_OFF);
+  if (!r)
+    return;
+  std::vector<float> none;
+  const std::vector<float> part(mono.begin() + rate, mono.begin() + 2 * rate);
+  const std::vector<uint8_t> plain = webRecording(r, part, 1, none);
+  CHECK(wp_web_rec_only_silence(r) == 0);
+  CHECK(wp_web_rec_feed(r, 0) == WP_REC_ERR_INVALID_ARGUMENT);
+  CHECK(wp_web_rec_feed(r, WP_WEB_MAX_BLOCK + 1) == WP_REC_ERR_INVALID_ARGUMENT);
+  wp_web_rec_free(r);
+  t = wp_web_track_decode(plain.data(), plain.size(), rate, &err);
+  CHECK(t != nullptr && wp_web_track_frames(t) == rate);
+  if (t)
+    record("web_rec_plain_file",
+           std::vector<float>(wp_web_track_data(t), wp_web_track_data(t) + 2 * rate));
+  wp_web_track_free(t);
+  // Limits: 8000 and 192000 Hz, 1 and 8 channels; a block of 1 and of WP_WEB_MAX_BLOCK frames, its
+  // last sample in the last channel reaching the core.
+  for (const auto [rRate, ch] :
+       {std::pair{WP_MIN_SAMPLE_RATE, 1}, std::pair{WP_MAX_SAMPLE_RATE, 8}}) {
+    r = wp_web_rec_create(rRate, ch, 0, 0, 0, 0, &err);
+    CHECK(r != nullptr && err == WP_OK);
+    if (!r)
+      continue;
+    float *in = wp_web_rec_input(r);
+    CHECK(in != nullptr);
+    if (!in) {
+      wp_web_rec_free(r);
+      continue;
+    }
+    const size_t n = static_cast<size_t>(WP_WEB_MAX_BLOCK) * static_cast<size_t>(ch);
+    std::fill(in, in + n, 0.0f);
+    in[n - 1] = 0.75f;
+    CHECK(wp_web_rec_feed(r, WP_WEB_MAX_BLOCK) == WP_OK);
+    CHECK(std::fabs(wp_web_rec_level(r) - 0.75f) < 1e-6f);
+    CHECK(wp_web_rec_feed(r, 1) == WP_OK);
+    CHECK(std::fabs(wp_web_rec_seconds(r) - (WP_WEB_MAX_BLOCK + 1.0) / rRate) < 1e-12);
+    wp_web_rec_free(r);
+  }
+  CHECK(wp_web_rec_create(WP_MIN_SAMPLE_RATE - 1, 2, 0, 0, 0, 0, &err) == nullptr);
+  CHECK(wp_web_rec_create(WP_MAX_SAMPLE_RATE + 1, 2, 0, 0, 0, 0, &err) == nullptr);
+  CHECK(wp_web_rec_create(rate, 2, 1, -30.0, 0.0, 1.0, &err) == nullptr);
+  CHECK(err == WP_REC_ERR_INVALID_ARGUMENT);
+  CHECK(wp_web_rec_create(4000, 2, 0, 0, 0, 0, &err) == nullptr);
+  CHECK(wp_web_rec_create(rate, 0, 0, 0, 0, 0, &err) == nullptr);
+  CHECK(wp_web_rec_create(rate, 9, 0, 0, 0, 0, nullptr) == nullptr);
+  CHECK(wp_web_rec_feed(nullptr, 1) == WP_REC_ERR_INVALID_ARGUMENT);
+  CHECK(wp_web_rec_finish(nullptr) == WP_REC_ERR_INVALID_ARGUMENT);
+  CHECK(wp_web_rec_input(nullptr) == nullptr && wp_web_rec_out(nullptr) == nullptr);
+  CHECK(wp_web_rec_out_size(nullptr) == 0 && wp_web_rec_out_offset(nullptr) == 0.0);
+  CHECK(wp_web_rec_header(nullptr) == nullptr && wp_web_rec_header_size(nullptr) == 0);
+  CHECK(wp_web_rec_gate(nullptr) == WP_REC_GATE_OFF && wp_web_rec_cut(nullptr) == 0.0);
+  CHECK(wp_web_rec_seconds(nullptr) == 0.0 && wp_web_rec_kept_seconds(nullptr) == 0.0);
+  CHECK(wp_web_rec_level(nullptr) == 0.0f && wp_web_rec_only_silence(nullptr) == 0);
+  wp_web_rec_take(nullptr);
+  wp_web_rec_free(nullptr);
+}
+
 void sampleRateLowerLimit() {
   // #76/AK1 #76/AK2: WP_MIN_SAMPLE_RATE (8000 Hz) is the lowest rate the core accepts. At the limit
   // a player loads and plays; just below it (7999 Hz) and at nonsense rates (1 Hz, where the time
@@ -1251,6 +1396,7 @@ int main(int argc, char **argv) {
   run("#141 MP3 export unavailable offline", mp3ExportUnavailableOffline);
   run("#11 browser entry points at their limits", webEntryPointsAtTheirLimits);
   run("#116/AK4 #116/AK7 #120/AK4 trimming WAV, FLAC and M4A in memory", trimInMemory);
+  run("#157/AK5 recording in the browser, armed and plain", webRecordingArmed);
   run("#76/AK1 #76/AK2 sample rate lower limit", sampleRateLowerLimit);
   run("#97/AK1 #97/AK2 #97/AK3 sample rate upper limit", sampleRateUpperLimit);
 
