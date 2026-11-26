@@ -17,6 +17,7 @@ import 'package:wp_core/wp_types.dart';
 
 import '../metronome/metronome_controller.dart';
 import 'audio_core.dart';
+import 'audio_session_web.dart';
 import 'waveform_summary.dart';
 
 @JS('WebAssembly.compile')
@@ -65,6 +66,8 @@ class WebAudioCore implements AudioCore {
     }
     final module = await _wasmCompile(await response.arrayBuffer().toDart)
         .toDart;
+    // #158: before the first sound, so the iPhone plays in silent mode too
+    setAudioSessionType(AudioSessionType.playback);
     final ctx = await supportedContext(web.AudioContext());
     await ctx.audioWorklet.addModule('${base}wp_worklet.js').toDart;
     final options = JSObject()

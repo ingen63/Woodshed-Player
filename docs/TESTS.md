@@ -376,7 +376,7 @@ WAV ohne Frames, Wellenform ohne Audio und Play ohne Titel.
 genannt):
 
 - **Code nur fürs Web** (`file_platform_web.dart`, `file_store_web.dart`, `platform_web.dart`,
-  `audio_core_web.dart`): Diese Dateien importieren `package:web` bzw. `dart:js_interop` und lassen sich in der
+  `audio_core_web.dart`, `audio_session_web.dart`): Diese Dateien importieren `package:web` bzw. `dart:js_interop` und lassen sich in der
   Dart-VM von `flutter test` nicht laden; `flutter test --platform chrome` liefert keine Abdeckung. Sie werden bei jeder
   Prüfung aufgelistet. Geprüft werden sie im Browser mit `flutter test --platform chrome` (`app/test/web/`, `make test-web`, Job `web`,
   #13), von Hand mit `app/tool/web_*_check.sh`, und über `web_binding_test.dart`.
