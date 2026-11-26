@@ -1,5 +1,6 @@
 // #54/AK7: the storage chosen for the sync is kept per device in device.json, never in the shared state.
 // #129/AK3: the width of the library sidebar, too. #147/AK9: threshold and pause of «Armed».
+// #156/AK1: whether «Armed» stays on after a take.
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -114,4 +115,29 @@ void main() {
       expect(o.armSilenceSeconds, isNull, reason: odd);
     }
   });
+
+  test(
+    '#156/AK1 device.json: «Armed» goes off after a take unless kept on',
+    () async {
+      final store = MemoryFileStore();
+      const off = DeviceSettings(deviceId: '0123456789abcdef');
+      expect(off.armKeepsOn, isFalse);
+      expect(off.toJson(), isNot(contains('armKeepsOn')));
+      final on = off.copyWith(armKeepsOn: true);
+      expect(on.toJson()['armKeepsOn'], isTrue);
+      await on.save(store);
+      expect((await DeviceSettings.load(store)).armKeepsOn, isTrue);
+      expect(on.copyWith(area: 'player').armKeepsOn, isTrue);
+      for (final odd in ['false', '"true"', '1', 'null']) {
+        store.files[DeviceSettings.fileName] = Uint8List.fromList(
+          utf8.encode('{"deviceId":"0123456789abcdef","armKeepsOn":$odd}'),
+        );
+        expect(
+          (await DeviceSettings.load(store)).armKeepsOn,
+          isFalse,
+          reason: odd,
+        );
+      }
+    },
+  );
 }

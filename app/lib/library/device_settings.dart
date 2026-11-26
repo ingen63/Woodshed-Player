@@ -42,6 +42,7 @@ class DeviceSettings {
     this.yearsRead = false,
     this.armThresholdDb,
     this.armSilenceSeconds,
+    this.armKeepsOn = false,
   });
 
   static const fileName = 'device.json';
@@ -115,6 +116,9 @@ class DeviceSettings {
   /// #147/AK9: pause (seconds) that ends a take of the armed practice recording; null: the default.
   final double? armSilenceSeconds;
 
+  /// #156/AK1: «Armed» stays on after a take for the next one; false (the default): it goes off.
+  final bool armKeepsOn;
+
   DeviceSettings copyWith({
     bool? synced,
     int? cacheLimit,
@@ -135,6 +139,7 @@ class DeviceSettings {
     bool? yearsRead,
     double? armThresholdDb,
     double? armSilenceSeconds,
+    bool? armKeepsOn,
   }) => DeviceSettings(
     deviceId: deviceId,
     synced: synced ?? this.synced,
@@ -156,6 +161,7 @@ class DeviceSettings {
     yearsRead: yearsRead ?? this.yearsRead,
     armThresholdDb: armThresholdDb ?? this.armThresholdDb,
     armSilenceSeconds: armSilenceSeconds ?? this.armSilenceSeconds,
+    armKeepsOn: armKeepsOn ?? this.armKeepsOn,
   );
 
   Map<String, Object?> toJson() => {
@@ -179,6 +185,7 @@ class DeviceSettings {
     if (yearsRead) 'yearsRead': true,
     if (armThresholdDb != null) 'armThresholdDb': armThresholdDb,
     if (armSilenceSeconds != null) 'armSilenceSeconds': armSilenceSeconds,
+    if (armKeepsOn) 'armKeepsOn': true,
   };
 
   static String newDeviceId([Random? random]) {
@@ -242,6 +249,7 @@ class DeviceSettings {
             yearsRead: j['yearsRead'] == true,
             armThresholdDb: _finite(j['armThresholdDb']),
             armSilenceSeconds: _finite(j['armSilenceSeconds']),
+            armKeepsOn: j['armKeepsOn'] == true,
           );
         }
       }

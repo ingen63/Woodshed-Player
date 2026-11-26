@@ -967,6 +967,16 @@ class Library extends ChangeNotifier {
     return _updateDevice(next);
   }
 
+  /// #156/AK1: «Armed» stays on after a take on this device; off by default.
+  bool get armKeepsOn => _device.armKeepsOn;
+
+  /// #156/AK1: remembers on this device whether «Armed» stays on after a take (device-local, never
+  /// synced); a failed write keeps it for this run only.
+  Future<void> setArmKeepsOn(bool keep) {
+    if (_device.armKeepsOn == keep) return Future.value();
+    return _updateDevice(_device.copyWith(armKeepsOn: keep));
+  }
+
   /// #123: the section «Library» (all tracks) is open in the library list on this device; closed by default.
   bool get libraryOpen => _device.libraryOpen;
 

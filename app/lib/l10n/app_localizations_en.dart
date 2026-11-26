@@ -1305,19 +1305,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get armedSwitchTooltip =>
-      'Records the microphone by itself while you practise: each time you play, a recording starts, and it ends after a pause or with the space bar. The recordings go to the library into Recordings › date.';
+      'Records the microphone by itself while you practise: as soon as you play, a recording starts, and it ends after a pause or with the space bar. Then «Armed» goes off, unless it is set to stay on for the next recording. The recordings go to the library into Recordings › date.';
 
   @override
   String get armedWaiting => 'Armed, waiting for sound';
 
   @override
-  String get armedSettings => 'Threshold and pause';
+  String get armedSettings => 'Threshold, pause and end';
 
   @override
   String get armedThreshold => 'Starts above';
 
   @override
   String get armedSilence => 'Ends after a pause of';
+
+  @override
+  String get armedOffAfterTake => 'Switch off after a recording';
 
   @override
   String get armedLevel => 'Microphone level';
@@ -1517,7 +1520,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpRecordingBody =>
-      '“Record” at the top right starts and stops a recording. The menu beside it chooses the source for this device: system audio (macOS 14.2 or later; the player and the metronome are left out) or the microphone. The recording is saved losslessly as FLAC and appears in the library as a new track, named after date and time. The first time, macOS asks for permission.\n\nArmed: in Practice and Metronome, the switch “Armed” records from the microphone by itself. As soon as the level rises above the threshold, a recording starts, 1 second early; after a pause of the set length it ends. Space plays or pauses as usual and also ends a running recording. Each recording lands in the library in the folder Recordings › date. The arrow beside the switch sets threshold and pause. While “Armed” is on, “Record” is locked.';
+      '“Record” at the top right starts and stops a recording. The menu beside it chooses the source for this device: system audio (macOS 14.2 or later; the player and the metronome are left out) or the microphone. The recording is saved losslessly as FLAC and appears in the library as a new track, named after date and time. The first time, macOS asks for permission.\n\nArmed: in Practice and Metronome, the switch “Armed” records from the microphone by itself. As soon as the level rises above the threshold, a recording starts, 1 second early; after a pause of the set length it ends. Space plays or pauses as usual and also ends a running recording. Then “Armed” goes off; to keep it armed for the next recording, switch off “Switch off after a recording” in its settings. Each recording lands in the library in the folder Recordings › date. The arrow beside the switch sets threshold, pause and whether it goes off after a recording. While “Armed” is on, “Record” is locked.';
 
   @override
   String get helpExportTitle => 'Export as MP3';

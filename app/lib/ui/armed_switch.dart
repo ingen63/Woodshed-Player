@@ -194,7 +194,8 @@ class _ArmedSwitchState extends State<ArmedSwitch> {
   }
 }
 
-/// #147/AK9: the popover at the switch: threshold with a level meter, and the pause.
+/// #147/AK9: the popover at the switch: threshold with a level meter, and the pause; #156/AK1: whether
+/// the switch goes off after a take.
 class ArmedSettingsPanel extends StatelessWidget {
   const ArmedSettingsPanel({super.key, required this.practice});
   final PracticeRecording practice;
@@ -310,6 +311,17 @@ class ArmedSettingsPanel extends StatelessWidget {
             label: l.armedSilenceValue(silence.round()),
             onChanged: (v) => p.setSilenceSeconds(v.roundToDouble()),
             onChangeEnd: (_) => p.applySettings(),
+          ),
+          // #156/AK1: off after a take (the default) or armed again for the next one.
+          Row(
+            children: [
+              Expanded(child: Text(l.armedOffAfterTake)),
+              Switch(
+                key: const Key('armedOffAfterTake'),
+                value: !p.keepsOn,
+                onChanged: (v) => p.setKeepsOn(!v),
+              ),
+            ],
           ),
         ],
       ),

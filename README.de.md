@@ -52,7 +52,7 @@ Ein Stück langsamer abspielen, ohne dass sich die Tonhöhe ändert, die schwere
 - 📈 **Steigerung.** Bei 60 % beginnen, alle 10 Durchgänge 5 % schneller, am Ende volles Tempo, ganz von selbst.
 - 🥁 **Metronom.** 20–300 BPM, Tap-Tempo, 4/4, 3/4, 2/4 und 6/8, Unterteilungen bis zu Sechzehnteln und eine automatische Tempo-Steigerung nach Takten oder nach Zeit.
 - 📚 **Bibliothek.** Ordner, Playlists, Mehrfachauswahl, Ziehen und Ablegen. Jede Datei wird nur einmal gespeichert, erkannt an ihrem Inhalt. Anfang und Ende eines Titels abschneiden (WAV, FLAC, MP3, AAC, M4A).
-- 🎙️ **Aufnahme (Mac).** Systemton oder Mikrofon verlustfrei als FLAC aufnehmen. Die Aufnahme landet direkt in der Bibliothek, bereit für den Loop. Mit dem Schalter **Scharf** wird beim Üben jedes Spielen zu einer eigenen Aufnahme, abgelegt unter `Recordings › Datum`.
+- 🎙️ **Aufnahme (Mac).** Systemton oder Mikrofon verlustfrei als FLAC aufnehmen. Die Aufnahme landet direkt in der Bibliothek, bereit für den Loop. Mit dem Schalter **Scharf** wird beim Üben das nächste Spielen zu einer eigenen Aufnahme, abgelegt unter `Recordings › Datum`; bleibt er scharf, wird jede Spielphase aufgenommen.
 - ☁️ **Deine Geräte, Deine Wahl.** Abgleich auf Wunsch über Dein eigenes Google Drive, nur mit den Dateien, die die App selbst anlegt. Ohne Konto verlässt nichts Dein Gerät.
 - 🌗 **Zum Üben gemacht.** Die Bereiche Player, Üben und Metronom, Layouts für Desktop, Tablet und Phone, hell und dunkel, Tastenkürzel überall (**?** zeigt die Übersicht), eine eingebaute Hilfe, die auch offline geht, Deutsch und Englisch nach der Systemsprache, auch in der Menüleiste des Mac und in den Rückfragen des Systems.
 

@@ -1314,19 +1314,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get armedSwitchTooltip =>
-      'Nimmt beim Üben von selbst über das Mikrofon auf: Jedes Mal, wenn Du spielst, beginnt eine Aufnahme; sie endet nach einer Pause oder mit der Leertaste. Die Aufnahmen kommen in die Bibliothek nach Recordings › Datum.';
+      'Nimmt beim Üben von selbst über das Mikrofon auf: Sobald Du spielst, beginnt eine Aufnahme; sie endet nach einer Pause oder mit der Leertaste. Danach geht «Scharf» aus, ausser es ist eingestellt, für die nächste Aufnahme an zu bleiben. Die Aufnahmen kommen in die Bibliothek nach Recordings › Datum.';
 
   @override
   String get armedWaiting => 'Scharf, wartet auf einen Ton';
 
   @override
-  String get armedSettings => 'Schwelle und Pause';
+  String get armedSettings => 'Schwelle, Pause und Ende';
 
   @override
   String get armedThreshold => 'Beginnt über';
 
   @override
   String get armedSilence => 'Endet nach einer Pause von';
+
+  @override
+  String get armedOffAfterTake => 'Nach einer Aufnahme ausschalten';
 
   @override
   String get armedLevel => 'Pegel des Mikrofons';
@@ -1527,7 +1530,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpRecordingBody =>
-      '«Aufnahme» oben rechts startet und stoppt eine Aufnahme. Das Menü daneben wählt die Quelle für dieses Gerät: Systemton (ab macOS 14.2; Player und Metronom sind ausgenommen) oder Mikrofon. Die Aufnahme wird verlustfrei als FLAC gespeichert und erscheint als neuer Titel in der Bibliothek, benannt nach Datum und Uhrzeit. Beim ersten Mal fragt macOS nach der Berechtigung.\n\nScharf: In Üben und Metronom nimmt der Schalter «Scharf» von selbst über das Mikrofon auf. Sobald der Pegel über die Schwelle steigt, beginnt eine Aufnahme, und zwar 1 Sekunde früher; nach einer Pause der eingestellten Länge endet sie. Die Leertaste spielt oder pausiert wie gewohnt und beendet zugleich eine laufende Aufnahme. Jede Aufnahme landet in der Bibliothek im Ordner Recordings › Datum. Der Pfeil neben dem Schalter stellt Schwelle und Pause ein. Solange «Scharf» an ist, ist «Aufnahme» gesperrt.';
+      '«Aufnahme» oben rechts startet und stoppt eine Aufnahme. Das Menü daneben wählt die Quelle für dieses Gerät: Systemton (ab macOS 14.2; Player und Metronom sind ausgenommen) oder Mikrofon. Die Aufnahme wird verlustfrei als FLAC gespeichert und erscheint als neuer Titel in der Bibliothek, benannt nach Datum und Uhrzeit. Beim ersten Mal fragt macOS nach der Berechtigung.\n\nScharf: In Üben und Metronom nimmt der Schalter «Scharf» von selbst über das Mikrofon auf. Sobald der Pegel über die Schwelle steigt, beginnt eine Aufnahme, und zwar 1 Sekunde früher; nach einer Pause der eingestellten Länge endet sie. Die Leertaste spielt oder pausiert wie gewohnt und beendet zugleich eine laufende Aufnahme. Danach geht «Scharf» aus; soll es für die nächste Aufnahme scharf bleiben, schalte in seinen Einstellungen «Nach einer Aufnahme ausschalten» aus. Jede Aufnahme landet in der Bibliothek im Ordner Recordings › Datum. Der Pfeil neben dem Schalter stellt Schwelle, Pause und das Ausschalten nach einer Aufnahme ein. Solange «Scharf» an ist, ist «Aufnahme» gesperrt.';
 
   @override
   String get helpExportTitle => 'Export als MP3';

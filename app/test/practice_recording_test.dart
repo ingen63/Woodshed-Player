@@ -47,6 +47,9 @@ void main() {
       tick: const Duration(milliseconds: 1),
     );
     practice = PracticeRecording(app: app.controller, recording: recording);
+    // #147 tests the switch staying on after a take; #156 turns that off by default (group 'off after
+    // a take').
+    await app.library.setArmKeepsOn(true);
   });
   tearDown(() {
     practice.dispose();
@@ -366,6 +369,125 @@ void main() {
       final copy = d.copyWith(armThresholdDb: -10);
       expect(copy.armThresholdDb, -10);
       expect(copy.armSilenceSeconds, 3);
+    });
+  });
+
+  group('off after a take', () {
+    setUp(() => app.library.setArmKeepsOn(false));
+
+    test('#156/AK1: by default the switch goes off after a take', () async {
+      final fresh = TestApp(Directory('${tmp.path}/fresh'));
+      await fresh.library.load();
+      expect(fresh.library.armKeepsOn, isFalse);
+      expect(
+        const DeviceSettings(deviceId: '0123456789abcdef').armKeepsOn,
+        isFalse,
+      );
+    });
+
+    test('#156/AK2: the pause ends the take, it is saved and the switch goes off', () async {
+      await practice.turnOn(de);
+      await armed(1);
+      await sound();
+      await pause(1);
+      await eventually(() => !practice.on, 'switch off');
+      expect(recording.phase, RecordingPhase.idle);
+      expect(recording.reserved, isFalse);
+      expect(rec.recording, isFalse);
+      // Sound afterwards starts nothing: one take for three phases of playing.
+      rec.gate = WpRecGate.recording;
+      const quiet = Duration(milliseconds: 20);
+      await Future<void>.delayed(quiet); // absence: no new take is armed
+      expect(rec.starts, 1);
+      expect(app.library.tracks, hasLength(1));
+    });
+
+    test(
+      '#156/AK2: the space bar ends the take and the switch goes off',
+      () async {
+        await practice.turnOn(de);
+        await armed(1);
+        await sound();
+        rec.keptSeconds = 2.5;
+        await practice.endTake();
+        expect(app.library.tracks, hasLength(1));
+        await eventually(() => !practice.on, 'switch off');
+        expect(rec.starts, 1);
+      },
+    );
+
+    test(
+      '#156/AK2: new settings while waiting arm anew, the switch stays on',
+      () async {
+        await practice.turnOn(de);
+        await armed(1);
+        practice.setThresholdDb(-40);
+        await practice.applySettings();
+        await armed(2);
+        expect(practice.on, isTrue);
+        await practice.turnOff();
+      },
+    );
+
+    test('#156/AK3: set to stay on, three phases give three takes', () async {
+      practice.setKeepsOn(true);
+      expect(practice.keepsOn, isTrue);
+      await practice.turnOn(de);
+      for (var i = 1; i <= 3; i++) {
+        await armed(i);
+        await sound();
+        await pause(i);
+      }
+      await armed(4);
+      expect(practice.on, isTrue);
+      await practice.turnOff();
+    });
+
+    test(
+      '#156/AK4: changed during a take, the new choice applies when it ends',
+      () async {
+        await practice.turnOn(de);
+        await armed(1);
+        await sound();
+        practice.setKeepsOn(true);
+        await pause(1);
+        await armed(2);
+        expect(practice.on, isTrue);
+        await sound();
+        practice.setKeepsOn(false);
+        await pause(2);
+        await eventually(() => !practice.on, 'switch off');
+        expect(rec.starts, 2);
+      },
+    );
+
+    test('#156/AK1: the choice is kept on this device', () async {
+      practice.setKeepsOn(true);
+      await eventually(
+        () =>
+            File('${tmp.path}/lib/${DeviceSettings.fileName}')
+                .readAsStringSync()
+                .contains('"armKeepsOn":true'),
+        'saved',
+      );
+      final again = TestApp(Directory('${tmp.path}/lib'));
+      await again.library.load();
+      expect(again.library.armKeepsOn, isTrue);
+      practice.setKeepsOn(false);
+      await eventually(
+        () =>
+            !File('${tmp.path}/lib/${DeviceSettings.fileName}')
+                .readAsStringSync()
+                .contains('armKeepsOn'),
+        'saved off',
+      );
+      expect(
+        const DeviceSettings(deviceId: '0123456789abcdef')
+            .copyWith(armKeepsOn: true)
+            .copyWith(armThresholdDb: -3)
+            .armKeepsOn,
+        isTrue,
+      );
     });
   });
 

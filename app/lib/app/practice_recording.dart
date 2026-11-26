@@ -3,8 +3,9 @@
 // (1 s before the sound), and it ends after the chosen pause (1 s after the last sound) or with the
 // space bar. Each take goes to the library into `Recordings › <YYYY-MM-DD>`, named after the loaded
 // track and the start time. The core detects sound and silence (sound_gate.cpp); this class arms the
-// next take after each one and holds the recording, so the record button and the command line stay
-// off while it is on. Platform-independent, tested with a fake recorder.
+// next take after each one (#156: only if set to stay on, otherwise the switch goes off) and holds the
+// recording, so the record button and the command line stay off while it is on. Platform-independent,
+// tested with a fake recorder.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -76,6 +77,9 @@ class PracticeRecording extends ChangeNotifier implements PracticeArming {
   static const tailSeconds = 1.0;
 
   bool _on = false;
+
+  /// A take of this switch was recording at the last change of the recording.
+  bool _wasRunning = false;
   AppLocalizations? _texts;
   PracticeArmProblem? _problem;
 
@@ -110,6 +114,16 @@ class PracticeRecording extends ChangeNotifier implements PracticeArming {
         minSilenceSeconds,
         maxSilenceSeconds,
       );
+
+  /// #156/AK1: the switch stays on after a take (otherwise it goes off), as chosen on this device.
+  bool get keepsOn => app.library.armKeepsOn;
+
+  /// #156/AK1, AK4: remembers on this device whether the switch stays on after a take; a running take
+  /// follows the new choice when it ends.
+  void setKeepsOn(bool keep) {
+    unawaited(app.library.setArmKeepsOn(keep));
+    notifyListeners();
+  }
 
   /// #147/AK9: remembers the threshold on this device; the next armed take uses it ([applySettings]).
   void setThresholdDb(double db) {
@@ -209,8 +223,17 @@ class PracticeRecording extends ChangeNotifier implements PracticeArming {
         started,
       );
 
-  /// #147/AK5: after each take the next one is armed while the switch is on.
+  /// #147/AK5: after each take the next one is armed while the switch is on. #156/AK2: unless it
+  /// stays on ([keepsOn]), the switch goes off once a take has ended; the take is saved as before.
   void _changed() {
+    final running = takeRunning;
+    final ended =
+        _wasRunning && !running && recording.phase == RecordingPhase.idle;
+    _wasRunning = running;
+    if (_on && ended && !keepsOn) {
+      unawaited(turnOff());
+      return;
+    }
     if (_on) unawaited(Future.microtask(_arm));
     notifyListeners();
   }

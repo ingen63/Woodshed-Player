@@ -718,6 +718,8 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get armedSilence => pseudo(super.armedSilence);
   @override
+  String get armedOffAfterTake => pseudo(super.armedOffAfterTake);
+  @override
   String get armedLevel => pseudo(super.armedLevel);
   @override
   String get armedLevelOff => pseudo(super.armedLevelOff);

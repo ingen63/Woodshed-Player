@@ -193,6 +193,28 @@ void main() {
     expect(tester.widget<Text>(byKey('armedSilenceValue')).data, '8 s');
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
+  testWidgets(
+    '#156/AK1: popover switch «Switch off after a recording», on by default',
+    (tester) async {
+      final s = await pump(tester);
+      await area(tester, AppArea.practice);
+      await tester.tap(byKey('armedSettingsButton'));
+      await tester.pumpAndSettle();
+      Switch offAfter() => tester.widget<Switch>(byKey('armedOffAfterTake'));
+      expect(offAfter().value, isTrue);
+      expect(s.practice.keepsOn, isFalse);
+      await tester.tap(byKey('armedOffAfterTake'));
+      await tester.pump();
+      expect(s.practice.keepsOn, isTrue);
+      expect(offAfter().value, isFalse);
+      await tester.tap(byKey('armedOffAfterTake'));
+      await tester.pump();
+      expect(s.practice.keepsOn, isFalse);
+      expect(offAfter().value, isTrue);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
   test('#147/AK10: the meter runs from -60 to 0 dBFS', () {
     expect(meterPosition(0), 0);
     expect(meterPosition(1), 1);
@@ -202,33 +224,36 @@ void main() {
     expect(meterPosition(0.0316228), closeTo(0.5, 1e-4)); // -30 dBFS
   });
 
-  testWidgets('#147/AK4: Space plays or pauses and ends the running take', (
-    tester,
-  ) async {
-    final s = await pump(tester);
-    await area(tester, AppArea.metronome);
-    await toggle(tester);
-    await armed(tester, s, 1);
-    s.rec
-      ..keptSeconds = 3
-      ..gate = WpRecGate.recording;
-    await pumpUntil(tester, () => s.practice.takeRunning, 'recording');
-    expect(s.app.controller.metronome.running, isFalse);
-    await tester.runAsync(() async {
-      await tester.sendKeyEvent(LogicalKeyboardKey.space);
-      await tester.pump();
-    });
-    expect(s.app.controller.metronome.running, isTrue); // Space as before
-    expect(s.practice.takeRunning, isFalse);
-    await waitUntil(
-      tester,
-      () => s.app.library.tracks.length == 4,
-      'take saved',
-    );
-    expect(s.practice.on, isTrue);
-    s.app.controller.metronome.stop();
-    await s.practice.turnOff();
-  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+  testWidgets(
+    '#147/AK4, #156/AK2: Space plays or pauses and ends the running take',
+    (tester) async {
+      final s = await pump(tester);
+      await area(tester, AppArea.metronome);
+      await toggle(tester);
+      await armed(tester, s, 1);
+      s.rec
+        ..keptSeconds = 3
+        ..gate = WpRecGate.recording;
+      await pumpUntil(tester, () => s.practice.takeRunning, 'recording');
+      expect(s.app.controller.metronome.running, isFalse);
+      await tester.runAsync(() async {
+        await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        await tester.pump();
+      });
+      expect(s.app.controller.metronome.running, isTrue); // Space as before
+      expect(s.practice.takeRunning, isFalse);
+      await waitUntil(
+        tester,
+        () => s.app.library.tracks.length == 4,
+        'take saved',
+      );
+      // #156/AK2: by default the switch goes off after the take.
+      await pumpUntil(tester, () => !s.practice.on, 'switch off');
+      s.app.controller.metronome.stop();
+      await s.practice.turnOff();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
 
   testWidgets(
     '#147/AK11: while on, the record button only explains why it is locked',

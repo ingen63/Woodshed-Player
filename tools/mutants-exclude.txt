@@ -802,3 +802,9 @@ app/lib/library/folder_tree.dart | dart_remove_void_call | done.addAll(path);
 # gleichwertig: _older() vergleicht nur Ordner desselben Zyklus, und die haben verschiedene IDs;
 # compareTo() ist also nie 0, «< 0» und «<= 0» geben dasselbe.
 app/lib/library/folder_tree.dart | dart_lt_to_le | return a.compareTo(b) < 0;
+
+# ---- app/lib/app/practice_recording.dart ----
+# gleichwertig: _wasRunning wirkt nur bei eingeschaltetem Schalter. turnOn() reserviert, bevor _on
+# wahr wird; reserve() meldet den Wechsel, und _changed() setzt _wasRunning dabei auf takeRunning
+# (falsch), solange _on noch falsch ist. Der Anfangswert erreicht so nie die Prüfung auf ein Ende.
+app/lib/app/practice_recording.dart | dart_false_to_true | bool _wasRunning = false;
