@@ -6,9 +6,9 @@
 
 #include "test_required.hpp"
 
-// #60: not with MSVC either: the limits and the slow counter-check of #159 are calibrated on clang
-// (macOS and Linux, where the jobs «checks» and «bench» measure them); the Windows job checks
-// behaviour only.
+// #60: not with MSVC either: the limits are calibrated on clang (macOS and Linux, where the jobs
+// «checks» and «bench» measure them); the Windows job checks behaviour only. The counter-check of
+// #159 runs on a scripted clock and does not depend on this switch.
 #if defined(NDEBUG) && !defined(WP_SANITIZED) && !defined(_MSC_VER)
 constexpr bool kTimingChecks = true;
 #else

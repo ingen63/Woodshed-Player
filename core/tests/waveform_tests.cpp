@@ -102,17 +102,27 @@ void invalidRangesFail() { // #28/AK4
 
 // #159: the fastest of up to `runs` timings of `work` in ms. Stops as soon as one run is under
 // `limitMs`, so a single run slowed by parallel load (other builds) no longer fails the limit,
-// while a computation that is slow every time still does.
-double bestTimeMs(int runs, double limitMs, const std::function<void()> &work) {
+// while a computation that is slow every time still does. `nowMs` is the clock (steady_clock in
+// the timing tests, a scripted clock in the tests of this decision).
+double steadyNowMs() {
+  return std::chrono::duration<double, std::milli>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
+}
+
+double bestTimeMs(int runs, double limitMs, const std::function<void()> &work,
+                  const std::function<double()> &nowMs = steadyNowMs) {
   double best = 1e300;
   for (int i = 0; i < runs && best >= limitMs; ++i) {
-    const auto t0 = std::chrono::steady_clock::now();
+    const double t0 = nowMs();
     work();
-    const auto t1 = std::chrono::steady_clock::now();
-    best = std::min(best, std::chrono::duration<double, std::milli>(t1 - t0).count());
+    best = std::min(best, nowMs() - t0);
   }
   return best;
 }
+
+// #159: the time check of the timing tests: the best time must stay under the limit.
+bool withinLimit(double bestMs, double limitMs) { return bestMs < limitMs; }
 
 constexpr int kTimingRuns = 5;
 constexpr double kBuildLimitMs = 200.0;
@@ -133,21 +143,58 @@ void overviewIsFast() {
   });
   std::printf("  5 min: computed while loading %.1f ms, overview of 1000 values %.2f ms\n", build,
               query);
-  CHECK(!kTimingChecks || build < kBuildLimitMs);
-  CHECK(!kTimingChecks || query < kQueryLimitMs);
+  CHECK(!kTimingChecks || withinLimit(build, kBuildLimitMs));
+  CHECK(!kTimingChecks || withinLimit(query, kQueryLimitMs));
 }
 
-// #159/AK2: a real regression is still caught. A computation ten times slower (the same overview
-// built ten times in a row, about 350 ms here) stays over the limit in every one of the 5 runs.
+// #159: a scripted clock. Each run of `work` takes the next of `durationsMs` (the last one
+// repeats); `runs` counts the runs.
+struct ScriptedRuns {
+  std::vector<double> durationsMs;
+  double now = 0.0;
+  int runs = 0;
+  std::function<void()> work() {
+    return [this] {
+      const size_t i = std::min(static_cast<size_t>(runs), durationsMs.size() - 1);
+      now += durationsMs[i];
+      ++runs;
+    };
+  }
+  std::function<double()> clock() {
+    return [this] { return now; };
+  }
+};
+
+double scriptedBest(ScriptedRuns &s, double limitMs) {
+  return bestTimeMs(kTimingRuns, limitMs, s.work(), s.clock());
+}
+
+// #159/AK2: a real regression is still caught, independent of the speed of the machine (#159:
+// the former real ten times slower computation was under 200 ms on the CI runner). The same
+// decision as in overviewIsFast runs on a scripted clock: a computation ten times slower than
+// the usual 30 ms (300 ms in every run) fails after all 5 runs, and so does one just over the
+// limit; a single run slowed by load (367 ms, as in #159) passes with the next one.
 void tenTimesSlowerOverviewFails() {
-  const auto v = sine(300.0, 0.5);
-  const double slow = bestTimeMs(kTimingRuns, kBuildLimitMs, [&] {
-    for (int i = 0; i < 10; ++i) {
-      const auto p = peaksOf(v);
-    }
-  });
-  std::printf("  5 min, ten times slower: %.1f ms\n", slow);
-  CHECK(!kTimingChecks || slow >= kBuildLimitMs);
+  ScriptedRuns tenTimes{{300.0}};
+  const double slow = scriptedBest(tenTimes, kBuildLimitMs);
+  CHECK(slow == 300.0);
+  CHECK(tenTimes.runs == kTimingRuns);
+  CHECK(!withinLimit(slow, kBuildLimitMs));
+
+  ScriptedRuns justOver{{250.0, 230.0, 210.0, 205.0, 200.0}};
+  const double over = scriptedBest(justOver, kBuildLimitMs);
+  CHECK(over == 200.0); // the limit itself fails
+  CHECK(justOver.runs == kTimingRuns);
+  CHECK(!withinLimit(over, kBuildLimitMs));
+
+  ScriptedRuns underLoad{{367.0, 31.0, 999.0}};
+  const double loaded = scriptedBest(underLoad, kBuildLimitMs);
+  CHECK(loaded == 31.0);
+  CHECK(underLoad.runs == 2); // stops at the first run under the limit
+  CHECK(withinLimit(loaded, kBuildLimitMs));
+
+  ScriptedRuns slowQuery{{200.0}}; // ten times the 20 ms limit of the query
+  CHECK(!withinLimit(scriptedBest(slowQuery, kQueryLimitMs), kQueryLimitMs));
 }
 
 } // namespace
