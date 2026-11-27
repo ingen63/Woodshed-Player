@@ -665,7 +665,7 @@ jobs:
           cmake -S core -B core/build -A x64 >/dev/null
           # on failure only the compiler's error lines (MSVC: «error C…», linker: «error LNK…»)
           if ! cmake --build core/build --config Release --parallel 4 >"$RUNNER_TEMP/core-build.log" 2>&1; then
-            grep -E "error|warning C4" "$RUNNER_TEMP/core-build.log" | head -80
+            grep -E ": (fatal )?error" "$RUNNER_TEMP/core-build.log" | sort -u | head -80
             exit 1
           fi
           ctest --test-dir core/build -C Release --output-on-failure

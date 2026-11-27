@@ -462,7 +462,8 @@ void queueKeepsOrderAndRejectsWhenFull() { // #14/AK1
 
 void queueManyProducersDeliverEachCommandOnce() { // #14/AK1
   wp::CommandQueue<int> q(64);
-  constexpr int kThreads = 4, kPerThread = 20000;
+  // static: MSVC would need the constant captured by the lambda below (#60)
+  static constexpr int kThreads = 4, kPerThread = 20000;
   std::vector<std::thread> producers;
   producers.reserve(kThreads);
   for (int t = 0; t < kThreads; ++t) {

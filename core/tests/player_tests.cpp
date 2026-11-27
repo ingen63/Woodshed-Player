@@ -8,6 +8,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#ifdef _WIN32
+#include <malloc.h> // _aligned_malloc (#60)
+#endif
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -69,8 +72,15 @@ void *testNew(std::size_t n, std::align_val_t al) {
     throw std::bad_alloc();
   void *p = nullptr;
   const std::size_t a = std::max(static_cast<std::size_t>(al), sizeof(void *));
+#ifdef _WIN32
+  // #60: MSVC has no posix_memalign; _aligned_malloc needs _aligned_free (operator delete below)
+  p = _aligned_malloc(n ? n : 1, a);
+  if (p)
+    return p;
+#else
   if (posix_memalign(&p, a, n ? n : 1) == 0)
     return p;
+#endif
   throw std::bad_alloc();
 }
 } // namespace
@@ -97,10 +107,17 @@ void operator delete(void *p) noexcept { std::free(p); }
 void operator delete[](void *p) noexcept { std::free(p); }
 void operator delete(void *p, std::size_t) noexcept { std::free(p); }
 void operator delete[](void *p, std::size_t) noexcept { std::free(p); }
+#ifdef _WIN32
+void operator delete(void *p, std::align_val_t) noexcept { _aligned_free(p); }
+void operator delete[](void *p, std::align_val_t) noexcept { _aligned_free(p); }
+void operator delete(void *p, std::size_t, std::align_val_t) noexcept { _aligned_free(p); }
+void operator delete[](void *p, std::size_t, std::align_val_t) noexcept { _aligned_free(p); }
+#else
 void operator delete(void *p, std::align_val_t) noexcept { std::free(p); }
 void operator delete[](void *p, std::align_val_t) noexcept { std::free(p); }
 void operator delete(void *p, std::size_t, std::align_val_t) noexcept { std::free(p); }
 void operator delete[](void *p, std::size_t, std::align_val_t) noexcept { std::free(p); }
+#endif
 #endif
 
 namespace {
@@ -470,7 +487,9 @@ fs::path writeSineWav(const std::string &name, double seconds, double amp) {
   put32(f, bytes);
   for (long long i = 0; i < frames; ++i) {
     const auto s = static_cast<unsigned>(
-        static_cast<int>(std::lround(amp * 32767 * std::sin(2 * M_PI * 440 * i / kSr))) & 0xffff);
+        static_cast<int>(
+            std::lround(amp * 32767 * std::sin(2 * 3.14159265358979323846 * 440 * i / kSr))) &
+        0xffff);
     put16(f, s);
     put16(f, s);
   }

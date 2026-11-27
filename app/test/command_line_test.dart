@@ -964,6 +964,11 @@ void main() {
         await ChannelCommandServer.start('p', handler, channel: channel),
         isNull,
       );
+      // without listening, the app answers no connection of the runner
+      await fromRunner('open', 5);
+      await fromRunner('line', {'id': 5, 'text': 'garbage'});
+      await pumpEventQueue();
+      expect(written(5), isEmpty);
       // a runner without the channel (MissingPluginException)
       messenger.setMockMethodCallHandler(channel, null);
       expect(
