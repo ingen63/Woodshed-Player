@@ -271,6 +271,11 @@ class FakeFiles implements FilePlatform {
   Map<String, String>? menuTitles;
   @override
   void localizeMenuBar(Map<String, String> titles) => menuTitles = titles;
+
+  /// Appearances handed to the window's title bar, in order (#152).
+  final windowAppearances = <Appearance>[];
+  @override
+  void showWindowAppearance(Appearance a) => windowAppearances.add(a);
 }
 
 /// Kern, Timer, Bibliothek in [dir] und Controller zusammen. Laden wird mit [finishLoads] abgeschlossen.

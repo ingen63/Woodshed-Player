@@ -362,3 +362,68 @@ struct LaunchBackgroundTests {
     #expect([rgb.redComponent, rgb.greenComponent, rgb.blueComponent] == expected)
   }
 }
+
+/// Keeps the handlers the window registers, so a test can call a channel as Dart would.
+final class HandlerMessenger: NSObject, FlutterBinaryMessenger {
+  var handlers: [String: FlutterBinaryMessageHandler] = [:]
+  func send(onChannel channel: String, message: Data?) {}
+  func send(onChannel channel: String, message: Data?, binaryReply callback: FlutterBinaryReply? = nil) {}
+  func setMessageHandlerOnChannel(
+    _ channel: String, binaryMessageHandler handler: FlutterBinaryMessageHandler? = nil
+  ) -> FlutterBinaryMessengerConnection {
+    handlers[channel] = handler
+    return 0
+  }
+  func cleanUpConnection(_ connection: FlutterBinaryMessengerConnection) {}
+
+  /// Calls [method] on [channel] with the standard codec; true once the handler answered.
+  @discardableResult
+  func call(_ channel: String, _ method: String, _ arguments: Any?) -> Bool {
+    let codec = FlutterStandardMethodCodec.sharedInstance()
+    var answered = false
+    handlers[channel]?(codec.encode(FlutterMethodCall(methodName: method, arguments: arguments))) { _ in
+      answered = true
+    }
+    return answered
+  }
+}
+
+// #152: the title bar of the window follows the appearance chosen in the app.
+struct WindowAppearanceTests {
+  @Test("#152/AK1 #152/AK2 #152/AK5 appearance chosen in the app → appearance of the window")
+  func mapping() {
+    #expect(MainFlutterWindow.windowAppearance(for: "dark")?.name == .darkAqua)
+    #expect(MainFlutterWindow.windowAppearance(for: "light")?.name == .aqua)
+    #expect(MainFlutterWindow.windowAppearance(for: "system") == nil)
+    // unknown or missing: the standard appearance, dark (#149/AK2)
+    #expect(MainFlutterWindow.windowAppearance(for: "sepia")?.name == .darkAqua)
+    #expect(MainFlutterWindow.windowAppearance(for: nil)?.name == .darkAqua)
+  }
+
+  @Test("#152/AK4 the title bar is dark from the start")
+  @MainActor
+  func darkAtStart() throws {
+    let window = try #require(NSApp.windows.compactMap { $0 as? MainFlutterWindow }.first)
+    #expect(window.appearance?.name == .darkAqua)
+    #expect(window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
+  }
+
+  @Test("#152/AK1 #152/AK2 #152/AK3 «windowAppearance» on the channel changes the window at once")
+  @MainActor
+  func channelChangesWindow() {
+    let window = MainFlutterWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 100, height: 100), styleMask: [.titled],
+      backing: .buffered, defer: true)
+    let messenger = HandlerMessenger()
+    window.registerFileChannel(messenger)
+    #expect(messenger.call("woodshed/files", "windowAppearance", "light"))
+    #expect(window.appearance?.name == .aqua)
+    #expect(window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .aqua)
+    messenger.call("woodshed/files", "windowAppearance", "dark")
+    #expect(window.appearance?.name == .darkAqua)
+    #expect(window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
+    messenger.call("woodshed/files", "windowAppearance", "system")
+    #expect(window.appearance == nil)
+    #expect(window.effectiveAppearance.name == NSApp.effectiveAppearance.name)
+  }
+}

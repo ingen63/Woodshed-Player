@@ -36,8 +36,22 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
   /// before Dart runs, so the start is dark; with Light chosen the app changes after loading.
   static let launchBackground = NSColor(srgbRed: 0x12 / 255, green: 0x12 / 255, blue: 0x14 / 255, alpha: 1)
 
+  /// #152: the appearance of the window (title bar, traffic lights) for the appearance chosen in the app
+  /// (`Appearance.name` in Dart): dark and light regardless of the system setting, nil for «system», so
+  /// the window follows the system setting, also while the app runs. Unknown values mean dark, the
+  /// standard appearance (#149/AK2).
+  static func windowAppearance(for name: String?) -> NSAppearance? {
+    switch name {
+    case "system": return nil
+    case "light": return NSAppearance(named: .aqua)
+    default: return NSAppearance(named: .darkAqua)
+    }
+  }
+
   override func awakeFromNib() {
     backgroundColor = Self.launchBackground
+    // #152/AK4: dark until Dart reports the saved appearance, like the content (#149/AK5).
+    appearance = Self.windowAppearance(for: "dark")
     let flutterViewController: FlutterViewController
     if Self.isTestHost() {
       let engine = FlutterEngine(name: "test-host", project: nil, allowHeadlessExecution: true)
@@ -157,7 +171,7 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
   func registerFileChannel(_ messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(name: "woodshed/files", binaryMessenger: messenger)
     self.channel = channel
-    channel.setMethodCallHandler { call, result in
+    channel.setMethodCallHandler { [weak self] call, result in
       switch call.method {
       case "pickAudioFiles":
         let panel = NSOpenPanel()
@@ -222,6 +236,10 @@ class MainFlutterWindow: NSWindow, NSDraggingDestination {
         // #50/AK6: written by tool/stamp_build_info.sh at build time.
         let info = Bundle.main.infoDictionary ?? [:]
         result(["tag": info["WPGitTag"] as? String ?? "", "date": info["WPBuildDate"] as? String ?? ""])
+      case "windowAppearance":
+        // #152/AK1-AK3: the title bar follows the appearance chosen in the app.
+        self?.appearance = Self.windowAppearance(for: call.arguments as? String)
+        result(nil)
       case "localizeMenuBar":
         // #144/AK1: after the UI has built the menu bar (PlatformMenuBar, app/lib/ui/app_menu_bar.dart)
         if let titles = call.arguments as? [String: String], let menu = NSApp.mainMenu {

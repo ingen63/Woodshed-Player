@@ -8,6 +8,7 @@ import 'dart:ui' show Offset;
 
 import 'package:web/web.dart' as web;
 
+import '../library/track.dart' show Appearance;
 import 'file_platform.dart';
 
 class WebFilePlatform implements FilePlatform {
@@ -175,6 +176,9 @@ class WebFilePlatform implements FilePlatform {
 
   @override
   void localizeMenuBar(Map<String, String> titles) {}
+
+  @override
+  void showWindowAppearance(Appearance a) {}
 
   /// In the browser from `--dart-define=WP_GIT_TAG=… --dart-define=WP_BUILD_DATE=YYYY-MM-DD` (#50/AK6).
   @override

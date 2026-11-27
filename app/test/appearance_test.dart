@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:woodshed_player/app/file_platform.dart';
 import 'package:woodshed_player/app/file_store_io.dart';
 import 'package:woodshed_player/library/library.dart';
 import 'package:woodshed_player/main.dart';
@@ -353,6 +355,95 @@ void main() {
           'flutterViewController.backgroundColor = Self.launchBackground',
         ),
       );
+    });
+  });
+
+  // #152: the title bar of the Mac window follows the appearance chosen in the app (MainFlutterWindow,
+  // «windowAppearance»; RunnerTests WindowAppearanceTests checks the native side).
+  group('#152 title bar', () {
+    test('#152/AK4 dark at the start, before the saved choice is loaded', () {
+      final app = TestApp(tmp);
+      expect(app.files.windowAppearances, [Appearance.dark]);
+    });
+
+    test('#152/AK1 #152/AK4 the saved choice goes to the title bar once it is loaded', () async {
+      final l = await loaded(tmp);
+      l.appearance = Appearance.light;
+      await saved('appearance', 'light');
+      final app = TestApp(tmp);
+      await app.library.load();
+      expect(app.files.windowAppearances, [Appearance.dark, Appearance.light]);
+    });
+
+    test('#152/AK3 a change goes to the title bar at once, other changes send nothing', () async {
+      final app = TestApp(tmp);
+      await app.library.load();
+      final sent = app.files.windowAppearances;
+      app.library.appearance = Appearance.system;
+      expect(sent, [Appearance.dark, Appearance.system]);
+      app.library.appearance = Appearance.light;
+      app.library.sortOrder = TrackSortOrder.alphabetical;
+      app.library.appearance = Appearance.light;
+      app.library.appearance = Appearance.dark;
+      expect(sent, [
+        Appearance.dark,
+        Appearance.system,
+        Appearance.light,
+        Appearance.dark,
+      ]);
+    });
+
+    testWidgets('#152/AK3 choosing in the menu changes the title bar', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1100, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final app = TestApp(Directory('${tmp.path}/menu'));
+      await tester.runAsync(app.library.load);
+      await tester.pumpWidget(
+        WoodshedApp(controller: app.controller, locale: testLocale),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('libraryMoreMenu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('appearance-light')));
+      await tester.pumpAndSettle();
+      expect(app.files.windowAppearances.last, Appearance.light);
+    });
+
+    test('#152/AK1 #152/AK2 #152/AK5 the channel names the appearance, only on the Mac', () async {
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const channel = MethodChannel('woodshed/files');
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(channel, null);
+        debugDefaultTargetPlatformOverride = null;
+      });
+      final p = ChannelFilePlatform();
+      for (final platform in TargetPlatform.values) {
+        debugDefaultTargetPlatformOverride = platform;
+        for (final a in Appearance.values) {
+          p.showWindowAppearance(a);
+        }
+      }
+      debugDefaultTargetPlatformOverride = null;
+      await pumpEventQueue();
+      expect(calls.map((c) => c.method).toSet(), {'windowAppearance'});
+      expect(calls.map((c) => c.arguments), ['system', 'light', 'dark']);
+      // without a native side (or with an error) nothing fails
+      messenger.setMockMethodCallHandler(
+        channel,
+        (call) async => throw PlatformException(code: 'x'),
+      );
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      p.showWindowAppearance(Appearance.dark);
+      await pumpEventQueue();
     });
   });
 }

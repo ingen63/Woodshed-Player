@@ -49,6 +49,7 @@ class AppController extends ChangeNotifier {
     files.onFileDrag = _fileDrag;
     library.addListener(_libraryChanged);
     player.addListener(_playerChanged);
+    files.showWindowAppearance(_windowAppearance = library.appearance);
   }
 
   final Library library;
@@ -132,7 +133,13 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// #152: the appearance the window's title bar shows; sent again only when the choice changes.
+  late Appearance _windowAppearance;
+
   void _libraryChanged() {
+    if (library.appearance != _windowAppearance) {
+      files.showWindowAppearance(_windowAppearance = library.appearance);
+    }
     final err = library.lastError;
     if (err != null) {
       library.lastError = null;

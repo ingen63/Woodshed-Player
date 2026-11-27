@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/services.dart';
 
+import '../library/track.dart' show Appearance;
+
 /// #121: files dragged from outside the app (Finder, file explorer) over the window.
 sealed class FileDragEvent {
   const FileDragEvent();
@@ -161,6 +163,10 @@ abstract class FilePlatform {
   /// Titles of the standard items of the menu bar in the UI language (#144/AK1), see
   /// `menuBarTitles` in ui/app_menu_bar.dart; no-op without a menu bar.
   void localizeMenuBar(Map<String, String> titles);
+
+  /// #152: the title bar of the window (macOS) follows the appearance [a] chosen in the app;
+  /// no-op on other platforms.
+  void showWindowAppearance(Appearance a);
 }
 
 class ChannelFilePlatform implements FilePlatform {
@@ -228,6 +234,12 @@ class ChannelFilePlatform implements FilePlatform {
   @override
   void localizeMenuBar(Map<String, String> titles) =>
       _channel.invokeMethod<void>('localizeMenuBar', titles).catchError((_) {});
+
+  @override
+  void showWindowAppearance(Appearance a) {
+    if (defaultTargetPlatform != TargetPlatform.macOS) return;
+    _channel.invokeMethod<void>('windowAppearance', a.name).catchError((_) {});
+  }
 
   @override
   Future<BuildInfo> buildInfo() async {
