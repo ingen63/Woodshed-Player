@@ -32,6 +32,8 @@ class FlutterWindow : public Win32Window {
 
   // #60: «woodshed/files» (files_channel.cpp) and the command line (command_bridge.cpp)
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> files_channel_;
+  // #161: the refresh token of the cloud sign-in (keychain_channel.cpp)
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> keychain_channel_;
   std::unique_ptr<CommandBridge> command_bridge_;
 };
 

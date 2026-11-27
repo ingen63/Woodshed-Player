@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "files_channel.h"
+#include "keychain_channel.h"
 #include "flutter/generated_plugin_registrant.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -28,6 +29,7 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   files_channel_ =
       CreateFilesChannel(flutter_controller_->engine()->messenger(), GetHandle());
+  keychain_channel_ = CreateKeychainChannel(flutter_controller_->engine()->messenger());
   command_bridge_ = std::make_unique<CommandBridge>(
       flutter_controller_->engine()->messenger(), GetHandle());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
@@ -47,6 +49,7 @@ bool FlutterWindow::OnCreate() {
 void FlutterWindow::OnDestroy() {
   command_bridge_ = nullptr;
   files_channel_ = nullptr;
+  keychain_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

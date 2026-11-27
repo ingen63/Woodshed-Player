@@ -1094,6 +1094,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Auf iPhone und iPad läuft der Abgleich mit Google Drive in der Web-App.';
 
   @override
+  String get syncNoSecretStore =>
+      'Der Abgleich mit Google Drive braucht libsecret, das die Anmeldung im Schlüsselbund des Systems ablegt. Installiere es (unter Debian und Ubuntu: libsecret-1-0) und starte die App neu.';
+
+  @override
   String get syncSignIn => 'Mit Google anmelden';
 
   @override

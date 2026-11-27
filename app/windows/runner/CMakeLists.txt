@@ -26,6 +26,7 @@ add_executable(${BINARY_NAME} WIN32
   "command_line.cpp"
   "files_channel.cpp"
   "flutter_window.cpp"
+  "keychain_channel.cpp"
   "main.cpp"
   "utils.cpp"
   "win32_window.cpp"
@@ -51,7 +52,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
-target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib" wp_cli_win ole32 shell32)
+target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib" wp_cli_win ole32 shell32 advapi32)
 target_compile_definitions(${BINARY_NAME} PRIVATE "WP_GIT_TAG=\"${WP_GIT_TAG}\""
   "WP_BUILD_DATE=\"${WP_BUILD_DATE}\"")
 target_include_directories(${BINARY_NAME} PRIVATE "${WP_CORE_DIR}/include")

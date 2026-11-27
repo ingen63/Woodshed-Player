@@ -1790,6 +1790,12 @@ abstract class AppLocalizations {
   /// **'On iPhone and iPad, sync with Google Drive runs in the web app.'**
   String get syncGoogleWebOnly;
 
+  /// Settings, Sync: on Linux without libsecret (#161) Google Drive is not offered; says what to install.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with Google Drive needs libsecret, which keeps the sign-in in the keyring of your system. Install it (on Debian and Ubuntu: libsecret-1-0) and start the app again.'**
+  String get syncNoSecretStore;
+
   /// No description provided for @syncSignIn.
   ///
   /// In en, this message translates to:

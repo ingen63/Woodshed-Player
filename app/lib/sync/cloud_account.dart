@@ -106,6 +106,7 @@ class CloudAccount extends ChangeNotifier {
     SyncSwitch? sync,
     this.loadGoogle,
     this.chooseFolders = false,
+    this.secretStoreMissing = false,
   }) : sync = sync ?? SyncSwitch() {
     this.sync.addListener(notifyListeners);
   }
@@ -119,6 +120,10 @@ class CloudAccount extends ChangeNotifier {
 
   /// Desktop: the first sign-in asks which folders to sync (AK10).
   final bool chooseFolders;
+
+  /// #161/AK2: the system has no token store for the sign-in (Linux without libsecret); Google Drive is
+  /// not offered and the settings say why.
+  final bool secretStoreMissing;
 
   CloudBackend? _backend;
   bool _signingIn = false;

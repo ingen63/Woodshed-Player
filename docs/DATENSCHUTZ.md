@@ -46,7 +46,7 @@ Dann gilt:
 - Die App legt beim Anbieter je Gerät eine Datei mit dem Stand der Bibliothek an (Bibliothek, Loops, Tempo und geteilte Einstellungen mit Gerät-ID), dazu die letzten Stände als Sicherung und die Audiodateien. Andere Daten überträgt sie nicht.
 - **Google Drive:** Die App fragt nur das Recht `drive.file` an. Damit sieht und bearbeitet sie **nur Dateien, die die App selbst anlegt** (Ordner `WoodshedPlayer` in «Meine Ablage»). Auf Deine übrigen Dateien hat sie keinen Zugriff.
 - Titel, die Du mit *Nicht hochladen* markierst, und Titel in Ordnern ohne *Synchronisieren* bleiben als Datei auf dem Gerät. Ihre Metadaten wandern trotzdem mit.
-- Die Anmeldung läuft direkt bei Deinem Anbieter, am Mac im Anmeldefenster des Systems über OAuth mit PKCE, im Browser per Weiterleitung. Wir sehen Dein Passwort nicht. Die Zugangstokens speichert die App nur lokal (am Desktop im Schlüsselbund bzw. in der Anmeldeinformationsverwaltung des Systems, im Browser im Speicher der Seite, IndexedDB).
+- Die Anmeldung läuft direkt bei Deinem Anbieter, am Mac im Anmeldefenster des Systems, unter Windows und Linux im Standardbrowser (beides über OAuth mit PKCE), im Browser per Weiterleitung. Wir sehen Dein Passwort nicht. Die Zugangstokens speichert die App nur lokal (am Mac im Schlüsselbund, unter Windows in der Anmeldeinformationsverwaltung, unter Linux im Schlüsselbund des Desktops über libsecret, im Browser im Speicher der Seite, IndexedDB).
 - Für die Verarbeitung dort gilt die [Datenschutzerklärung von Google](https://policies.google.com/privacy).
 - **Abmelden** entfernt die Tokens und beendet jeden Netzverkehr zum Anbieter. Lokale Daten bleiben erhalten. Die Dateien beim Anbieter löschst Du in Deinem Konto.
 

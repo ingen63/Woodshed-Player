@@ -837,3 +837,11 @@ core/src/flac_writer.cpp | cxx_gt_to_ge | if (offset > (w->sink_ ? w->sinkEnd_ :
 # Eingabepuffer leer, wp_web_rec_input liefert nullptr und reference_tests endet mit einem Absturz
 # (Exit-Code 139) in webRecordingArmed.
 core/web/wp_core_web.cpp | cxx_remove_void_call | rec->in.assign(static_cast<size_t>(WP_WEB_MAX_BLOCK) * static_cast<size_t>(channels), 0.0f);
+
+# ---- app/lib/sync/providers/google_smoke.dart (#161) ----
+# gleichwertig: Am Ende schliesst _server.close(force: true) jede Verbindung zum nachgebildeten Google,
+# auch eine offen gehaltene; ob die Anfrage des «Browsers» Keep-alive nutzt, ändert den Ablauf nicht.
+app/lib/sync/providers/google_smoke.dart | dart_false_to_true | request.persistentConnection = false;
+# gleichwertig: Beim Schliessen ist keine Verbindung mehr offen: der Transport der App ist vorher mit
+# force geschlossen, die Anfrage des «Browsers» hat kein Keep-alive; close() ohne force endet gleich.
+app/lib/sync/providers/google_smoke.dart | dart_true_to_false | Future<void> close() => _server.close(force: true);

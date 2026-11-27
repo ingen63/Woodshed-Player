@@ -9,6 +9,10 @@ their place (for example an update of your distribution).
 - PulseAudio client library (libpulse) or ALSA (libasound), loaded at run time for the
   audio output: GNU Lesser General Public License 2.1 or later,
   https://www.freedesktop.org/wiki/Software/PulseAudio/ and https://www.alsa-project.org
+- libsecret (libsecret-1.so.0), loaded at run time for the sign-in of the sync with Google
+  Drive: it keeps the sign-in in the Secret Service of your desktop (GNOME Keyring, KWallet).
+  Without it the app runs, only the sync is off. GNU Lesser General Public License 2.1 or
+  later, https://gitlab.gnome.org/GNOME/libsecret
 
 Install them with the package manager of your distribution, e.g. on Debian and Ubuntu:
-  sudo apt install libgtk-3-0 libpulse0
+  sudo apt install libgtk-3-0 libpulse0 libsecret-1-0

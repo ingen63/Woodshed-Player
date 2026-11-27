@@ -583,7 +583,9 @@ void main() {
         'the smoke scripts take the program of the Windows and Linux build',
         () {
           final app = read('../tools/smoke_app.sh');
-          expect(app, contains('WP_SMOKE=1 "\$bin"'));
+          // #161: WP_SMOKE=1, or «google» as second argument
+          expect(app, contains('mode=\${2:-1}'));
+          expect(app, contains('WP_SMOKE=\$mode "\$bin"'));
           expect(app, contains('*) bin="\$app" ;;'));
           final cli = read('../tools/smoke_cli.sh');
           for (final text in [

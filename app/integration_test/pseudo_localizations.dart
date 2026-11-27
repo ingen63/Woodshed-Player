@@ -611,6 +611,8 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get syncGoogleWebOnly => pseudo(super.syncGoogleWebOnly);
   @override
+  String get syncNoSecretStore => pseudo(super.syncNoSecretStore);
+  @override
   String get syncSignIn => pseudo(super.syncSignIn);
   @override
   String get syncSigningIn => pseudo(super.syncSigningIn);

@@ -898,6 +898,10 @@
   "syncOff": "Off – everything stays on this device",
   "syncGoogle": "Google Drive",
   "syncGoogleWebOnly": "On iPhone and iPad, sync with Google Drive runs in the web app.",
+  "syncNoSecretStore": "Sync with Google Drive needs libsecret, which keeps the sign-in in the keyring of your system. Install it (on Debian and Ubuntu: libsecret-1-0) and start the app again.",
+  "@syncNoSecretStore": {
+    "description": "Settings, Sync: on Linux without libsecret (#161) Google Drive is not offered; says what to install."
+  },
   "syncSignIn": "Sign in with Google",
   "syncSigningIn": "Waiting for the sign-in in the browser …",
   "syncSignInFailed": "The sign-in did not work. Try again.",

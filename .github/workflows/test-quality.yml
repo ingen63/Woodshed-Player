@@ -21,7 +21,8 @@
 #   since the last successful nightly run (#11); a not detected mutant fails the job.
 # - windows: core with MSVC and its tests, the Dart tests, `flutter build windows` and smoke tests of
 #   the built app and its command line (#60). linux: `flutter build linux` and the same smoke tests in
-#   xvfb (#60); core and Dart tests run on Linux in «checks».
+#   xvfb (#60); core and Dart tests run on Linux in «checks». Both: smoke test of the Google sign-in with
+#   the token store of the system (#161).
 # By hand (workflow_dispatch): the push jobs; with nightly=true also every nightly job, gate or not;
 # with desktop=true only the jobs windows and linux (#60).
 # Nightly runs have their own concurrency group: a push never cancels them (#13/AK8).
@@ -691,6 +692,10 @@ jobs:
       - name: Smoke test of the command line (#60, #140)
         if: ${{ !cancelled() }}
         run: tools/smoke_cli.sh app/build/windows/x64/runner/Release/WoodshedPlayer.com
+      - name: Smoke test of the Google sign-in with the Credential Manager (#161/AK1, AK2, AK5)
+        # simulated Google on 127.0.0.1, the token in the Credential Manager, removed on sign-out
+        if: ${{ !cancelled() }}
+        run: tools/smoke_app.sh app/build/windows/x64/runner/Release/WoodshedPlayer.exe google
       - name: Pack like the release (#60, tools/package.sh)
         # with the latest tag when the app has its version (between a version change and its tag: skipped)
         run: |
@@ -725,6 +730,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ninja-build libgtk-3-dev xvfb >/dev/null
+      - name: libsecret and a Secret Service for the sign-in (#161)
+        run: sudo apt-get install -y -qq libsecret-1-0 gnome-keyring dbus-x11 >/dev/null
       - name: flutter build linux (#60/AK1, AK2)
         working-directory: app
         run: |
@@ -734,6 +741,12 @@ jobs:
         run: xvfb-run -a tools/smoke_app.sh app/build/linux/x64/release/bundle/woodshed-player
       - name: Smoke test of the command line in xvfb (#60, #140)
         run: xvfb-run -a tools/smoke_cli.sh app/build/linux/x64/release/bundle/woodshed-player
+      - name: Smoke test of the Google sign-in with libsecret in xvfb (#161/AK1, AK2, AK5)
+        # own D-Bus session with an unlocked GNOME Keyring as Secret Service; simulated Google on 127.0.0.1
+        run: |
+          dbus-run-session -- sh -c '
+            printf smoke | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+            xvfb-run -a tools/smoke_app.sh app/build/linux/x64/release/bundle/woodshed-player google'
       - name: Pack like the release (#60, tools/package.sh)
         # with the latest tag when the app has its version (between a version change and its tag: skipped)
         run: |

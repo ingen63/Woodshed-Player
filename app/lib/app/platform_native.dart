@@ -17,6 +17,8 @@ import '../player/player_service.dart';
 import '../sync/cloud_account.dart';
 // #54/AK6: the provider module is loaded only once Google Drive is chosen
 import '../sync/providers/google_platform_io.dart' deferred as google;
+// #161: the smoke test of the sign-in (WP_SMOKE=google), loaded only then
+import '../sync/providers/google_smoke.dart' deferred as google_smoke;
 import '../ui/armed_switch.dart';
 import '../ui/recording_button.dart';
 import 'app_controller.dart';
@@ -65,18 +67,25 @@ Future<AppController> createAppController({
   );
   await metronome.restore();
   final playerService = PlayerService(WpAudioCore(player));
-  // #54: Google Drive on the Mac; on iPhone and iPad only in the web app; on Windows and Linux not
-  // yet (#161: the token store there). Without a choice NoSync.
+  // #54, #161: Google Drive on the Mac, Windows and Linux; on iPhone and iPad only in the web app.
+  // Linux without libsecret: no sync, a hint says why (#161/AK2). Without a choice NoSync.
+  final secrets = KeychainStore();
+  final secretStoreMissing =
+      googleOnThisPlatform &&
+      baseDir == null &&
+      Platform.isLinux &&
+      !await secrets.available();
   final cloud = CloudAccount(
     library: library,
     chooseFolders: true,
-    loadGoogle: !googleOnThisPlatform || baseDir != null
+    secretStoreMissing: secretStoreMissing,
+    loadGoogle: !googleOnThisPlatform || baseDir != null || secretStoreMissing
         ? null
         : () async {
             await google.loadLibrary();
             return google.openGoogle(
               library: library,
-              secrets: KeychainStore(),
+              secrets: secrets,
               openUrl: files.openUrl,
               systemSignIn: Platform.isMacOS ? WebAuthChannel() : null,
               playing: () => playerService.isPlaying,
@@ -113,8 +122,10 @@ Future<AppController> createAppController({
   return controller;
 }
 
-/// #54, #161: Google Drive is offered on the Mac only (Windows and Linux follow with #161).
-bool get googleOnThisPlatform => Platform.isMacOS;
+/// #54, #161: Google Drive is offered on the Mac, on Windows and on Linux (sign-in in the system browser
+/// with a receiver on 127.0.0.1 there); on iPhone and iPad only in the web app.
+bool get googleOnThisPlatform =>
+    Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 
 /// #140, #60: the desktop app has a command line on macOS, Windows and Linux.
 bool get commandLineOnThisPlatform =>
@@ -247,8 +258,10 @@ class _PlayerMetronome implements MetronomeBackend {
 /// #151: the app is only the host of the Swift tests; the Dart app does not start.
 bool get swiftTestHost => isSwiftTestHost(Platform.environment);
 
-/// #13/AK5: WP_SMOKE=1 starts the smoke test of the built app (smoke.dart, tools/smoke_app.sh).
-bool get smokeRequested => Platform.environment['WP_SMOKE'] == '1';
+/// #13/AK5: WP_SMOKE=1 starts the smoke test of the built app (smoke.dart, tools/smoke_app.sh); #161:
+/// WP_SMOKE=google the smoke test of the Google sign-in with the token store of the system.
+bool get smokeRequested =>
+    const {'1', 'google'}.contains(Platform.environment['WP_SMOKE']);
 
 /// Runs the smoke test in a temporary folder with a generated sine file, shows the app built by [app]
 /// and ends the process with 0 (passed) or 1 (failed, reason on stdout).
@@ -259,7 +272,12 @@ Future<Never> runSmokeApp(Widget Function(AppController c) app) async {
     final wav = File('${dir.path}/Smoke sine.wav')..writeAsBytesSync(sineWav());
     final c = await createAppController(baseDir: Directory('${dir.path}/app'));
     runApp(app(c));
-    failure = await smokeRun(c, wav.path) ?? '';
+    if (Platform.environment['WP_SMOKE'] == 'google') {
+      await google_smoke.loadLibrary();
+      failure = await google_smoke.smokeGoogleSignIn(KeychainStore()) ?? '';
+    } else {
+      failure = await smokeRun(c, wav.path) ?? '';
+    }
   } catch (e) {
     failure = 'exception: $e';
   }

@@ -90,11 +90,13 @@ CloudAccount Function(Library) account(
   FakeBackend b, {
   bool google = true,
   bool folders = false,
+  bool noSecretStore = false,
 }) =>
     (lib) => CloudAccount(
       library: lib,
       loadGoogle: google ? () async => b : null,
       chooseFolders: folders,
+      secretStoreMissing: noSecretStore,
     );
 
 Future<void> openSettings(WidgetTester tester) async {
@@ -224,15 +226,42 @@ void main() {
       'iPhone/iPad app: Google Drive is not offered, with a hint to the web app',
       (tester) async {
         final b = FakeBackend();
-        final app = await pumpApp(tester, cloud: account(b, google: false));
+        // as the iPhone/iPad app builds it: without a word on the token store (#161)
+        final app = await pumpApp(
+          tester,
+          cloud: (lib) => CloudAccount(library: lib),
+        );
         await tester.runAsync(() => app.library.setSyncProvider('google'));
         await openSettings(tester);
+        expect(app.controller.cloud.secretStoreMissing, isFalse);
         expect(find.byKey(const Key('syncChoice-google')), findsNothing);
+        expect(find.byKey(const Key('syncNoSecretStore')), findsNothing);
         expect(find.byKey(const Key('syncWebOnly')), findsOneWidget);
         expect(find.text(de.syncGoogleWebOnly), findsOneWidget);
         expect(app.controller.cloud.choice, CloudChoice.none);
         await tester.runAsync(() => app.controller.cloud.open());
         expect(b.loads, 0);
+      },
+    );
+
+    testWidgets(
+      '#161/AK2 Linux without libsecret: a hint says so and the sync stays off',
+      (tester) async {
+        final b = FakeBackend()..signedInValue = true;
+        final app = await pumpApp(
+          tester,
+          cloud: account(b, google: false, noSecretStore: true),
+        );
+        await tester.runAsync(() => app.library.setSyncProvider('google'));
+        await openSettings(tester);
+        expect(find.byKey(const Key('syncChoice-google')), findsNothing);
+        expect(find.byKey(const Key('syncWebOnly')), findsNothing);
+        expect(find.byKey(const Key('syncNoSecretStore')), findsOneWidget);
+        expect(find.text(de.syncNoSecretStore), findsOneWidget);
+        expect(app.controller.cloud.choice, CloudChoice.none);
+        await tester.runAsync(() => app.controller.cloud.open());
+        expect(b.loads, 0);
+        expect(app.controller.cloud.sync.inner, isA<NoSync>());
       },
     );
 

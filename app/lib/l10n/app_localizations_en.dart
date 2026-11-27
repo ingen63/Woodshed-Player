@@ -1087,6 +1087,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'On iPhone and iPad, sync with Google Drive runs in the web app.';
 
   @override
+  String get syncNoSecretStore =>
+      'Sync with Google Drive needs libsecret, which keeps the sign-in in the keyring of your system. Install it (on Debian and Ubuntu: libsecret-1-0) and start the app again.';
+
+  @override
   String get syncSignIn => 'Sign in with Google';
 
   @override

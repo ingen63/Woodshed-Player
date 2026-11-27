@@ -218,7 +218,14 @@ class DesktopGoogleAuth extends GoogleAuth {
         return SignInResult.failed;
       }
       _take(j);
-      await secrets.write(refreshKey, refresh);
+      try {
+        await secrets.write(refreshKey, refresh);
+      } catch (_) {
+        // #161: the token store refused (keyring locked or no Secret Service on Linux): not signed in
+        _access = null;
+        _expires = null;
+        return SignInResult.failed;
+      }
       _refresh = refresh;
       _needsSignIn = false;
       notifyListeners();

@@ -109,7 +109,7 @@ The full list is in the [release notes](CHANGELOG.en.md).
 | **macOS** 14+ | Native app, Apple Silicon and Intel | Recording, MP3 export and the full command line only here |
 | **iPhone, iPad** | [Web app](https://ingen63.github.io/Woodshed-Player/app/), installable to the home screen | Works offline, lock-screen controls, microphone recording |
 | **Android and everything else** | [Web app](https://ingen63.github.io/Woodshed-Player/app/) in the browser | No installation, no account, microphone recording |
-| **Windows** 10 (1803)+ and 11, x64 | Native app | Command line for playback; no recording and no Google Drive sync yet (both in the web app) |
+| **Windows** 10 (1803)+ and 11, x64 | Native app | Command line for playback, sync through Google Drive; no recording yet (in the web app) |
 | **Linux**, x64 | Native app with GTK 3 | As on Windows |
 
 ## Installation
@@ -125,7 +125,7 @@ The packages of every version are under [Releases](https://github.com/ingen63/Wo
 
 - **macOS:** Open the `.dmg` and drag *Woodshed Player* into *Applications*. The app is only ad hoc signed and not notarized (there is no Apple Developer account). So the first time, choose **Right-click › Open** in the Finder and *Open* again in the dialog. If macOS only offers «Don't Open» or «Move to Trash», go to *System Settings › Privacy & Security* and click *Open Anyway* next to «Woodshed Player was blocked». After that it starts normally.
 - **Windows:** Unpack the `.zip` into a folder of your choice and start `WoodshedPlayer.exe` in the folder `WoodshedPlayer`. The app is not signed, so the first time Windows SmartScreen shows «Windows protected your PC»: click **More info › Run anyway**. Your library lives in `%LOCALAPPDATA%\WoodshedPlayer`.
-- **Linux:** Unpack it with `tar -xzf WoodshedPlayer-<Version>-linux.tar.gz` and start `WoodshedPlayer/woodshed-player`. It needs GTK 3 and PulseAudio or ALSA from your system (they are not in the package, see `licenses/SYSTEM-LIBRARIES.txt`); on Debian and Ubuntu: `sudo apt install libgtk-3-0 libpulse0`. Your library lives in `~/.local/share/WoodshedPlayer`.
+- **Linux:** Unpack it with `tar -xzf WoodshedPlayer-<Version>-linux.tar.gz` and start `WoodshedPlayer/woodshed-player`. It needs GTK 3 and PulseAudio or ALSA from your system (they are not in the package, see `licenses/SYSTEM-LIBRARIES.txt`); on Debian and Ubuntu: `sudo apt install libgtk-3-0 libpulse0`. The sync with Google Drive also needs libsecret (`libsecret-1-0`), which keeps the sign-in in your desktop's keyring. Your library lives in `~/.local/share/WoodshedPlayer`.
 - **Web app:** Nothing to install, just open <https://ingen63.github.io/Woodshed-Player/app/>. To host it yourself, put the folder from the `.zip` at the root of a web server with HTTPS (or serve it on `localhost`). It only runs at the root (`/`), not in a subfolder.
 
 ## Command line

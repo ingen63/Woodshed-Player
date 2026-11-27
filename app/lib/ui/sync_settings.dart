@@ -119,7 +119,12 @@ class _SyncSettings extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (!a.googleAvailable)
+                  if (!a.googleAvailable && a.secretStoreMissing)
+                    Text(
+                      l.syncNoSecretStore,
+                      key: const Key('syncNoSecretStore'),
+                    )
+                  else if (!a.googleAvailable)
                     Text(l.syncGoogleWebOnly, key: const Key('syncWebOnly')),
                   if (google) ..._google(context, l),
                 ],

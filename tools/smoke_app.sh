@@ -8,9 +8,19 @@
 # Usage: tools/smoke_app.sh [app], default the release build of `flutter build macos`. #60: [app] may
 # also be the program of the Windows or Linux build (WoodshedPlayer.exe, woodshed-player); on Linux
 # without a display run it inside xvfb-run.
+# #161: [mode] «google» runs the smoke test of the Google sign-in instead (WP_SMOKE=google,
+# app/lib/sync/providers/google_smoke.dart): sign-in in the «browser» of a simulated Google on 127.0.0.1,
+# the token in the token store of the system (Credential Manager, libsecret, keychain), found again,
+# removed on sign-out. Only loopback connections; on Linux it needs a running Secret Service.
+# Usage: tools/smoke_app.sh [app [mode]]
 set -u
 cd "$(dirname "$0")/.." || exit 2
 app=${1:-"app/build/macos/Build/Products/Release/Woodshed Player.app"}
+mode=${2:-1}
+case "$mode" in
+  1 | google) ;;
+  *) echo "smoke_app: unknown mode $mode (google)"; exit 2 ;;
+esac
 case "$app" in
   *.app | *.app/) bin="$app/Contents/MacOS/Woodshed Player" ;;
   *) bin="$app" ;;
@@ -20,7 +30,7 @@ if [ ! -f "$bin" ]; then
   exit 2
 fi
 log=$(mktemp "${TMPDIR:-/tmp}/wp_smoke.XXXXXX")
-WP_SMOKE=1 "$bin" >"$log" 2>&1
+WP_SMOKE=$mode "$bin" >"$log" 2>&1
 rc=$?
 grep '^smoke:' "$log" || tail -20 "$log"
 ok=$(tr -d '\r' <"$log" | grep -c '^smoke: ok$')

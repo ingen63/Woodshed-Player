@@ -137,6 +137,23 @@ void main() {
       expect(r.stdout, contains('crashed')); // the end of the log
     });
 
+    // slow: runs tools/smoke_app.sh twice as a shell process
+    test(
+      '#161/AK5 mode «google» sets WP_SMOKE=google, other modes are refused',
+      () {
+        var r = smokeScript(
+          tmp,
+          r'[ "$WP_SMOKE" = google ] || exit 3; echo "smoke: ok"; exit 0',
+          mode: 'google',
+        );
+        expect(r.exitCode, 0, reason: '${r.stdout}');
+        expect(r.stdout, contains('smoke_app: passed, exit code 0'));
+        r = smokeScript(tmp, 'echo "smoke: ok"; exit 0', mode: 'cloud');
+        expect(r.exitCode, 2);
+        expect(r.stdout, contains('unknown mode cloud'));
+      },
+    );
+
     test('names the missing build', () {
       final r = smokeScript(tmp, null);
       expect(r.exitCode, 2);
@@ -148,7 +165,8 @@ void main() {
 const kForever = Duration(days: 1);
 
 /// Runs tools/smoke_app.sh against a fake app whose binary runs [script] (sh).
-ProcessResult smokeScript(Directory tmp, String? script) {
+/// #161: [mode] is the second argument of the script («google»).
+ProcessResult smokeScript(Directory tmp, String? script, {String? mode}) {
   final bin = File('${tmp.path}/Fake.app/Contents/MacOS/Woodshed Player');
   if (script != null) {
     bin
@@ -156,5 +174,8 @@ ProcessResult smokeScript(Directory tmp, String? script) {
       ..writeAsStringSync('#!/bin/sh\n$script\n');
     Process.runSync('chmod', ['+x', bin.path]);
   }
-  return Process.runSync('../tools/smoke_app.sh', ['${tmp.path}/Fake.app']);
+  return Process.runSync('../tools/smoke_app.sh', [
+    '${tmp.path}/Fake.app',
+    ?mode,
+  ]);
 }

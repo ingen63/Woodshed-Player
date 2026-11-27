@@ -109,7 +109,7 @@ Die vollständige Liste steht in den [Release Notes](CHANGELOG.md).
 | **macOS** 14+ | Native App, Apple Silicon und Intel | Aufnahme, MP3-Export und die volle Kommandozeile nur hier |
 | **iPhone, iPad** | [Web-App](https://ingen63.github.io/Woodshed-Player/app/), auf den Home-Bildschirm installierbar | Läuft offline, Steuerung auf dem Sperrbildschirm, Aufnahme über das Mikrofon |
 | **Android und alles andere** | [Web-App](https://ingen63.github.io/Woodshed-Player/app/) im Browser | Ohne Installation, ohne Konto, Aufnahme über das Mikrofon |
-| **Windows** 10 (1803)+ und 11, x64 | Native App | Kommandozeile zum Abspielen; noch keine Aufnahme und kein Abgleich über Google Drive (beides in der Web-App) |
+| **Windows** 10 (1803)+ und 11, x64 | Native App | Kommandozeile zum Abspielen, Abgleich über Google Drive; noch keine Aufnahme (in der Web-App) |
 | **Linux**, x64 | Native App mit GTK 3 | Wie unter Windows |
 
 ## Installation
@@ -125,7 +125,7 @@ Die Pakete jeder Version liegen unter [Releases](https://github.com/ingen63/Wood
 
 - **macOS:** `.dmg` öffnen und *Woodshed Player* in den Ordner *Programme* ziehen. Die App ist nur ad hoc signiert und nicht notarisiert (es gibt kein Apple-Developer-Konto). Beim ersten Start darum im Finder **Rechtsklick › Öffnen** wählen und im Dialog nochmals *Öffnen*. Zeigt macOS nur «Nicht öffnen» oder «In den Papierkorb», unter *Systemeinstellungen › Datenschutz & Sicherheit* bei «Woodshed Player wurde blockiert» auf *Dennoch öffnen* klicken. Danach startet sie normal.
 - **Windows:** Das `.zip` in einen beliebigen Ordner auspacken und im Ordner `WoodshedPlayer` die Datei `WoodshedPlayer.exe` starten. Die App ist nicht signiert, darum meldet Windows SmartScreen beim ersten Start «Der Computer wurde durch Windows geschützt»: auf **Weitere Informationen › Trotzdem ausführen** klicken. Die Bibliothek liegt in `%LOCALAPPDATA%\WoodshedPlayer`.
-- **Linux:** Mit `tar -xzf WoodshedPlayer-<Version>-linux.tar.gz` auspacken und `WoodshedPlayer/woodshed-player` starten. Nötig sind GTK 3 und PulseAudio oder ALSA des Systems (nicht im Paket, siehe `licenses/SYSTEM-LIBRARIES.txt`); unter Debian und Ubuntu: `sudo apt install libgtk-3-0 libpulse0`. Die Bibliothek liegt in `~/.local/share/WoodshedPlayer`.
+- **Linux:** Mit `tar -xzf WoodshedPlayer-<Version>-linux.tar.gz` auspacken und `WoodshedPlayer/woodshed-player` starten. Nötig sind GTK 3 und PulseAudio oder ALSA des Systems (nicht im Paket, siehe `licenses/SYSTEM-LIBRARIES.txt`); unter Debian und Ubuntu: `sudo apt install libgtk-3-0 libpulse0`. Der Abgleich mit Google Drive braucht zudem libsecret (`libsecret-1-0`), das die Anmeldung im Schlüsselbund des Desktops ablegt. Die Bibliothek liegt in `~/.local/share/WoodshedPlayer`.
 - **Web-App:** Nichts zu installieren, einfach <https://ingen63.github.io/Woodshed-Player/app/> öffnen. Zum Selbst-Hosten den Ordner aus dem `.zip` an die Wurzel eines Webservers mit HTTPS legen (oder lokal über `localhost` ausliefern). Die App läuft nur an der Wurzel (`/`), nicht in einem Unterordner.
 
 ## Kommandozeile

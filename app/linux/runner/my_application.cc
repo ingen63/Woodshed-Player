@@ -3,6 +3,7 @@
 #include <flutter_linux/flutter_linux.h>
 
 #include "files_channel.h"
+#include "keychain_channel.h"
 #include "flutter/generated_plugin_registrant.h"
 
 struct _MyApplication {
@@ -10,6 +11,8 @@ struct _MyApplication {
   char** dart_entrypoint_arguments;
   // #60: file choice, data folder, links and command line (files_channel.cc)
   FlMethodChannel* files_channel;
+  // #161: the refresh token of the cloud sign-in through libsecret (keychain_channel.cc)
+  FlMethodChannel* keychain_channel;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
@@ -67,6 +70,8 @@ static void my_application_activate(GApplication* application) {
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   self->files_channel = files_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)), window);
+  self->keychain_channel =
+      keychain_channel_new(fl_engine_get_binary_messenger(fl_view_get_engine(view)));
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
@@ -115,6 +120,7 @@ static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   g_clear_object(&self->files_channel);
+  g_clear_object(&self->keychain_channel);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
 
