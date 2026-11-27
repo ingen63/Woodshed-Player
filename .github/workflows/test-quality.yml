@@ -670,6 +670,8 @@ jobs:
           fi
           ctest --test-dir core/build -C Release --output-on-failure
       - name: Tests of the Dart logic (#60/AK2, AK4)
+        # also after a failed earlier step, so one run shows every failure (the job stays red)
+        if: ${{ !cancelled() }}
         working-directory: app
         env:
           WP_WINDOWS_REQUIRED: '1'  # #60/AK4: the Windows paths must run here
@@ -677,11 +679,14 @@ jobs:
           flutter pub get >/dev/null
           flutter test --reporter failures-only
       - name: flutter build windows (#60/AK1, AK2)
+        if: ${{ !cancelled() }}
         working-directory: app
         run: flutter build windows --release
       - name: Smoke test of the built app (#60/AK3)
+        if: ${{ !cancelled() }}
         run: tools/smoke_app.sh app/build/windows/x64/runner/Release/WoodshedPlayer.exe
       - name: Smoke test of the command line (#60, #140)
+        if: ${{ !cancelled() }}
         run: tools/smoke_cli.sh app/build/windows/x64/runner/Release/WoodshedPlayer.com
       - name: Pack like the release (#60, tools/package.sh)
         # with the latest tag when the app has its version (between a version change and its tag: skipped)

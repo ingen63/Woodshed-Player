@@ -87,11 +87,11 @@ int mapOpenError(ma_result r) {
 // Prüft vorab, ob die Datei existiert und lesbar ist; miniaudio meldet sonst nur «kein Decoder».
 // `size` (optional) receives the file size in bytes, 0 if unknown.
 int checkReadable(const std::string &path, size_t *size = nullptr) {
-  ma_default_vfs vfs; // Standard-Dateisystem von miniaudio (UTF-8 auch unter Windows)
+  ma_default_vfs vfs; // miniaudio's default file system; #60: UTF-8 paths also on Windows
   if (ma_default_vfs_init(&vfs, nullptr) != MA_SUCCESS)
     return kErrFileUnreadable;
   ma_vfs_file f = nullptr;
-  const ma_result r = ma_vfs_open(&vfs, path.c_str(), MA_OPEN_MODE_READ, &f);
+  const ma_result r = wp_vfs_open(&vfs, path.c_str(), MA_OPEN_MODE_READ, &f);
   if (r != MA_SUCCESS)
     return mapOpenError(r);
   ma_file_info info{};
@@ -123,7 +123,7 @@ public:
     if (ma_result r = ma_default_vfs_init(&vfs, nullptr); r != MA_SUCCESS)
       return r;
     size_t size = 0;
-    if (ma_result r = ma_vfs_open_and_read_file(&vfs, path.c_str(), &bytes_, &size, nullptr);
+    if (ma_result r = wp_vfs_open_and_read_file(&vfs, path.c_str(), &bytes_, &size);
         r != MA_SUCCESS)
       return r;
     return ma_decoder_init_memory(bytes_, size, &cfg, &dec);

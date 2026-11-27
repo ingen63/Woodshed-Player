@@ -767,7 +767,10 @@ void longTitleFromFileReservesOnce() {
   wp::Player p(kLongSr);
   CHECK(p.load(file.string()) == wp::kOk);
   CHECK(p.engine().frames() == kLongFrames);
-  CHECK(gLargestAlloc.load() <= static_cast<size_t>(kLongFrames + 8192) * 2 * sizeof(float));
+  const size_t limit = static_cast<size_t>(kLongFrames + 8192) * 2 * sizeof(float);
+  if (gLargestAlloc.load() > limit)
+    std::printf("  largest allocation %zu bytes, limit %zu\n", gLargestAlloc.load(), limit);
+  CHECK(gLargestAlloc.load() <= limit);
 }
 
 // #10 regression (found bug 8, fuzz regression decoder/huge_length_header): a damaged MP3 header

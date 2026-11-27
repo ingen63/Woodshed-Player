@@ -6,7 +6,10 @@
 
 #include "test_required.hpp"
 
-#if defined(NDEBUG) && !defined(WP_SANITIZED)
+// #60: not with MSVC either: the limits and the slow counter-check of #159 are calibrated on clang
+// (macOS and Linux, where the jobs «checks» and «bench» measure them); the Windows job checks
+// behaviour only.
+#if defined(NDEBUG) && !defined(WP_SANITIZED) && !defined(_MSC_VER)
 constexpr bool kTimingChecks = true;
 #else
 constexpr bool kTimingChecks = false;
