@@ -4,10 +4,12 @@
 
 # Woodshed Player
 
-**The practice player for musicians.**<br>
-Slow a track down without changing its pitch, loop the hard bars, practise with a metronome, and step up the tempo as you get better.
+### Practise smarter. Play it until it sits.
 
-[**Open the web app**](https://ingen63.github.io/Woodshed-Player/app/) · [Download for macOS](https://github.com/ingen63/Woodshed-Player/releases) · [Changelog](CHANGELOG.en.md)
+**The practice player for musicians.**<br>
+Slow any track down without changing its pitch, loop the hard bars, play along with a metronome, and let the tempo climb as you get better. On the Mac, on your iPhone or iPad, and in any browser. Free, open source, and private by design.
+
+[**▶ Open the web app**](https://ingen63.github.io/Woodshed-Player/app/) · [**Download 1.0 for macOS**](https://github.com/ingen63/Woodshed-Player/releases) · [What's new](CHANGELOG.en.md)
 
 [![Test quality](https://github.com/ingen63/Woodshed-Player/actions/workflows/test-quality.yml/badge.svg)](https://github.com/ingen63/Woodshed-Player/actions/workflows/test-quality.yml)
 [![Pages](https://github.com/ingen63/Woodshed-Player/actions/workflows/pages.yml/badge.svg)](https://github.com/ingen63/Woodshed-Player/actions/workflows/pages.yml)
@@ -45,18 +47,59 @@ Slow a track down without changing its pitch, loop the hard bars, practise with 
 
 ## Why Woodshed Player?
 
-*Woodshedding* is what musicians call practising a hard passage over and over until it sits. Woodshed Player is built for exactly that: a library of the music you are learning, and the tools to take it apart.
+*Woodshedding* is what musicians call going off on your own and practising a hard passage over and over until it sits. Woodshed Player is built for exactly that moment: the solo you are transcribing, the run that is still too fast, the groove you want to lock in.
 
-- 🐢 **Slower, same pitch.** Tempo from 0.1× to 2× without changing the key, with a high-quality time stretch running in a C++ audio engine.
+- **Hear every note.** Slow the music down to a crawl and it still sounds like itself, in the right key.
+- **Stay on the hard part.** Mark the bars once; the loop, the tempo and your progress are still there tomorrow.
+- **Get faster without thinking about it.** The speed trainer raises the tempo for you, pass by pass, until you play it at full speed.
+- **Hear yourself.** Arm the recorder, play, and every take lands in your library, ready to listen back or loop.
+- **Your music stays yours.** No account, no ads, no tracking. Nothing leaves your device unless you switch on sync.
+
+## Features
+
+### 🎧 Player and practice
+
+- 🐢 **Slower, same pitch.** Tempo from 0.1× to 2× without changing the key, powered by a high-quality time stretch in a C++ audio engine.
 - 🔁 **Loops that stay put.** Drag the **S** and **E** markers on the waveform, type `mm:ss.d`, or press **S** / **E** while it plays. Every track remembers its loop and tempo.
-- 📈 **Speed trainer.** Start at 60 %, gain 5 % every 10 passes, end at full speed, all on its own.
-- 🥁 **Metronome.** 20–300 BPM, tap tempo, 4/4, 3/4, 2/4 and 6/8, subdivisions down to sixteenths, and an automatic tempo ramp by bars or by time.
-- 📚 **Library.** Folders, playlists, multi-select, drag and drop. Each file is stored once, recognised by its content. Trim the start and end of a track (WAV, FLAC, MP3, AAC, M4A).
-- 🎙️ **Recording.** Record the system audio (Mac) or the microphone (Mac and web app) as lossless FLAC. The recording goes straight into the library, ready to loop. Switch on **Armed** while practising and the next time you play becomes a recording of its own, filed under `Recordings › date`; it can also stay armed so that every phase of playing is recorded.
-- ☁️ **Your devices, your choice.** Optional sync through your own Google Drive, using only the files the app creates itself. Without an account, nothing leaves your device.
-- 🌗 **Made to practise with.** Player, Practice and Metronome areas, layouts for desktop, tablet and phone, light and dark, keyboard shortcuts everywhere (press **?** for the overview), built-in help that works offline, English and German following the system language, including the Mac menu bar and the questions the system asks.
+- 📈 **Speed trainer.** Start at 60 %, gain 5 % every 10 passes, finish at full speed, all on its own.
+- 🥁 **Metronome.** 20–300 BPM, tap tempo, 4/4, 3/4, 2/4 and 6/8, subdivisions down to sixteenths, and an automatic tempo ramp by bars, by time or by passes.
+
+### 🎙️ Recording
+
+- **Record what you play.** Microphone on the Mac and in the web app, system audio on the Mac, lossless as 24-bit FLAC. Each recording goes straight into the library, ready to loop.
+- **Armed.** Switch it on in *Practice* or *Metronome* and just play: the first note starts a take with one second of lead-in, a pause ends it, and it is filed under `Recordings › date`. Leave it armed and every phase of playing becomes its own take.
+
+### 📚 Library
+
+- Folders with subfolders of any depth, playlists, multi-select, drag and drop, sorting.
+- Each file is stored once, recognised by its content. Trim the start and end of a track (WAV, FLAC, MP3, AAC, M4A).
+- **MP3 export on the Mac** with title, artist and year.
+
+### ☁️ Sync, if you want it
+
+- Optional sync through your own Google Drive, using only the files the app creates itself. Without an account, nothing leaves your device.
+
+### 🌗 Made to practise with
+
+- Three areas: Player, Practice and Metronome, with layouts for desktop, tablet and phone.
+- Dark by default, light whenever you like; on the Mac even the title bar follows your choice.
+- Keyboard shortcuts everywhere (press **?** for the overview) and built-in help that works offline.
+- English and German, following the system language, down to the Mac menu bar.
 
 All features in detail (in German): [`docs/FUNKTIONEN.md`](docs/FUNKTIONEN.md).
+
+## New in 1.0
+
+Version 1.0 is the first stable release of the new app: a Flutter interface on a C++ audio engine that runs natively on the Mac and as WebAssembly in the browser. Highlights since the first preview:
+
+- **Recording in the web app,** with the microphone and the **Armed** switch, on iPhone, iPad, Android and the desktop.
+- **Armed recording while practising,** every take filed by date.
+- **Subfolders,** help pages for every area and a shortcut overview.
+- **Dark by default,** with a Mac title bar that matches the app.
+- **Audible on the iPhone in silent mode,** like a music app.
+- **MP3 export and a command line** on the Mac.
+
+The full list is in the [release notes](CHANGELOG.en.md).
 
 ## Platforms
 

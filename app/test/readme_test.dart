@@ -34,11 +34,14 @@ void main() {
     expect(top(de), contains('[English](README.md)'));
   });
 
+  // #160: «Features» and «New in 1.0» for the 1.0 release.
   test('#145/AK2 both READMEs have the same sections in the same order', () {
     final english = headings(read(en));
     final german = headings(read(de));
     expect(english, [
       'Why Woodshed Player?',
+      'Features',
+      'New in 1.0',
       'Platforms',
       'Installation',
       'Command line (Mac)',
@@ -49,6 +52,8 @@ void main() {
     ]);
     expect(german, [
       'Warum Woodshed Player?',
+      'Funktionen',
+      'Neu in 1.0',
       'Plattformen',
       'Installation',
       'Kommandozeile (Mac)',

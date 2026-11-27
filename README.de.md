@@ -4,10 +4,12 @@
 
 # Woodshed Player
 
-**Der Übe-Player für Musikerinnen und Musiker.**<br>
-Ein Stück langsamer abspielen, ohne dass sich die Tonhöhe ändert, die schweren Takte im Loop üben, mit Metronom spielen und das Tempo steigern, wenn es sitzt.
+### Gezielter üben. Spielen, bis es sitzt.
 
-[**Web-App öffnen**](https://ingen63.github.io/Woodshed-Player/app/) · [Für macOS laden](https://github.com/ingen63/Woodshed-Player/releases) · [Änderungen](CHANGELOG.md)
+**Der Übe-Player für Musikerinnen und Musiker.**<br>
+Jedes Stück langsamer abspielen, ohne dass sich die Tonhöhe ändert, die schweren Takte im Loop üben, mit Metronom spielen und das Tempo steigen lassen, wenn es sitzt. Am Mac, auf iPhone und iPad und in jedem Browser. Kostenlos, quelloffen und von Grund auf privat.
+
+[**▶ Web-App öffnen**](https://ingen63.github.io/Woodshed-Player/app/) · [**Version 1.0 für macOS laden**](https://github.com/ingen63/Woodshed-Player/releases) · [Was ist neu](CHANGELOG.md)
 
 [![Test quality](https://github.com/ingen63/Woodshed-Player/actions/workflows/test-quality.yml/badge.svg)](https://github.com/ingen63/Woodshed-Player/actions/workflows/test-quality.yml)
 [![Pages](https://github.com/ingen63/Woodshed-Player/actions/workflows/pages.yml/badge.svg)](https://github.com/ingen63/Woodshed-Player/actions/workflows/pages.yml)
@@ -45,18 +47,59 @@ Ein Stück langsamer abspielen, ohne dass sich die Tonhöhe ändert, die schwere
 
 ## Warum Woodshed Player?
 
-*Woodshedding* nennen Musikerinnen und Musiker das Üben einer schweren Stelle, immer wieder, bis sie sitzt. Genau dafür ist Woodshed Player gemacht: eine Bibliothek mit der Musik, die Du lernst, und die Werkzeuge, um sie auseinanderzunehmen.
+*Woodshedding* nennen Musikerinnen und Musiker das Üben im stillen Kämmerlein: eine schwere Stelle immer wieder, bis sie sitzt. Genau für diesen Moment ist Woodshed Player gemacht: das Solo, das Du heraushörst, der Lauf, der noch zu schnell ist, der Groove, der sitzen soll.
+
+- **Jeden Ton hören.** Die Musik im Schneckentempo abspielen, und sie klingt trotzdem nach sich selbst, in der richtigen Tonart.
+- **Bei der schweren Stelle bleiben.** Die Takte einmal markieren; Loop, Tempo und Fortschritt sind auch morgen noch da.
+- **Schneller werden, ohne daran zu denken.** Die Steigerung hebt das Tempo für Dich, Durchgang um Durchgang, bis Du es in vollem Tempo spielst.
+- **Dich selbst hören.** Aufnahme scharf machen, spielen, und jede Aufnahme landet in der Bibliothek, bereit zum Anhören oder für den Loop.
+- **Deine Musik bleibt Deine.** Kein Konto, keine Werbung, kein Tracking. Nichts verlässt Dein Gerät, ausser Du schaltest den Abgleich ein.
+
+## Funktionen
+
+### 🎧 Player und Üben
 
 - 🐢 **Langsamer, gleiche Tonhöhe.** Tempo von 0,1× bis 2×, ohne dass sich die Tonart ändert, mit hochwertigem Time-Stretch in einem Audio-Kern in C++.
 - 🔁 **Loops, die bleiben.** Die Marker **S** und **E** in der Wellenform ziehen, `mm:ss.d` eintippen oder während der Wiedergabe **S** / **E** drücken. Jeder Titel merkt sich seinen Loop und sein Tempo.
 - 📈 **Steigerung.** Bei 60 % beginnen, alle 10 Durchgänge 5 % schneller, am Ende volles Tempo, ganz von selbst.
-- 🥁 **Metronom.** 20–300 BPM, Tap-Tempo, 4/4, 3/4, 2/4 und 6/8, Unterteilungen bis zu Sechzehnteln und eine automatische Tempo-Steigerung nach Takten oder nach Zeit.
-- 📚 **Bibliothek.** Ordner, Playlists, Mehrfachauswahl, Ziehen und Ablegen. Jede Datei wird nur einmal gespeichert, erkannt an ihrem Inhalt. Anfang und Ende eines Titels abschneiden (WAV, FLAC, MP3, AAC, M4A).
-- 🎙️ **Aufnahme.** Systemton (Mac) oder Mikrofon (Mac und Web-App) verlustfrei als FLAC aufnehmen. Die Aufnahme landet direkt in der Bibliothek, bereit für den Loop. Mit dem Schalter **Scharf** wird beim Üben das nächste Spielen zu einer eigenen Aufnahme, abgelegt unter `Recordings › Datum`; bleibt er scharf, wird jede Spielphase aufgenommen.
-- ☁️ **Deine Geräte, Deine Wahl.** Abgleich auf Wunsch über Dein eigenes Google Drive, nur mit den Dateien, die die App selbst anlegt. Ohne Konto verlässt nichts Dein Gerät.
-- 🌗 **Zum Üben gemacht.** Die Bereiche Player, Üben und Metronom, Layouts für Desktop, Tablet und Phone, hell und dunkel, Tastenkürzel überall (**?** zeigt die Übersicht), eine eingebaute Hilfe, die auch offline geht, Deutsch und Englisch nach der Systemsprache, auch in der Menüleiste des Mac und in den Rückfragen des Systems.
+- 🥁 **Metronom.** 20–300 BPM, Tap-Tempo, 4/4, 3/4, 2/4 und 6/8, Unterteilungen bis zu Sechzehnteln und eine automatische Tempo-Steigerung nach Takten, Zeit oder Durchgängen.
+
+### 🎙️ Aufnahme
+
+- **Aufnehmen, was Du spielst.** Mikrofon am Mac und in der Web-App, Systemton am Mac, verlustfrei als FLAC mit 24 Bit. Jede Aufnahme landet direkt in der Bibliothek, bereit für den Loop.
+- **Scharf.** In *Üben* oder *Metronom* einschalten und einfach spielen: Der erste Ton startet eine Aufnahme mit einer Sekunde Vorlauf, eine Pause beendet sie, abgelegt unter `Recordings › Datum`. Bleibt der Schalter scharf, wird jede Spielphase zu einer eigenen Aufnahme.
+
+### 📚 Bibliothek
+
+- Ordner mit beliebig tiefen Unterordnern, Playlists, Mehrfachauswahl, Ziehen und Ablegen, Sortierung.
+- Jede Datei wird nur einmal gespeichert, erkannt an ihrem Inhalt. Anfang und Ende eines Titels abschneiden (WAV, FLAC, MP3, AAC, M4A).
+- **MP3-Export am Mac** mit Titel, Artist und Jahr.
+
+### ☁️ Abgleich, wenn Du willst
+
+- Abgleich auf Wunsch über Dein eigenes Google Drive, nur mit den Dateien, die die App selbst anlegt. Ohne Konto verlässt nichts Dein Gerät.
+
+### 🌗 Zum Üben gemacht
+
+- Drei Bereiche: Player, Üben und Metronom, mit Layouts für Desktop, Tablet und Phone.
+- Dunkel als Standard, hell, wann immer Du willst; am Mac folgt sogar die Titelleiste Deiner Wahl.
+- Tastenkürzel überall (**?** zeigt die Übersicht) und eine eingebaute Hilfe, die auch offline geht.
+- Deutsch und Englisch nach der Systemsprache, bis in die Menüleiste des Mac.
 
 Alle Funktionen im Detail: [`docs/FUNKTIONEN.md`](docs/FUNKTIONEN.md).
+
+## Neu in 1.0
+
+Version 1.0 ist die erste stabile Version der neuen App: eine Oberfläche in Flutter auf einem Audio-Kern in C++, der am Mac nativ und im Browser als WebAssembly läuft. Das Wichtigste seit der ersten Vorschau:
+
+- **Aufnahme in der Web-App,** mit dem Mikrofon und dem Schalter **Scharf**, auf iPhone, iPad, Android und dem Desktop.
+- **Scharfe Aufnahme beim Üben,** jede Aufnahme nach Datum abgelegt.
+- **Unterordner,** Hilfe-Seiten für jeden Bereich und eine Übersicht der Tastenkürzel.
+- **Dunkel als Standard,** mit einer Titelleiste am Mac, die zur App passt.
+- **Auf dem iPhone auch im Stumm-Modus hörbar,** wie eine Musik-App.
+- **MP3-Export und Kommandozeile** am Mac.
+
+Die vollständige Liste steht in den [Release Notes](CHANGELOG.md).
 
 ## Plattformen
 
