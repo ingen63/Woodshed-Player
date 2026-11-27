@@ -2,6 +2,19 @@
 
 Release notes of Woodshed Player, newest version first. This file translates [`CHANGELOG.md`](CHANGELOG.md) (German), which is authoritative. Every entry starts with `## Version X.Y.Z` and has the sections «New, changed, fixed» and «Tests and development» (at least one, in this order); every bullet names its issues. `python3 tools/changelog.py check` checks both files (#139).
 
+## Version 1.0.0-beta.3
+
+### New, changed, fixed
+
+- **Recording in the web app (#157):** The web app records from the microphone, in every browser with background storage access (OPFS), as 24-bit FLAC like the native app; the «Armed» switch is now in the web app too.
+- **Armed turns off after a recording (#156):** After a recording «Armed» is off again; switch it on for the next one.
+- **Web app on the iPhone audible in silent mode (#158):** Player and metronome sound even when the silent switch is on.
+
+### Tests and development
+
+- Time limit and diagnostics for the iOS smoke test in CI (#155).
+- Stable web test for «Armed» (#157).
+
 ## Version 1.0.0-beta.2
 
 ### New, changed, fixed

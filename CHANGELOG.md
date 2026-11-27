@@ -2,6 +2,19 @@
 
 Release Notes von Woodshed Player, neueste Version zuerst. Diese Datei ist massgebend; [`CHANGELOG.en.md`](CHANGELOG.en.md) übersetzt jede Version. Jeder Eintrag beginnt mit `## Version X.Y.Z` und hat die Abschnitte «Neu, geändert, behoben» und «Tests und Entwicklung» (mindestens einen, in dieser Reihenfolge); jeder Punkt nennt seine Issues. `python3 tools/changelog.py check` prüft beide Dateien (#139).
 
+## Version 1.0.0-beta.3
+
+### Neu, geändert, behoben
+
+- **Aufnahme in der Web-App (#157):** Die Web-App nimmt mit dem Mikrofon auf, in allen Browsern mit Speicherzugriff im Hintergrund (OPFS), als FLAC mit 24 Bit wie die native App; den Schalter «Scharf» gibt es jetzt auch in der Web-App.
+- **Scharf geht nach einer Aufnahme aus (#156):** Nach einer Aufnahme ist «Scharf» wieder aus; für die nächste schaltest Du es wieder ein.
+- **Web-App auf dem iPhone im Stumm-Modus hörbar (#158):** Player und Metronom klingen auch, wenn der Stumm-Schalter an ist.
+
+### Tests und Entwicklung
+
+- Zeitgrenze und Diagnose für den iOS-Rauchtest in CI (#155).
+- Stabiler Web-Test für «Scharf» (#157).
+
 ## Version 1.0.0-beta.2
 
 ### Neu, geändert, behoben
