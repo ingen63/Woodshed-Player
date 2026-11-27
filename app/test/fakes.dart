@@ -490,6 +490,10 @@ class FakeRecorder with RecordingFiles implements Recorder {
   @override
   double keptSeconds = 0;
 
+  /// #157: set by the test to end the recording as the browser would.
+  @override
+  RecordingInterruption? interruption;
+
   @override
   bool sourceAvailable(WpRecSource source) => sources.contains(source);
 
@@ -504,6 +508,7 @@ class FakeRecorder with RecordingFiles implements Recorder {
       starts++ == 0 ? 'recorded audio' : 'recorded audio $starts',
     );
     recording = true;
+    interruption = null;
     arming = null;
     gate = WpRecGate.off;
   }

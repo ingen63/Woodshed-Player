@@ -1,9 +1,10 @@
-// #147: the switch «Armed» of the areas Practice and Metronome (Mac only): on, the microphone records
+// #147: the switch «Armed» of the areas Practice and Metronome (Mac; #157: and the web app): on, the microphone records
 // each time you play (PracticeRecording). It shows armed (a ring) and recording (a square and the
 // duration), the level of the microphone, and opens a popover with the threshold, a level meter to set
 // it by, and the pause that ends a take.
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 
 import '../app/practice_recording.dart';
@@ -18,7 +19,11 @@ String armedProblemMessage(
   PracticeRecording practice,
 ) => switch (p) {
   PracticeArmProblem.busy => l.armedBusy,
-  PracticeArmProblem.microphoneDenied => l.armedMicrophoneDenied,
+  // #157/AK6: in the browser the website's permission, not a macOS setting
+  PracticeArmProblem.microphoneDenied =>
+    kIsWeb ? l.armedMicrophoneDeniedBrowser : l.armedMicrophoneDenied,
+  PracticeArmProblem.background => l.armedStoppedInBackground,
+  PracticeArmProblem.storageFull => l.armedStorageFull,
   PracticeArmProblem.failed => switch (practice.recording.error) {
     final e? => l.recordingFailed(recordingErrorMessage(l, e)),
     null => l.armedFailed,

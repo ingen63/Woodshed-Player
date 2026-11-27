@@ -755,4 +755,44 @@ void main() {
       },
     );
   });
+
+  group('#157 ended by the browser', () {
+    test('#157/AK8: storage full during a take: the take is saved, «Armed» goes off with the reason', () async {
+      expect(await practice.turnOn(de), isNull);
+      await armed(1);
+      await sound();
+      rec.interruption = RecordingInterruption.storageFull;
+      await eventually(() {
+        app.finishLoads();
+        return !practice.on && app.library.tracks.length == 1;
+      }, 'off and saved');
+      expect(practice.problem, PracticeArmProblem.storageFull);
+      expect(rec.starts, 1); // no next take
+      expect(recording.reserved, isFalse);
+    });
+
+    test('#157/AK7: in the background while waiting for sound: off with the reason, nothing saved', () async {
+      expect(await practice.turnOn(de), isNull);
+      await armed(1);
+      rec.interruption = RecordingInterruption.background;
+      await eventually(() => !practice.on, 'off');
+      expect(practice.problem, PracticeArmProblem.background);
+      expect(app.library.tracks, isEmpty);
+      expect(rec.starts, 1);
+      // switched on again: the reason goes, the next take is armed
+      expect(await practice.turnOn(de), isNull);
+      await armed(2);
+      expect(practice.problem, isNull);
+      expect(practice.on, isTrue);
+      await practice.turnOff();
+    });
+
+    test('a failed recording turns «Armed» off as failed', () async {
+      expect(await practice.turnOn(de), isNull);
+      await armed(1);
+      rec.interruption = RecordingInterruption.failed;
+      await eventually(() => !practice.on, 'off');
+      expect(practice.problem, PracticeArmProblem.failed);
+    });
+  });
 }

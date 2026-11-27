@@ -291,6 +291,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only silence is coming from the microphone. Check which microphone the browser uses for this website and that it is not muted.';
 
   @override
+  String get recordingStoppedInBackground =>
+      'The recording ended because the app went to the background or the screen was locked. What was recorded until then is in the library.';
+
+  @override
+  String get recordingStorageFull =>
+      'The recording ended because the storage of this browser is full. What was recorded until then is in the library. Delete tracks or recordings to make room.';
+
+  @override
+  String get armedMicrophoneDeniedBrowser =>
+      'The browser does not let this website use the microphone, so «Armed» is off again. Allow the microphone for this website in the browser\'s site settings, then switch it on again.';
+
+  @override
+  String get armedStoppedInBackground =>
+      '«Armed» went off because the app went to the background or the screen was locked. A running recording was saved.';
+
+  @override
+  String get armedStorageFull =>
+      '«Armed» went off because the storage of this browser is full. A running recording was saved up to that point.';
+
+  @override
   String get noTrackSelected => 'No track selected';
 
   @override
@@ -1529,6 +1549,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get helpRecordingBody =>
       '“Record” at the top right starts and stops a recording. The menu beside it chooses the source for this device: system audio (macOS 14.2 or later; the player and the metronome are left out) or the microphone. The recording is saved losslessly as FLAC and appears in the library as a new track, named after date and time. The first time, macOS asks for permission.\n\nArmed: in Practice and Metronome, the switch “Armed” records from the microphone by itself. As soon as the level rises above the threshold, a recording starts, 1 second early; after a pause of the set length it ends. Space plays or pauses as usual and also ends a running recording. Then “Armed” goes off; to keep it armed for the next recording, switch off “Switch off after a recording” in its settings. Each recording lands in the library in the folder Recordings › date. The arrow beside the switch sets threshold, pause and whether it goes off after a recording. While “Armed” is on, “Record” is locked.';
+
+  @override
+  String get helpRecordingBodyBrowser =>
+      '“Record” at the top right starts and stops a recording through the microphone. The recording is saved losslessly as FLAC in the storage of this browser and appears in the library as a new track, named after date and time. The first time, the browser asks whether this website may use the microphone; if it is refused, allow it in the browser\'s site settings. If the app goes to the background or the screen is locked, the recording ends and is saved; while recording, the screen stays on.\n\nArmed: in Practice and Metronome, the switch “Armed” records from the microphone by itself. As soon as the level rises above the threshold, a recording starts, 1 second early; after a pause of the set length it ends. Space plays or pauses as usual and also ends a running recording. Then “Armed” goes off; to keep it armed for the next recording, switch off “Switch off after a recording” in its settings. Each recording lands in the library in the folder Recordings › date. The arrow beside the switch sets threshold, pause and whether it goes off after a recording. While “Armed” is on, “Record” is locked; in the background “Armed” goes off.';
 
   @override
   String get helpExportTitle => 'Export as MP3';

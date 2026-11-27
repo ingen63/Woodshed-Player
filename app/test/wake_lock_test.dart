@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:woodshed_player/app/media_session.dart';
 import 'package:woodshed_player/app/wake_lock.dart';
@@ -333,4 +334,40 @@ void main() {
       expect(readme, contains('**Bildschirm bleibt an** (#109'));
     });
   });
+
+  test(
+    '#157/AK7 while a recording runs or «Armed» is on, the screen lock is held',
+    () async {
+      final app = await loaded();
+      final api = FakeWakeLock();
+      final recording = ValueNotifier(false);
+      final l = WakeLockLink(
+        api,
+        app.player,
+        recording: recording,
+        recordingActive: () => recording.value,
+      );
+      addTearDown(l.dispose);
+      await settle();
+      expect(api.requests, 0);
+      recording.value = true;
+      await settle();
+      expect(api.requests, 1);
+      expect(l.lock, same(api.locks.single));
+      app.player.play(); // playing as well: the same lock
+      await settle();
+      expect(api.requests, 1);
+      app.player.pause();
+      await settle();
+      expect(api.locks.single.released, isFalse); // still recording
+      recording.value = false;
+      await settle();
+      expect(api.locks.single.released, isTrue);
+      expect(l.lock, isNull);
+      l.dispose();
+      recording.value = true; // no longer listened to
+      await settle();
+      expect(api.requests, 1);
+    },
+  );
 }

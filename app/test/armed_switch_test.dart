@@ -342,5 +342,19 @@ void main() {
       armedProblemMessage(de, PracticeArmProblem.busy, practice),
       de.armedBusy,
     );
+    // #157/AK7, AK8: ended by the browser
+    expect(
+      armedProblemMessage(de, PracticeArmProblem.background, practice),
+      de.armedStoppedInBackground,
+    );
+    expect(
+      armedProblemMessage(de, PracticeArmProblem.storageFull, practice),
+      de.armedStorageFull,
+    );
+    // outside the browser the permission is a setting of macOS
+    expect(
+      armedProblemMessage(de, PracticeArmProblem.microphoneDenied, practice),
+      de.armedMicrophoneDenied,
+    );
   });
 }

@@ -1,6 +1,7 @@
 // #148: the help of the app, offline and in the UI language: a page of its own with the contents on the
 // left and the section on the right (on the phone a list that opens a section), and the keyboard
 // shortcuts in a dialog of their own. All texts come from the ARB files; nothing is loaded.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -34,7 +35,8 @@ class HelpTopics {
     this.keyboard = false,
   });
 
-  /// Recording and the switch «Armed»: only on the Mac (HomePage shows the recording button).
+  /// Recording and the switch «Armed»: on the Mac and (#157) in the browser where it can record (HomePage
+  /// shows the recording button).
   final bool recording;
 
   /// Export as MP3: only where the core encodes MP3 ([AppController.mp3], the Mac).
@@ -89,7 +91,9 @@ String helpSectionBody(AppLocalizations l, HelpSection s) => switch (s) {
   HelpSection.metronome => l.helpMetronomeBody,
   HelpSection.sync => l.helpSyncBody,
   HelpSection.appearance => l.helpAppearanceBody,
-  HelpSection.recording => l.helpRecordingBody,
+  // #157/AK10: in the browser the microphone only, the permission of the website
+  HelpSection.recording =>
+    kIsWeb ? l.helpRecordingBodyBrowser : l.helpRecordingBody,
   HelpSection.export => l.helpExportBody,
   HelpSection.commandLine => l.helpCommandLineBody,
   HelpSection.web => l.helpWebBody,

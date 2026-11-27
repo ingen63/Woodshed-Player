@@ -53,6 +53,12 @@ enum PracticeArmProblem {
 
   /// The core could not start (see [RecordingController.error]) or there is no folder for recordings.
   failed,
+
+  /// #157/AK7: the app went to the background (the browser stops the microphone there).
+  background,
+
+  /// #157/AK8: the storage is full; the take holds what was recorded until then.
+  storageFull,
 }
 
 class PracticeRecording extends ChangeNotifier implements PracticeArming {
@@ -230,6 +236,17 @@ class PracticeRecording extends ChangeNotifier implements PracticeArming {
     final ended =
         _wasRunning && !running && recording.phase == RecordingPhase.idle;
     _wasRunning = running;
+    // #157/AK7, AK8: the recorder ended the take (or the armed wait) by itself: off, with the reason
+    final interrupted = recording.interruption;
+    if (_on && interrupted != null && recording.phase == RecordingPhase.idle) {
+      unawaited(turnOff());
+      _fail(switch (interrupted) {
+        RecordingInterruption.background => PracticeArmProblem.background,
+        RecordingInterruption.storageFull => PracticeArmProblem.storageFull,
+        RecordingInterruption.failed => PracticeArmProblem.failed,
+      });
+      return;
+    }
     if (_on && ended && !keepsOn) {
       unawaited(turnOff());
       return;

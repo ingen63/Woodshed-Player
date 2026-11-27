@@ -53,11 +53,27 @@ abstract class Recorder {
   /// Only silence so far: no permission, or nothing is playing.
   bool get onlySilence;
 
+  /// #157: why the recorder ended the running recording by itself; null while it runs as asked. The
+  /// controller then stops and saves what was recorded.
+  RecordingInterruption? get interruption;
+
   /// #157: a recording file at [path] exists (natively a file, in the browser one of the recorder).
   bool exists(String path);
 
   /// #157: removes the recording file at [path] (a cancelled armed recording); gone already is fine.
   void delete(String path);
+}
+
+/// #157: why a recording ended without a stop (the browser).
+enum RecordingInterruption {
+  /// AK7: the app went to the background or the screen was locked.
+  background,
+
+  /// AK8: the storage is full; the file holds what was recorded until then.
+  storageFull,
+
+  /// The recording could not go on (the file or the core failed).
+  failed,
 }
 
 /// #157: [Recorder.exists] and [Recorder.delete] for files of the file system (desktop, tests).
@@ -184,6 +200,7 @@ class RecordingController extends ChangeNotifier {
   Object? _reservedBy;
   Future<void>? _saving;
   WpRecordingException? _error;
+  RecordingInterruption? _interruption;
   bool _micDenied = false;
   Completer<RecordingOutcome>? _done;
 
@@ -203,6 +220,9 @@ class RecordingController extends ChangeNotifier {
 
   /// Error of the core when the last recording could not start (#44).
   WpRecordingException? get error => _error;
+
+  /// #157/AK7, AK8: why the last recording ended by itself; cleared by the next start or [choose].
+  RecordingInterruption? get interruption => _interruption;
 
   /// #113/AK4: the microphone permission was refused at the last start.
   bool get microphoneDenied => _micDenied;
@@ -259,6 +279,7 @@ class RecordingController extends ChangeNotifier {
     // The library takes the new source at once and saves it in the background.
     unawaited(app.library.setRecordingSource(s.name));
     _micDenied = false;
+    _interruption = null;
     _error = null;
     _silent = false;
     notifyListeners();
@@ -282,6 +303,7 @@ class RecordingController extends ChangeNotifier {
   }) async {
     if (busy || !identical(_reservedBy, owner)) return const RecordingBusy();
     _starting = true;
+    _interruption = null;
     try {
       final from = source ?? this.source;
       final at = now();
@@ -347,6 +369,13 @@ class RecordingController extends ChangeNotifier {
 
   void _update() {
     if (_phase == RecordingPhase.idle) return;
+    // #157/AK7, AK8: ended by the recorder: saved like a stop, with the reason for the hint
+    final interruption = recorder.interruption;
+    if (interruption != null) {
+      _interruption = interruption;
+      unawaited(stop());
+      return;
+    }
     final total = recorder.seconds;
     _level = recorder.level;
     _silent = total > silentAfter && recorder.onlySilence;

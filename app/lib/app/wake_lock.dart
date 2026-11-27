@@ -2,7 +2,7 @@
 // end of the track the lock is released, so the device's own screen timeout applies again. The browser
 // releases the lock when the page is hidden; on return with playback running it is requested again. This
 // file holds the logic without the browser (testable with a fake [WakeLockApi]); wake_lock_web.dart talks
-// to `navigator.wakeLock`.
+// to `navigator.wakeLock`. #157/AK7: the screen also stays on while a recording runs or «Armed» is on.
 import 'package:flutter/foundation.dart';
 
 import '../player/player_service.dart';
@@ -25,14 +25,19 @@ abstract class WakeLockApi {
 }
 
 class WakeLockLink {
-  WakeLockLink(this.api, this.player) {
+  WakeLockLink(this.api, this.player, {this.recording, this.recordingActive}) {
     api.onVisible(_resume);
     player.addListener(_update);
+    recording?.addListener(_update);
     _update();
   }
 
   final WakeLockApi api;
   final PlayerService player;
+
+  /// #157/AK7: tells of changes of the recording; [recordingActive] says whether one runs or is armed.
+  final Listenable? recording;
+  final bool Function()? recordingActive;
 
   bool _wanted = false;
   bool _requesting = false;
@@ -44,7 +49,9 @@ class WakeLockLink {
   WakeLockHandle? get lock => _lock;
 
   void _update() {
-    final wanted = player.hasTrack && player.isPlaying;
+    final wanted =
+        (player.hasTrack && player.isPlaying) ||
+        (recordingActive?.call() ?? false);
     if (wanted == _wanted) return;
     _wanted = wanted;
     if (wanted) {
@@ -83,6 +90,7 @@ class WakeLockLink {
 
   void dispose() {
     player.removeListener(_update);
+    recording?.removeListener(_update);
     _lock?.release();
     _lock = null;
   }

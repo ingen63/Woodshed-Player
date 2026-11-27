@@ -41,4 +41,8 @@ class CoreRecorder with RecordingFiles implements Recorder {
   double get level => WpRecorder.level;
   @override
   bool get onlySilence => WpRecorder.onlySilence;
+
+  /// The native core records until it is stopped.
+  @override
+  RecordingInterruption? get interruption => null;
 }

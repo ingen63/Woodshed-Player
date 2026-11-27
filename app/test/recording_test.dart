@@ -97,6 +97,39 @@ void main() {
   );
 
   testWidgets(
+    '#157/AK7 #157/AK8: a recording ended by the browser names the reason at the button',
+    (tester) async {
+      final (app, rec) = await pump(tester);
+      for (final (reason, text) in [
+        (RecordingInterruption.storageFull, de.recordingStorageFull),
+        (RecordingInterruption.background, de.recordingStoppedInBackground),
+        (
+          RecordingInterruption.failed,
+          de.recordingFailed(de.recordingErrorFile),
+        ),
+      ]) {
+        await tapRecord(tester);
+        rec.interruption = reason;
+        final problem = find.byKey(const Key('recordingProblem'));
+        await pumpUntil(
+          tester,
+          () => problem.evaluate().isNotEmpty,
+          'ended by itself: $reason',
+        );
+        expect(tester.widget<IconButton>(problem).tooltip, text);
+        expect(find.byKey(const Key('recordingDuration')), findsNothing);
+        await tester.runAsync(() async {
+          for (var i = 0; i < 20; i++) {
+            app.finishLoads();
+            await pumpEventQueue();
+          }
+        });
+        await tester.pump();
+      }
+    },
+  );
+
+  testWidgets(
     '#4/AK3: silence (permission denied) explains where to grant it',
     (tester) async {
       final (_, rec) = await pump(tester);

@@ -138,4 +138,34 @@ void main() {
       expect(() => own.addListener(() {}), throwsA(isA<Error>()));
     },
   );
+
+  /// #157: waits until the recording ended by itself is saved, finishing loads on the way.
+  Future<RecordingOutcome> ended() async {
+    RecordingOutcome? outcome;
+    unawaited(recording.done!.then((o) => outcome = o));
+    await eventually(() {
+      app.finishLoads();
+      return outcome != null;
+    }, 'ended and saved');
+    return outcome!;
+  }
+
+  test('#157/AK7 #157/AK8: the recorder ends the recording by itself: saved, with the reason, until the next start', () async {
+    expect(await recording.start(de), isNull);
+    rec.seconds = 2;
+    rec.interruption = RecordingInterruption.storageFull;
+    final outcome = await ended();
+    expect(outcome, isA<RecordingSaved>());
+    expect((outcome as RecordingSaved).track, isNotNull);
+    expect(rec.recording, isFalse);
+    expect(recording.phase, RecordingPhase.idle);
+    expect(recording.interruption, RecordingInterruption.storageFull);
+    expect(await recording.start(de), isNull);
+    expect(recording.interruption, isNull);
+    rec.interruption = RecordingInterruption.background;
+    await ended();
+    expect(recording.interruption, RecordingInterruption.background);
+    recording.choose(WpRecSource.microphone);
+    expect(recording.interruption, isNull);
+  });
 }

@@ -7,7 +7,9 @@
 //   init [module]           compiled wp_core_web.wasm (WebAssembly.Module); true if this browser can store a
 //                           recording (synchronous OPFS access, only in Workers), else false
 //   start [options, port]   options { name, sampleRate, channels, armed, thresholdDb, silenceSeconds,
-//                           tailSeconds }; port: the MessagePort «wp-mic» sends to. 0 or WP_REC_ERR_*
+//                           tailSeconds, storageLimit }; port: the MessagePort «wp-mic» sends to. 0 or
+//                           WP_REC_ERR_*. storageLimit (tests): bytes the file may take before the storage
+//                           counts as full
 //   stop []                 waits for { end } on the port (at most 1 s), finishes the file:
 //                           { code, size, seconds, keptSeconds, interrupted }
 // While recording it sends { status: { gate, seconds, keptSeconds, level, silent, interrupted } } about every
@@ -51,6 +53,9 @@ function store(j) {
   const piece = core.take();
   if (!piece || j.interrupted) return;
   try {
+    if (j.limit !== undefined && piece.offset + piece.bytes.length > j.limit) {
+      throw new DOMException('Storage limit of the test', 'QuotaExceededError');
+    }
     const n = j.file.write(piece.bytes, { at: piece.offset });
     if (n !== piece.bytes.length) throw new DOMException('Short write', 'QuotaExceededError');
     j.size = piece.offset + piece.bytes.length;
@@ -121,6 +126,7 @@ async function start(options, port) {
     interrupted: null,
     ended: false,
     stopped: false,
+    limit: options.storageLimit,
   };
   job = j;
   port.onmessage = ({ data }) => onAudio(j, data);

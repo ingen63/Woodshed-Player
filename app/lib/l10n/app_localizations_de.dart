@@ -295,6 +295,26 @@ class AppLocalizationsDe extends AppLocalizations {
       'Vom Mikrofon kommt nur Stille. Prüfe, welches Mikrofon der Browser für diese Website verwendet und ob es stummgeschaltet ist.';
 
   @override
+  String get recordingStoppedInBackground =>
+      'Die Aufnahme ist beendet, weil die App in den Hintergrund ging oder der Bildschirm gesperrt wurde. Was bis dahin aufgenommen war, liegt in der Bibliothek.';
+
+  @override
+  String get recordingStorageFull =>
+      'Die Aufnahme ist beendet, weil der Speicher dieses Browsers voll ist. Was bis dahin aufgenommen war, liegt in der Bibliothek. Lösche Titel oder Aufnahmen, um Platz zu schaffen.';
+
+  @override
+  String get armedMicrophoneDeniedBrowser =>
+      'Der Browser lässt diese Website das Mikrofon nicht verwenden, darum ist «Scharf» wieder aus. Erlaube das Mikrofon für diese Website in den Website-Einstellungen des Browsers und schalte es dann wieder ein.';
+
+  @override
+  String get armedStoppedInBackground =>
+      '«Scharf» ist aus, weil die App in den Hintergrund ging oder der Bildschirm gesperrt wurde. Eine laufende Aufnahme wurde gespeichert.';
+
+  @override
+  String get armedStorageFull =>
+      '«Scharf» ist aus, weil der Speicher dieses Browsers voll ist. Eine laufende Aufnahme wurde bis dahin gespeichert.';
+
+  @override
   String get noTrackSelected => 'Kein Titel ausgewählt';
 
   @override
@@ -1539,6 +1559,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get helpRecordingBody =>
       '«Aufnahme» oben rechts startet und stoppt eine Aufnahme. Das Menü daneben wählt die Quelle für dieses Gerät: Systemton (ab macOS 14.2; Player und Metronom sind ausgenommen) oder Mikrofon. Die Aufnahme wird verlustfrei als FLAC gespeichert und erscheint als neuer Titel in der Bibliothek, benannt nach Datum und Uhrzeit. Beim ersten Mal fragt macOS nach der Berechtigung.\n\nScharf: In Üben und Metronom nimmt der Schalter «Scharf» von selbst über das Mikrofon auf. Sobald der Pegel über die Schwelle steigt, beginnt eine Aufnahme, und zwar 1 Sekunde früher; nach einer Pause der eingestellten Länge endet sie. Die Leertaste spielt oder pausiert wie gewohnt und beendet zugleich eine laufende Aufnahme. Danach geht «Scharf» aus; soll es für die nächste Aufnahme scharf bleiben, schalte in seinen Einstellungen «Nach einer Aufnahme ausschalten» aus. Jede Aufnahme landet in der Bibliothek im Ordner Recordings › Datum. Der Pfeil neben dem Schalter stellt Schwelle, Pause und das Ausschalten nach einer Aufnahme ein. Solange «Scharf» an ist, ist «Aufnahme» gesperrt.';
+
+  @override
+  String get helpRecordingBodyBrowser =>
+      '«Aufnahme» oben rechts startet und stoppt eine Aufnahme über das Mikrofon. Die Aufnahme wird verlustfrei als FLAC im Speicher dieses Browsers gesichert und erscheint als neuer Titel in der Bibliothek, benannt nach Datum und Uhrzeit. Beim ersten Mal fragt der Browser, ob diese Website das Mikrofon verwenden darf; wurde es verweigert, erlaube es in den Website-Einstellungen des Browsers. Geht die App in den Hintergrund oder wird der Bildschirm gesperrt, endet die Aufnahme und wird gespeichert; während der Aufnahme bleibt der Bildschirm an.\n\nScharf: In Üben und Metronom nimmt der Schalter «Scharf» von selbst über das Mikrofon auf. Sobald der Pegel über die Schwelle steigt, beginnt eine Aufnahme, und zwar 1 Sekunde früher; nach einer Pause der eingestellten Länge endet sie. Die Leertaste spielt oder pausiert wie gewohnt und beendet zugleich eine laufende Aufnahme. Danach geht «Scharf» aus; soll es für die nächste Aufnahme scharf bleiben, schalte in seinen Einstellungen «Nach einer Aufnahme ausschalten» aus. Jede Aufnahme landet in der Bibliothek im Ordner Recordings › Datum. Der Pfeil neben dem Schalter stellt Schwelle, Pause und das Ausschalten nach einer Aufnahme ein. Solange «Scharf» an ist, ist «Aufnahme» gesperrt; im Hintergrund geht «Scharf» aus.';
 
   @override
   String get helpExportTitle => 'Export als MP3';

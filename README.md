@@ -52,7 +52,7 @@ Slow a track down without changing its pitch, loop the hard bars, practise with 
 - 📈 **Speed trainer.** Start at 60 %, gain 5 % every 10 passes, end at full speed, all on its own.
 - 🥁 **Metronome.** 20–300 BPM, tap tempo, 4/4, 3/4, 2/4 and 6/8, subdivisions down to sixteenths, and an automatic tempo ramp by bars or by time.
 - 📚 **Library.** Folders, playlists, multi-select, drag and drop. Each file is stored once, recognised by its content. Trim the start and end of a track (WAV, FLAC, MP3, AAC, M4A).
-- 🎙️ **Recording (Mac).** Record the system audio or the microphone as lossless FLAC. The recording goes straight into the library, ready to loop. Switch on **Armed** while practising and the next time you play becomes a recording of its own, filed under `Recordings › date`; it can also stay armed so that every phase of playing is recorded.
+- 🎙️ **Recording.** Record the system audio (Mac) or the microphone (Mac and web app) as lossless FLAC. The recording goes straight into the library, ready to loop. Switch on **Armed** while practising and the next time you play becomes a recording of its own, filed under `Recordings › date`; it can also stay armed so that every phase of playing is recorded.
 - ☁️ **Your devices, your choice.** Optional sync through your own Google Drive, using only the files the app creates itself. Without an account, nothing leaves your device.
 - 🌗 **Made to practise with.** Player, Practice and Metronome areas, layouts for desktop, tablet and phone, light and dark, keyboard shortcuts everywhere (press **?** for the overview), built-in help that works offline, English and German following the system language, including the Mac menu bar and the questions the system asks.
 
@@ -62,9 +62,9 @@ All features in detail (in German): [`docs/FUNKTIONEN.md`](docs/FUNKTIONEN.md).
 
 | | How | |
 | --- | --- | --- |
-| **macOS** 14+ | Native app, Apple Silicon and Intel | Recording, MP3 export and command line only here |
-| **iPhone, iPad** | [Web app](https://ingen63.github.io/Woodshed-Player/app/), installable to the home screen | Works offline, lock-screen controls |
-| **Android and everything else** | [Web app](https://ingen63.github.io/Woodshed-Player/app/) in the browser | No installation, no account |
+| **macOS** 14+ | Native app, Apple Silicon and Intel | System-audio recording, MP3 export and command line only here |
+| **iPhone, iPad** | [Web app](https://ingen63.github.io/Woodshed-Player/app/), installable to the home screen | Works offline, lock-screen controls, microphone recording |
+| **Android and everything else** | [Web app](https://ingen63.github.io/Woodshed-Player/app/) in the browser | No installation, no account, microphone recording |
 | **Windows, Linux** | Coming later | Until then: the web app |
 
 ## Installation
@@ -99,7 +99,7 @@ Woodshed Player works **locally**.
 - No account needed, no ads, no analytics, no tracking.
 - No network connection, except for the sync you choose yourself (Google Drive after signing in, or your own paired devices) and loading the web app.
 - Your music and your library stay in the app's private folder, or in the browser's private storage for the web app.
-- The microphone is only used while you record with it or while **Armed** is on; recordings stay on your Mac.
+- The microphone is only used while you record with it or while **Armed** is on; recordings stay on your device (in the web app in the browser's storage) and leave it only through the sync you chose.
 - An automatic check on every push makes sure only the sync code may open connections.
 
 Privacy policy: <https://ingen63.github.io/Woodshed-Player/datenschutz.html> · Terms of use: <https://ingen63.github.io/Woodshed-Player/nutzungsbedingungen.html> · All details (in German): [`docs/FUNKTIONEN.md`](docs/FUNKTIONEN.md#datenschutz-im-detail)

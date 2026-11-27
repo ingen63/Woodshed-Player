@@ -17,7 +17,7 @@ import '../time_format.dart';
 import 'messages.dart';
 import 'style.dart';
 
-export '../app/recording_controller.dart' show Recorder;
+export '../app/recording_controller.dart' show Recorder, RecordingInterruption;
 
 class RecordingButton extends StatefulWidget {
   const RecordingButton({
@@ -110,6 +110,13 @@ class _RecordingButtonState extends State<RecordingButton> {
     final sources = rec.sources;
     final problem = error != null
         ? l.recordingFailed(recordingErrorMessage(l, error))
+        // #157/AK7, AK8: ended by itself in the browser
+        : rec.interruption == RecordingInterruption.background
+        ? l.recordingStoppedInBackground
+        : rec.interruption == RecordingInterruption.storageFull
+        ? l.recordingStorageFull
+        : rec.interruption == RecordingInterruption.failed
+        ? l.recordingFailed(l.recordingErrorFile)
         : rec.microphoneDenied
         // #157/AK6: in the browser the website's permission, not a macOS setting
         ? (kIsWeb

@@ -26,8 +26,10 @@ import 'install_hint.dart';
 import 'library_settings_store.dart';
 import 'practice_arming.dart';
 import 'media_session.dart';
+import 'practice_recording.dart';
 import 'recorder_web.dart';
 import 'recording_controller.dart';
+import '../ui/armed_switch.dart';
 import '../ui/recording_button.dart';
 import 'media_session_web.dart';
 import 'wake_lock.dart';
@@ -89,17 +91,32 @@ Future<AppController> createAppController({
     files: files,
     trimmer: core.trim, // #116: in the core's loader worker
   );
+  RecordingController? recording;
+  PracticeRecording? practice;
   if (recorder != null) {
-    _recordings[controller] = RecordingController(
+    recording = _recordings[controller] = RecordingController(
       app: controller,
       recorder: recorder,
+    );
+    practice = _practice[controller] = PracticeRecording(
+      app: controller,
+      recording: recording,
     );
   }
   if (WebMediaSession.create() case final api?) {
     MediaSessionLink(api, controller); // lives as long as the page
   }
   if (WebWakeLock.create() case final api?) {
-    WakeLockLink(api, controller.player); // lives as long as the page
+    // #157/AK7: also while a recording runs or «Armed» is on
+    WakeLockLink(
+      api,
+      controller.player,
+      recording: recording == null
+          ? null
+          : Listenable.merge([recording, practice]),
+      recordingActive: () =>
+          (recording?.busy ?? false) || (practice?.on ?? false),
+    ); // lives as long as the page
   }
   // #54/AK1: the first frame never waits on keychain, network or sync
   startInBackground(controller);
@@ -120,8 +137,15 @@ Widget? recordingButtonFor(AppController controller) {
       : RecordingButton(controller: controller, recording: recording);
 }
 
-/// #147: no armed practice recording in the browser.
-ArmedSwitchSlot? armedSwitchFor(AppController controller) => null;
+final _practice = Expando<PracticeRecording>();
+
+/// #157/AK4: the switch «Armed» where the browser can record.
+ArmedSwitchSlot? armedSwitchFor(AppController controller) {
+  final practice = _practice[controller];
+  return practice == null
+      ? null
+      : (arming: practice, widget: ArmedSwitch(practice: practice));
+}
 
 @JS('navigator.standalone')
 external bool? get _iosStandalone;

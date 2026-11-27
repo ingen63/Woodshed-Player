@@ -181,6 +181,18 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get recordingMicrophoneSilentBrowser =>
       pseudo(super.recordingMicrophoneSilentBrowser);
   @override
+  String get recordingStoppedInBackground =>
+      pseudo(super.recordingStoppedInBackground);
+  @override
+  String get recordingStorageFull => pseudo(super.recordingStorageFull);
+  @override
+  String get armedMicrophoneDeniedBrowser =>
+      pseudo(super.armedMicrophoneDeniedBrowser);
+  @override
+  String get armedStoppedInBackground => pseudo(super.armedStoppedInBackground);
+  @override
+  String get armedStorageFull => pseudo(super.armedStorageFull);
+  @override
   String get noTrackSelected => pseudo(super.noTrackSelected);
   @override
   String get openFileHintDrop => pseudo(super.openFileHintDrop);
@@ -843,6 +855,8 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get helpRecordingTitle => pseudo(super.helpRecordingTitle);
   @override
   String get helpRecordingBody => pseudo(super.helpRecordingBody);
+  @override
+  String get helpRecordingBodyBrowser => pseudo(super.helpRecordingBodyBrowser);
   @override
   String get helpExportTitle => pseudo(super.helpExportTitle);
   @override

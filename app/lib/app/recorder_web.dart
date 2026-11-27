@@ -8,6 +8,10 @@
 // the stop it is closed unless the next take starts. While it is open the page's audio session is
 // 'play-and-record' (Safari on iPhone records only then), otherwise 'playback' (#158).
 // The getters of [Recorder] are synchronous and read the state the worker last sent (about every 50 ms).
+// AK7: when the page is hidden (another app, locked screen) a running recording ends ([interruption]
+// background; the controller saves it) and the microphone closes; Safari would stop it there anyway.
+// AK8: when the storage is full the worker ends the file with what was stored ([interruption]
+// storageFull).
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
@@ -42,9 +46,13 @@ class WebRecorder with ChangeNotifier implements Recorder {
     this._open, {
     required this.releaseAfter,
     required this.setSession,
+    this.storageLimit,
   }) {
     _worker.onmessage = ((web.MessageEvent e) => _onMessage(e.data)).toJS;
   }
+
+  /// Tests: the worker reports a full storage once the file would grow beyond this many bytes.
+  final int? storageLimit;
 
   /// Folder of the recordings in the page's OPFS, until the library takes them over.
   static const folder = 'WoodshedPlayerRecordings';
@@ -84,6 +92,8 @@ class WebRecorder with ChangeNotifier implements Recorder {
     MicrophoneOpener? open,
     Duration releaseAfter = const Duration(milliseconds: 1500),
     bool Function(AudioSessionType type) setSession = setAudioSessionType,
+    int? storageLimit,
+    bool watchPage = true,
   }) async {
     if (!supported) return null;
     final worker = web.Worker(
@@ -97,11 +107,24 @@ class WebRecorder with ChangeNotifier implements Recorder {
       open ?? _getUserMedia,
       releaseAfter: releaseAfter,
       setSession: setSession,
+      storageLimit: storageLimit,
     );
     final ready = await r._ask('init', [core.wasmModule]);
     if ((ready as JSBoolean?)?.toDart != true) {
       worker.terminate();
       return null;
+    }
+    if (watchPage) {
+      web.document.addEventListener(
+        'visibilitychange',
+        ((web.Event _) {
+          if (web.document.visibilityState == 'hidden') r.pageHidden();
+        }).toJS,
+      );
+      web.window.addEventListener(
+        'pagehide',
+        ((web.Event _) => r.pageHidden()).toJS,
+      );
     }
     return r;
   }
@@ -280,8 +303,26 @@ class WebRecorder with ChangeNotifier implements Recorder {
   bool _silent = true;
   String? _interrupted;
 
-  /// Why the worker stopped by itself ('storage': the storage is full; 'error'); null while it runs.
-  String? get interrupted => _interrupted;
+  /// AK7: the page went to the background: a running recording ends (the controller saves it), the
+  /// microphone closes.
+  void pageHidden() {
+    if (_recording) {
+      _interrupted ??= 'background';
+      notifyListeners();
+    } else {
+      releaseMicrophone();
+    }
+  }
+
+  @override
+  RecordingInterruption? get interruption => !_recording
+      ? null
+      : switch (_interrupted) {
+          'background' => RecordingInterruption.background,
+          'storage' => RecordingInterruption.storageFull,
+          'error' => RecordingInterruption.failed,
+          _ => null,
+        };
 
   @override
   bool sourceAvailable(WpRecSource source) => source == WpRecSource.microphone;
@@ -340,6 +381,7 @@ class WebRecorder with ChangeNotifier implements Recorder {
               'thresholdDb': arming?.thresholdDb ?? 0,
               'silenceSeconds': arming?.silenceSeconds ?? 0,
               'tailSeconds': arming?.tailSeconds ?? 0,
+              'storageLimit': ?storageLimit,
             }.jsify()!
             as JSObject;
     final started = _ask('start', [options, channel.port2], [channel.port2]);

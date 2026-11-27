@@ -18,6 +18,7 @@ import 'package:woodshed_player/app/app_controller.dart';
 import 'package:woodshed_player/app/file_platform_web.dart';
 import 'package:woodshed_player/app/file_store_web.dart';
 import 'package:woodshed_player/app/platform_web.dart';
+import 'package:woodshed_player/app/practice_recording.dart';
 import 'package:woodshed_player/app/recorder_web.dart';
 import 'package:woodshed_player/app/recording_controller.dart';
 import 'package:woodshed_player/app/smoke.dart';
@@ -44,10 +45,13 @@ class SineMicrophone {
   final opened = <JSObject>[];
   web.MediaStream? stream;
 
+  /// Level of the sine; tests schedule phases of sound and silence on it.
+  web.GainNode? gain;
+
   JSPromise<web.MediaStream> open(JSObject constraints) {
     opened.add(constraints);
     final osc = ctx.createOscillator()..frequency.value = 1000;
-    final gain = ctx.createGain()..gain.value = minus12;
+    final gain = this.gain = ctx.createGain()..gain.value = minus12;
     final out = ctx.createMediaStreamDestination();
     osc.connect(gain);
     gain.connect(out);
@@ -63,7 +67,7 @@ JSPromise<web.MediaStream> refused(JSObject constraints) =>
     ).toJS;
 
 Future<(AppController, WebRecorder, RecordingController, SineMicrophone)>
-start({Duration releaseAfter = Duration.zero}) async {
+start({Duration releaseAfter = Duration.zero, int? storageLimit}) async {
   final c = await createAppController();
   final core = c.player.core as WebAudioCore;
   final mic = SineMicrophone(core.context);
@@ -72,6 +76,8 @@ start({Duration releaseAfter = Duration.zero}) async {
     core,
     open: mic.open,
     releaseAfter: releaseAfter,
+    storageLimit: storageLimit,
+    watchPage: false,
     setSession: (t) {
       sessions.add(t);
       return true;
@@ -239,6 +245,101 @@ void main() {
       expect(hint.tooltip, isNot(contains('System Settings')));
       // only the microphone: no source menu
       expect(find.byKey(const Key('recordingSource')), findsNothing);
+    },
+  );
+
+  test('#157/AK4 #157/AK5 «Armed» in the browser: sound starts a take 1 s early, the pause ends it, filed by date', () async {
+    final (c, rec, recording, mic) = await start();
+    await c.library.setArmSettings(thresholdDb: -30, silenceSeconds: 1);
+    final practice = PracticeRecording(app: c, recording: recording);
+    c.setArea(AppArea.metronome);
+    expect(await practice.turnOn(en), isNull);
+    expect(practice.on, isTrue);
+    // the sine is silent for 1.5 s, sounds 1 s, then stays silent
+    final g = mic.gain!.gain;
+    final t0 = (c.player.core as WebAudioCore).context.currentTime;
+    g
+      ..cancelScheduledValues(0)
+      ..setValueAtTime(0, t0)
+      ..setValueAtTime(minus12, t0 + 1.5)
+      ..setValueAtTime(0, t0 + 2.5);
+    expect(
+      await waitFor(practice, () => practice.takeRunning, guard: hangGuard),
+      isTrue,
+    );
+    // the take ends after the pause and is saved
+    expect(await recording.done, isA<RecordingSaved>());
+    // #156: after the take «Armed» goes off by itself
+    expect(practice.on, isFalse);
+    final take = c.library.tracks.single;
+    expect(take.title, matches(RegExp(r'^\d\d:\d\d:\d\d$')));
+    final day = c.library.folders.firstWhere((f) => f.id == take.folderId);
+    expect(day.name, matches(RegExp(r'^\d{4}-\d\d-\d\d$')));
+    final top = c.library.folders.firstWhere((f) => f.id == day.parentId);
+    expect(top.name, recordingsFolder);
+    final bytes = (await c.library.readAudio(take))!;
+    final buffer = await (c.player.core as WebAudioCore).context
+        .decodeAudioData(bytes.buffer.toJS)
+        .toDart;
+    // 1 s lead-in + 1 s sound + 1 s tail
+    expect(buffer.duration, closeTo(3.0, 0.15));
+    final ch = buffer.getChannelData(0).toDart;
+    final first = ch.indexWhere((v) => v.abs() > 0.03);
+    expect(first / buffer.sampleRate, closeTo(1.0, 0.1));
+    expect(
+      await waitFor(rec, () => !rec.microphoneOpen, guard: hangGuard),
+      isTrue,
+    );
+    practice.dispose();
+  });
+
+  test('#157/AK7 in the background a recording ends and is saved, the microphone closes', () async {
+    final (c, rec, recording, _) = await start();
+    expect(await recording.start(en), isNull);
+    expect(
+      await waitFor(recording, () => recording.seconds > 0.5, guard: hangGuard),
+      isTrue,
+    );
+    rec.pageHidden();
+    final outcome = await recording.done!;
+    expect(outcome, isA<RecordingSaved>());
+    expect((outcome as RecordingSaved).track, isNotNull);
+    expect(recording.interruption, RecordingInterruption.background);
+    expect(c.library.tracks, hasLength(1));
+    expect(
+      await waitFor(rec, () => !rec.microphoneOpen, guard: hangGuard),
+      isTrue,
+    );
+  });
+
+  test('#157/AK7 «Armed» goes off in the background with the reason', () async {
+    final (c, rec, recording, _) = await start();
+    final practice = PracticeRecording(app: c, recording: recording);
+    expect(await practice.turnOn(en), isNull);
+    rec.pageHidden();
+    expect(
+      await waitFor(practice, () => !practice.on, guard: hangGuard),
+      isTrue,
+    );
+    expect(practice.problem, PracticeArmProblem.background);
+    expect(c.library.tracks, isEmpty); // it was waiting for sound
+    practice.dispose();
+  });
+
+  test(
+    '#157/AK8 a full storage ends the recording with what was stored',
+    () async {
+      final (c, _, recording, _) = await start(storageLimit: 6000);
+      expect(await recording.start(en), isNull);
+      final outcome = await recording.done!;
+      expect(recording.interruption, RecordingInterruption.storageFull);
+      final track = (outcome as RecordingSaved).track!;
+      final bytes = (await c.library.readAudio(track))!;
+      expect(bytes.length, lessThanOrEqualTo(6000));
+      final buffer = await (c.player.core as WebAudioCore).context
+          .decodeAudioData(bytes.buffer.toJS)
+          .toDart;
+      expect(buffer.duration, greaterThan(0.05));
     },
   );
 }
