@@ -201,6 +201,8 @@ class PseudoLocalizations extends AppLocalizationsEn {
   @override
   String get openFileHintBrowser => pseudo(super.openFileHintBrowser);
   @override
+  String get openFileHintDialog => pseudo(super.openFileHintDialog);
+  @override
   String get openFile => pseudo(super.openFile);
   @override
   String loopLength(double seconds) => pseudo(super.loopLength(seconds));

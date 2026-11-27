@@ -881,12 +881,8 @@ void main() {
           (_) {},
         );
 
-    Future<void> until(bool Function() done) async {
-      for (var i = 0; i < 1000 && !done(); i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 1));
-      }
-      expect(done(), isTrue);
-    }
+    Future<void> until(bool Function() done) =>
+        eventually(done, 'the runner channel answered');
 
     /// The lines the app wrote to connection [id].
     List<String> written(int id) => [
