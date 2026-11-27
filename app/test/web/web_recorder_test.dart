@@ -40,8 +40,12 @@ final sessions = <AudioSessionType>[];
 
 /// A microphone that plays a 1 kHz sine at −12 dBFS; remembers the constraints it was opened with.
 class SineMicrophone {
-  SineMicrophone(this.ctx);
+  SineMicrophone(this.ctx, {this.silent = false});
   final web.AudioContext ctx;
+
+  /// The sine starts silent. Armed tests need this: a sine that sounds until the test schedules its phases
+  /// would start a take of its own on a slow machine.
+  final bool silent;
   final opened = <JSObject>[];
   web.MediaStream? stream;
 
@@ -51,7 +55,8 @@ class SineMicrophone {
   JSPromise<web.MediaStream> open(JSObject constraints) {
     opened.add(constraints);
     final osc = ctx.createOscillator()..frequency.value = 1000;
-    final gain = this.gain = ctx.createGain()..gain.value = minus12;
+    final gain = this.gain = ctx.createGain()
+      ..gain.value = silent ? 0 : minus12;
     final out = ctx.createMediaStreamDestination();
     osc.connect(gain);
     gain.connect(out);
@@ -67,10 +72,14 @@ JSPromise<web.MediaStream> refused(JSObject constraints) =>
     ).toJS;
 
 Future<(AppController, WebRecorder, RecordingController, SineMicrophone)>
-start({Duration releaseAfter = Duration.zero, int? storageLimit}) async {
+start({
+  Duration releaseAfter = Duration.zero,
+  int? storageLimit,
+  bool silentMic = false,
+}) async {
   final c = await createAppController();
   final core = c.player.core as WebAudioCore;
-  final mic = SineMicrophone(core.context);
+  final mic = SineMicrophone(core.context, silent: silentMic);
   sessions.clear();
   final rec = (await WebRecorder.create(
     core,
@@ -249,7 +258,7 @@ void main() {
   );
 
   test('#157/AK4 #157/AK5 «Armed» in the browser: sound starts a take 1 s early, the pause ends it, filed by date', () async {
-    final (c, rec, recording, mic) = await start();
+    final (c, rec, recording, mic) = await start(silentMic: true);
     await c.library.setArmSettings(thresholdDb: -30, silenceSeconds: 1);
     final practice = PracticeRecording(app: c, recording: recording);
     c.setArea(AppArea.metronome);
@@ -313,7 +322,7 @@ void main() {
   });
 
   test('#157/AK7 «Armed» goes off in the background with the reason', () async {
-    final (c, rec, recording, _) = await start();
+    final (c, rec, recording, _) = await start(silentMic: true);
     final practice = PracticeRecording(app: c, recording: recording);
     expect(await practice.turnOn(en), isNull);
     rec.pageHidden();
