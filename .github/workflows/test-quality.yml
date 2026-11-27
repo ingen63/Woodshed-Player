@@ -654,6 +654,8 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Line endings as in the repository (LF), like on Linux and macOS
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # the Git tag of the About dialog (git describe)
@@ -677,7 +679,8 @@ jobs:
           WP_WINDOWS_REQUIRED: '1'  # #60/AK4: the Windows paths must run here
         run: |
           flutter pub get >/dev/null
-          flutter test --reporter failures-only
+          # «repo»: checks of the repository's files and scripts, they run on Linux (dart_test.yaml)
+          flutter test --reporter failures-only --exclude-tags repo
       - name: flutter build windows (#60/AK1, AK2)
         if: ${{ !cancelled() }}
         working-directory: app

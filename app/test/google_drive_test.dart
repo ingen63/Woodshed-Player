@@ -971,6 +971,8 @@ void main() {
     );
 
     test(
+      tags: 'repo', // #60: a check of the repository's files, not on Windows
+
       'engine and providers are reachable only through deferred imports',
       () {
         final direct = {

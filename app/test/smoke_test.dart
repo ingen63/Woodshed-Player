@@ -1,5 +1,10 @@
 // #13/AK5: the flow of the app smoke test (lib/app/smoke.dart) with the fake core; the built app runs
 // it with the real core in tools/smoke_app.sh. Also the generated sine file and the state waiting.
+// #60: «repo» = checks of the repository's files, scripts and workflows (POSIX paths and shells);
+// they run on Linux and macOS, the Windows job leaves them out (--exclude-tags repo).
+@Tags(['repo'])
+library;
+
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';

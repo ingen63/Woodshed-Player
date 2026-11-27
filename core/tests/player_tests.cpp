@@ -767,7 +767,9 @@ void longTitleFromFileReservesOnce() {
   wp::Player p(kLongSr);
   CHECK(p.load(file.string()) == wp::kOk);
   CHECK(p.engine().frames() == kLongFrames);
-  const size_t limit = static_cast<size_t>(kLongFrames + 8192) * 2 * sizeof(float);
+  // #60: plus 64 bytes: MSVC's library asks for a few bytes more for a large aligned block (39 on
+  // x64); a second buffer would be megabytes, not bytes.
+  const size_t limit = static_cast<size_t>(kLongFrames + 8192) * 2 * sizeof(float) + 64;
   if (gLargestAlloc.load() > limit)
     std::printf("  largest allocation %zu bytes, limit %zu\n", gLargestAlloc.load(), limit);
   CHECK(gLargestAlloc.load() <= limit);

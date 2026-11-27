@@ -3,3 +3,6 @@
 tags:
   bench:
     timeout: 5m
+  # #60: checks of the repository's files, scripts and workflows (POSIX paths, shells, file modes);
+  # the Windows job runs `flutter test --exclude-tags repo`, Linux and macOS run them.
+  repo: {}

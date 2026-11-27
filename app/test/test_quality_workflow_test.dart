@@ -1,6 +1,11 @@
 // #57, #10, #58, #13, #59, #11, #64, #77, #67, #79, #89, #83, #88, #99: actionlint, contract native/WASM, sanitizer, fuzzing, random test, network check, checks, web, macOS, UI, bench and mutation runs in
 // .github/workflows/test-quality.yml and the make targets they call. The runs themselves happen on GitHub; this test pins down when they start and what
 // they run. Runs from app/ like the other tests.
+// #60: «repo» = checks of the repository's files, scripts and workflows (POSIX paths and shells);
+// they run on Linux and macOS, the Windows job leaves them out (--exclude-tags repo).
+@Tags(['repo'])
+library;
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -515,7 +520,9 @@ void main() {
           expect(win, contains("WP_AUDIO_BACKEND: 'null'"));
           expect(win, contains("WP_WINDOWS_REQUIRED: '1'"));
           final ctest = win.indexOf('ctest --test-dir core/build -C Release');
-          final dart = win.indexOf('flutter test --reporter failures-only');
+          final dart = win.indexOf(
+            'flutter test --reporter failures-only --exclude-tags repo',
+          );
           final build = win.indexOf('flutter build windows --release');
           final app = win.indexOf(
             'tools/smoke_app.sh app/build/windows/x64/runner/Release/WoodshedPlayer.exe',

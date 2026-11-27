@@ -99,30 +99,38 @@ void main() {
       },
     );
 
-    test('the app imports the sync engine and the providers only deferred', () {
-      final files = {
-        ...reachable('lib/main.dart'),
-        ...reachable('lib/app/platform_native.dart'),
-        ...reachable('lib/app/platform_web.dart'),
-      };
-      expect(files, contains(endsWith('sync/sync_service.dart')));
-      for (final module in [
-        'sync_engine.dart',
-        'cloud_provider.dart',
-        'in_memory_provider.dart',
-      ]) {
-        expect(files.where((f) => f.endsWith(module)), isEmpty, reason: module);
-      }
-      // no HTTP client outside the deferred provider modules (app/lib/sync/providers/, #58)
-      for (final f in files) {
-        final text = File(f).readAsStringSync();
-        expect(
-          text.contains('HttpClient') || text.contains('package:http/'),
-          isFalse,
-          reason: f,
-        );
-      }
-    });
+    test(
+      tags: 'repo', // #60: a check of the repository's files, not on Windows
+      'the app imports the sync engine and the providers only deferred',
+      () {
+        final files = {
+          ...reachable('lib/main.dart'),
+          ...reachable('lib/app/platform_native.dart'),
+          ...reachable('lib/app/platform_web.dart'),
+        };
+        expect(files, contains(endsWith('sync/sync_service.dart')));
+        for (final module in [
+          'sync_engine.dart',
+          'cloud_provider.dart',
+          'in_memory_provider.dart',
+        ]) {
+          expect(
+            files.where((f) => f.endsWith(module)),
+            isEmpty,
+            reason: module,
+          );
+        }
+        // no HTTP client outside the deferred provider modules (app/lib/sync/providers/, #58)
+        for (final f in files) {
+          final text = File(f).readAsStringSync();
+          expect(
+            text.contains('HttpClient') || text.contains('package:http/'),
+            isFalse,
+            reason: f,
+          );
+        }
+      },
+    );
   });
 
   group('#37 triggers are connected', () {

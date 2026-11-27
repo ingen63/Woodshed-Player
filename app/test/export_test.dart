@@ -313,13 +313,14 @@ void main() {
         for (final t in [a, b, c]) {
           lib.editMetadata(t.id, title: 'Same', artist: null);
         }
-        File('${out.path}/same.MP3')
-            .writeAsBytesSync([0]); // another case: the same name on macOS
+        File('${out.path}/same.MP3').writeAsBytesSync([
+          0,
+        ]); // another case: the same name on macOS and Windows (#60)
         final r = await exporter().run(
           [a, b, c].map((t) => lib.track(t.id)!).toList(),
           out.path,
         );
-        final names = Platform.isMacOS
+        final names = Platform.isMacOS || Platform.isWindows
             ? ['Same (2).mp3', 'Same (3).mp3', 'Same (4).mp3']
             : ['Same.mp3', 'Same (2).mp3', 'Same (3).mp3'];
         expect(r.exported, names);

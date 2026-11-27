@@ -42,21 +42,25 @@ void main() {
   setUp(() => KeyboardPresence.instance.value = false);
 
   group('#30/AK1 Theme an einer Stelle', () {
-    test('keine Farbwerte ausserhalb von ui/style.dart', () {
-      final offenders = <String>[];
-      final colorLiteral = RegExp(r'\bColors\.|\bColor\(|Color\.from');
-      for (final f in Directory('lib').listSync(recursive: true)) {
-        if (f is! File || !f.path.endsWith('.dart')) continue;
-        if (f.path.endsWith('ui/style.dart')) continue;
-        final lines = f.readAsLinesSync();
-        for (var i = 0; i < lines.length; i++) {
-          if (colorLiteral.hasMatch(lines[i])) {
-            offenders.add('${f.path}:${i + 1}');
+    test(
+      tags: 'repo', // #60: a check of the repository's files, not on Windows
+      'keine Farbwerte ausserhalb von ui/style.dart',
+      () {
+        final offenders = <String>[];
+        final colorLiteral = RegExp(r'\bColors\.|\bColor\(|Color\.from');
+        for (final f in Directory('lib').listSync(recursive: true)) {
+          if (f is! File || !f.path.endsWith('.dart')) continue;
+          if (f.path.endsWith('ui/style.dart')) continue;
+          final lines = f.readAsLinesSync();
+          for (var i = 0; i < lines.length; i++) {
+            if (colorLiteral.hasMatch(lines[i])) {
+              offenders.add('${f.path}:${i + 1}');
+            }
           }
         }
-      }
-      expect(offenders, isEmpty);
-    });
+        expect(offenders, isEmpty);
+      },
+    );
 
     test('ThemeExtension in beiden Helligkeiten', () {
       for (final b in Brightness.values) {

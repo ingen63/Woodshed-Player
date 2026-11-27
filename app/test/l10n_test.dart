@@ -217,24 +217,28 @@ void main() {
     // positions; log and error messages of the code are no UI positions either.
     const excluded = <String, String>{};
 
-    test('#144/AK4 every folder under lib/ is checked', () {
-      final folders = Directory('lib')
-          .listSync()
-          .whereType<Directory>()
-          .map((d) => d.path)
-          .where((d) => d != 'lib/l10n');
-      for (final d in folders) {
-        expect(
-          files.where((f) => f.path.startsWith('$d/')),
-          isNotEmpty,
-          reason: d,
-        );
-      }
-      expect(files.map((f) => f.path), contains('lib/main.dart'));
-      for (final f in excluded.keys) {
-        expect(File(f).existsSync(), isTrue, reason: 'excluded: $f');
-      }
-    });
+    test(
+      tags: 'repo', // #60: a check of the repository's files, not on Windows
+      '#144/AK4 every folder under lib/ is checked',
+      () {
+        final folders = Directory('lib')
+            .listSync()
+            .whereType<Directory>()
+            .map((d) => d.path)
+            .where((d) => d != 'lib/l10n');
+        for (final d in folders) {
+          expect(
+            files.where((f) => f.path.startsWith('$d/')),
+            isNotEmpty,
+            reason: d,
+          );
+        }
+        expect(files.map((f) => f.path), contains('lib/main.dart'));
+        for (final f in excluded.keys) {
+          expect(File(f).existsSync(), isTrue, reason: 'excluded: $f');
+        }
+      },
+    );
 
     test('#144/AK4 the pattern finds fixed texts in both kinds of quotes', () {
       for (final hit in [

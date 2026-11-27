@@ -1,5 +1,10 @@
 // #84: Dropbox is dropped (docs/KONZEPT-SYNC.md). Code and plan no longer announce it as a provider.
 // Same scope as `grep -ri dropbox app docs`; runs from app/ like the other tests.
+// #60: «repo» = checks of the repository's files, scripts and workflows (POSIX paths and shells);
+// they run on Linux and macOS, the Windows job leaves them out (--exclude-tags repo).
+@Tags(['repo'])
+library;
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';

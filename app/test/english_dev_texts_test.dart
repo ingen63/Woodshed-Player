@@ -4,6 +4,11 @@
 // (without third_party and the closed W0 feasibility test) for umlauts, «ß» and common German words. In app/test
 // only `reason:` texts are scanned, because test names and test data may stay German. UI texts live in the ARB
 // files and are not scanned. Run again with: cd app && flutter test test/english_dev_texts_test.dart
+// #60: «repo» = checks of the repository's files, scripts and workflows (POSIX paths and shells);
+// they run on Linux and macOS, the Windows job leaves them out (--exclude-tags repo).
+@Tags(['repo'])
+library;
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';

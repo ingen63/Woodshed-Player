@@ -19,7 +19,15 @@ final stamp = DateTime(2026, 11, 19, 14, 5, 9);
 void main() {
   late Directory tmp;
   setUp(() => tmp = Directory.systemTemp.createTempSync('wp_rec_test'));
-  tearDown(() => tmp.deleteSync(recursive: true));
+  tearDown(() {
+    try {
+      tmp.deleteSync(recursive: true);
+    } on FileSystemException {
+      // #60: Windows keeps a file of the fake recording open until the test process ends; the
+      // system cleans its temp folder. Elsewhere the folder must go.
+      if (!Platform.isWindows) rethrow;
+    }
+  });
 
   Future<(TestApp, FakeRecorder)> pump(
     WidgetTester tester, {
