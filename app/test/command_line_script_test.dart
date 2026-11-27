@@ -17,7 +17,16 @@ void main() {
     expect(text, contains('set -- --help'));
     // #145: the feature table moved to docs/FUNKTIONEN.md; both READMEs keep a short section.
     final features = File('../docs/FUNKTIONEN.md').readAsStringSync();
-    expect(features, contains('| Kommandozeile (nur Mac, #140) |'));
+    expect(
+      features,
+      contains('| Kommandozeile (#140; Windows und Linux nur `play`, #60) |'),
+    );
+    // #60: Windows (WoodshedPlayer.com) and Linux in both READMEs
+    for (final name in ['README.md', 'README.de.md']) {
+      final readme = File('../$name').readAsStringSync();
+      expect(readme, contains('WoodshedPlayer play --title'), reason: name);
+      expect(readme, contains('./woodshed-player play --title'), reason: name);
+    }
     for (final name in ['README.md', 'README.de.md', 'docs/FUNKTIONEN.md']) {
       final readme = File('../$name').readAsStringSync();
       expect(
