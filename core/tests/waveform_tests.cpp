@@ -100,21 +100,54 @@ void invalidRangesFail() { // #28/AK4
   CHECK(p.query(0.0, 2.0, 4, mins, maxs)); // genau die Dauer ist erlaubt
 }
 
-void overviewIsFast() { // #28/AK5: 5 Minuten, 1000 Werte, auf dem Mac unter 200 ms
+// #159: the fastest of up to `runs` timings of `work` in ms. Stops as soon as one run is under
+// `limitMs`, so a single run slowed by parallel load (other builds) no longer fails the limit,
+// while a computation that is slow every time still does.
+double bestTimeMs(int runs, double limitMs, const std::function<void()> &work) {
+  double best = 1e300;
+  for (int i = 0; i < runs && best >= limitMs; ++i) {
+    const auto t0 = std::chrono::steady_clock::now();
+    work();
+    const auto t1 = std::chrono::steady_clock::now();
+    best = std::min(best, std::chrono::duration<double, std::milli>(t1 - t0).count());
+  }
+  return best;
+}
+
+constexpr int kTimingRuns = 5;
+constexpr double kBuildLimitMs = 200.0;
+constexpr double kQueryLimitMs = 20.0;
+
+// #28/AK5: 5 minutes, 1000 values, under 200 ms on the Mac.
+// #159/AK1: best of up to 5 runs against the unchanged limits, robust under parallel load.
+void overviewIsFast() {
   const auto v = sine(300.0, 0.5);
-  const auto t0 = std::chrono::steady_clock::now();
-  const auto p = peaksOf(v); // beim Laden, im Lade-Thread
+  const double build = bestTimeMs(kTimingRuns, kBuildLimitMs, [&] {
+    const auto p = peaksOf(v); // while loading, in the loading thread
+  });
+  const auto p = peaksOf(v);
   std::vector<float> mins(1000), maxs(1000);
   CHECK(p.query(0.0, p.duration(), 1000, mins.data(), maxs.data()));
-  const auto t1 = std::chrono::steady_clock::now();
-  CHECK(p.query(0.0, p.duration(), 1000, mins.data(), maxs.data()));
-  const auto t2 = std::chrono::steady_clock::now();
-  const double build = std::chrono::duration<double, std::milli>(t1 - t0).count();
-  const double query = std::chrono::duration<double, std::milli>(t2 - t1).count();
+  const double query = bestTimeMs(kTimingRuns, kQueryLimitMs, [&] {
+    p.query(0.0, p.duration(), 1000, mins.data(), maxs.data());
+  });
   std::printf("  5 min: computed while loading %.1f ms, overview of 1000 values %.2f ms\n", build,
               query);
-  CHECK(!kTimingChecks || build < 200.0);
-  CHECK(!kTimingChecks || query < 20.0);
+  CHECK(!kTimingChecks || build < kBuildLimitMs);
+  CHECK(!kTimingChecks || query < kQueryLimitMs);
+}
+
+// #159/AK2: a real regression is still caught. A computation ten times slower (the same overview
+// built ten times in a row, about 350 ms here) stays over the limit in every one of the 5 runs.
+void tenTimesSlowerOverviewFails() {
+  const auto v = sine(300.0, 0.5);
+  const double slow = bestTimeMs(kTimingRuns, kBuildLimitMs, [&] {
+    for (int i = 0; i < 10; ++i) {
+      const auto p = peaksOf(v);
+    }
+  });
+  std::printf("  5 min, ten times slower: %.1f ms\n", slow);
+  CHECK(!kTimingChecks || slow >= kBuildLimitMs);
 }
 
 } // namespace
@@ -206,6 +239,7 @@ int main() {
       {"clipsToRange", clipsToRange},
       {"invalidRangesFail", invalidRangesFail},
       {"overviewIsFast", overviewIsFast},
+      {"tenTimesSlowerOverviewFails", tenTimesSlowerOverviewFails},
       {"noAudioHasNoOverview", noAudioHasNoOverview},
   };
   for (auto &[name, fn] : tests) {
