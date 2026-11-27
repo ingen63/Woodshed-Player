@@ -10,7 +10,8 @@
 //      [localSocketFileProblem]).
 //   2. app/pubspec.lock contains no package from [blockedPackages] (analytics, crash reports, ads,
 //      remote configuration); exact package names.
-//   3. The C++ core (core/src, core/include) has no network calls or headers. core/third_party is never read.
+//   3. The C++ core (core/src, core/include) and the runners of Windows and Linux (#60) have no network
+//      calls or headers. core/third_party is never read.
 //      #140: the command line client connects to the app's Unix domain socket; lines marked with
 //      [localSocketMarker] are allowed in a file that uses AF_UNIX and nothing of IP.
 //   4. The web app (app/web/index.html) has a Content Security Policy whose connect-src is exactly
@@ -52,8 +53,14 @@ const shippedWebFiles = [
   'core/web/wp_worklet.js',
 ];
 
-/// Folders of the C++ core that are checked.
-const coreDirs = ['core/src', 'core/include'];
+/// Folders of the C++ core that are checked; #60: also the runners of Windows and Linux (the command
+/// line's socket on Windows lives in the runner).
+const coreDirs = [
+  'core/src',
+  'core/include',
+  'app/windows/runner',
+  'app/linux/runner',
+];
 
 const _appExtensions = {'.dart', '.js', '.mjs', '.html'};
 const _coreExtensions = {'.c', '.cc', '.cpp', '.h', '.hpp', '.m', '.mm'};

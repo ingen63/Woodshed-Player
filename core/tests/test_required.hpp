@@ -10,6 +10,14 @@
 #include <cstdlib>
 #include <cstring>
 
+#ifdef _WIN32
+// #60: the POSIX names the tests use for the environment, on Windows (MSVC has _putenv_s only).
+inline int setenv(const char *name, const char *value, int /*overwrite*/) {
+  return _putenv_s(name, value);
+}
+inline int unsetenv(const char *name) { return _putenv_s(name, ""); }
+#endif
+
 namespace wptest {
 
 constexpr const char *kAudioDeviceRequired = "WP_AUDIO_DEVICE_REQUIRED";

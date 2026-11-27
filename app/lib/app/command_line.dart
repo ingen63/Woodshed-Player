@@ -202,7 +202,7 @@ class CommandHandler {
   ) async {
     final rec = recording;
     if (rec == null) {
-      o.err('Recording is not available on this platform.');
+      o.err('Recording is not supported on this platform.');
       return CliExit.failed;
     }
     // #147/AK11: «Armed» holds the microphone while it is on.

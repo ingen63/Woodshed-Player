@@ -101,6 +101,36 @@ void errorMessagesAndFileDuration() {
   CHECK(wp_file_duration("") == WP_ERR_INVALID_ARGUMENT);
 }
 
+// #60/AK4: a path with umlauts and spaces, in UTF-8 as Dart passes it. On Windows the core opens it
+// as UTF-16 (wp_decoder_init_file); a narrow path there is the ANSI code page and would not open.
+void unicodePath() {
+  const fs::path top =
+      fs::temp_directory_path() /
+      ("wp_capi_tests_60_" + std::to_string(std::random_device{}()) + "_" +
+       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+  const fs::path dir = top / fs::u8path(u8"\u00dcbungen Caf\u00e9");
+  std::error_code ec;
+  fs::create_directories(dir, ec);
+  const fs::path file = dir / fs::u8path(u8"\u00c4rger \u00f6\u00fc \u00df.flac");
+  fs::copy_file(kSine, file, fs::copy_options::overwrite_existing, ec);
+  CHECK(!ec);
+  const std::string utf8 = file.u8string();
+  CHECK_NEAR(wp_file_duration(utf8.c_str()), 1.0, 1e-6);
+  CHECK(wp_file_duration((dir.u8string() + "/missing \u00e4.flac").c_str()) ==
+        WP_ERR_FILE_NOT_FOUND);
+  wp_player *p = wp_create();
+  CHECK(p != nullptr);
+  if (p) {
+    wp_set_volume(p, 0.0f);
+    const int r = wp_load(p, utf8.c_str());
+    CHECK(r == WP_OK || (!nullBackend && r == WP_ERR_DEVICE_UNAVAILABLE));
+    if (r == WP_OK)
+      CHECK_NEAR(wp_duration(p), 1.0, 1e-3);
+    wp_destroy(p);
+  }
+  fs::remove_all(top, ec);
+}
+
 void mp3ExportWithoutEncoder() {
   // #141: the MP3 export of wp_core without LAME (the encoding is tested in mp3_export_tests)
   CHECK(wp_mp3_available("/nonexistent/libmp3lame.dylib") == 0);
@@ -323,6 +353,7 @@ int main(int argc, char **argv) {
   const std::vector<std::pair<std::string, std::function<void()>>> tests = {
       {"nullHandleIsSafe", nullHandleIsSafe},
       {"errorMessagesAndFileDuration", errorMessagesAndFileDuration},
+      {"unicodePath", unicodePath},
       {"mp3ExportWithoutEncoder", mp3ExportWithoutEncoder},
       {"pathEndingInDot", pathEndingInDot},
       {"loadAndTransport", loadAndTransport},

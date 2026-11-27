@@ -500,7 +500,96 @@ void main() {
     'property',
     'bench',
     'mutants-diff',
+    'windows', // #60
+    'linux', // #60
   ];
+
+  group(
+    '#60/AK2, AK3 Windows and Linux nightly: builds, tests, smoke tests',
+    () {
+      test(
+        'windows: core with MSVC and ctest, Dart tests, build, smoke tests',
+        () {
+          final win = job(workflow, 'windows');
+          expect(win, contains('runs-on: windows-latest'));
+          expect(win, contains("WP_AUDIO_BACKEND: 'null'"));
+          expect(win, contains("WP_WINDOWS_REQUIRED: '1'"));
+          final ctest = win.indexOf('ctest --test-dir core/build -C Release');
+          final dart = win.indexOf('flutter test --reporter failures-only');
+          final build = win.indexOf('flutter build windows --release');
+          final app = win.indexOf(
+            'tools/smoke_app.sh app/build/windows/x64/runner/Release/WoodshedPlayer.exe',
+          );
+          final cli = win.indexOf(
+            'tools/smoke_cli.sh app/build/windows/x64/runner/Release/WoodshedPlayer.com',
+          );
+          expect([ctest, dart, build, app, cli], everyElement(isNot(-1)));
+          expect(build, greaterThan(dart));
+          expect(app, greaterThan(build));
+          expect(cli, greaterThan(app));
+        },
+      );
+
+      test('linux: build and both smoke tests in xvfb', () {
+        final linux = job(workflow, 'linux');
+        expect(linux, contains('runs-on: ubuntu-latest'));
+        expect(linux, contains('libgtk-3-dev'));
+        final build = linux.indexOf('flutter build linux --release');
+        final app = linux.indexOf(
+          'xvfb-run -a tools/smoke_app.sh app/build/linux/x64/release/bundle/woodshed-player',
+        );
+        final cli = linux.indexOf(
+          'xvfb-run -a tools/smoke_cli.sh app/build/linux/x64/release/bundle/woodshed-player',
+        );
+        expect([build, app, cli], everyElement(isNot(-1)));
+        expect(app, greaterThan(build));
+      });
+
+      test('by hand with desktop=true only these two jobs run', () {
+        expect(workflow, contains('      desktop:\n'));
+        for (final name in ['windows', 'linux']) {
+          expect(
+            job(workflow, name),
+            contains(
+              "(github.event_name == 'workflow_dispatch' && inputs.desktop)",
+            ),
+          );
+        }
+        for (final name in [
+          'checks',
+          'web',
+          'sanitize',
+          'contract',
+          'network-free',
+        ]) {
+          expect(
+            job(workflow, name),
+            contains(
+              "(github.event_name == 'workflow_dispatch' && !inputs.desktop)",
+            ),
+            reason: name,
+          );
+        }
+      });
+
+      test(
+        'the smoke scripts take the program of the Windows and Linux build',
+        () {
+          final app = read('../tools/smoke_app.sh');
+          expect(app, contains('WP_SMOKE=1 "\$bin"'));
+          expect(app, contains('*) bin="\$app" ;;'));
+          final cli = read('../tools/smoke_cli.sh');
+          for (final text in [
+            'No title "Smoke CLI missing" in the library.',
+            'Recording is not supported on this platform.',
+            'taskkill //IM WoodshedPlayer.exe',
+          ]) {
+            expect(cli, contains(text));
+          }
+        },
+      );
+    },
+  );
 
   group('#13/AK3 checks on Linux on every push with a code change', () {
     test('changes reports code and web changes', () {

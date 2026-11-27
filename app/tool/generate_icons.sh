@@ -15,9 +15,9 @@
 #   Linux    assets/icons/generated/linux/app_icon_<px>.png
 #   Web      web/favicon.png, web/icons/Icon-{120,192,512}.png, Icon-maskable-{192,512}.png
 #
-# Android, Windows und Linux haben im Projekt noch keinen Ordner. Die Dateien landen
-# deshalb unter assets/icons/generated/ und werden beim Anlegen dieser Plattformen
-# (flutter create --platforms=…) an die richtige Stelle kopiert.
+# Android hat im Projekt noch keinen Ordner, die Dateien landen unter assets/icons/generated/.
+# Windows und Linux (#60) bekommen ihre Icons zusätzlich in windows/runner/resources/ und
+# linux/runner/.
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -131,7 +131,8 @@ for s, blob in zip(sizes, blobs):
     offset += len(blob)
 open(out, "wb").write(header + entries + b"".join(blobs))
 PY
-echo "Windows: $WIN/app_icon.ico"
+cp "$WIN/app_icon.ico" "$APP_DIR/windows/runner/resources/app_icon.ico"  # #60
+echo "Windows: $WIN/app_icon.ico, windows/runner/resources/app_icon.ico"
 
 # --- Linux -----------------------------------------------------------------
 LIN="$GEN/linux"
@@ -139,7 +140,8 @@ mkdir -p "$LIN"
 for px in 64 128 256 512; do
   resize "$MASTER" "$px" "$LIN/app_icon_$px.png"
 done
-echo "Linux: $LIN"
+cp "$LIN/app_icon_256.png" "$APP_DIR/linux/runner/app_icon.png"  # #60, window icon
+echo "Linux: $LIN, linux/runner/app_icon.png"
 
 # --- Web -------------------------------------------------------------------
 WEB="$APP_DIR/web"

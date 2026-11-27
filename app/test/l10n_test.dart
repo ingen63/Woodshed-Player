@@ -294,6 +294,15 @@ void main() {
         expect(openFileHint(l, HintPlatform.mobile), l.openFileHintFiles);
         expect(emptyLibraryHint(l, HintPlatform.macOS), l.emptyLibraryHintDrop);
         expect(emptyLibraryHint(l, HintPlatform.mobile), l.emptyLibraryHint);
+        // #60: Windows and Linux: the file dialog, no dragging and no «Files».
+        expect(openFileHint(l, HintPlatform.desktop), l.openFileHintDialog);
+        expect(emptyLibraryHint(l, HintPlatform.desktop), l.emptyLibraryHint);
+        for (final h in [l.openFileHintDialog, l.emptyLibraryHint]) {
+          expect(
+            h,
+            isNot(contains(locale.languageCode == 'de' ? 'zieh' : 'drag')),
+          );
+        }
         // The browser: its file picker, neither «Files» nor dragging.
         final hints = [
           openFileHint(l, HintPlatform.browser),

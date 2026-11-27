@@ -21,6 +21,7 @@ import '../ui/armed_switch.dart';
 import '../ui/recording_button.dart';
 import 'app_controller.dart';
 import 'app_start.dart';
+import 'command_channel.dart';
 import 'command_line.dart';
 import 'command_server.dart';
 import 'file_platform.dart';
@@ -64,11 +65,12 @@ Future<AppController> createAppController({
   );
   await metronome.restore();
   final playerService = PlayerService(WpAudioCore(player));
-  // #54: Google Drive on the desktop; on iPhone and iPad only in the web app. Without a choice NoSync.
+  // #54: Google Drive on the Mac; on iPhone and iPad only in the web app; on Windows and Linux not
+  // yet (#161: the token store there). Without a choice NoSync.
   final cloud = CloudAccount(
     library: library,
     chooseFolders: true,
-    loadGoogle: Platform.isIOS || baseDir != null
+    loadGoogle: !googleOnThisPlatform || baseDir != null
         ? null
         : () async {
             await google.loadLibrary();
@@ -103,12 +105,20 @@ Future<AppController> createAppController({
   );
   // #54/AK1: the first frame never waits on keychain, network or sync
   startInBackground(controller);
-  // #140: the command line of the desktop app; not in the smoke test (own folder)
-  if (Platform.isMacOS && baseDir == null) {
+  // #140: the command line of the desktop app (#60: also Windows and Linux); not in the smoke test
+  // (own folder)
+  if (commandLineOnThisPlatform && baseDir == null) {
     unawaited(startCommandLine(controller));
   }
   return controller;
 }
+
+/// #54, #161: Google Drive is offered on the Mac only (Windows and Linux follow with #161).
+bool get googleOnThisPlatform => Platform.isMacOS;
+
+/// #140, #60: the desktop app has a command line on macOS, Windows and Linux.
+bool get commandLineOnThisPlatform =>
+    Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 
 /// #141: LAME inside the app: `Woodshed Player.app/Contents/Frameworks/libmp3lame.dylib`.
 String bundledLamePath() =>
@@ -155,17 +165,18 @@ Widget? recordingButtonFor(AppController controller) => WpRecorder.available
     : null;
 
 /// #140: listens for the command line on the socket file the platform names; none, no listening.
-Future<CommandServer?> startCommandLine(AppController controller) async {
+/// #60: on Windows the runner listens and hands the lines over a channel (command_channel.dart).
+Future<Object?> startCommandLine(AppController controller) async {
   final path = await controller.files.commandSocket();
   if (path == null) return null;
-  return CommandServer.start(
-    path,
-    CommandHandler(
-      app: controller,
-      recording: recordingFor(controller),
-      texts: systemTexts,
-    ),
+  final handler = CommandHandler(
+    app: controller,
+    recording: recordingFor(controller),
+    texts: systemTexts,
   );
+  return Platform.isWindows
+      ? ChannelCommandServer.start(path, handler)
+      : CommandServer.start(path, handler);
 }
 
 /// Texts in the first system language the app has, otherwise English (as the app, #43/AK3).

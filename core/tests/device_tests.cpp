@@ -19,6 +19,7 @@
 
 // NOLINTNEXTLINE(bugprone-suspicious-include): on purpose, see above
 #include "../src/player.cpp"
+#include "test_required.hpp" // #60: setenv and unsetenv on Windows
 
 namespace fs = std::filesystem;
 

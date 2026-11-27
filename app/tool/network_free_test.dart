@@ -412,6 +412,22 @@ void main() {
         'core/include/wp.h:1',
       ]);
     });
+
+    test('#60: the runners of Windows and Linux are checked too', () {
+      final dir = _stage({
+        'app/windows/runner/net.cpp': '#include <ws2tcpip.h>\n',
+        'app/linux/runner/net.cc': 'int s = socket(AF_INET, SOCK_STREAM, 0);\n',
+        // the command line's socket of the Windows runner, AF_UNIX with markers (command_bridge.cpp)
+        'app/windows/runner/bridge.cpp':
+            '#include <winsock2.h> // network-free: local unix socket\n'
+            '// network-free: local unix socket (AF_UNIX)\n'
+            'SOCKET s = ::socket(AF_UNIX, SOCK_STREAM, 0);\n',
+      });
+      expect(_where(checkRepository(dir.path).findings), [
+        'app/windows/runner/net.cpp:1',
+        'app/linux/runner/net.cc:1',
+      ]);
+    });
   });
 
   group('#58/AK4 Content Security Policy of the web app', () {

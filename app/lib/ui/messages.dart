@@ -19,19 +19,23 @@ extension L10nContext on BuildContext {
 }
 
 /// Where the app runs, for hints that say how files come in (#42/AK4).
-enum HintPlatform { browser, macOS, mobile }
+/// #60: Windows and Linux open files with the file dialog only (no dragging into the window yet).
+enum HintPlatform { browser, macOS, desktop, mobile }
 
 HintPlatform get currentHintPlatform => kIsWeb
     ? HintPlatform.browser
     : Platform.isMacOS
     ? HintPlatform.macOS
+    : Platform.isWindows || Platform.isLinux
+    ? HintPlatform.desktop
     : HintPlatform.mobile;
 
 /// Hint in the player without a track: drag into the window on macOS, «Files» on iPhone/iPad, the
-/// browser's file picker on the web.
+/// browser's file picker on the web, the file dialog on Windows and Linux.
 String openFileHint(AppLocalizations l, HintPlatform p) => switch (p) {
   HintPlatform.browser => l.openFileHintBrowser,
   HintPlatform.macOS => l.openFileHintDrop,
+  HintPlatform.desktop => l.openFileHintDialog,
   HintPlatform.mobile => l.openFileHintFiles,
 };
 
@@ -39,7 +43,7 @@ String openFileHint(AppLocalizations l, HintPlatform p) => switch (p) {
 String emptyLibraryHint(AppLocalizations l, HintPlatform p) => switch (p) {
   HintPlatform.browser => l.emptyLibraryHintBrowser,
   HintPlatform.macOS => l.emptyLibraryHintDrop,
-  HintPlatform.mobile => l.emptyLibraryHint,
+  HintPlatform.desktop || HintPlatform.mobile => l.emptyLibraryHint,
 };
 
 /// Bytes with one decimal from KB on, in the locale's notation: «512 B», «1,2 GB» (de), «1.2 GB» (en).

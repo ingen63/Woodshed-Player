@@ -129,12 +129,12 @@ std::unique_ptr<PcmReader> openMiniaudio(const char *path, int &code) {
   }
   auto r = std::make_unique<MiniaudioReader>();
   ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 0, 0);
-  ma_result res = ma_decoder_init_file(path, &cfg, &r->decoder);
+  ma_result res = wp_decoder_init_file(path, &cfg, &r->decoder);
   if (res == MA_SUCCESS && r->decoder.outputChannels > 2) {
     // more than two channels: mixed to stereo by miniaudio
     ma_decoder_uninit(&r->decoder);
     cfg = ma_decoder_config_init(ma_format_f32, 2, 0);
-    res = ma_decoder_init_file(path, &cfg, &r->decoder);
+    res = wp_decoder_init_file(path, &cfg, &r->decoder);
   }
   if (res != MA_SUCCESS) {
     code = res == MA_DOES_NOT_EXIST ? kErrFileNotFound : kErrUnsupportedFormat;

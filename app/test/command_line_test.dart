@@ -4,10 +4,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:woodshed_player/app/command_channel.dart';
 import 'package:woodshed_player/app/command_line.dart';
 import 'package:woodshed_player/app/command_server.dart';
 import 'package:woodshed_player/app/recording_controller.dart';
@@ -590,7 +591,7 @@ void main() {
           await none.run(record(), o2, Completer<void>().future),
           CliExit.failed,
         );
-        expect(o2.stderr, ['Recording is not available on this platform.']);
+        expect(o2.stderr, ['Recording is not supported on this platform.']);
       },
     );
   });
@@ -647,87 +648,98 @@ void main() {
     );
   });
 
-  group('socket', () {
-    late String path;
-    CommandServer? server;
-    setUp(() {
-      // short: a socket path holds at most 103 bytes, the temp folder of macOS is long
-      path =
-          '/tmp/wp_cli_${pid}_${DateTime.now().microsecondsSinceEpoch % 1000000}.sock';
-    });
-    tearDown(() async {
-      await server?.close();
-      server = null;
-    });
+  // #60: dart:io has no Unix domain sockets on Windows; there the runner's channel carries the lines
+  // (group «channel» below).
+  group(
+    'socket',
+    skip: Platform.isWindows
+        ? 'no Unix domain sockets in dart:io on Windows'
+        : false,
+    () {
+      late String path;
+      CommandServer? server;
+      setUp(() {
+        // short: a socket path holds at most 103 bytes, the temp folder of macOS is long
+        path =
+            '/tmp/wp_cli_${pid}_${DateTime.now().microsecondsSinceEpoch % 1000000}.sock';
+      });
+      tearDown(() async {
+        await server?.close();
+        server = null;
+      });
 
-    /// One call of the program: sends [lines], returns what the app answers until it closes.
-    Future<List<String>> call(
-      List<String> lines, {
-      FutureOr<void> Function(List<String> got, Socket s)? onLine,
-    }) async {
-      final s = await Socket.connect(
-        InternetAddress(path, type: InternetAddressType.unix),
-        0,
-      );
-      for (final l in lines) {
-        s.write('$l\n');
+      /// One call of the program: sends [lines], returns what the app answers until it closes.
+      Future<List<String>> call(
+        List<String> lines, {
+        FutureOr<void> Function(List<String> got, Socket s)? onLine,
+      }) async {
+        final s = await Socket.connect(
+          InternetAddress(path, type: InternetAddressType.unix),
+          0,
+        );
+        for (final l in lines) {
+          s.write('$l\n');
+        }
+        final got = <String>[];
+        await for (final l
+            in s
+                .cast<List<int>>()
+                .transform(utf8.decoder)
+                .transform(const LineSplitter())) {
+          got.add(l);
+          await onLine?.call(got, s);
+        }
+        s.destroy();
+        return got;
       }
-      final got = <String>[];
-      await for (final l
-          in s
-              .cast<List<int>>()
-              .transform(utf8.decoder)
-              .transform(const LineSplitter())) {
-        got.add(l);
-        await onLine?.call(got, s);
-      }
-      s.destroy();
-      return got;
-    }
 
-    test('#140/AK1, AK3, AK19: a request over the local socket is answered line by line', () async {
-      server = await CommandServer.start(path, handler);
-      expect(server, isNotNull);
-      expect(
-        FileSystemEntity.typeSync(path),
-        FileSystemEntityType.unixDomainSock,
-      );
-      final got = await call([
-        '{"version":1,"command":"play","title":"Solar","artist":"Trio"}',
-      ]);
-      expect(got, ['err No title "Solar" by Trio in the library.', 'exit 1']);
-      await add('Solar', 'Trio');
-      final played = call(['{"version":1,"command":"play","title":"solar"}']);
-      await eventually(() {
-        app.finishLoads();
-        return app.player.isPlaying;
-      }, 'playing');
-      expect(await played, ['out Playing "Solar" by Trio.', 'exit 0']);
-    });
+      test('#140/AK1, AK3, AK19: a request over the local socket is answered line by line', () async {
+        server = await CommandServer.start(path, handler);
+        expect(server, isNotNull);
+        expect(
+          FileSystemEntity.typeSync(path),
+          FileSystemEntityType.unixDomainSock,
+        );
+        final got = await call([
+          '{"version":1,"command":"play","title":"Solar","artist":"Trio"}',
+        ]);
+        expect(got, ['err No title "Solar" by Trio in the library.', 'exit 1']);
+        await add('Solar', 'Trio');
+        final played = call(['{"version":1,"command":"play","title":"solar"}']);
+        await eventually(() {
+          app.finishLoads();
+          return app.player.isPlaying;
+        }, 'playing');
+        expect(await played, ['out Playing "Solar" by Trio.', 'exit 0']);
+      });
 
-    test('#140/AK14: the line «stop» is Ctrl-C, other lines are not', () async {
-      server = await CommandServer.start(path, handler);
-      final got = await call(
-        ['{"version":1,"command":"record","title":"T"}'],
-        onLine: (got, s) async {
-          if (got.length != 1) return;
-          s.write('hello\n');
-          await s.flush();
-          const ticks = Duration(milliseconds: 50);
-          // «hello» must not stop it
-          await Future<void>.delayed(ticks); // absence: no stop
-          expect(recording.phase, RecordingPhase.armed);
-          s.write(' stop \n');
+      test(
+        '#140/AK14: the line «stop» is Ctrl-C, other lines are not',
+        () async {
+          server = await CommandServer.start(path, handler);
+          final got = await call(
+            ['{"version":1,"command":"record","title":"T"}'],
+            onLine: (got, s) async {
+              if (got.length != 1) return;
+              s.write('hello\n');
+              await s.flush();
+              const ticks = Duration(milliseconds: 50);
+              // «hello» must not stop it
+              await Future<void>.delayed(ticks); // absence: no stop
+              expect(recording.phase, RecordingPhase.armed);
+              s.write(' stop \n');
+            },
+          );
+          expect(got.first, startsWith('out Armed:'));
+          expect(got.skip(1), [
+            'err Cancelled, nothing was recorded.',
+            'exit 130',
+          ]);
+          expect(app.library.tracks, isEmpty);
         },
       );
-      expect(got.first, startsWith('out Armed:'));
-      expect(got.skip(1), ['err Cancelled, nothing was recorded.', 'exit 130']);
-      expect(app.library.tracks, isEmpty);
-    });
 
-    test(
-      '#140/AK14: a program that goes away (closed terminal) counts as Ctrl-C',
-      () async {
+      test('#140/AK14: a program that goes away (closed terminal) counts as Ctrl-C', () async {
         server = await CommandServer.start(path, handler);
         final s = await Socket.connect(
           InternetAddress(path, type: InternetAddressType.unix),
@@ -744,52 +756,52 @@ void main() {
           'cancelled',
         );
         expect(app.library.tracks, isEmpty);
-      },
-    );
+      });
 
-    test('#140/AK14: a connection reset by the program (Linux) is no unhandled error', () async {
-      final input = StreamController<Uint8List>();
-      final client = _ResetSocket(input.stream);
-      final served = CommandServer.serve(client, handler);
-      input.add(utf8.encode('{"version":1,"command":"record"}\n'));
-      await eventually(() => recording.phase == RecordingPhase.armed, 'armed');
-      await input.close();
-      await served;
-      expect(recording.phase, RecordingPhase.idle);
-      expect(client.written.last, 'exit ${CliExit.cancelled}\n');
-    });
+      test('#140/AK14: a connection reset by the program (Linux) is no unhandled error', () async {
+        final input = StreamController<Uint8List>();
+        final client = _ResetSocket(input.stream);
+        final served = CommandServer.serve(client, handler);
+        input.add(utf8.encode('{"version":1,"command":"record"}\n'));
+        await eventually(
+          () => recording.phase == RecordingPhase.armed,
+          'armed',
+        );
+        await input.close();
+        await served;
+        expect(recording.phase, RecordingPhase.idle);
+        expect(client.written.last, 'exit ${CliExit.cancelled}\n');
+      });
 
-    test('#140: a request the app does not understand ends with a message and code 2', () async {
-      server = await CommandServer.start(path, handler);
-      expect(await call(['not json']), [
-        'err The app did not understand the request; are the app and the command the same version?',
-        'exit 2',
-      ]);
-      expect(await call(['{"version":9,"command":"play"}']), hasLength(2));
-      // a program that sends nothing and closes
-      final s = await Socket.connect(
-        InternetAddress(path, type: InternetAddressType.unix),
-        0,
-      );
-      await s.close();
-      s.destroy();
-    });
+      test('#140: a request the app does not understand ends with a message and code 2', () async {
+        server = await CommandServer.start(path, handler);
+        expect(await call(['not json']), [
+          'err The app did not understand the request; are the app and the command the same version?',
+          'exit 2',
+        ]);
+        expect(await call(['{"version":9,"command":"play"}']), hasLength(2));
+        // a program that sends nothing and closes
+        final s = await Socket.connect(
+          InternetAddress(path, type: InternetAddressType.unix),
+          0,
+        );
+        await s.close();
+        s.destroy();
+      });
 
-    test('#140: messages with line breaks become several lines', () async {
-      server = await CommandServer.start(path, handler);
-      await add('Solar', 'Trio');
-      await add('Solar', 'Quartet');
-      final got = await call([
-        '{"version":1,"command":"play","title":"Solar"}',
-      ]);
-      expect(got.first, 'err 2 titles match; add --artist to choose one:');
-      expect(got, hasLength(4));
-      expect(got.last, 'exit 1');
-    });
+      test('#140: messages with line breaks become several lines', () async {
+        server = await CommandServer.start(path, handler);
+        await add('Solar', 'Trio');
+        await add('Solar', 'Quartet');
+        final got = await call([
+          '{"version":1,"command":"play","title":"Solar"}',
+        ]);
+        expect(got.first, 'err 2 titles match; add --artist to choose one:');
+        expect(got, hasLength(4));
+        expect(got.last, 'exit 1');
+      });
 
-    test(
-      '#140/AK16: a socket file left by an earlier run is replaced',
-      () async {
+      test('#140/AK16: a socket file left by an earlier run is replaced', () async {
         // A crashed app leaves its socket file behind (a process that ends without removing it).
         final r = Process.runSync('python3', [
           '-c',
@@ -810,30 +822,159 @@ void main() {
         await server!.close();
         server = null;
         expect(FileSystemEntity.typeSync(path), FileSystemEntityType.notFound);
+      });
+
+      test(
+        '#140: no socket where the path is too long or taken by a file',
+        () async {
+          final long = '/tmp/${'x' * 120}.sock';
+          expect(await CommandServer.start(long, handler), isNull);
+          // 103 bytes is the longest path that fits, 104 does not
+          final stem = '/tmp/wp${pid}_${DateTime.now().microsecondsSinceEpoch}';
+          final fits = '$stem${'x' * (maxSocketPath - 5 - stem.length)}.sock';
+          expect(fits.length, maxSocketPath);
+          server = await CommandServer.start(fits, handler);
+          expect(server, isNotNull);
+          await server!.close();
+          server = null;
+          expect(await CommandServer.start('${fits}x', handler), isNull);
+          File(path).writeAsStringSync('not a socket');
+          expect(await CommandServer.start(path, handler), isNull);
+          expect(
+            File(path).readAsStringSync(),
+            'not a socket',
+          ); // never deleted
+          File(path).deleteSync();
+          expect(maxSocketPath, 103);
+        },
+      );
+    },
+  );
+
+  group('channel (Windows, #60)', () {
+    const channel = MethodChannel('woodshed/test_commands');
+    late List<MethodCall> sent;
+    late Object? listenAnswer;
+    late TestDefaultBinaryMessenger messenger;
+    setUp(() {
+      messenger =
+          TestWidgetsFlutterBinding.ensureInitialized().defaultBinaryMessenger;
+      sent = [];
+      listenAnswer = true;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        sent.add(call);
+        return call.method == 'listen' ? listenAnswer : null;
+      });
+    });
+    tearDown(() {
+      messenger.setMockMethodCallHandler(channel, null);
+      channel.setMethodCallHandler(null);
+    });
+
+    /// A message of the runner to Dart.
+    Future<void> fromRunner(String method, Object? args) =>
+        messenger.handlePlatformMessage(
+          channel.name,
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall(method, args),
+          ),
+          (_) {},
+        );
+
+    Future<void> until(bool Function() done) async {
+      for (var i = 0; i < 1000 && !done(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(done(), isTrue);
+    }
+
+    /// The lines the app wrote to connection [id].
+    List<String> written(int id) => [
+      for (final c in sent)
+        if (c.method == 'write' && (c.arguments as Map)['id'] == id)
+          (c.arguments as Map)['text'] as String,
+    ];
+
+    test('#60/AK3, #140/AK1: a request over the runner\'s channel is answered line by line', () async {
+      final s = await ChannelCommandServer.start(
+        r'C:\Users\Jörg\AppData\Local\WoodshedPlayer\wp-cli.sock',
+        handler,
+        channel: channel,
+      );
+      expect(s, isNotNull);
+      expect(sent.single.method, 'listen');
+      expect(
+        sent.single.arguments,
+        r'C:\Users\Jörg\AppData\Local\WoodshedPlayer\wp-cli.sock',
+      );
+      await fromRunner('open', 7);
+      await fromRunner('open', 8);
+      expect(s!.openConnections, 2);
+      await fromRunner('line', {
+        'id': 7,
+        'text':
+            '{"version":1,"command":"play","title":"Solar","artist":"Trio"}',
+      });
+      await until(() => sent.any((c) => c.method == 'close'));
+      expect(written(7), [
+        'err No title "Solar" by Trio in the library.',
+        'exit 1',
+      ]);
+      expect(sent.last.method, 'close');
+      expect(sent.last.arguments, 7);
+      await fromRunner('closed', 7);
+      expect(s.openConnections, 1);
+      // a request the app does not understand; lines of unknown connections are dropped
+      await fromRunner('line', {'id': 99, 'text': 'garbage'});
+      await fromRunner('line', {'id': 8, 'text': 'garbage'});
+      await until(() => written(8).length == 2);
+      expect(written(8), [
+        'err The app did not understand the request; are the app and the command the same version?',
+        'exit 2',
+      ]);
+      expect(written(99), isEmpty);
+      // malformed messages of the runner change nothing
+      await fromRunner('open', 'x');
+      await fromRunner('line', 'x');
+      await fromRunner('closed', 'x');
+      await fromRunner('unknown', null);
+      expect(s.openConnections, 1);
+    });
+
+    test(
+      '#60: a program that goes away before its request ends the conversation',
+      () async {
+        final s = await ChannelCommandServer.start(
+          'p',
+          handler,
+          channel: channel,
+        );
+        await fromRunner('open', 3);
+        await fromRunner('closed', 3);
+        await until(() => sent.any((c) => c.method == 'close'));
+        expect(s!.openConnections, 0);
+        expect(written(3).last, 'exit 2');
       },
     );
 
-    test(
-      '#140: no socket where the path is too long or taken by a file',
-      () async {
-        final long = '/tmp/${'x' * 120}.sock';
-        expect(await CommandServer.start(long, handler), isNull);
-        // 103 bytes is the longest path that fits, 104 does not
-        final stem = '/tmp/wp${pid}_${DateTime.now().microsecondsSinceEpoch}';
-        final fits = '$stem${'x' * (maxSocketPath - 5 - stem.length)}.sock';
-        expect(fits.length, maxSocketPath);
-        server = await CommandServer.start(fits, handler);
-        expect(server, isNotNull);
-        await server!.close();
-        server = null;
-        expect(await CommandServer.start('${fits}x', handler), isNull);
-        File(path).writeAsStringSync('not a socket');
-        expect(await CommandServer.start(path, handler), isNull);
-        expect(File(path).readAsStringSync(), 'not a socket'); // never deleted
-        File(path).deleteSync();
-        expect(maxSocketPath, 103);
-      },
-    );
+    test('#60: no command line when the runner cannot listen', () async {
+      listenAnswer = false;
+      expect(
+        await ChannelCommandServer.start('p', handler, channel: channel),
+        isNull,
+      );
+      listenAnswer = null;
+      expect(
+        await ChannelCommandServer.start('p', handler, channel: channel),
+        isNull,
+      );
+      // a runner without the channel (MissingPluginException)
+      messenger.setMockMethodCallHandler(channel, null);
+      expect(
+        await ChannelCommandServer.start('p', handler, channel: channel),
+        isNull,
+      );
+    });
   });
 }
 

@@ -325,6 +325,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Open an MP3, WAV or FLAC file with the browser\'s file picker.';
 
   @override
+  String get openFileHintDialog => 'Open an MP3, WAV or FLAC file.';
+
+  @override
   String get openFile => 'Open file';
 
   @override

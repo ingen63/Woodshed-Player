@@ -19,7 +19,11 @@
 # - bench: performance and load tests of core and library (make bench, #59), values in the run summary.
 # - mutants-diff: mutation tests (Mull for the core, own mutator for the Dart logic) of the lines changed
 #   since the last successful nightly run (#11); a not detected mutant fails the job.
-# By hand (workflow_dispatch): the push jobs; with nightly=true also every nightly job, gate or not.
+# - windows: core with MSVC and its tests, the Dart tests, `flutter build windows` and smoke tests of
+#   the built app and its command line (#60). linux: `flutter build linux` and the same smoke tests in
+#   xvfb (#60); core and Dart tests run on Linux in «checks».
+# By hand (workflow_dispatch): the push jobs; with nightly=true also every nightly job, gate or not;
+# with desktop=true only the jobs windows and linux (#60).
 # Nightly runs have their own concurrency group: a push never cancels them (#13/AK8).
 # The checks for changed paths live in the job «changes».
 # #125: a job that provides a resource sets its WP_<RESOURCE>_REQUIRED to 1, so a test that needs it
@@ -35,7 +39,11 @@ on:
   workflow_dispatch:
     inputs:
       nightly:
-        description: 'Also run every nightly job (macOS/iOS, UI tests, app smoke test, TSan, fuzzing, random tests, mutation tests)'
+        description: 'Also run every nightly job (macOS/iOS, Windows, Linux, UI tests, app smoke tests, TSan, fuzzing, random tests, mutation tests)'
+        type: boolean
+        default: false
+      desktop:
+        description: 'Only the Windows and Linux jobs (#60): builds, tests and smoke tests'
         type: boolean
         default: false
 
@@ -93,7 +101,7 @@ jobs:
     needs: changes
     # after «changes» on push, and on manual start (then «changes» is skipped)
     if: >-
-      !cancelled() && (github.event_name == 'workflow_dispatch'
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && !inputs.desktop)
       || (github.event_name == 'push' && needs.changes.outputs.code == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -226,7 +234,7 @@ jobs:
     name: Web build and web tests in Chrome (#13/AK4)
     needs: changes
     if: >-
-      !cancelled() && (github.event_name == 'workflow_dispatch'
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && !inputs.desktop)
       || (github.event_name == 'push' && needs.changes.outputs.web == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -261,7 +269,7 @@ jobs:
     needs: changes
     # runs after «changes» on push, and on manual start (then «changes» is skipped)
     if: >-
-      !cancelled() && (github.event_name == 'workflow_dispatch'
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && !inputs.desktop)
       || (github.event_name == 'push' && needs.changes.outputs.core == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -281,7 +289,7 @@ jobs:
     needs: changes
     # after «changes» on push, and on manual start (then «changes» is skipped)
     if: >-
-      !cancelled() && (github.event_name == 'workflow_dispatch'
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && !inputs.desktop)
       || (github.event_name == 'push' && needs.changes.outputs.core == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -316,7 +324,7 @@ jobs:
   network-free:
     name: Network freedom (#58)
     # every push, no path filter: any file can bring network code; and on manual start
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.desktop)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -628,3 +636,81 @@ jobs:
             local/mutants/diff/results.json
             local/mutants/diff/core/*.log
           if-no-files-found: ignore
+
+  windows:
+    name: Windows build, core and Dart tests, smoke tests (#60)
+    needs: nightly-gate
+    # nightly after the gate, by hand with nightly=true or desktop=true (then the gate is skipped)
+    if: >-
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.nightly)
+      || (github.event_name == 'workflow_dispatch' && inputs.desktop)
+      || (github.event_name == 'schedule' && needs.nightly-gate.outputs.run == 'true'))
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      # GitHub's Windows runners have no audio device: the core plays to its silent null device
+      WP_AUDIO_BACKEND: 'null'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # the Git tag of the About dialog (git describe)
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Core with MSVC and its tests (#60/AK2, AK4)
+        run: |
+          cmake -S core -B core/build -A x64 >/dev/null
+          # shell bash runs with pipefail: a failed build fails the step
+          cmake --build core/build --config Release --parallel 4 2>&1 | tail -40
+          ctest --test-dir core/build -C Release --output-on-failure
+      - name: Tests of the Dart logic (#60/AK2, AK4)
+        working-directory: app
+        env:
+          WP_WINDOWS_REQUIRED: '1'  # #60/AK4: the Windows paths must run here
+        run: |
+          flutter pub get >/dev/null
+          flutter test --reporter failures-only
+      - name: flutter build windows (#60/AK1, AK2)
+        working-directory: app
+        run: flutter build windows --release
+      - name: Smoke test of the built app (#60/AK3)
+        run: tools/smoke_app.sh app/build/windows/x64/runner/Release/WoodshedPlayer.exe
+      - name: Smoke test of the command line (#60, #140)
+        run: tools/smoke_cli.sh app/build/windows/x64/runner/Release/WoodshedPlayer.com
+
+  linux:
+    name: Linux build, smoke tests in xvfb (#60)
+    needs: nightly-gate
+    # nightly after the gate, by hand with nightly=true or desktop=true (then the gate is skipped)
+    if: >-
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.nightly)
+      || (github.event_name == 'workflow_dispatch' && inputs.desktop)
+      || (github.event_name == 'schedule' && needs.nightly-gate.outputs.run == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # no audio device on the runner: the core plays to its silent null device
+      WP_AUDIO_BACKEND: 'null'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # the Git tag of the About dialog (git describe)
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: GTK, Ninja and xvfb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build libgtk-3-dev xvfb >/dev/null
+      - name: flutter build linux (#60/AK1, AK2)
+        working-directory: app
+        run: |
+          flutter pub get >/dev/null
+          flutter build linux --release
+      - name: Smoke test of the built app in xvfb (#60/AK3)
+        run: xvfb-run -a tools/smoke_app.sh app/build/linux/x64/release/bundle/woodshed-player
+      - name: Smoke test of the command line in xvfb (#60, #140)
+        run: xvfb-run -a tools/smoke_cli.sh app/build/linux/x64/release/bundle/woodshed-player

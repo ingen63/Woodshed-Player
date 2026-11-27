@@ -118,7 +118,7 @@ public:
 
   ma_result init(const std::string &path, const ma_decoder_config &cfg, ma_decoder &dec) {
     if (path.empty() || path.back() != '.')
-      return ma_decoder_init_file(path.c_str(), &cfg, &dec);
+      return wp_decoder_init_file(path.c_str(), &cfg, &dec);
     ma_default_vfs vfs;
     if (ma_result r = ma_default_vfs_init(&vfs, nullptr); r != MA_SUCCESS)
       return r;

@@ -86,6 +86,7 @@
   "openFileHintDrop": "Öffne eine MP3-, WAV- oder FLAC-Datei oder zieh sie ins Fenster.",
   "openFileHintFiles": "Öffne eine MP3-, WAV- oder FLAC-Datei aus «Dateien».",
   "openFileHintBrowser": "Öffne eine MP3-, WAV- oder FLAC-Datei über die Dateiauswahl des Browsers.",
+  "openFileHintDialog": "Öffne eine MP3-, WAV- oder FLAC-Datei.",
   "openFile": "Datei öffnen",
   "loopLength": "{seconds} s",
   "loopPass": "Durchgang {current} von {total}",

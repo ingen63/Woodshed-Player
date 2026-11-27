@@ -614,6 +614,12 @@ abstract class AppLocalizations {
   /// **'Open an MP3, WAV or FLAC file with the browser\'s file picker.'**
   String get openFileHintBrowser;
 
+  /// No description provided for @openFileHintDialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Open an MP3, WAV or FLAC file.'**
+  String get openFileHintDialog;
+
   /// No description provided for @openFile.
   ///
   /// In en, this message translates to:

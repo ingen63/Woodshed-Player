@@ -8,8 +8,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Statische Teile landen in der geteilten Bibliothek wp_core (Linux, Android).
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Plattformen: macOS und iOS werden gebaut und getestet; Windows, Linux und Android sind konfiguriert
-# (Bau dort in #13). iOS: cmake -S core -B core/build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS
+# Platforms: macOS, iOS, Windows and Linux are built and tested (#60, Windows with MSVC); Android is
+# configured only. iOS: cmake -S core -B core/build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS
 # Android: cmake -S core -B core/build-android -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26
 # Web (#33): emcmake cmake -S core -B core/build-wasm -DCMAKE_BUILD_TYPE=Release && cmake --build core/build-wasm
 #   && ctest --test-dir core/build-wasm   (Tests laufen unter Node.js, Ergebnis: wp_core_web.wasm fürs AudioWorklet)
@@ -210,14 +210,17 @@ wp_strict_warnings(wp_streamrec)
 wp_mutate(wp_streamrec)
 
 # #140: command line of the desktop app (wp_cli.h): arguments, help, the conversation with the
-# running app; the transport is a Unix domain socket on macOS and Linux (Windows follows with #60).
+# running app; the transport is a Unix domain socket (#60: on Windows through Winsock, cli_win.cpp).
 # Linked into the app's program by the Flutter plugin, not into wp_core.
-if(NOT WIN32)
+if(WIN32)
+  add_library(wp_cli STATIC src/cli.cpp src/cli_win.cpp)
+  target_link_libraries(wp_cli PUBLIC ws2_32)
+else()
   add_library(wp_cli STATIC src/cli.cpp src/cli_posix.cpp)
-  target_include_directories(wp_cli PUBLIC include src)
-  wp_strict_warnings(wp_cli)
-  wp_mutate(wp_cli)
 endif()
+target_include_directories(wp_cli PUBLIC include src)
+wp_strict_warnings(wp_cli)
+wp_mutate(wp_cli)
 
 # #141: MP3 export; LAME is loaded at run time (dlopen), never linked. Apple devices read M4A/AAC
 # through ExtAudioFile; elsewhere miniaudio reads MP3, WAV and FLAC.
@@ -226,6 +229,8 @@ if(APPLE)
 else()
   set(WP_MP3_READER src/mp3_reader_stub.cpp)
 endif()
+# #60: not on Windows (no MP3 export there, the C API answers with mp3_api_stub.cpp).
+if(NOT WIN32)
 add_library(wp_mp3 STATIC src/mp3_export.cpp ${WP_MP3_READER})
 target_include_directories(wp_mp3 PUBLIC include src)
 target_link_libraries(wp_mp3 PUBLIC wp_miniaudio ${CMAKE_DL_LIBS})
@@ -235,6 +240,7 @@ if(APPLE)
 endif()
 wp_strict_warnings(wp_mp3)
 wp_mutate(wp_mp3)
+endif()
 
 # Kern mit C-API (wp_core.h)
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -242,9 +248,17 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
 else()
   set(WP_RECORDER src/recorder_stub.cpp)
 endif()
-add_library(wp_core SHARED src/player.cpp src/trim_api.cpp src/mp3_api.cpp ${WP_RECORDER})
+if(WIN32)
+  set(WP_MP3_API src/mp3_api_stub.cpp)
+else()
+  set(WP_MP3_API src/mp3_api.cpp)
+endif()
+add_library(wp_core SHARED src/player.cpp src/trim_api.cpp ${WP_MP3_API} ${WP_RECORDER})
 target_include_directories(wp_core PUBLIC include)
-target_link_libraries(wp_core PRIVATE wp_playercore wp_trim wp_mp3)
+target_link_libraries(wp_core PRIVATE wp_playercore wp_trim)
+if(NOT WIN32)
+  target_link_libraries(wp_core PRIVATE wp_mp3)
+endif()
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   target_link_libraries(wp_core PRIVATE wp_reccore)
 endif()
@@ -292,19 +306,25 @@ add_test(NAME player_tests COMMAND player_tests)
 
 # #68: recording without an audio device (ring buffer, WAV file, level, tap layouts); #113: FLAC
 # file loaded again by the core (wp_playercore), microphone on the null backend
-add_executable(recorder_tests tests/recorder_tests.cpp)
-target_link_libraries(recorder_tests PRIVATE wp_reccore wp_playercore)
-wp_strict_warnings(recorder_tests)
-add_test(NAME recorder_tests COMMAND recorder_tests)
+# #60: POSIX only (sys/resource.h); the Windows app records nothing yet (#162)
+if(NOT WIN32)
+  add_executable(recorder_tests tests/recorder_tests.cpp)
+  target_link_libraries(recorder_tests PRIVATE wp_reccore wp_playercore)
+  wp_strict_warnings(recorder_tests)
+  add_test(NAME recorder_tests COMMAND recorder_tests)
+endif()
 
 # #140: armed recording, sound and silence detection with generated sine and silence
 # #141: MP3 export with LAME from local/lame (tools/build-lame.sh) or WP_LAME_PATH
-add_executable(mp3_export_tests tests/mp3_export_tests.cpp src/mp3_api.cpp)
-target_link_libraries(mp3_export_tests PRIVATE wp_mp3 wp_playercore)
-target_compile_definitions(mp3_export_tests
-                           PRIVATE WP_LAME_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../local/lame")
-wp_strict_warnings(mp3_export_tests)
-add_test(NAME mp3_export_tests COMMAND mp3_export_tests)
+# #60: not on Windows (no MP3 export there)
+if(NOT WIN32)
+  add_executable(mp3_export_tests tests/mp3_export_tests.cpp src/mp3_api.cpp)
+  target_link_libraries(mp3_export_tests PRIVATE wp_mp3 wp_playercore)
+  target_compile_definitions(mp3_export_tests
+                             PRIVATE WP_LAME_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../local/lame")
+  wp_strict_warnings(mp3_export_tests)
+  add_test(NAME mp3_export_tests COMMAND mp3_export_tests)
+endif()
 
 add_executable(sound_gate_tests tests/sound_gate_tests.cpp)
 target_link_libraries(sound_gate_tests PRIVATE wp_reccore wp_playercore)
@@ -333,6 +353,8 @@ wp_strict_warnings(trim_tests)
 add_test(NAME trim_tests COMMAND trim_tests)
 
 # #120: trimming MP4/M4A; on Apple platforms the results are also decoded by the system decoder
+# #60: POSIX only (mkstemp)
+if(NOT WIN32)
 add_executable(trim_mp4_tests tests/trim_mp4_tests.cpp src/trim_api.cpp)
 target_link_libraries(trim_mp4_tests PRIVATE wp_trim)
 if(APPLE)
@@ -341,6 +363,7 @@ endif()
 target_compile_definitions(trim_mp4_tests PRIVATE WP_TEST_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/audio")
 wp_strict_warnings(trim_mp4_tests)
 add_test(NAME trim_mp4_tests COMMAND trim_mp4_tests)
+endif()
 
 # #61: the device shell (src/player.cpp) compiled into the test itself, on the null device
 add_executable(device_tests tests/device_tests.cpp)
@@ -361,17 +384,23 @@ add_test(NAME capi_tests COMMAND capi_tests)
 add_test(NAME capi_null_backend_tests COMMAND capi_tests --null-backend)
 
 # #57/AK4: no allocation and no blocking lock in the render path (Player::render)
-add_executable(realtime_tests tests/realtime_tests.cpp)
-target_link_libraries(realtime_tests PRIVATE wp_playercore ${CMAKE_DL_LIBS})
-wp_strict_warnings(realtime_tests)
-add_test(NAME realtime_tests COMMAND realtime_tests)
+# #60: POSIX only (replaces malloc through dlsym)
+if(NOT WIN32)
+  add_executable(realtime_tests tests/realtime_tests.cpp)
+  target_link_libraries(realtime_tests PRIVATE wp_playercore ${CMAKE_DL_LIBS})
+  wp_strict_warnings(realtime_tests)
+  add_test(NAME realtime_tests COMMAND realtime_tests)
+endif()
 
 # #59: performance and load tests (make bench, nightly). Always built, so format, lint and the
 # compiler see them; registered only with WP_BENCH=ON and the label «bench», so ctest in make test
 # never runs them. They write a 605 MiB WAV to the temp folder and need about 1.5 GiB of memory.
-add_executable(bench_tests tests/bench_tests.cpp)
-target_link_libraries(bench_tests PRIVATE wp_playercore)
-wp_strict_warnings(bench_tests)
+# #60: POSIX only (getrusage), the measurements run on Linux
+if(NOT WIN32)
+  add_executable(bench_tests tests/bench_tests.cpp)
+  target_link_libraries(bench_tests PRIVATE wp_playercore)
+  wp_strict_warnings(bench_tests)
+endif()
 option(WP_BENCH "Register the performance and load tests (#59)" OFF)
 if(WP_BENCH)
   add_test(NAME bench_stretch COMMAND bench_tests stretch)
