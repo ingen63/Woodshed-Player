@@ -663,8 +663,11 @@ jobs:
       - name: Core with MSVC and its tests (#60/AK2, AK4)
         run: |
           cmake -S core -B core/build -A x64 >/dev/null
-          # shell bash runs with pipefail: a failed build fails the step
-          cmake --build core/build --config Release --parallel 4 2>&1 | tail -40
+          # on failure only the compiler's error lines (MSVC: «error C…», linker: «error LNK…»)
+          if ! cmake --build core/build --config Release --parallel 4 >"$RUNNER_TEMP/core-build.log" 2>&1; then
+            grep -E "error|warning C4" "$RUNNER_TEMP/core-build.log" | head -80
+            exit 1
+          fi
           ctest --test-dir core/build -C Release --output-on-failure
       - name: Tests of the Dart logic (#60/AK2, AK4)
         working-directory: app

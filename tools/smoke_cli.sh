@@ -44,7 +44,8 @@ expect "record is not supported" 1 'Recording is not supported on this platform.
 # end the app the command started
 case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) taskkill //IM WoodshedPlayer.exe //F >/dev/null 2>&1 ;;
-  *) pkill -f "$(basename "$prog")" >/dev/null 2>&1 ;;
+  # by process name: the command line of this script names the program too
+  *) pkill -x "$(basename "$prog")" >/dev/null 2>&1 || true ;;
 esac
 rm -f "$out" "$err"
 if [ "$failed" -ne 0 ]; then
