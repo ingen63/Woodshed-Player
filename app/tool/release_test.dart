@@ -121,8 +121,26 @@ void main() {
         contains('tools/package.sh web "\$TAG" dist'),
       );
       final release = job(workflow, 'release');
-      expect(release, contains("-name '*.dmg' -o -name '*.zip'"));
-      expect(release, contains('test "\$(find dist -type f | wc -l)" -eq 2'));
+      expect(
+        release,
+        contains("-name '*.dmg' -o -name '*.zip' -o -name '*.tar.gz'"),
+      );
+      expect(release, contains('test "\$(find dist -type f | wc -l)" -eq 4'));
+    });
+
+    test('#60: builds the Windows .zip and the Linux .tar.gz (x64)', () {
+      final windows = job(workflow, 'windows');
+      expect(windows, contains('runs-on: windows-latest'));
+      expect(windows, contains('flutter build windows --release'));
+      expect(windows, contains('tools/package.sh windows "\$TAG" dist'));
+      final linux = job(workflow, 'linux');
+      expect(linux, contains('runs-on: ubuntu-latest'));
+      expect(linux, contains('libgtk-3-dev'));
+      expect(linux, contains('flutter build linux --release'));
+      expect(linux, contains('tools/package.sh linux "\$TAG" dist'));
+      for (final j in [windows, linux]) {
+        expect(j, contains('fetch-depth: 0'));
+      }
     });
 
     test('the web app is built like the one on GitHub Pages', () {
@@ -166,15 +184,24 @@ void main() {
         package(['name', 'web', 'v1.0.0-beta.2']).stdout,
         'WoodshedPlayer-1.0.0-beta.2-web.zip\n',
       );
+      // #60
+      expect(
+        package(['name', 'windows', 'v1.0.0']).stdout,
+        'WoodshedPlayer-1.0.0-windows.zip\n',
+      );
+      expect(
+        package(['name', 'linux', 'v1.0.0']).stdout,
+        'WoodshedPlayer-1.0.0-linux.tar.gz\n',
+      );
     });
 
     test('no name without a version tag or for an unknown platform', () {
       final noTag = package(['name', 'macos', '0.9.0']);
       expect(noTag.exitCode, 1);
       expect(noTag.stderr, contains("tag '0.9.0' is not vX.Y.Z"));
-      final platform = package(['name', 'linux', 'v0.9.0']);
+      final platform = package(['name', 'android', 'v0.9.0']);
       expect(platform.exitCode, 1);
-      expect(platform.stderr, contains("unknown platform 'linux'"));
+      expect(platform.stderr, contains("unknown platform 'android'"));
     });
   });
 
@@ -253,6 +280,73 @@ void main() {
         job(workflow, 'web'),
         contains('--dart-define=WP_GIT_TAG="\$TAG"'),
       );
+    });
+  });
+
+  group('#60 #139/AK4 Windows and Linux packages refuse a wrong build', () {
+    Directory build(Map<String, String> files) {
+      final dir = Directory.systemTemp.createTempSync('wp_desktop_build_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      files.forEach((name, text) {
+        File('${dir.path}/$name')
+          ..createSync(recursive: true)
+          ..writeAsStringSync(text);
+      });
+      return dir;
+    }
+
+    test('without the tag in the program or the version in the Dart code', () {
+      final out = Directory.systemTemp.createTempSync('wp_release_');
+      addTearDown(() => out.deleteSync(recursive: true));
+      final noTag = package([
+        'linux',
+        'v0.9.0',
+        out.path,
+        build({'woodshed-player': 'x', 'lib/libapp.so': '0.9.0'}).path,
+      ]);
+      expect(noTag.exitCode, 1);
+      expect(
+        noTag.stderr,
+        contains('linux: tag v0.9.0 not in woodshed-player'),
+      );
+      final oldVersion = package([
+        'windows',
+        'v0.9.0',
+        out.path,
+        build({'WoodshedPlayer.exe': 'v0.9.0', 'data/app.so': '0.8.2'}).path,
+      ]);
+      expect(oldVersion.exitCode, 1);
+      expect(
+        oldVersion.stderr,
+        contains('windows: version 0.9.0 not in app.so'),
+      );
+      expect(out.listSync(), isEmpty);
+    });
+
+    test('a program that is not x64', () {
+      final out = Directory.systemTemp.createTempSync('wp_release_');
+      addTearDown(() => out.deleteSync(recursive: true));
+      final result = package([
+        'linux',
+        'v0.9.0',
+        out.path,
+        build({
+          'woodshed-player': 'v0.9.0',
+          'lib/libapp.so': '0.9.0',
+          'lib/libwp_core.so': 'x',
+          'lib/libflutter_linux_gtk.so': 'x',
+        }).path,
+      ]);
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('linux: woodshed-player is not x86-64'));
+    });
+
+    test('Linux names the system libraries (LGPL, not in the package)', () {
+      expect(read('../tools/package.sh'), contains('SYSTEM-LIBRARIES.txt'));
+      final text = read('linux/SYSTEM-LIBRARIES.txt');
+      expect(text, contains('GTK 3'));
+      expect(text, contains('Lesser General Public License'));
+      expect(text, contains('not part of this package'));
     });
   });
 
@@ -699,8 +793,9 @@ void main() {
           job(workflow, 'notes'),
           contains('python3 tools/changelog.py notes "\$TAG"'),
         );
-        expect(job(workflow, 'macos'), contains('needs: notes'));
-        expect(job(workflow, 'web'), contains('needs: notes'));
+        for (final name in ['macos', 'web', 'windows', 'linux']) {
+          expect(job(workflow, name), contains('needs: notes'), reason: name);
+        }
       });
     },
   );
@@ -776,7 +871,7 @@ void main() {
       'the draft needs every package job and runs only after their success',
       () {
         final release = job(workflow, 'release');
-        expect(release, contains('needs: [notes, macos, web]'));
+        expect(release, contains('needs: [notes, macos, web, windows, linux]'));
         // no `if:` on the job, which would let it run after a failure (always(), failure(), !cancelled())
         expect(release, isNot(contains('    if:')));
       },
@@ -790,6 +885,14 @@ void main() {
       expect(
         job(workflow, 'web'),
         contains('::error title=Web package failed::'),
+      );
+      expect(
+        job(workflow, 'windows'),
+        contains('::error title=Windows package failed::'),
+      );
+      expect(
+        job(workflow, 'linux'),
+        contains('::error title=Linux package failed::'),
       );
     });
   });
@@ -815,6 +918,11 @@ void main() {
           expect(install, contains('/releases'));
           expect(install, contains('WoodshedPlayer-<Version>-macos.dmg'));
           expect(install, contains('WoodshedPlayer-<Version>-web.zip'));
+          // #60: Windows and Linux, x64
+          expect(install, contains('WoodshedPlayer-<Version>-windows.zip'));
+          expect(install, contains('WoodshedPlayer-<Version>-linux.tar.gz'));
+          expect(install, contains('SmartScreen'));
+          expect(install, contains('libgtk-3-0'));
           expect(install, contains(rightClick));
         },
       );
@@ -841,7 +949,8 @@ void main() {
           .allMatches(workflow)
           .map((m) => m[1])
           .toSet();
-      expect(runners, {'ubuntu-latest', 'macos-latest'});
+      // #60: Windows on windows-latest
+      expect(runners, {'ubuntu-latest', 'macos-latest', 'windows-latest'});
     });
 
     test('no secret besides the run token', () {

@@ -1,0 +1,14 @@
+Woodshed Player for Linux: libraries of the operating system
+
+The app uses these libraries of your Linux system. They are not part of this package: the
+program links or loads them dynamically from the system, so any compatible version can take
+their place (for example an update of your distribution).
+
+- GTK 3 with GLib, GDK, Pango, Cairo and their dependencies (window, file dialog):
+  GNU Lesser General Public License 2.1 or later, https://www.gtk.org
+- PulseAudio client library (libpulse) or ALSA (libasound), loaded at run time for the
+  audio output: GNU Lesser General Public License 2.1 or later,
+  https://www.freedesktop.org/wiki/Software/PulseAudio/ and https://www.alsa-project.org
+
+Install them with the package manager of your distribution, e.g. on Debian and Ubuntu:
+  sudo apt install libgtk-3-0 libpulse0

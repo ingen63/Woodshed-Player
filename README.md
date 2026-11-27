@@ -7,9 +7,9 @@
 ### Practise smarter. Play it until it sits.
 
 **The practice player for musicians.**<br>
-Slow any track down without changing its pitch, loop the hard bars, play along with a metronome, and let the tempo climb as you get better. On the Mac, on your iPhone or iPad, and in any browser. Free, open source, and private by design.
+Slow any track down without changing its pitch, loop the hard bars, play along with a metronome, and let the tempo climb as you get better. On the Mac, on Windows and Linux, on your iPhone or iPad, and in any browser. Free, open source, and private by design.
 
-[**▶ Open the web app**](https://ingen63.github.io/Woodshed-Player/app/) · [**Download 1.0 for macOS**](https://github.com/ingen63/Woodshed-Player/releases) · [What's new](CHANGELOG.en.md)
+[**▶ Open the web app**](https://ingen63.github.io/Woodshed-Player/app/) · [**Download 1.0 for macOS, Windows and Linux**](https://github.com/ingen63/Woodshed-Player/releases) · [What's new](CHANGELOG.en.md)
 
 [![Test quality](https://github.com/ingen63/Woodshed-Player/actions/workflows/test-quality.yml/badge.svg)](https://github.com/ingen63/Woodshed-Player/actions/workflows/test-quality.yml)
 [![Pages](https://github.com/ingen63/Woodshed-Player/actions/workflows/pages.yml/badge.svg)](https://github.com/ingen63/Woodshed-Player/actions/workflows/pages.yml)
@@ -90,13 +90,14 @@ All features in detail (in German): [`docs/FUNKTIONEN.md`](docs/FUNKTIONEN.md).
 
 ## New in 1.0
 
-Version 1.0 is the first stable release of the new app: a Flutter interface on a C++ audio engine that runs natively on the Mac and as WebAssembly in the browser. Highlights since the first preview:
+Version 1.0 is the first stable release of the new app: a Flutter interface on a C++ audio engine that runs natively on the Mac, on Windows and on Linux, and as WebAssembly in the browser. Highlights since the first preview:
 
 - **Recording in the web app,** with the microphone and the **Armed** switch, on iPhone, iPad, Android and the desktop.
 - **Armed recording while practising,** every take filed by date.
 - **Subfolders,** help pages for every area and a shortcut overview.
 - **Dark by default,** with a Mac title bar that matches the app.
 - **Audible on the iPhone in silent mode,** like a music app.
+- **Native apps for Windows and Linux** (x64), with the command line for playback.
 - **MP3 export and a command line** on the Mac.
 
 The full list is in the [release notes](CHANGELOG.en.md).
@@ -105,10 +106,11 @@ The full list is in the [release notes](CHANGELOG.en.md).
 
 | | How | |
 | --- | --- | --- |
-| **macOS** 14+ | Native app, Apple Silicon and Intel | System-audio recording, MP3 export and command line only here |
+| **macOS** 14+ | Native app, Apple Silicon and Intel | Recording, MP3 export and the full command line only here |
 | **iPhone, iPad** | [Web app](https://ingen63.github.io/Woodshed-Player/app/), installable to the home screen | Works offline, lock-screen controls, microphone recording |
 | **Android and everything else** | [Web app](https://ingen63.github.io/Woodshed-Player/app/) in the browser | No installation, no account, microphone recording |
-| **Windows, Linux** | Coming later | Until then: the web app |
+| **Windows** 10 (1803)+ and 11, x64 | Native app | Command line for playback; no recording and no Google Drive sync yet (both in the web app) |
+| **Linux**, x64 | Native app with GTK 3 | As on Windows |
 
 ## Installation
 
@@ -117,14 +119,18 @@ The packages of every version are under [Releases](https://github.com/ingen63/Wo
 | Package | Platform |
 | --- | --- |
 | `WoodshedPlayer-<Version>-macos.dmg` | macOS 14 or later, Apple Silicon and Intel (Universal) |
+| `WoodshedPlayer-<Version>-windows.zip` | Windows 10 (version 1803) or later and Windows 11, x64 |
+| `WoodshedPlayer-<Version>-linux.tar.gz` | Linux, x64, with GTK 3 |
 | `WoodshedPlayer-<Version>-web.zip` | Web app to host yourself, the same version as <https://ingen63.github.io/Woodshed-Player/app/> |
 
 - **macOS:** Open the `.dmg` and drag *Woodshed Player* into *Applications*. The app is only ad hoc signed and not notarized (there is no Apple Developer account). So the first time, choose **Right-click › Open** in the Finder and *Open* again in the dialog. If macOS only offers «Don't Open» or «Move to Trash», go to *System Settings › Privacy & Security* and click *Open Anyway* next to «Woodshed Player was blocked». After that it starts normally.
+- **Windows:** Unpack the `.zip` into a folder of your choice and start `WoodshedPlayer.exe` in the folder `WoodshedPlayer`. The app is not signed, so the first time Windows SmartScreen shows «Windows protected your PC»: click **More info › Run anyway**. Your library lives in `%LOCALAPPDATA%\WoodshedPlayer`.
+- **Linux:** Unpack it with `tar -xzf WoodshedPlayer-<Version>-linux.tar.gz` and start `WoodshedPlayer/woodshed-player`. It needs GTK 3 and PulseAudio or ALSA from your system (they are not in the package, see `licenses/SYSTEM-LIBRARIES.txt`); on Debian and Ubuntu: `sudo apt install libgtk-3-0 libpulse0`. Your library lives in `~/.local/share/WoodshedPlayer`.
 - **Web app:** Nothing to install, just open <https://ingen63.github.io/Woodshed-Player/app/>. To host it yourself, put the folder from the `.zip` at the root of a web server with HTTPS (or serve it on `localhost`). It only runs at the root (`/`), not in a subfolder.
 
-## Command line (Mac)
+## Command line
 
-The app doubles as a command line: play a track from the library, or arm a recording that starts with the first sound and stops by itself after a pause, so a piece played in the browser lands in the library without silence at either end.
+The app doubles as a command line: play a track from the library, or (on the Mac) arm a recording that starts with the first sound and stops by itself after a pause, so a piece played in the browser lands in the library without silence at either end.
 
 ```bash
 cp tools/woodshed ~/bin/woodshed          # any folder in your PATH
@@ -133,7 +139,9 @@ woodshed record --title "Blue Practice" --artist "Test Band" --year 1937
 woodshed --help
 ```
 
-The command only talks to the app on the same Mac through a socket file, never over the network. Details: [`docs/FUNKTIONEN.md`](docs/FUNKTIONEN.md) (row «Kommandozeile»).
+On Windows the command is `WoodshedPlayer play --title "Blue Practice"` in the app's folder (`WoodshedPlayer.com`, which the shell finds before the `.exe`), on Linux `./woodshed-player play --title "Blue Practice"`; `record` answers «not supported» there.
+
+The command only talks to the app on the same computer through a socket file, never over the network. Details: [`docs/FUNKTIONEN.md`](docs/FUNKTIONEN.md) (row «Kommandozeile»).
 
 ## Privacy
 
@@ -149,7 +157,7 @@ Privacy policy: <https://ingen63.github.io/Woodshed-Player/datenschutz.html> · 
 
 ## Under the hood
 
-- **App:** [Flutter](https://flutter.dev) for macOS, iOS and the web, in [`app/`](app/).
+- **App:** [Flutter](https://flutter.dev) for macOS, iOS, Windows, Linux and the web, in [`app/`](app/).
 - **Audio engine:** C++17 in [`core/`](core/) with a C API, with [miniaudio](https://miniaud.io), [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/) and libFLAC. Natively through `dart:ffi`, in the browser as WebAssembly in an AudioWorklet.
 - **Tested hard:** unit and UI tests, sanitizers, coverage limits, mutation testing, and a check that the WASM build behaves exactly like the native one. See [`docs/TESTS.md`](docs/TESTS.md).
 - **Older version:** the original SwiftUI app lives on in [`WoodshedPlayer/`](WoodshedPlayer/).

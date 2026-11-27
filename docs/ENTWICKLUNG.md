@@ -4,7 +4,7 @@ Bauen, Testen, Technik und Release von Woodshed Player. Den Überblick gibt die 
 
 ## Release
 
-Ein Tag `v*` startet [`.github/workflows/release.yml`](../.github/workflows/release.yml) (#139): Er prüft die Release Notes, baut das macOS-Paket und die Web-App und legt einen **Entwurf** unter *Releases* an. Fehlt die Version in einer Sprache oder schlägt ein Paket fehl, entsteht kein Entwurf; der rote Lauf nennt Sprache bzw. Plattform.
+Ein Tag `v*` startet [`.github/workflows/release.yml`](../.github/workflows/release.yml) (#139): Er prüft die Release Notes, baut die Pakete für macOS, Windows, Linux (#60) und die Web-App und legt einen **Entwurf** unter *Releases* an. Fehlt die Version in einer Sprache oder schlägt ein Paket fehl, entsteht kein Entwurf; der rote Lauf nennt Sprache bzw. Plattform.
 
 1. **Version setzen:** `version` in `app/pubspec.yaml` und `appVersion` in `app/lib/app/app_info.dart`, z. B. `0.9.0`. Vorabversionen heissen wie bei VivaPlan `1.0.0-beta.N`, der Titel des Release lautet dann «Woodshed Player 1.0.0 Beta N». Windows kennt in der Versionsnummer nur Ziffern: Dort wird `1.0.0-beta.N` zu `1.0.0.N` (#60). Flutter nimmt die vierte Stelle aus der Build-Nummer, darum steht in `pubspec.yaml` `1.0.0-beta.N+N`.
 2. **Eintrag schreiben:** in `CHANGELOG.md` oben `## Version 0.9.0` mit den Abschnitten `### Neu, geändert, behoben` und `### Tests und Entwicklung` (mindestens einer, in dieser Reihenfolge); jeder Punkt nennt seine Issues (`#123`). Eine Einleitung vor dem ersten Abschnitt ist erlaubt.
@@ -14,6 +14,21 @@ Ein Tag `v*` startet [`.github/workflows/release.yml`](../.github/workflows/rele
 6. **Veröffentlichen:** unter *Releases* den Entwurf prüfen und *Publish release* klicken (**Publish**).
 
 Lokal baut `make package` die Pakete des letzten Tags nach `local/release/`, aus den zuvor gebauten Apps (`flutter build macos --release`; `flutter build web --release --base-href / --dart-define=WP_GIT_TAG=<Tag>`), und prüft Version, Tag, Universal-Binärdateien und Signatur. Die Web-App unter GitHub Pages veröffentlicht weiterhin `pages.yml` beim selben Tag.
+
+## Windows und Linux (#60)
+
+Beide Ziele bauen nur in GitHub Actions (kein Windows- oder Linux-Rechner im Projekt), nur für x64. Die Jobs `windows` und `linux` in `test-quality.yml` laufen nächtlich nach einem neuen Commit oder von Hand: `gh workflow run test-quality.yml -f desktop=true` startet nur diese beiden, ohne die übrigen Jobs.
+
+- **windows** (`windows-latest`): Kern mit MSVC und `ctest`, die Dart-Tests (`flutter test`, mit `WP_WINDOWS_REQUIRED=1` für die Windows-Pfade, #60/AK4), `flutter build windows --release`, dann `tools/smoke_app.sh` mit `WoodshedPlayer.exe` (Start, erzeugte Testdatei offline abspielen, Ende mit Code 0) und `tools/smoke_cli.sh` mit `WoodshedPlayer.com` (Hilfe, `play` startet die App und erreicht sie, `record` meldet «not supported»), zuletzt `tools/package.sh windows` mit dem letzten Tag, wenn die App dessen Version hat.
+- **linux** (`ubuntu-latest`): GTK 3, Ninja und xvfb, `flutter build linux --release`, dieselben Rauchtests in `xvfb-run`, das Paket. Kern- und Dart-Tests unter Linux laufen bei jedem Push im Job `checks`.
+
+Auf einem eigenen Rechner: Windows braucht Visual Studio 2022 mit «Desktopentwicklung mit C++», dann `cd app && flutter build windows --release`; Linux `sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev`, dann `flutter build linux --release`. Ohne Audiogerät `WP_AUDIO_BACKEND=null` setzen.
+
+- **Kern:** Das FFI-Plugin baut ihn mit `app/packages/wp_core/src/CMakeLists.txt` aus `core/src` (`wp_core.dll` bzw. `lib/libwp_core.so`), ohne Aufnahme (#162) und ohne MP3-Export: Die C-API antwortet dort mit `recorder_stub.cpp` und `mp3_api_stub.cpp`. miniaudio spielt über WASAPI bzw. PulseAudio/ALSA (zur Laufzeit geladen). Pfade gehen als UTF-8 in den Kern; unter Windows öffnet ihn `wp_decoder_init_file` als UTF-16, damit Umlaute gehen.
+- **Runner:** `app/windows/runner/files_channel.cpp` und `app/linux/runner/files_channel.cc` beantworten den Kanal `woodshed/files` wie der Mac (Dateiauswahl, Ordner, Datenordner `%LOCALAPPDATA%` bzw. `~/.local/share`, Links nur `https`, Git-Tag und Build-Datum aus CMake). Hineinziehen von Dateien gibt es dort noch nicht; der Hinweis ohne Titel nennt nur die Dateiauswahl.
+- **Kommandozeile:** Linux ruft `wp_cli_main` aus `libwp_core.so` im Programm selbst auf (`main.cc`), Socket in `$XDG_RUNTIME_DIR`. Unter Windows ist `WoodshedPlayer.com` ein Konsolenprogramm neben `WoodshedPlayer.exe` (cmd und PowerShell nehmen `.com` vor `.exe`), Transport `core/src/cli_win.cpp` (AF_UNIX von Winsock, Windows 10 1803+). dart:io kennt dort keine Unix Domain Sockets, darum lauscht der Runner (`command_bridge.cpp`) und reicht die Zeilen über den Kanal `woodshed/commands` an Dart (`app/lib/app/command_channel.dart`).
+- **Ausgeblendet** bis zu eigenen Issues: Abgleich über Google Drive (#161), Mikrofon-Aufnahme (#162), Systemton, MP3-Export und Menüleiste.
+- **Pakete:** `tools/package.sh windows|linux <Tag> <Ordner>` prüft Tag (im Programm) und Version (im Dart-Code), x64 und die Dateien und packt den Ordner `WoodshedPlayer` mit `licenses/`; Linux legt `licenses/SYSTEM-LIBRARIES.txt` dazu (GTK und Audio-Bibliotheken des Systems, LGPL, nicht im Paket).
 
 ## Swift-Altprojekt starten
 

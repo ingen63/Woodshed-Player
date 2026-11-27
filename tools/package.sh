@@ -5,12 +5,17 @@
 #   tools/package.sh macos <tag> <out-dir> [app]         .dmg from the built app (default: release build of
 #                                                       `flutter build macos --release`)
 #   tools/package.sh web <tag> <out-dir> [build-dir]     .zip from the built web app (default: app/build/web)
+#   tools/package.sh windows <tag> <out-dir> [build-dir] .zip from `flutter build windows --release` (#60)
+#   tools/package.sh linux <tag> <out-dir> [bundle]      .tar.gz from `flutter build linux --release` (#60)
 #
 # Before packing, the build is checked: the version in the app equals the tag's version and the tag stamped
 # into it is the tag (#139/AK4, «About Woodshed Player»); on macOS every binary is universal (arm64 and
 # x86_64) and the ad hoc signature is valid. Each package carries LICENSE and the licence texts of fonts and
 # core libraries (#139/AK3, #119) in a folder «Licenses» (macOS) or «licenses» (web). The app is not notarised
 # (no Apple developer account); README «Installation» says how to open it the first time.
+# #60: Windows and Linux are x64 only; the package holds the folder «WoodshedPlayer» with the program, the
+# core library, the command line (WoodshedPlayer.com on Windows) and «licenses»; on Linux also
+# licenses/SYSTEM-LIBRARIES.txt (GTK and the audio libraries of the system, LGPL, not in the package).
 # WP_LAME_REQUIRED=1 (CI) fails the macOS package when the app carries no LAME (MP3 export, #141).
 set -euo pipefail
 
@@ -33,7 +38,9 @@ file_name() {
   case "$1" in
   macos) echo "$APP_NAME-$version-macos.dmg" ;;
   web) echo "$APP_NAME-$version-web.zip" ;;
-  *) die "unknown platform '$1' (macos, web)" ;;
+  windows) echo "$APP_NAME-$version-windows.zip" ;;
+  linux) echo "$APP_NAME-$version-linux.tar.gz" ;;
+  *) die "unknown platform '$1' (macos, web, windows, linux)" ;;
   esac
 }
 
@@ -114,6 +121,76 @@ package_web() {
   echo "$zip"
 }
 
+# #60: the version (in the Dart code of the app) and the tag (stamped into the program by CMake) of a
+# Windows or Linux build; $1 platform, $2 tag, $3 program, $4 AOT library of the Dart code.
+check_stamps() {
+  local platform=$1 tag=$2 program=$3 aot=$4 version
+  version=$(version_of "$tag")
+  [ -f "$program" ] || die "$platform: $program missing"
+  [ -f "$aot" ] || die "$platform: $aot missing (release build?)"
+  grep -qaF "$tag" "$program" || die "$platform: tag $tag not in $(basename "$program") (git describe of the build)"
+  grep -qaF "$version" "$aot" || die "$platform: version $version not in $(basename "$aot")"
+}
+
+# #60: the machine of a PE file (Windows): 8664 for x64.
+pe_machine() {
+  local offset
+  offset=$(od -An -tu4 -j60 -N4 "$1" | tr -d ' ')
+  od -An -tx2 -j"$((offset + 4))" -N2 "$1" | tr -d ' '
+}
+
+package_windows() {
+  local tag=$1 out=$2 build=${3:-"$root/app/build/windows/x64/runner/Release"}
+  local version name stage zip file
+  version=$(version_of "$tag")
+  [ -d "$build" ] || die "$build missing, first: cd app && flutter build windows --release"
+  check_stamps windows "$tag" "$build/$APP_NAME.exe" "$build/data/app.so"
+  for file in "$APP_NAME.exe" "$APP_NAME.com" wp_core.dll flutter_windows.dll; do
+    [ -f "$build/$file" ] || die "windows: $file missing in $build"
+    [ "$(pe_machine "$build/$file")" = 8664 ] || die "windows: $file is not x64"
+  done
+  mkdir -p "$out"
+  out="$(cd "$out" && pwd)"
+  name="$APP_NAME"
+  stage=$(mktemp -d "${TMPDIR:-/tmp}/wp_package.XXXXXX")
+  trap 'rm -rf "$stage"' RETURN
+  cp -R "$build" "$stage/$name"
+  copy_licenses "$stage/$name/licenses" without-lame
+  zip="$out/$(file_name windows "$tag")"
+  rm -f "$zip"
+  if command -v zip >/dev/null; then
+    (cd "$stage" && zip -qr -X "$zip" "$name")
+  else
+    # GitHub's Windows runners have no zip in Git Bash; PowerShell packs the folder
+    powershell -NoProfile -Command "Compress-Archive -Path '$(cygpath -w "$stage/$name")' -DestinationPath '$(cygpath -w "$zip")'"
+  fi
+  echo "$zip"
+}
+
+package_linux() {
+  local tag=$1 out=$2 bundle=${3:-"$root/app/build/linux/x64/release/bundle"}
+  local version name stage tgz file
+  version=$(version_of "$tag")
+  [ -d "$bundle" ] || die "$bundle missing, first: cd app && flutter build linux --release"
+  check_stamps linux "$tag" "$bundle/woodshed-player" "$bundle/lib/libapp.so"
+  for file in woodshed-player lib/libwp_core.so lib/libflutter_linux_gtk.so; do
+    [ -f "$bundle/$file" ] || die "linux: $file missing in $bundle"
+    file -b "$bundle/$file" | grep -q 'ELF 64-bit.*x86-64' || die "linux: $file is not x86-64"
+  done
+  mkdir -p "$out"
+  out="$(cd "$out" && pwd)"
+  name="$APP_NAME"
+  stage=$(mktemp -d "${TMPDIR:-/tmp}/wp_package.XXXXXX")
+  trap 'rm -rf "$stage"' RETURN
+  cp -R "$bundle" "$stage/$name"
+  copy_licenses "$stage/$name/licenses" without-lame
+  cp "$root/app/linux/SYSTEM-LIBRARIES.txt" "$stage/$name/licenses/SYSTEM-LIBRARIES.txt"
+  tgz="$out/$(file_name linux "$tag")"
+  rm -f "$tgz"
+  tar -C "$stage" -czf "$tgz" "$name"
+  echo "$tgz"
+}
+
 case "${1:-}" in
 name)
   [ $# -eq 3 ] || die "usage: tools/package.sh name <platform> <tag>"
@@ -127,5 +204,13 @@ web)
   [ $# -ge 3 ] || die "usage: tools/package.sh web <tag> <out-dir> [build-dir]"
   package_web "${@:2}"
   ;;
-*) die "usage: tools/package.sh name|macos|web …" ;;
+windows)
+  [ $# -ge 3 ] || die "usage: tools/package.sh windows <tag> <out-dir> [build-dir]"
+  package_windows "${@:2}"
+  ;;
+linux)
+  [ $# -ge 3 ] || die "usage: tools/package.sh linux <tag> <out-dir> [bundle]"
+  package_linux "${@:2}"
+  ;;
+*) die "usage: tools/package.sh name|macos|web|windows|linux …" ;;
 esac

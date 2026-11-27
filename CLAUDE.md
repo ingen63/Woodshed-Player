@@ -4,9 +4,9 @@ Woodshed Player ist ein Übe-Player für Musiker (Bibliothek, Tempo ohne Tonhöh
 
 ## Technik
 
-- **App:** Flutter/Dart (`app/`) für macOS, iOS und Web. Dart-Pakete stehen in `app/pubspec.yaml`.
+- **App:** Flutter/Dart (`app/`) für macOS, iOS, Windows, Linux und Web. Dart-Pakete stehen in `app/pubspec.yaml`.
 - **Audio-Kern:** C++17 mit CMake (`core/`) und C-API `core/include/wp_core.h`.
-  - Nativ (macOS, iOS) bindet das FFI-Plugin `app/packages/wp_core/` den Kern über `dart:ffi` an.
+  - Nativ (macOS, iOS, Windows, Linux) bindet das FFI-Plugin `app/packages/wp_core/` den Kern über `dart:ffi` an (Windows und Linux: `src/CMakeLists.txt` des Plugins).
   - Im Web wird der Kern mit Emscripten zu WebAssembly gebaut (`core/web/`, `core/build-wasm/`) und läuft in einem AudioWorklet. AAC/M4A dekodiert dort der Browser.
 - **Bibliotheken im Kern** (header-only, in `core/third_party/`, Versionen dort im README): miniaudio für Dekodieren und Audiogerät, signalsmith-stretch mit signalsmith-linear für Tempo ohne Tonhöhenänderung.
 - **Schriften:** Inter und JetBrains Mono (SIL OFL 1.1, `app/assets/fonts/`).
@@ -86,7 +86,7 @@ tools/hoervergleich.sh <datei.mp3>   # 0,5x/0,25x: neuer Kern gegen AVAudioUnitT
 - **Kein Netzwerk** in der App ausser für beschlossene Funktionen mit eigenem Issue. Ausnahme (`docs/KONZEPT-SYNC.md`): Netzwerkzugriff nur für den Abgleich und nur nach ausdrücklicher Wahl: zu Google Drive nach Anmeldung, oder zu gekoppelten Geräten, mit Verbindungsaufbau über öffentliche Relays und STUN-Server. Dazu das Laden der Web-App selbst (GitHub Pages). Ohne Konto und ohne Kopplung keine Verbindung. Kein Tracking.
 - **Keine privaten Daten** in Code, Tests, Issues, Commits, Screenshots (keine echten Namen, E-Mails, Titel oder Künstler). Commits mit der GitHub-noreply-Adresse.
 - **Keine fremden Audiodateien.** Testaudio erzeugen (Sinus, Klicks) oder CC0 mit Quelle.
-- **Lizenzen:** nur MIT-verträglich (MIT, BSD, Apache-2.0, Public Domain/MIT-0), keine GPL/AGPL. Ausnahme: LGPL für den MP3-Encoder des Exports (#141), nur dynamisch gebunden und austauschbar, mit Lizenztext und Quellenangabe im Repo. Schriften zusätzlich unter SIL OFL 1.1 (unverändert einbinden, Lizenztext und Copyright-Hinweis ins Repo). Neue Abhängigkeiten nur nach Rückfrage.
+- **Lizenzen:** nur MIT-verträglich (MIT, BSD, Apache-2.0, Public Domain/MIT-0), keine GPL/AGPL. Ausnahme: LGPL für den MP3-Encoder des Exports (#141), nur dynamisch gebunden und austauschbar, mit Lizenztext und Quellenangabe im Repo. Ausnahme unter Linux (#60): GTK (Flutter-Linux) und libsecret (Token-Speicher, #161) als Systembibliotheken, nur dynamisch, nie im Paket, mit Hinweis in den Lizenzangaben (`app/linux/SYSTEM-LIBRARIES.txt`). Schriften zusätzlich unter SIL OFL 1.1 (unverändert einbinden, Lizenztext und Copyright-Hinweis ins Repo). Neue Abhängigkeiten nur nach Rückfrage.
 - Audio und Oberfläche trennen: Audio in `core/` (Swift: `Audio/`), Daten in `Model/`, Darstellung in `Views/`.
 - `docs/FUNKTIONEN.md` (Funktionstabelle, Datenschutz im Detail) im selben Zug nachführen, wenn sich Verhalten oder Begriffe ändern; `README.md` und `README.de.md` dazu, wenn es den Überblick betrifft (Funktionen, Plattformen, Installation, Datenschutz kurz).
-- Jede Änderung muss auf macOS, iOS und Web bauen; Änderungen am Kern auch als WASM. Aufnahme gibt es in der nativen App auf iPhone/iPad nicht; die Web-App nimmt überall das Mikrofon auf (#157), Systemton und Kommandozeile bleiben Mac-only.
+- Jede Änderung muss auf macOS, iOS und Web bauen; Änderungen am Kern auch als WASM. Windows und Linux (x64, #60) bauen nur in GitHub Actions (Jobs `windows` und `linux` in `test-quality.yml`, nächtlich oder von Hand mit `desktop=true`). Aufnahme gibt es in der nativen App auf iPhone/iPad nicht; die Web-App nimmt überall das Mikrofon auf (#157), Systemton, MP3-Export und `record` der Kommandozeile bleiben Mac-only (Windows und Linux: `play`, #60; Mikrofon dort mit #162).

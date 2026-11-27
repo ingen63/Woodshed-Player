@@ -4,7 +4,7 @@ Release notes of Woodshed Player, newest version first. This file translates [`C
 
 ## Version 1.0.0
 
-The first stable version of Woodshed Player: a new Flutter app with a C++ audio engine for macOS, iPhone/iPad and the browser. These release notes sum up everything since the first preview 0.8.0; the individual steps follow below.
+The first stable version of Woodshed Player: a new Flutter app with a C++ audio engine for macOS, Windows, Linux, iPhone/iPad and the browser. These release notes sum up everything since the first preview 0.8.0; the individual steps follow below.
 
 ### New, changed, fixed
 
@@ -12,6 +12,7 @@ The first stable version of Woodshed Player: a new Flutter app with a C++ audio 
 - **Library:** Folders with subfolders of any depth, playlists, multi-select, dragging files in from outside, sorting, trimming start and end; robust against entries with the same name, invalid loops and damaged tags (#114, #121, #122, #123, #124, #135, #136, #137, #143, #146).
 - **Recording:** Microphone and system audio on the Mac as 24-bit FLAC, microphone also in the web app; the «Armed» switch turns every time you play into a recording of its own under `Recordings › date` and can turn itself off afterwards (#113, #116, #118, #120, #147, #156, #157).
 - **Mac:** MP3 export with year, the `woodshed` command line for playback and armed recordings, menu bar in the system language, window with a resizable sidebar and remembered size, title bar matching the appearance (#129, #130, #140, #141, #144, #152).
+- **Windows and Linux:** Native apps for x64 as `.zip` and `.tar.gz`, with file dialog, playback through WASAPI or PulseAudio/ALSA and the `play` command line; no recording and no Google Drive sync there yet (#60).
 - **Web app:** Starts offline, lock-screen controls, audio cache, install hint, the screen stays on while practising, audible on the iPhone even in silent mode (#39, #71, #72, #82, #109, #110, #158).
 - **Sync via Google Drive:** Sign-in on the Mac and in the web app, one file per device, a question before changes would be lost, protection against revived deleted entries; OneDrive, Dropbox and the old repair removed (#53, #54, #55, #65, #84, #90, #98, #104, #107, #111, #131).
 - **Use:** Help page for all areas and a keyboard shortcut overview, dark appearance by default, licence texts in the app (#119, #148, #149).
@@ -22,7 +23,8 @@ The first stable version of Woodshed Player: a new Flutter app with a C++ audio 
 - Test strategy with coverage per part, reference cases, random tests, fuzzing, golden files, UI tests and smoke tests on the iOS simulator (#7, #8, #9, #10, #12, #13, #99).
 - Sanitizers, real-time safety, network freedom, load and mutation tests; the same behaviour of the native and the WASM core (#11, #57, #58, #59, #63, #77, #101, #138, #142).
 - More stable tests without fixed pauses and with time limits (#62, #78, #92, #95, #112, #128, #150, #155, #159).
-- Release workflow with macOS package, web app and release notes in two languages; English README with a German version (#41, #139, #145, #160).
+- Nightly builds, tests and smoke tests on Windows and Linux, Windows paths with drive letter, UNC and umlauts (#60).
+- Release workflow with packages for macOS, Windows, Linux and the web app and release notes in two languages; English README with a German version (#41, #139, #145, #160).
 
 ## Version 1.0.0-beta.3
 

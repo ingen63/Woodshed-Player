@@ -680,6 +680,15 @@ jobs:
         run: tools/smoke_app.sh app/build/windows/x64/runner/Release/WoodshedPlayer.exe
       - name: Smoke test of the command line (#60, #140)
         run: tools/smoke_cli.sh app/build/windows/x64/runner/Release/WoodshedPlayer.com
+      - name: Pack like the release (#60, tools/package.sh)
+        # with the latest tag when the app has its version (between a version change and its tag: skipped)
+        run: |
+          tag=$(git describe --tags --abbrev=0)
+          if grep -q "^version: ${tag#v}+" app/pubspec.yaml; then
+            tools/package.sh windows "$tag" dist
+          else
+            echo "app version differs from $tag: package check skipped"
+          fi
 
   linux:
     name: Linux build, smoke tests in xvfb (#60)
@@ -714,3 +723,12 @@ jobs:
         run: xvfb-run -a tools/smoke_app.sh app/build/linux/x64/release/bundle/woodshed-player
       - name: Smoke test of the command line in xvfb (#60, #140)
         run: xvfb-run -a tools/smoke_cli.sh app/build/linux/x64/release/bundle/woodshed-player
+      - name: Pack like the release (#60, tools/package.sh)
+        # with the latest tag when the app has its version (between a version change and its tag: skipped)
+        run: |
+          tag=$(git describe --tags --abbrev=0)
+          if grep -q "^version: ${tag#v}+" app/pubspec.yaml; then
+            tools/package.sh linux "$tag" dist
+          else
+            echo "app version differs from $tag: package check skipped"
+          fi
