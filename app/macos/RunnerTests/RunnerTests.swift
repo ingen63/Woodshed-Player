@@ -220,6 +220,29 @@ struct CommandLineToolTests {
 /// their titles in the UI language from the ARB files.
 @MainActor
 struct MenuBarTests {
+  /// #150: the menus of NSApp before a test. localizeMenuBar moves AppKit's Services menu into the menu
+  /// bar of the test, and only that menu bar keeps it alive: once it is gone, NSApp.servicesMenu is nil for
+  /// the tests that run later. [restore] puts the Services menu back into its own item of the main menu.
+  @MainActor
+  struct SavedMenus {
+    let main = NSApp.mainMenu
+    let services = NSApp.servicesMenu
+    let windows = NSApp.windowsMenu
+    let help = NSApp.helpMenu
+    let servicesItem = NSApp.servicesMenu.flatMap { s in s.supermenu?.items.first { $0.submenu === s } }
+
+    func restore() {
+      if let services, let servicesItem, servicesItem.submenu !== services {
+        services.supermenu?.items.first { $0.submenu === services }?.submenu = nil
+        servicesItem.submenu = services
+      }
+      NSApp.mainMenu = main
+      NSApp.servicesMenu = services
+      NSApp.windowsMenu = windows
+      NSApp.helpMenu = help
+    }
+  }
+
   /// A menu bar as Flutter builds it: copies of the standard items, its own items, Help without items.
   func flutterMenuBar() -> NSMenu {
     func item(_ title: String, _ action: Selector?, _ items: [NSMenuItem]? = nil) -> NSMenuItem {
@@ -250,8 +273,8 @@ struct MenuBarTests {
 
   @Test("#144/AK1 standard items get the titles of the UI language, AppKit gets Services, Window and Help")
   func localizedTitles() {
-    let saved = (NSApp.mainMenu, NSApp.servicesMenu, NSApp.windowsMenu, NSApp.helpMenu)
-    defer { (NSApp.mainMenu, NSApp.servicesMenu, NSApp.windowsMenu, NSApp.helpMenu) = saved }
+    let saved = SavedMenus()
+    defer { saved.restore() }
     // AppKit reports the Services and Window menus only inside the main menu, as in the app.
     let menu = flutterMenuBar()
     NSApp.mainMenu = menu
@@ -268,8 +291,8 @@ struct MenuBarTests {
     ])
     #expect(menu.items[1].submenu!.items[1].submenu!.items[0].title == "Sprachausgabe starten")
     #expect(menu.items[2].submenu!.items[0].title == "Im Dock ablegen")
-    #expect(app.items[1].submenu === saved.1)  // AppKit's own Services menu, now titled «Dienste»
-    #expect(saved.1?.title == "Dienste")
+    #expect(app.items[1].submenu === saved.services)  // AppKit's own Services menu, now titled «Dienste»
+    #expect(saved.services?.title == "Dienste")
     #expect(NSApp.windowsMenu === menu.items[2].submenu)
     #expect(menu.items[3].submenu != nil)
     #expect(NSApp.helpMenu === menu.items[3].submenu)
@@ -300,14 +323,28 @@ struct MenuBarTests {
 
   @Test("#144/AK1 a title missing from the list leaves the item as it is")
   func missingTitle() {
-    let saved = (NSApp.servicesMenu, NSApp.windowsMenu, NSApp.helpMenu)
-    defer { (NSApp.servicesMenu, NSApp.windowsMenu, NSApp.helpMenu) = saved }
+    let saved = SavedMenus()
+    defer { saved.restore() }
     let menu = flutterMenuBar()
     MainFlutterWindow.localizeMenuBar(menu, titles: [:])
     #expect(menu.items[0].submenu!.items.map(\.title) == [
       "Über Woodshed Player", "Services", "Hide Woodshed Player", "Quit Woodshed Player",
     ])
     #expect(menu.items[3].submenu == nil)
+  }
+
+  @Test("#150 a test that localizes its own menu bar leaves AppKit's Services menu in the main menu")
+  func servicesMenuRestored() throws {
+    let before = try #require(NSApp.servicesMenu)
+    autoreleasepool {
+      let saved = SavedMenus()
+      // as in missingTitle: the menu bar of the test is not the main menu and goes away after the test
+      MainFlutterWindow.localizeMenuBar(flutterMenuBar(), titles: [:])
+      #expect(before.supermenu?.supermenu !== NSApp.mainMenu)
+      saved.restore()
+    }
+    #expect(NSApp.servicesMenu === before)
+    #expect(before.supermenu?.supermenu === NSApp.mainMenu)
   }
 }
 
