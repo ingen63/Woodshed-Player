@@ -953,12 +953,83 @@ void main() {
       expect(runners, {'ubuntu-latest', 'macos-latest', 'windows-latest'});
     });
 
-    test('no secret besides the run token', () {
-      expect(workflow, isNot(contains('secrets.')));
-      expect(
-        RegExp(r'GH_TOKEN: (.*)').allMatches(workflow).map((m) => m[1]).toSet(),
-        {r'${{ github.token }}'},
+    test(
+      'no secret besides the run token and the Google desktop secret (#164)',
+      () {
+        // #164: AK12 adapted; the Windows and Linux packages need the secret of Google's desktop client.
+        expect(
+          RegExp(r'secrets\.(\w+)')
+              .allMatches(workflow)
+              .map((m) => m[1])
+              .toSet(),
+          {'WP_GOOGLE_DESKTOP_SECRET'},
+        );
+        for (final name in ['notes', 'macos', 'web', 'release']) {
+          expect(
+            job(workflow, name),
+            isNot(contains('secrets.')),
+            reason: name,
+          );
+        }
+        expect(
+          RegExp(r'GH_TOKEN: (.*)')
+              .allMatches(workflow)
+              .map((m) => m[1])
+              .toSet(),
+          {r'${{ github.token }}'},
+        );
+      },
+    );
+  });
+
+  group('#164 Google desktop secret for the Windows and Linux packages', () {
+    for (final platform in ['windows', 'linux']) {
+      test(
+        '#164/AK2: the $platform build gets the secret from the environment',
+        () {
+          final build = job(workflow, platform);
+          expect(
+            build,
+            contains(
+              r'WP_GOOGLE_DESKTOP_SECRET: ${{ secrets.WP_GOOGLE_DESKTOP_SECRET }}',
+            ),
+          );
+          expect(
+            build,
+            contains(
+              'flutter build $platform --release '
+              r'--dart-define=WP_GOOGLE_DESKTOP_SECRET="$WP_GOOGLE_DESKTOP_SECRET"',
+            ),
+          );
+          expect(build, isNot(contains(r'echo "$WP_GOOGLE_DESKTOP_SECRET')));
+        },
       );
+    }
+
+    test('#164/AK2: no Google client secret in the repository', () {
+      final files = Process.runSync(
+        'git',
+        ['ls-files'],
+        workingDirectory: '..',
+      ).stdout.toString().split('\n').where((f) => f.isNotEmpty);
+      final secret = RegExp(r'GOCSPX-[\w-]{10,}');
+      for (final f in files) {
+        final file = File('../$f');
+        if (!file.existsSync() || file.lengthSync() > 2000000) continue;
+        final String text;
+        try {
+          text = file.readAsStringSync();
+        } on FileSystemException {
+          continue; // binary
+        }
+        expect(secret.hasMatch(text), isFalse, reason: f);
+      }
+    });
+
+    test('#164/AK3: docs/ENTWICKLUNG.md names where the build takes the secret from', () {
+      final docs = File('../docs/ENTWICKLUNG.md').readAsStringSync();
+      expect(docs, contains('WP_GOOGLE_DESKTOP_SECRET'));
+      expect(docs, contains('Secrets and variables'));
     });
   });
 }

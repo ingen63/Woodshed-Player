@@ -84,5 +84,10 @@ Der Audio-Kern enthält miniaudio (Public Domain oder MIT-0), Signalsmith Stretc
 
 ## Google-Anmeldung unter Windows und Linux (#161)
 
-Windows und Linux melden sich mit dem Desktop-Client von Google an (`googleDesktopClientId` in `app/lib/sync/providers/google_auth.dart`, Loopback mit PKCE). Verlangt Google beim Code-Tausch das «Secret» des Desktop-Clients, gibt der Build es mit `--dart-define=WP_GOOGLE_DESKTOP_SECRET=…` mit; im Repository steht es nie, und der Release-Workflow hat bisher keine Secrets (#139/AK12).
+Windows und Linux melden sich mit dem Desktop-Client von Google an (`googleDesktopClientId` in `app/lib/sync/providers/google_auth.dart`, Loopback mit PKCE). Verlangt Google beim Code-Tausch das «Secret» des Desktop-Clients, gibt der Build es mit `--dart-define=WP_GOOGLE_DESKTOP_SECRET=…` mit; im Repository steht es nie (#164).
+
+- **Release-Pakete:** Der Release-Workflow (`release.yml`, Jobs `windows` und `linux`) nimmt es aus dem GitHub-Actions-Secret `WP_GOOGLE_DESKTOP_SECRET` (*Settings › Secrets and variables › Actions*) und gibt es als Umgebungsvariable an `--dart-define` weiter, ohne es in eine Datei oder ins Protokoll zu schreiben. Es ist neben dem `GITHUB_TOKEN` des Laufs das einzige Secret des Workflows (#139/AK12, angepasst in #164).
+- **Secret holen oder erneuern:** In der Google Cloud Console unter *Google Auth Platform › Clients* den Client vom Typ «Desktop» öffnen und mit *Add secret* ein neues anlegen; Google zeigt es nur einmal. Danach mit `gh secret set WP_GOOGLE_DESKTOP_SECRET` hinterlegen und den Release neu bauen.
+- **Eigener Build:** `flutter build windows --release --dart-define=WP_GOOGLE_DESKTOP_SECRET=<secret>` (bzw. `linux`). Ohne Secret baut die App ebenfalls; verlangt Google es, scheitert die Anmeldung dann beim Code-Tausch.
+- Die Builds in `test-quality.yml` brauchen kein Secret: Ihre Tests melden sich bei einem nachgebildeten Google an.
 

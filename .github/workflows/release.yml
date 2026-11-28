@@ -12,8 +12,9 @@
 #   «Installation»); Linux needs GTK 3 of the system (licenses/SYSTEM-LIBRARIES.txt).
 # - release: only when every package job succeeded; otherwise there is no draft and the red job names the
 #   platform. Title «Woodshed Player <version>», text from tools/changelog.py (English open, German folded).
-# Only GitHub-hosted runners, no secrets besides the
-# run's own GITHUB_TOKEN. By hand: Actions › Release › Run workflow with an existing tag (rebuilds its
+# Only GitHub-hosted runners. Secrets: the run's own GITHUB_TOKEN and, for the Windows and Linux builds only,
+# WP_GOOGLE_DESKTOP_SECRET (#164), the «secret» of Google's desktop client for the sign-in; it is passed as an
+# environment variable to --dart-define, never written to a file or the log. By hand: Actions › Release › Run workflow with an existing tag (rebuilds its
 # packages into its release; an existing release keeps its text).
 name: Release
 
@@ -175,9 +176,11 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Build the app (release, x64)
         working-directory: app
+        env:
+          WP_GOOGLE_DESKTOP_SECRET: ${{ secrets.WP_GOOGLE_DESKTOP_SECRET }}  # #164
         run: |
           flutter pub get >/dev/null
-          flutter build windows --release
+          flutter build windows --release --dart-define=WP_GOOGLE_DESKTOP_SECRET="$WP_GOOGLE_DESKTOP_SECRET"
       - name: Check and pack (#139/AK2, AK3, AK4)
         run: tools/package.sh windows "$TAG" dist
       - uses: actions/upload-artifact@v7
@@ -208,9 +211,11 @@ jobs:
           sudo apt-get install -y -qq ninja-build libgtk-3-dev >/dev/null
       - name: Build the app (release, x64)
         working-directory: app
+        env:
+          WP_GOOGLE_DESKTOP_SECRET: ${{ secrets.WP_GOOGLE_DESKTOP_SECRET }}  # #164
         run: |
           flutter pub get >/dev/null
-          flutter build linux --release
+          flutter build linux --release --dart-define=WP_GOOGLE_DESKTOP_SECRET="$WP_GOOGLE_DESKTOP_SECRET"
       - name: Check and pack (#139/AK2, AK3, AK4)
         run: tools/package.sh linux "$TAG" dist
       - uses: actions/upload-artifact@v7
