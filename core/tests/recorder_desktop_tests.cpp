@@ -234,6 +234,11 @@ void deviceErrorsMapToTheirCodes() { // #162/AK3: only a refusal of access names
 void nullBackendListsAnInputDevice() { // #162: the device list of given backends
   ma_backend backends[] = {ma_backend_null};
   CHECK(wp::rec::hasInputDevice(backends, 1));
+  // Chosen by miniaudio itself, the null backend (no audio hardware) has no microphone.
+  CHECK(!wp::rec::isSystemInput(false, ma_backend_null));
+  CHECK(wp::rec::isSystemInput(true, ma_backend_null));
+  CHECK(wp::rec::isSystemInput(false, ma_backend_wasapi));
+  CHECK(wp::rec::isSystemInput(false, ma_backend_pulseaudio));
   ma_context ctx;
   CHECK(ma_context_init(backends, 1, nullptr, &ctx) == MA_SUCCESS);
   CHECK(wp::rec::hasInputDeviceOn(&ctx));

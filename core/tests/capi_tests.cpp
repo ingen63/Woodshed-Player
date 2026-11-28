@@ -264,7 +264,8 @@ void metronomeThroughCApi() {
 }
 
 // Recording itself needs real system audio and the user's permission (#51); only the states
-// before a recording and the argument check are tested. Other platforms have the stub.
+// before a recording and the argument check are tested. Windows and Linux have recorder_desktop.cpp
+// (#162, tested with its artificial input in recorder_desktop_tests), iOS the stub.
 void recorderStartsIdle() {
 #if defined(__APPLE__)
   CHECK(wp_rec_start(nullptr) == WP_REC_ERR_INVALID_PATH);
@@ -286,7 +287,10 @@ void recorderStartsIdle() {
         WP_REC_ERR_INVALID_ARGUMENT);
   CHECK(wp_rec_start_armed_tail("x.flac", 7, -30.0, 5.0, 1.0) == WP_REC_ERR_UNSUPPORTED);
 #else
-  CHECK(wp_rec_available() == 0);
+  // #162: Windows and Linux record the microphone when there is an input device, never the
+  // system audio.
+  CHECK(wp_rec_available() == wp_rec_source_available(WP_REC_SOURCE_MIC));
+  CHECK(wp_rec_source_available(WP_REC_SOURCE_SYSTEM) == 0);
   CHECK(wp_rec_start("x.wav") == WP_REC_ERR_UNSUPPORTED);
 #endif
   CHECK(wp_rec_is_recording() == 0);

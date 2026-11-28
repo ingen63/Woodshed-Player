@@ -10,6 +10,9 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#ifndef NOMINMAX
+#define NOMINMAX // std::min, std::max and std::clamp instead of the macros of windows.h
+#endif
 #include <windows.h>
 #endif
 

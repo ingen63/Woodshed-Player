@@ -176,7 +176,11 @@ int micStartError(ma_result result);
 
 // #162: whether miniaudio lists an input device on `context`.
 bool hasInputDeviceOn(ma_context *context);
-// #162: the same on a context of its own with `backends` (nullptr: miniaudio picks the backend).
+// #162: whether the devices of `backend` count: always if the backends were `chosen` (tests), else
+// not those of the null backend.
+bool isSystemInput(bool chosen, ma_backend backend);
+// #162: the same on a context of its own with `backends` (nullptr: miniaudio picks the backend; its
+// null backend, the fallback without audio hardware, then counts as no input device).
 bool hasInputDevice(const ma_backend *backends = nullptr, ma_uint32 backendCount = 0);
 
 // Microphone (#113): the default input device of the system through miniaudio, handed to a Capture

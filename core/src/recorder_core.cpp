@@ -198,11 +198,15 @@ bool hasInputDeviceOn(ma_context *context) {
          captureCount != 0;
 }
 
+bool isSystemInput(bool chosen, ma_backend backend) { return chosen || backend != ma_backend_null; }
+
 bool hasInputDevice(const ma_backend *backends, ma_uint32 backendCount) {
   ma_context own;
   if (ma_context_init(backends, backendCount, nullptr, &own) != MA_SUCCESS)
     return false;
-  const bool found = hasInputDeviceOn(&own);
+  // Without audio hardware miniaudio falls back to its null backend; its silent capture device is
+  // no microphone of the system (only when asked for by name, as in the tests).
+  const bool found = isSystemInput(backends != nullptr, own.backend) && hasInputDeviceOn(&own);
   ma_context_uninit(&own);
   return found;
 }
