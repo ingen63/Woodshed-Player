@@ -68,9 +68,11 @@ void main() {
         ),
         isNull,
       );
+      // the guard is measured with DateTime, the watch with another clock: on Windows the two
+      // differ by up to a tick of the system clock (15.6 ms), so only roughly
       expect(
         watch.elapsed,
-        greaterThanOrEqualTo(const Duration(milliseconds: 30)),
+        greaterThanOrEqualTo(const Duration(milliseconds: 10)),
       );
       expect(await pollFor(() => 1, guard: Duration.zero), 1);
     },
