@@ -896,6 +896,11 @@ class PseudoLocalizations extends AppLocalizationsEn {
       pseudo(super.armedMicrophoneDeniedLinux);
   @override
   String get helpRecordingBodyDesktop => pseudo(super.helpRecordingBodyDesktop);
+  @override
+  String get helpCommandLineBodyWindows =>
+      pseudo(super.helpCommandLineBodyWindows);
+  @override
+  String get helpCommandLineBodyLinux => pseudo(super.helpCommandLineBodyLinux);
 }
 
 /// Loads [PseudoLocalizations] for any locale.

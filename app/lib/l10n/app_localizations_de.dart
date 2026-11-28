@@ -1624,4 +1624,12 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get helpRecordingBodyDesktop =>
       '«Aufnahme» oben rechts startet und stoppt eine Aufnahme über das Mikrofon (das Standard-Eingabegerät des Systems). Die Aufnahme wird verlustfrei als FLAC gespeichert und erscheint als neuer Titel in der Bibliothek, benannt nach Datum und Uhrzeit. Ohne Eingabegerät gibt es keine «Aufnahme». Erlaubt Windows das Mikrofon nicht, schalte es unter Einstellungen › Datenschutz und Sicherheit › Mikrofon ein, auch für Desktop-Apps.\n\nScharf: In Üben und Metronom nimmt der Schalter «Scharf» von selbst über das Mikrofon auf. Sobald der Pegel über die Schwelle steigt, beginnt eine Aufnahme, und zwar 1 Sekunde früher; nach einer Pause der eingestellten Länge endet sie. Die Leertaste spielt oder pausiert wie gewohnt und beendet zugleich eine laufende Aufnahme. Danach geht «Scharf» aus; soll es für die nächste Aufnahme scharf bleiben, schalte in seinen Einstellungen «Nach einer Aufnahme ausschalten» aus. Jede Aufnahme landet in der Bibliothek im Ordner Recordings › Datum. Der Pfeil neben dem Schalter stellt Schwelle, Pause und das Ausschalten nach einer Aufnahme ein. Solange «Scharf» an ist, ist «Aufnahme» gesperrt.';
+
+  @override
+  String get helpCommandLineBodyWindows =>
+      'Das Programm der App ist zugleich ihre Kommandozeile. Öffne die Eingabeaufforderung oder PowerShell im Ordner der App.\n\nWoodshedPlayer play --title \"<Titel>\" spielt einen Titel der Bibliothek; --artist \"<Artist>\" wählt unter Titeln mit gleichem Namen. Ist die App geschlossen, startet der Befehl sie. WoodshedPlayer play --help beschreibt die Optionen.\n\nDer Befehl spricht nur mit der App auf demselben Rechner, nie über das Netz.';
+
+  @override
+  String get helpCommandLineBodyLinux =>
+      'Das Programm der App ist zugleich ihre Kommandozeile. Öffne ein Terminal im Ordner der App.\n\n./woodshed-player play --title \"<Titel>\" spielt einen Titel der Bibliothek; --artist \"<Artist>\" wählt unter Titeln mit gleichem Namen. Ist die App geschlossen, startet der Befehl sie. ./woodshed-player play --help beschreibt die Optionen.\n\nDer Befehl spricht nur mit der App auf demselben Rechner, nie über das Netz.';
 }

@@ -2599,6 +2599,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'“Record” at the top right starts and stops a recording through the microphone (the default input device of the system). The recording is saved losslessly as FLAC and appears in the library as a new track, named after date and time. Without an input device there is no “Record”. If Windows does not allow the microphone, switch it on in Settings › Privacy & security › Microphone, also for desktop apps.\n\nArmed: in Practice and Metronome, the switch “Armed” records from the microphone by itself. As soon as the level rises above the threshold, a recording starts, 1 second early; after a pause of the set length it ends. Space plays or pauses as usual and also ends a running recording. Then “Armed” goes off; to keep it armed for the next recording, switch off “Switch off after a recording” in its settings. Each recording lands in the library in the folder Recordings › date. The arrow beside the switch sets threshold, pause and whether it goes off after a recording. While “Armed” is on, “Record” is locked.'**
   String get helpRecordingBodyDesktop;
+
+  /// #166
+  ///
+  /// In en, this message translates to:
+  /// **'The program of the app is also its command line. Open Command Prompt or PowerShell in the folder of the app.\n\nWoodshedPlayer play --title \"<title>\" plays a track of the library; with --artist \"<artist>\" it picks among tracks of the same title. If the app is closed, the command starts it. WoodshedPlayer play --help describes the options.\n\nThe command talks only to the app on the same computer, never over the network.'**
+  String get helpCommandLineBodyWindows;
+
+  /// #166
+  ///
+  /// In en, this message translates to:
+  /// **'The program of the app is also its command line. Open a terminal in the folder of the app.\n\n./woodshed-player play --title \"<title>\" plays a track of the library; with --artist \"<artist>\" it picks among tracks of the same title. If the app is closed, the command starts it. ./woodshed-player play --help describes the options.\n\nThe command talks only to the app on the same computer, never over the network.'**
+  String get helpCommandLineBodyLinux;
 }
 
 class _AppLocalizationsDelegate

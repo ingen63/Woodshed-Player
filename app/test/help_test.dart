@@ -493,6 +493,61 @@ void main() {
     });
   });
 
+  group('#166 command line on Windows and Linux', () {
+    Future<String> commandLineText(WidgetTester tester, Locale locale) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: locale,
+          localizationsDelegates: testDelegates,
+          supportedLocales: testLocales,
+          home: const HelpPage(topics: HelpTopics(commandLine: true)),
+        ),
+      );
+      await tester.tap(byKey('helpTopic:commandLine'));
+      await tester.pumpAndSettle();
+      final l = lookupAppLocalizations(locale);
+      final body = helpSectionBody(l, HelpSection.commandLine);
+      for (final p in body.split('\n\n')) {
+        expect(find.text(p), findsOneWidget);
+      }
+      return body;
+    }
+
+    for (final (platform, command, key) in [
+      (TargetPlatform.windows, 'WoodshedPlayer play --title', 'Windows'),
+      (TargetPlatform.linux, './woodshed-player play --title', 'Linux'),
+    ]) {
+      for (final locale in testLocales) {
+        testWidgets(
+          '#166/AK1 #166/AK2 ${platform.name}: the command of the platform and only play '
+          '(${locale.languageCode})',
+          (tester) async {
+            final body = await commandLineText(tester, locale);
+            final l = lookupAppLocalizations(locale);
+            expect(
+              body,
+              key == 'Windows'
+                  ? l.helpCommandLineBodyWindows
+                  : l.helpCommandLineBodyLinux,
+            );
+            expect(body, contains(command));
+            for (final w in ['record', 'tools/woodshed', 'Mac', '~/bin']) {
+              expect(body, isNot(contains(w)), reason: w);
+            }
+          },
+          variant: TargetPlatformVariant.only(platform),
+        );
+      }
+    }
+
+    testWidgets('#166 the Mac keeps its text', (tester) async {
+      final body = await commandLineText(tester, testLocale);
+      expect(body, de.helpCommandLineBody);
+      expect(body, contains('tools/woodshed'));
+      expect(body, contains('woodshed record'));
+    }, variant: _mac);
+  });
+
   group('#148/AK14 overview of the shortcuts', () {
     for (final (platform, command) in [
       (TargetPlatform.macOS, '⌘'),

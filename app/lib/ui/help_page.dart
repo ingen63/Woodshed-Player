@@ -41,7 +41,7 @@ class HelpTopics {
   /// Export as MP3: only where the core encodes MP3 ([AppController.mp3], the Mac).
   final bool export;
 
-  /// The command line `woodshed`: where the platform has its socket (the Mac).
+  /// The command line: where the platform has its socket (the Mac, Windows and Linux).
   final bool commandLine;
 
   /// Install, offline start and the audio cache: only in the browser.
@@ -98,7 +98,12 @@ String helpSectionBody(AppLocalizations l, HelpSection s) => switch (s) {
     MicSystem.mac => l.helpRecordingBody,
   },
   HelpSection.export => l.helpExportBody,
-  HelpSection.commandLine => l.helpCommandLineBody,
+  // #166: on Windows and Linux only `play`, with the program of the app itself
+  HelpSection.commandLine => switch (micSystem) {
+    MicSystem.windows => l.helpCommandLineBodyWindows,
+    MicSystem.linux => l.helpCommandLineBodyLinux,
+    MicSystem.mac || MicSystem.browser => l.helpCommandLineBody,
+  },
   HelpSection.web => l.helpWebBody,
   HelpSection.shortcuts => l.helpShortcutsBody,
 };
