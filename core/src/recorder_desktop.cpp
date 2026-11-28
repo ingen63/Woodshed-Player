@@ -16,9 +16,9 @@ struct Recorder {
   std::mutex mutex;
   std::string error;
   std::atomic<bool> recording{false};
-  std::atomic<double> sampleRate{48000};
-  wp::rec::Capture capture; // ring buffer, writer thread, file, level
-  wp::rec::MicSource mic;   // device or artificial input (#162)
+  std::atomic<double> sampleRate{0}; // of the input; 0 before the first start
+  wp::rec::Capture capture;          // ring buffer, writer thread, file, level
+  wp::rec::MicSource mic;            // device or artificial input (#162)
 };
 
 Recorder &rec() {
@@ -130,7 +130,8 @@ int wp_rec_is_recording(void) { return rec().recording.load() ? 1 : 0; }
 
 double wp_rec_seconds(void) {
   auto &r = rec();
-  return static_cast<double>(r.capture.meter().frames()) / r.sampleRate.load();
+  const double rate = r.sampleRate.load();
+  return rate > 0 ? static_cast<double>(r.capture.meter().frames()) / rate : 0.0;
 }
 
 float wp_rec_level(void) { return rec().capture.meter().takeLevel(); }

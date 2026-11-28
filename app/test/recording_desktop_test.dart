@@ -297,5 +297,24 @@ void main() {
       final f = File('${tmp.path}/other.flac')..writeAsBytesSync(other);
       expect(flacBits(f.path), isNull);
     });
+
+    test('closes each file it reads', () async {
+      final f = File('${tmp.path}/24.flac')..writeAsBytesSync(flacHeader(24));
+      final wav = File('${tmp.path}/x.wav')
+        ..writeAsBytesSync([...'RIFF'.codeUnits, ...List.filled(40, 0)]);
+      // the open files of this process; the listing's own entry cannot be read (macOS), so errors
+      // are skipped
+      Future<int> open() =>
+          Directory('/dev/fd')
+              .list(followLinks: false)
+              .handleError((Object _) {})
+              .length;
+      final before = await open();
+      for (var i = 0; i < 20; i++) {
+        expect(flacBits(f.path), 24);
+        expect(flacBits(wav.path), isNull);
+      }
+      expect(await open(), before);
+    }, skip: Platform.isWindows ? 'counts the open files in /dev/fd' : false);
   });
 }

@@ -391,8 +391,10 @@ void toneRecordsFlacWith24Bit() { // #162/AK2, AK4: microphone as FLAC 24 bit, u
   CHECK(wp_rec_set_input(WP_REC_INPUT_TONE) == 0);
   TempDir dir;
   const std::string path = dir.file("Recording \xC3\xA4\xC3\xB6\xC3\xBC.flac");
+  CHECK(std::strcmp(wp_rec_error(), "") != 0); // the failed starts before left their error
   CHECK(wp_rec_start_source(path.c_str(), WP_REC_SOURCE_MIC) == 0);
   CHECK(wp_rec_is_recording() == 1);
+  CHECK(std::strcmp(wp_rec_error(), "") == 0); // a start that works clears the last error
   CHECK(wp_rec_start_source(path.c_str(), WP_REC_SOURCE_MIC) == 0); // already running: no change
   sleepSeconds(1.0);
   CHECK(wp_rec_level() > 0.2f);
@@ -513,6 +515,9 @@ void wavFileOpensUtf8Paths() { // #162: the older WAV format as well
 } // namespace
 
 int main() {
+  // Before the first start: no length (the rate of the input is not known yet).
+  CHECK(wp_rec_seconds() == 0.0);
+  CHECK(wp_rec_kept_seconds() == 0.0);
   unknownInputIsRejected();
   withoutInputDeviceNothingIsAvailable();
   systemAudioIsMacOnly();

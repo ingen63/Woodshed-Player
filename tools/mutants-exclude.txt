@@ -860,3 +860,16 @@ core/src/recorder_core.cpp | cxx_lt_to_le | if (device_ < 0)
 # Werkzeugs, wie bei ~Capture oben). Von Hand entfernt erkennt ihn
 # simulatedInputStopsWhenRestartedOrDestroyed: der laufende Thread endet mit std::terminate.
 core/src/recorder_core.cpp | cxx_remove_void_call | SimulatedInput::~SimulatedInput() { close(); }
+
+# ---- core/src/recorder_desktop.cpp (#162) ----
+# Mull-Grenze: Von Hand gemessen, ohne den Aufruf scheitert silenceIsReportedAsSilence
+# (recorder_desktop_tests: nach der Aufnahme mit Ton meldet wp_rec_only_silence() weiter 0).
+core/src/recorder_desktop.cpp | cxx_remove_void_call | r.capture.meter().reset();
+# Mull-Grenze: Von Hand gemessen, ohne den Aufruf scheitert toneRecordsFlacWith24Bit
+# (recorder_desktop_tests: nach wp_rec_stop() nimmt der Kern weiter auf, wp_rec_is_recording() bleibt 1).
+core/src/recorder_desktop.cpp | cxx_remove_void_call | teardown(r); | 3
+# Speicherfreigabe: Nach einem gescheiterten Start schliesst teardown nur den schon geöffneten Eingang
+# (und eine schon angelegte Datei, wenn erst der Start des Eingangs scheitert). Rückgabe, Fehlertext
+# und wp_rec_is_recording() sind dieselben, und der nächste Start oder wp_rec_stop() schliesst beides
+# ebenso; bis dahin bleibt nur das Gerät geöffnet.
+core/src/recorder_desktop.cpp | cxx_remove_void_call | teardown(r); | 5
