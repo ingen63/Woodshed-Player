@@ -2,6 +2,17 @@
 
 Release notes of Woodshed Player, newest version first. This file translates [`CHANGELOG.md`](CHANGELOG.md) (German), which is authoritative. Every entry starts with `## Version X.Y.Z` and has the sections «New, changed, fixed» and «Tests and development» (at least one, in this order); every bullet names its issues. `python3 tools/changelog.py check` checks both files (#139).
 
+## Version 1.0.1
+
+### New, changed, fixed
+
+- **Google sign-in on Windows and Linux (#164):** The Windows and Linux packages carry the secret of Google's desktop client, which Google asks for at sign-in. The build takes it from a GitHub Actions secret; it is never in the repository.
+
+### Tests and development
+
+- Besides the run's token, the release workflow allows exactly this one secret, only for Windows and Linux; a test checks that no Google secret is in the repository (#164, #139).
+- More tests for recording on Windows and Linux from the nightly mutation run (#138).
+
 ## Version 1.0.0
 
 The first stable version of Woodshed Player: a new Flutter app with a C++ audio engine for macOS, Windows, Linux, iPhone/iPad and the browser. These release notes sum up everything since the first preview 0.8.0; the individual steps follow below.
