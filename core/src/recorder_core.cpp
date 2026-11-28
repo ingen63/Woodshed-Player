@@ -288,13 +288,16 @@ void SimulatedInput::loop(Capture &capture) {
   using Clock = std::chrono::steady_clock;
   float block[kBlockFrames * kChannels];
   const auto begin = Clock::now();
-  uint64_t position = 0;
+  uint64_t delivered = 0;
   while (run_.load()) {
-    render(block, kBlockFrames, position, tone_.load());
+    // The sine goes on where the last start left it, so two takes alike in timing still differ
+    // (the library keeps only one of two identical files).
+    render(block, kBlockFrames, position_, tone_.load());
     MicInput::deliver(capture, block, kBlockFrames);
-    position += kBlockFrames;
+    position_ += kBlockFrames;
+    delivered += kBlockFrames;
     // Real-time pace: the next block is due when the frames so far have played.
-    const auto due = std::chrono::duration<double>(static_cast<double>(position) / kSampleRate);
+    const auto due = std::chrono::duration<double>(static_cast<double>(delivered) / kSampleRate);
     std::this_thread::sleep_until(begin + std::chrono::duration_cast<Clock::duration>(due));
   }
 }

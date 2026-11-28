@@ -249,6 +249,7 @@ private:
   std::thread thread_;
   std::atomic<bool> run_{false};
   std::atomic<bool> tone_{false};
+  uint64_t position_ = 0; // frames rendered since the first start (only the thread writes it)
 };
 
 // #162: what the microphone of a recording reads, chosen with wp_rec_set_input: the default input

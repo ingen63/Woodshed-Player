@@ -278,6 +278,36 @@ void micSourceOnTheNullBackend() { // #162: the device path of MicSource without
   ma_context_uninit(&ctx);
 }
 
+// The first `frames` samples of a take of the sine from a fresh capture.
+std::vector<float> takeStart(SimulatedInput &sim, const std::string &path, uint32_t frames) {
+  wp::rec::Capture capture;
+  CHECK(capture.open(path.c_str(), SimulatedInput::kSampleRate, wp::rec::FileFormat::Flac) == 0);
+  sim.start(capture);
+  sleepSeconds(0.1);
+  sim.close();
+  capture.close();
+  Decoded d = decode(path);
+  d.samples.resize(static_cast<size_t>(frames) * 2);
+  return d.samples;
+}
+
+void simulatedTakesDiffer() { // #162: the library would keep only one of two identical takes
+  TempDir dir;
+  SimulatedInput sim;
+  sim.setTone(true);
+  const auto first = takeStart(sim, dir.file("one.flac"), 2048);
+  const auto second = takeStart(sim, dir.file("two.flac"), 2048);
+  CHECK(first.size() == second.size());
+  CHECK(first != second);
+  // Within a take one unbroken sine, block after block (here from frame 0 of a fresh input).
+  std::vector<float> expected(2048 * 2);
+  SimulatedInput::render(expected.data(), 2048, 0, true);
+  float diff = 0;
+  for (size_t i = 0; i < expected.size(); ++i)
+    diff = std::max(diff, std::fabs(first[i] - expected[i]));
+  CHECK(diff < 1e-6f);
+}
+
 void simulatedInputStopsWhenRestartedOrDestroyed() { // #162: never two threads, none left over
   TempDir dir;
   const std::string path = dir.file("restart.flac");
@@ -493,6 +523,7 @@ int main() {
   nullBackendListsAnInputDevice();
   micSourceOnTheNullBackend();
   simulatedInputStopsWhenRestartedOrDestroyed();
+  simulatedTakesDiffer();
   simulatedInputRendersSineOrSilence();
   simulatedInputRunsInRealTime();
   toneRecordsFlacWith24Bit();
