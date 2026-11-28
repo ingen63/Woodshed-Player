@@ -30,6 +30,10 @@ final _germanWords = RegExp(
 
 /// Literals that are test data or language data on purpose (file, literal).
 const _allowed = <(String, String)>{
+  // #163/AK2: names with umlauts of the smoke test of dropping files (test data).
+  ('app/lib/app/drop_smoke.dart', "'Ärger öü ß'"),
+  ('app/lib/app/drop_smoke.dart', "'Zweite Datei Ä'"),
+  ('app/lib/app/drop_smoke.dart', r"'${dir.path}$sepÜbungen Café #1 50% v1.2'"),
   // Collation table for natural sorting of German titles.
   ('app/lib/library/natural_compare.dart', "'ä'"),
   ('app/lib/library/natural_compare.dart', "'ö'"),

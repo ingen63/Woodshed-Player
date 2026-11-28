@@ -2,6 +2,7 @@
 
 #include <flutter_linux/flutter_linux.h>
 
+#include "file_drop.h"
 #include "files_channel.h"
 #include "keychain_channel.h"
 #include "flutter/generated_plugin_registrant.h"
@@ -72,6 +73,9 @@ static void my_application_activate(GApplication* application) {
       fl_engine_get_binary_messenger(fl_view_get_engine(view)), window);
   self->keychain_channel =
       keychain_channel_new(fl_engine_get_binary_messenger(fl_view_get_engine(view)));
+  // #163: audio files dragged from the file manager onto the view (file_drop.cc)
+  file_drop_attach(GTK_WIDGET(view), self->files_channel,
+                   fl_engine_get_binary_messenger(fl_view_get_engine(view)));
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

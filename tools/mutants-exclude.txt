@@ -838,6 +838,11 @@ core/src/flac_writer.cpp | cxx_gt_to_ge | if (offset > (w->sink_ ? w->sinkEnd_ :
 # (Exit-Code 139) in webRecordingArmed.
 core/web/wp_core_web.cpp | cxx_remove_void_call | rec->in.assign(static_cast<size_t>(WP_WEB_MAX_BLOCK) * static_cast<size_t>(channels), 0.0f);
 
+# ---- app/lib/app/drop_smoke.dart (#163) ----
+# gleichwertig: smokeDrop läuft einmal in runSmokeApp, danach endet der Prozess mit exit(); ein
+# verbliebener Zuhörer an fileDropHover sammelt nur noch in einer Liste, die niemand mehr liest.
+app/lib/app/drop_smoke.dart | dart_remove_void_call | c.fileDropHover.removeListener(hover);
+
 # ---- app/lib/sync/providers/google_smoke.dart (#161) ----
 # gleichwertig: Am Ende schliesst _server.close(force: true) jede Verbindung zum nachgebildeten Google,
 # auch eine offen gehaltene; ob die Anfrage des «Browsers» Keep-alive nutzt, ändert den Ablauf nicht.

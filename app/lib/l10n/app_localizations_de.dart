@@ -330,9 +330,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Öffne eine MP3-, WAV- oder FLAC-Datei über die Dateiauswahl des Browsers.';
 
   @override
-  String get openFileHintDialog => 'Öffne eine MP3-, WAV- oder FLAC-Datei.';
-
-  @override
   String get openFile => 'Datei öffnen';
 
   @override
@@ -1530,7 +1527,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpLibraryBody =>
-      'Titel kommen mit + oben in der Bibliothek dazu, oder Du ziehst Audiodateien ins Fenster (Mac und Browser); auf einen Ordner oder eine Playlist gezogen, landen sie dort. Jede Datei wird nur einmal gespeichert, erkannt an ihrem Inhalt.\n\nOrdner: «Neuer Ordner» im Menü mit den drei Punkten im Kopf der Bibliothek legt einen auf oberster Ebene an, «Neuer Unterordner …» im Menü eines Ordners einen darin, beliebig tief. Ein Klick klappt einen Ordner auf und zu. Titel oder ganze Ordner auf einen Ordner ziehen verschiebt sie (am iPhone und iPad erst lange drücken). «Ordner löschen» löscht auch seine Unterordner; die Titel bleiben in der Bibliothek unter «Ohne Ordner».\n\nSortiert wird mit dem Knopf «Sortieren», gesucht mit dem Suchfeld.\n\nDas Menü eines Titels (Rechtsklick oder die drei Punkte) bearbeitet Titel und Artist (nur in der Bibliothek, die Audiodatei bleibt unverändert), verschiebt ihn in einen Ordner, fügt ihn zu einer Playlist hinzu und löscht ihn nach einer Rückfrage.\n\nMehrere Titel wählst Du mit ⌘-Klick oder ⇧-Klick aus (Ctrl-Klick ausserhalb von Apple); am iPhone und iPad einen Titel lange drücken oder «Auswählen» wählen. Die ausgewählten Titel lassen sich gemeinsam ziehen, zu einer Playlist hinzufügen, verschieben oder löschen.\n\nPlaylists sind Listen von Titeln in eigener Reihenfolge. + neben «Playlists» legt eine an; Titel kommen durch Ziehen auf die Playlist oder mit «Zu Playlist hinzufügen» dazu. «Abspielen» spielt ihre Titel nacheinander.';
+      'Titel kommen mit + oben in der Bibliothek dazu, oder Du ziehst Audiodateien ins Fenster (Mac, Windows, Linux und Browser); auf einen Ordner oder eine Playlist gezogen, landen sie dort. Jede Datei wird nur einmal gespeichert, erkannt an ihrem Inhalt.\n\nOrdner: «Neuer Ordner» im Menü mit den drei Punkten im Kopf der Bibliothek legt einen auf oberster Ebene an, «Neuer Unterordner …» im Menü eines Ordners einen darin, beliebig tief. Ein Klick klappt einen Ordner auf und zu. Titel oder ganze Ordner auf einen Ordner ziehen verschiebt sie (am iPhone und iPad erst lange drücken). «Ordner löschen» löscht auch seine Unterordner; die Titel bleiben in der Bibliothek unter «Ohne Ordner».\n\nSortiert wird mit dem Knopf «Sortieren», gesucht mit dem Suchfeld.\n\nDas Menü eines Titels (Rechtsklick oder die drei Punkte) bearbeitet Titel und Artist (nur in der Bibliothek, die Audiodatei bleibt unverändert), verschiebt ihn in einen Ordner, fügt ihn zu einer Playlist hinzu und löscht ihn nach einer Rückfrage.\n\nMehrere Titel wählst Du mit ⌘-Klick oder ⇧-Klick aus (Ctrl-Klick ausserhalb von Apple); am iPhone und iPad einen Titel lange drücken oder «Auswählen» wählen. Die ausgewählten Titel lassen sich gemeinsam ziehen, zu einer Playlist hinzufügen, verschieben oder löschen.\n\nPlaylists sind Listen von Titeln in eigener Reihenfolge. + neben «Playlists» legt eine an; Titel kommen durch Ziehen auf die Playlist oder mit «Zu Playlist hinzufügen» dazu. «Abspielen» spielt ihre Titel nacheinander.';
 
   @override
   String get helpPracticeTitle => 'Üben';

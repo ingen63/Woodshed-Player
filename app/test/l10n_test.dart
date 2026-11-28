@@ -293,15 +293,18 @@ void main() {
     for (final locale in const [Locale('en'), Locale('de')]) {
       final l = lookupAppLocalizations(locale);
       test('$locale', () {
-        // macOS and iOS keep their texts.
-        expect(openFileHint(l, HintPlatform.macOS), l.openFileHintDrop);
+        // #163: macOS, Windows and Linux: dragging into the window; iOS: «Files».
+        expect(openFileHint(l, HintPlatform.desktop), l.openFileHintDrop);
         expect(openFileHint(l, HintPlatform.mobile), l.openFileHintFiles);
-        expect(emptyLibraryHint(l, HintPlatform.macOS), l.emptyLibraryHintDrop);
+        expect(
+          emptyLibraryHint(l, HintPlatform.desktop),
+          l.emptyLibraryHintDrop,
+        );
         expect(emptyLibraryHint(l, HintPlatform.mobile), l.emptyLibraryHint);
-        // #60: Windows and Linux: the file dialog, no dragging and no «Files».
-        expect(openFileHint(l, HintPlatform.desktop), l.openFileHintDialog);
-        expect(emptyLibraryHint(l, HintPlatform.desktop), l.emptyLibraryHint);
-        for (final h in [l.openFileHintDialog, l.emptyLibraryHint]) {
+        for (final h in [l.openFileHintDrop, l.emptyLibraryHintDrop]) {
+          expect(h, contains(locale.languageCode == 'de' ? 'zieh' : 'drag'));
+        }
+        for (final h in [l.openFileHintFiles, l.emptyLibraryHint]) {
           expect(
             h,
             isNot(contains(locale.languageCode == 'de' ? 'zieh' : 'drag')),

@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "file_drop.h"
 #include "files_channel.h"
 #include "keychain_channel.h"
 #include "flutter/generated_plugin_registrant.h"
@@ -33,6 +34,13 @@ bool FlutterWindow::OnCreate() {
   command_bridge_ = std::make_unique<CommandBridge>(
       flutter_controller_->engine()->messenger(), GetHandle());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  // #163: audio files dragged from Explorer onto the Flutter view
+  drop_target_ = new FileDropTarget(flutter_controller_->view()->GetNativeWindow(),
+                                    files_channel_.get(),
+                                    flutter_controller_->engine()->messenger());
+  if (!drop_target_->Attach()) {
+    ::OutputDebugStringW(L"Woodshed Player: no drop target for dragged files\n");
+  }
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
@@ -47,6 +55,11 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  if (drop_target_ != nullptr) {
+    drop_target_->Detach();
+    drop_target_->Release();
+    drop_target_ = nullptr;
+  }
   command_bridge_ = nullptr;
   files_channel_ = nullptr;
   keychain_channel_ = nullptr;

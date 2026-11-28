@@ -24,6 +24,7 @@ string(TIMESTAMP WP_BUILD_DATE "%Y-%m-%d" UTC)
 add_executable(${BINARY_NAME} WIN32
   "command_bridge.cpp"
   "command_line.cpp"
+  "file_drop.cpp"
   "files_channel.cpp"
   "flutter_window.cpp"
   "keychain_channel.cpp"

@@ -614,12 +614,6 @@ abstract class AppLocalizations {
   /// **'Open an MP3, WAV or FLAC file with the browser\'s file picker.'**
   String get openFileHintBrowser;
 
-  /// No description provided for @openFileHintDialog.
-  ///
-  /// In en, this message translates to:
-  /// **'Open an MP3, WAV or FLAC file.'**
-  String get openFileHintDialog;
-
   /// No description provided for @openFile.
   ///
   /// In en, this message translates to:
@@ -2447,7 +2441,7 @@ abstract class AppLocalizations {
   /// No description provided for @helpLibraryBody.
   ///
   /// In en, this message translates to:
-  /// **'Add tracks with + at the top of the library, or drag audio files into the window (Mac and browser); dropped on a folder or a playlist, they go there. Each file is stored only once, recognised by its content.\n\nFolders: “New folder” in the menu with the three dots at the top of the library creates one at the top level, “New subfolder …” in the menu of a folder one inside it, as deep as you like. A click opens or closes a folder. Drag tracks or whole folders onto a folder to move them (on iPhone and iPad press and hold first). “Delete folder” also deletes its subfolders; the tracks stay in the library under “No folder”.\n\nSort the library with the sort button, search it with the search field.\n\nThe menu of a track (right click or the three dots) edits title and artist (only in the library, the audio file stays unchanged), moves it to a folder, adds it to a playlist and deletes it after asking.\n\nSelect several tracks with ⌘-click or ⇧-click (Ctrl-click outside Apple); on iPhone and iPad press and hold a track or choose “Select”. The selected tracks can be dragged, added to a playlist, moved or deleted together.\n\nPlaylists are lists of tracks in their own order. + beside “Playlists” creates one; add tracks by dragging them onto it or with “Add to playlist”. “Play” plays its tracks one after the other.'**
+  /// **'Add tracks with + at the top of the library, or drag audio files into the window (Mac, Windows, Linux and browser); dropped on a folder or a playlist, they go there. Each file is stored only once, recognised by its content.\n\nFolders: “New folder” in the menu with the three dots at the top of the library creates one at the top level, “New subfolder …” in the menu of a folder one inside it, as deep as you like. A click opens or closes a folder. Drag tracks or whole folders onto a folder to move them (on iPhone and iPad press and hold first). “Delete folder” also deletes its subfolders; the tracks stay in the library under “No folder”.\n\nSort the library with the sort button, search it with the search field.\n\nThe menu of a track (right click or the three dots) edits title and artist (only in the library, the audio file stays unchanged), moves it to a folder, adds it to a playlist and deletes it after asking.\n\nSelect several tracks with ⌘-click or ⇧-click (Ctrl-click outside Apple); on iPhone and iPad press and hold a track or choose “Select”. The selected tracks can be dragged, added to a playlist, moved or deleted together.\n\nPlaylists are lists of tracks in their own order. + beside “Playlists” creates one; add tracks by dragging them onto it or with “Add to playlist”. “Play” plays its tracks one after the other.'**
   String get helpLibraryBody;
 
   /// No description provided for @helpPracticeTitle.

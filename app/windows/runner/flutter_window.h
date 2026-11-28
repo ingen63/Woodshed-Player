@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "command_bridge.h"
+#include "file_drop.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -35,6 +36,8 @@ class FlutterWindow : public Win32Window {
   // #161: the refresh token of the cloud sign-in (keychain_channel.cpp)
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> keychain_channel_;
   std::unique_ptr<CommandBridge> command_bridge_;
+  // #163: files dragged from Explorer (file_drop.cpp); COM reference counted, released in OnDestroy
+  FileDropTarget* drop_target_ = nullptr;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

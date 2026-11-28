@@ -530,7 +530,12 @@ void main() {
           final cli = win.indexOf(
             'tools/smoke_cli.sh app/build/windows/x64/runner/Release/WoodshedPlayer.com',
           );
-          expect([ctest, dart, build, app, cli], everyElement(isNot(-1)));
+          // #163: dropping files, after the build
+          final drop = win.indexOf(
+            'tools/smoke_app.sh app/build/windows/x64/runner/Release/WoodshedPlayer.exe drop',
+          );
+          expect([ctest, dart, build, app, cli, drop], everyElement(isNot(-1)));
+          expect(drop, greaterThan(build));
           expect(build, greaterThan(dart));
           expect(app, greaterThan(build));
           expect(cli, greaterThan(app));
@@ -548,8 +553,13 @@ void main() {
         final cli = linux.indexOf(
           'xvfb-run -a tools/smoke_cli.sh app/build/linux/x64/release/bundle/woodshed-player',
         );
-        expect([build, app, cli], everyElement(isNot(-1)));
+        // #163: dropping files, after the build
+        final drop = linux.indexOf(
+          'xvfb-run -a tools/smoke_app.sh app/build/linux/x64/release/bundle/woodshed-player drop',
+        );
+        expect([build, app, cli, drop], everyElement(isNot(-1)));
         expect(app, greaterThan(build));
+        expect(drop, greaterThan(build));
       });
 
       test('by hand with desktop=true only these two jobs run', () {

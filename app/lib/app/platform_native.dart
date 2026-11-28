@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui' show PlatformDispatcher;
 
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:material_ui/material_ui.dart';
 import 'package:wp_core/wp_core.dart';
 
@@ -21,6 +22,7 @@ import '../sync/providers/google_platform_io.dart' deferred as google;
 // #161: the smoke test of the sign-in (WP_SMOKE=google), loaded only then
 import '../sync/providers/google_smoke.dart' deferred as google_smoke;
 import '../ui/armed_switch.dart';
+import '../ui/file_drop.dart';
 import '../ui/recording_button.dart';
 import 'app_controller.dart';
 import 'app_start.dart';
@@ -33,6 +35,8 @@ import 'keychain_store.dart';
 import 'library_settings_store.dart';
 import 'practice_arming.dart';
 import 'core_recorder.dart';
+import 'drop_smoke.dart';
+import 'file_drop.dart';
 import 'practice_recording.dart';
 import 'recording_controller.dart';
 import 'recording_smoke.dart';
@@ -240,6 +244,46 @@ class _SmokeFiles extends ChannelFilePlatform {
   Future<String?> platformRecordingsDir() => super.recordingsDir();
 }
 
+/// #163: the platform's services; the drag events it reports are kept in [seen] as well.
+class _DropSmokeFiles extends ChannelFilePlatform {
+  final seen = <FileDragEvent>[];
+
+  @override
+  set onFileDrag(void Function(FileDragEvent event)? handler) =>
+      super.onFileDrag = handler == null
+      ? null
+      : (e) {
+          seen.add(e);
+          handler(e);
+        };
+}
+
+/// #163: the middle of the area of [target] in the window (logical pixels); null while not shown.
+Offset? _onScreen(FileDropTarget target) {
+  final view = PlatformDispatcher.instance.implicitView;
+  if (view == null) return null;
+  final size = view.physicalSize / view.devicePixelRatio;
+  Rect? area;
+  for (var y = 2.0; y < size.height; y += 4) {
+    for (var x = 4.0; x < size.width; x += 8) {
+      final p = Offset(x, y);
+      if (fileDropTargetAt(p) == target) {
+        area =
+            area?.expandToInclude(Rect.fromPoints(p, p)) ??
+            Rect.fromPoints(p, p);
+      }
+    }
+  }
+  return area?.center;
+}
+
+/// #163: hands [paths] to the runner's drop code as a drop at [at] (channel «woodshed/dropSmoke», only
+/// with WP_SMOKE=drop); true if the window took them.
+Future<bool> _simulateDrop(List<String> paths, Offset at) async =>
+    await const MethodChannel('woodshed/dropSmoke')
+        .invokeMethod<bool>('drop', {'paths': paths, 'x': at.dx, 'y': at.dy}) ??
+    false;
+
 /// The page language exists only in the browser (#144/AK3); macOS and iOS take the system language.
 void showDocumentLanguage(Locale locale) {}
 
@@ -301,9 +345,14 @@ bool get swiftTestHost => isSwiftTestHost(Platform.environment);
 /// #13/AK5: WP_SMOKE=1 starts the smoke test of the built app (smoke.dart, tools/smoke_app.sh); #161:
 /// WP_SMOKE=google the smoke test of the Google sign-in with the token store of the system; #162:
 /// WP_SMOKE=record the smoke test of the recording with the core's artificial input
-/// (recording_smoke.dart).
-bool get smokeRequested =>
-    const {'1', 'google', 'record'}.contains(Platform.environment['WP_SMOKE']);
+/// (recording_smoke.dart); #163: WP_SMOKE=drop the smoke test of dropping files on Windows and Linux
+/// (drop_smoke.dart).
+bool get smokeRequested => const {
+  '1',
+  'google',
+  'record',
+  'drop',
+}.contains(Platform.environment['WP_SMOKE']);
 
 /// Runs the smoke test in a temporary folder with a generated sine file, shows the app built by [app]
 /// and ends the process with 0 (passed) or 1 (failed, reason on stdout).
@@ -313,9 +362,13 @@ Future<Never> runSmokeApp(Widget Function(AppController c) app) async {
   try {
     final wav = File('${dir.path}/Smoke sine.wav')..writeAsBytesSync(sineWav());
     final mode = Platform.environment['WP_SMOKE'];
-    final files = mode == 'record'
-        ? _SmokeFiles(Directory('${dir.path}/Recordings')..createSync())
-        : null;
+    final ChannelFilePlatform? files = switch (mode) {
+      'record' => _SmokeFiles(
+        Directory('${dir.path}/Recordings')..createSync(),
+      ),
+      'drop' => _DropSmokeFiles(),
+      _ => null,
+    };
     // #162: the artificial input before the app asks whether the microphone records
     if (mode == 'record') WpRecorder.setInput(WpRecInput.silence);
     final c = await createAppController(
@@ -326,8 +379,21 @@ Future<Never> runSmokeApp(Widget Function(AppController c) app) async {
     if (mode == 'google') {
       await google_smoke.loadLibrary();
       failure = await google_smoke.smokeGoogleSignIn(KeychainStore()) ?? '';
-    } else if (files != null) {
+    } else if (files is _SmokeFiles) {
       failure = await _smokeRecording(c, files) ?? '';
+    } else if (files is _DropSmokeFiles) {
+      failure =
+          await smokeDrop(
+            c,
+            files: dropSmokeFiles(
+              Directory('${dir.path}${Platform.pathSeparator}drop'),
+              windows: Platform.isWindows,
+            ),
+            seen: files.seen,
+            find: _onScreen,
+            drop: _simulateDrop,
+          ) ??
+          '';
     } else {
       failure = await smokeRun(c, wav.path) ?? '';
     }

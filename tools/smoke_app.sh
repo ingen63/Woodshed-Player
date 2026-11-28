@@ -17,14 +17,19 @@
 # recording, «Armed» with three play phases (three takes in Recordings › date), a refused
 # microphone; every take FLAC with 24 bit. For Windows and Linux (macOS would ask for the
 # microphone permission).
+# #163: [mode] «drop» runs the smoke test of dropping files instead (WP_SMOKE=drop,
+# app/lib/app/drop_smoke.dart): the runner's drop code takes a drop put together like one from Explorer
+# (CF_HDROP) or the file manager (text/uri-list) on a playlist: audio files with drive letter, UNC
+# path and umlauts (Windows) or escapes in the URI (Linux) land there, other files stay out. For
+# Windows and Linux; a real drag from Explorer or a file manager is not part of it.
 # Usage: tools/smoke_app.sh [app [mode]]
 set -u
 cd "$(dirname "$0")/.." || exit 2
 app=${1:-"app/build/macos/Build/Products/Release/Woodshed Player.app"}
 mode=${2:-1}
 case "$mode" in
-  1 | google | record) ;;
-  *) echo "smoke_app: unknown mode $mode (google, record)"; exit 2 ;;
+  1 | google | record | drop) ;;
+  *) echo "smoke_app: unknown mode $mode (google, record, drop)"; exit 2 ;;
 esac
 case "$app" in
   *.app | *.app/) bin="$app/Contents/MacOS/Woodshed Player" ;;
