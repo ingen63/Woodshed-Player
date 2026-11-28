@@ -2,7 +2,8 @@
 // live in lib/l10n/app_*.arb; numbers are formatted for the user's locale.
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:wp_core/wp_types.dart';
@@ -93,6 +94,42 @@ String loadErrorMessage(AppLocalizations l, LoadError e) => switch (e.code) {
 String recordingTitle(AppLocalizations l, DateTime t) =>
     l.recordingFileName(DateFormat.yMd(l.localeName).add_jms().format(t));
 
+/// #162: where the microphone is allowed and chosen: the settings of macOS, Windows or Linux, or the
+/// site settings of the browser (#157).
+enum MicSystem { mac, windows, linux, browser }
+
+MicSystem get micSystem => kIsWeb
+    ? MicSystem.browser
+    : switch (defaultTargetPlatform) {
+        TargetPlatform.windows => MicSystem.windows,
+        TargetPlatform.linux => MicSystem.linux,
+        _ => MicSystem.mac,
+      };
+
+/// #113/AK4, #157/AK6, #162/AK3: the microphone was refused; the hint names the setting of this
+/// system. [armed]: the hint of the switch «Armed» (#147/AK12).
+String microphoneDeniedMessage(
+  AppLocalizations l, {
+  bool armed = false,
+}) => switch (micSystem) {
+  MicSystem.mac =>
+    armed ? l.armedMicrophoneDenied : l.recordingMicrophoneDenied,
+  MicSystem.windows =>
+    armed ? l.armedMicrophoneDeniedWindows : l.recordingMicrophoneDeniedWindows,
+  MicSystem.linux =>
+    armed ? l.armedMicrophoneDeniedLinux : l.recordingMicrophoneDeniedLinux,
+  MicSystem.browser =>
+    armed ? l.armedMicrophoneDeniedBrowser : l.recordingMicrophoneDeniedBrowser,
+};
+
+/// #113, #157, #162: only silence comes from the microphone; the hint names the input setting.
+String microphoneSilentMessage(AppLocalizations l) => switch (micSystem) {
+  MicSystem.mac => l.recordingMicrophoneSilent,
+  MicSystem.windows => l.recordingMicrophoneSilentWindows,
+  MicSystem.linux => l.recordingMicrophoneSilentLinux,
+  MicSystem.browser => l.recordingMicrophoneSilentBrowser,
+};
+
 /// #44/AK1: localized message for a recording error of the core; the OSStatus stays a plain number.
 String recordingErrorMessage(AppLocalizations l, WpRecordingException e) {
   final text = switch (e.code) {
@@ -108,6 +145,7 @@ String recordingErrorMessage(AppLocalizations l, WpRecordingException e) {
     WpRecCode.start => l.recordingErrorStart,
     WpRecCode.noInput => l.recordingErrorNoInput,
     WpRecCode.invalidArgument => l.recordingErrorInvalidArgument,
+    WpRecCode.accessDenied => l.recordingErrorAccessDenied,
     _ => l.recordingErrorUnknown(e.code),
   };
   return e.osStatus == 0 ? text : '$text (OSStatus ${e.osStatus})';

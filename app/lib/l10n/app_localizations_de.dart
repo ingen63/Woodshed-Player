@@ -1595,4 +1595,36 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get helpShortcutsBody =>
       'Die meisten Funktionen haben ein Tastenkürzel. Die Übersicht nennt sie alle, nach Bereich gruppiert; die Taste ? öffnet sie jederzeit, ausser beim Tippen in einem Textfeld. Kürzel mit ⌘ gehen ausserhalb von Apple mit Ctrl.';
+
+  @override
+  String get recordingErrorAccessDenied =>
+      'Das System erlaubt das Mikrofon nicht.';
+
+  @override
+  String get recordingMicrophoneDeniedWindows =>
+      'Windows lässt Woodshed Player das Mikrofon nicht verwenden. Schalte unter Einstellungen › Datenschutz und Sicherheit › Mikrofon «Zugriff auf das Mikrofon» und «Desktop-Apps Zugriff auf Ihr Mikrofon gewähren» ein und starte die Aufnahme dann neu.';
+
+  @override
+  String get recordingMicrophoneDeniedLinux =>
+      'Das System lässt Woodshed Player das Mikrofon nicht verwenden. Prüfe in den Toneinstellungen des Systems, ob das Eingabegerät verwendet werden darf, und starte die Aufnahme dann neu.';
+
+  @override
+  String get recordingMicrophoneSilentWindows =>
+      'Vom Mikrofon kommt nur Stille. Prüfe das Eingabegerät unter Einstellungen › System › Sound › Eingabe.';
+
+  @override
+  String get recordingMicrophoneSilentLinux =>
+      'Vom Mikrofon kommt nur Stille. Prüfe das Eingabegerät und seine Lautstärke in den Toneinstellungen des Systems.';
+
+  @override
+  String get armedMicrophoneDeniedWindows =>
+      'Windows lässt Woodshed Player das Mikrofon nicht verwenden, darum ist «Scharf» wieder aus. Schalte unter Einstellungen › Datenschutz und Sicherheit › Mikrofon «Zugriff auf das Mikrofon» und «Desktop-Apps Zugriff auf Ihr Mikrofon gewähren» ein und schalte es dann wieder ein.';
+
+  @override
+  String get armedMicrophoneDeniedLinux =>
+      'Das System lässt Woodshed Player das Mikrofon nicht verwenden, darum ist «Scharf» wieder aus. Prüfe in den Toneinstellungen des Systems, ob das Eingabegerät verwendet werden darf, und schalte es dann wieder ein.';
+
+  @override
+  String get helpRecordingBodyDesktop =>
+      '«Aufnahme» oben rechts startet und stoppt eine Aufnahme über das Mikrofon (das Standard-Eingabegerät des Systems). Die Aufnahme wird verlustfrei als FLAC gespeichert und erscheint als neuer Titel in der Bibliothek, benannt nach Datum und Uhrzeit. Ohne Eingabegerät gibt es keine «Aufnahme». Erlaubt Windows das Mikrofon nicht, schalte es unter Einstellungen › Datenschutz und Sicherheit › Mikrofon ein, auch für Desktop-Apps.\n\nScharf: In Üben und Metronom nimmt der Schalter «Scharf» von selbst über das Mikrofon auf. Sobald der Pegel über die Schwelle steigt, beginnt eine Aufnahme, und zwar 1 Sekunde früher; nach einer Pause der eingestellten Länge endet sie. Die Leertaste spielt oder pausiert wie gewohnt und beendet zugleich eine laufende Aufnahme. Danach geht «Scharf» aus; soll es für die nächste Aufnahme scharf bleiben, schalte in seinen Einstellungen «Nach einer Aufnahme ausschalten» aus. Jede Aufnahme landet in der Bibliothek im Ordner Recordings › Datum. Der Pfeil neben dem Schalter stellt Schwelle, Pause und das Ausschalten nach einer Aufnahme ein. Solange «Scharf» an ist, ist «Aufnahme» gesperrt.';
 }

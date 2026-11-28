@@ -1271,5 +1271,37 @@
   "helpCommandLineBody": "The program of the app is also its command line. Copy the script tools/woodshed from the source code into a folder of your search path, for example ~/bin/woodshed.\n\nwoodshed play --title \"<title>\" plays a track of the library. woodshed record waits for the first sound, records and stops by itself after a pause. woodshed --help lists every command and option.\n\nThe command talks only to the app on the same Mac, never over the network.",
   "helpWebTitle": "Web app",
   "helpWebBody": "Install: on iPhone and iPad tap Share, then “Add to Home Screen”; on Android use the menu of the browser. The app then starts like any other.\n\nWithout a connection: after the first visit the app also starts offline. A new version replaces the old one at the next start with a connection.\n\nAudio cache: with sync, the audio files on this device have a limit, 2 GB unless you change it; a tap on the storage line at the bottom of the library sets it. Above it, the tracks not played for the longest time lose their file on this device if it is in the cloud. They stay in the library as “Only in the cloud” and load again when played. “Keep offline” in the menu of a track keeps its file.",
-  "helpShortcutsBody": "Most functions have a keyboard shortcut. The overview lists them all, grouped by area; the key ? opens it at any time, except while you type in a text field. Shortcuts with ⌘ use Ctrl outside Apple."
+  "helpShortcutsBody": "Most functions have a keyboard shortcut. The overview lists them all, grouped by area; the key ? opens it at any time, except while you type in a text field. Shortcuts with ⌘ use Ctrl outside Apple.",
+  "recordingErrorAccessDenied": "The system does not allow the microphone.",
+  "@recordingErrorAccessDenied": {
+    "description": "#162"
+  },
+  "recordingMicrophoneDeniedWindows": "Windows does not let Woodshed Player use the microphone. Switch on “Microphone access” and “Let desktop apps access your microphone” in Settings › Privacy & security › Microphone, then start the recording again.",
+  "@recordingMicrophoneDeniedWindows": {
+    "description": "#162"
+  },
+  "recordingMicrophoneDeniedLinux": "The system does not let Woodshed Player use the microphone. Check in the sound settings of the system that the input device may be used, then start the recording again.",
+  "@recordingMicrophoneDeniedLinux": {
+    "description": "#162"
+  },
+  "recordingMicrophoneSilentWindows": "Only silence is coming from the microphone. Check the input device in Settings › System › Sound › Input.",
+  "@recordingMicrophoneSilentWindows": {
+    "description": "#162"
+  },
+  "recordingMicrophoneSilentLinux": "Only silence is coming from the microphone. Check the input device and its volume in the sound settings of the system.",
+  "@recordingMicrophoneSilentLinux": {
+    "description": "#162"
+  },
+  "armedMicrophoneDeniedWindows": "Windows does not let Woodshed Player use the microphone, so «Armed» is off again. Switch on “Microphone access” and “Let desktop apps access your microphone” in Settings › Privacy & security › Microphone, then switch it on again.",
+  "@armedMicrophoneDeniedWindows": {
+    "description": "#162"
+  },
+  "armedMicrophoneDeniedLinux": "The system does not let Woodshed Player use the microphone, so «Armed» is off again. Check in the sound settings of the system that the input device may be used, then switch it on again.",
+  "@armedMicrophoneDeniedLinux": {
+    "description": "#162"
+  },
+  "helpRecordingBodyDesktop": "“Record” at the top right starts and stops a recording through the microphone (the default input device of the system). The recording is saved losslessly as FLAC and appears in the library as a new track, named after date and time. Without an input device there is no “Record”. If Windows does not allow the microphone, switch it on in Settings › Privacy & security › Microphone, also for desktop apps.\n\nArmed: in Practice and Metronome, the switch “Armed” records from the microphone by itself. As soon as the level rises above the threshold, a recording starts, 1 second early; after a pause of the set length it ends. Space plays or pauses as usual and also ends a running recording. Then “Armed” goes off; to keep it armed for the next recording, switch off “Switch off after a recording” in its settings. Each recording lands in the library in the folder Recordings › date. The arrow beside the switch sets threshold, pause and whether it goes off after a recording. While “Armed” is on, “Record” is locked.",
+  "@helpRecordingBodyDesktop": {
+    "description": "#162"
+  }
 }

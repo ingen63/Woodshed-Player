@@ -256,6 +256,10 @@ final _recError = _lib
     .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
       'wp_rec_error',
     );
+final _recSetInput = _lib
+    .lookupFunction<Int32 Function(Int32), int Function(int)>(
+      'wp_rec_set_input',
+    );
 
 /// Ein Player mit eigenem Audiogerät.
 class WpPlayer {
@@ -455,8 +459,13 @@ WpTrimmed wpTrim(Uint8List bytes, double start, double end) {
   }
 }
 
-/// Recording of the system audio (macOS 14.2+) or the microphone (#113, macOS).
+/// Recording of the system audio (macOS 14.2+) or the microphone (#113 macOS, #162 Windows and
+/// Linux).
 abstract final class WpRecorder {
+  /// #162: what the microphone reads from now on ([WpRecInput.device] unless a test chose an
+  /// artificial input). False where the microphone does not record.
+  static bool setInput(WpRecInput input) => _recSetInput(input.code) == 0;
+
   /// At least one source records on this platform.
   static bool get available => _recAvailable() != 0;
 

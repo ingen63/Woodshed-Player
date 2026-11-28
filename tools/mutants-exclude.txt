@@ -845,3 +845,13 @@ app/lib/sync/providers/google_smoke.dart | dart_false_to_true | request.persiste
 # gleichwertig: Beim Schliessen ist keine Verbindung mehr offen: der Transport der App ist vorher mit
 # force geschlossen, die Anfrage des «Browsers» hat kein Keep-alive; close() ohne force endet gleich.
 app/lib/sync/providers/google_smoke.dart | dart_true_to_false | Future<void> close() => _server.close(force: true);
+
+# ---- core/src/recorder_core.cpp ----
+# gleichwertig: MicSource::available() merkt sich, ob miniaudio ein Eingabegerät nennt (#162). Mit
+# «device_ <= 0» fragt es bei «kein Gerät» jedes Mal neu; die Antwort ist dieselbe, nur die gesparte
+# Abfrage fällt weg.
+core/src/recorder_core.cpp | cxx_lt_to_le | if (device_ < 0)
+# gleichwertig: Gemessen, Mull schaltet diesen Mutanten im Destruktor nicht wirksam (Grenze des
+# Werkzeugs, wie bei ~Capture oben). Von Hand entfernt erkennt ihn
+# simulatedInputStopsWhenRestartedOrDestroyed: der laufende Thread endet mit std::terminate.
+core/src/recorder_core.cpp | cxx_remove_void_call | SimulatedInput::~SimulatedInput() { close(); }

@@ -7,7 +7,6 @@
 // only explains why.
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 import 'package:wp_core/wp_types.dart';
 
@@ -118,16 +117,10 @@ class _RecordingButtonState extends State<RecordingButton> {
         : rec.interruption == RecordingInterruption.failed
         ? l.recordingFailed(l.recordingErrorFile)
         : rec.microphoneDenied
-        // #157/AK6: in the browser the website's permission, not a macOS setting
-        ? (kIsWeb
-              ? l.recordingMicrophoneDeniedBrowser
-              : l.recordingMicrophoneDenied)
+        // #157/AK6, #162/AK3: the setting of this system or the website's permission
+        ? microphoneDeniedMessage(l)
         : rec.silent
-        ? (!mic
-              ? l.recordingSilent
-              : kIsWeb
-              ? l.recordingMicrophoneSilentBrowser
-              : l.recordingMicrophoneSilent)
+        ? (!mic ? l.recordingSilent : microphoneSilentMessage(l))
         : null;
     return ExcludeFocus(
       child: Row(

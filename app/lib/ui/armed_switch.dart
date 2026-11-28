@@ -4,7 +4,6 @@
 // it by, and the pause that ends a take.
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 
 import '../app/practice_recording.dart';
@@ -19,9 +18,11 @@ String armedProblemMessage(
   PracticeRecording practice,
 ) => switch (p) {
   PracticeArmProblem.busy => l.armedBusy,
-  // #157/AK6: in the browser the website's permission, not a macOS setting
-  PracticeArmProblem.microphoneDenied =>
-    kIsWeb ? l.armedMicrophoneDeniedBrowser : l.armedMicrophoneDenied,
+  // #157/AK6, #162/AK3: the setting of this system or the website's permission
+  PracticeArmProblem.microphoneDenied => microphoneDeniedMessage(
+    l,
+    armed: true,
+  ),
   PracticeArmProblem.background => l.armedStoppedInBackground,
   PracticeArmProblem.storageFull => l.armedStorageFull,
   PracticeArmProblem.failed => switch (practice.recording.error) {

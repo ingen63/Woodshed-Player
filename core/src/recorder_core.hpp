@@ -12,6 +12,7 @@
 #include "flac_writer.hpp"
 #include "miniaudio_impl.hpp"
 #include "sound_gate.hpp"
+#include "wp_core.h"
 
 namespace wp::rec {
 
@@ -165,6 +166,19 @@ private:
   std::atomic<bool> writerRun_{false};
 };
 
+// #162: the code of a failed start of the input device: WP_REC_ERR_ACCESS_DENIED if the system
+// refused access (MA_ACCESS_DENIED, e.g. the microphone privacy setting of Windows), otherwise
+// WP_REC_ERR_NO_INPUT.
+int micOpenError(ma_result result);
+// #162: the code of a failed start of an opened input device: WP_REC_ERR_ACCESS_DENIED for
+// MA_ACCESS_DENIED, otherwise WP_REC_ERR_START.
+int micStartError(ma_result result);
+
+// #162: whether miniaudio lists an input device on `context`.
+bool hasInputDeviceOn(ma_context *context);
+// #162: the same on a context of its own with `backends` (nullptr: miniaudio picks the backend).
+bool hasInputDevice(const ma_backend *backends = nullptr, ma_uint32 backendCount = 0);
+
 // Microphone (#113): the default input device of the system through miniaudio, handed to a Capture
 // as stereo float (mono inputs on both channels). Without the permission macOS delivers silence.
 class MicInput {
@@ -183,6 +197,8 @@ public:
   bool start(Capture &capture);
   // Stops and closes the device; afterwards nothing reaches the capture any more.
   void close();
+  // #162: miniaudio's result of the last open() or start(), MA_SUCCESS if both worked.
+  [[nodiscard]] ma_result result() const { return result_; }
 
   // Audio thread: hands `frames` interleaved stereo float frames of the device to `capture`.
   static void deliver(Capture &capture, const float *input, uint32_t frames);
@@ -193,7 +209,77 @@ private:
   ma_device
       device_{}; // NOLINT(bugprone-invalid-enum-default-initialization): zeroed miniaudio struct
   bool open_ = false;
+  ma_result result_ = MA_SUCCESS;
   Capture *capture_ = nullptr;
+};
+
+// #162: an artificial microphone for tests and the smoke tests on machines without one (the CI
+// runners): a sine or silence, handed to a Capture at real-time pace from its own thread, in blocks
+// of kBlockFrames like a device.
+class SimulatedInput {
+public:
+  static constexpr double kSampleRate = 48000;
+  static constexpr double kToneHz = 440;
+  // Peak of the sine, about -12 dBFS: above every threshold of an armed recording but 0 dBFS.
+  static constexpr float kToneAmplitude = 0.25f;
+
+  SimulatedInput() = default;
+  SimulatedInput(const SimulatedInput &) = delete;
+  SimulatedInput &operator=(const SimulatedInput &) = delete;
+  ~SimulatedInput();
+
+  // Starts delivering to `capture`, which must already be open; stops a running delivery first.
+  void start(Capture &capture);
+  // Stops the thread; afterwards nothing reaches the capture any more.
+  void close();
+  // Sine (true) or silence (false), also while it runs.
+  void setTone(bool tone) { tone_.store(tone); }
+  [[nodiscard]] bool tone() const { return tone_.load(); }
+
+  // `frames` stereo frames from frame `position` on: the sine if `tone`, otherwise silence.
+  static void render(float *out, uint32_t frames, uint64_t position, bool tone);
+
+private:
+  void loop(Capture &capture);
+
+  std::thread thread_;
+  std::atomic<bool> run_{false};
+  std::atomic<bool> tone_{false};
+};
+
+// #162: what the microphone of a recording reads, chosen with wp_rec_set_input: the default input
+// device of the system (normal), or for tests an artificial input (silence or sine), a device that
+// refuses access or no device at all.
+class MicSource {
+public:
+  MicSource() = default;
+  // Tests: the device of `context` (e.g. miniaudio's null backend) instead of the system's.
+  explicit MicSource(ma_context *context) : context_(context) {}
+
+  // WP_REC_INPUT_*; false (and no change) for an unknown value. Between silence and sine a running
+  // artificial input switches at once; every other change applies to the next open().
+  bool setInput(int input);
+  [[nodiscard]] int input() const { return input_.load(); }
+  // Whether there is something to record: the device only if miniaudio lists an input device
+  // (asked once, then kept), the artificial inputs and the refusing device always, none never.
+  bool available();
+  // Opens the input. 0, WP_REC_ERR_NO_INPUT or WP_REC_ERR_ACCESS_DENIED.
+  int open();
+  // Rate of the opened input in Hz, 0 if none is open.
+  [[nodiscard]] double sampleRate() const;
+  // Starts delivering to `capture`, which must already be open. 0, WP_REC_ERR_START or
+  // WP_REC_ERR_ACCESS_DENIED.
+  int start(Capture &capture);
+  // Stops and closes the input; afterwards nothing reaches the capture any more.
+  void close();
+
+private:
+  ma_context *context_ = nullptr; // nullptr: miniaudio picks the backend
+  std::atomic<int> input_{WP_REC_INPUT_DEVICE};
+  int device_ = -1; // whether miniaudio lists an input device; -1 until asked
+  MicInput mic_;
+  SimulatedInput sim_;
+  bool simOpen_ = false;
 };
 
 } // namespace wp::rec

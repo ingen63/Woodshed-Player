@@ -66,7 +66,7 @@ Slow any track down without changing its pitch, loop the hard bars, play along w
 
 ### 🎙️ Recording
 
-- **Record what you play.** Microphone on the Mac and in the web app, system audio on the Mac, lossless as 24-bit FLAC. Each recording goes straight into the library, ready to loop.
+- **Record what you play.** Microphone on the Mac, on Windows, on Linux and in the web app, system audio on the Mac, lossless as 24-bit FLAC. Each recording goes straight into the library, ready to loop.
 - **Armed.** Switch it on in *Practice* or *Metronome* and just play: the first note starts a take with one second of lead-in, a pause ends it, and it is filed under `Recordings › date`. Leave it armed and every phase of playing becomes its own take.
 
 ### 📚 Library
@@ -106,10 +106,10 @@ The full list is in the [release notes](CHANGELOG.en.md).
 
 | | How | |
 | --- | --- | --- |
-| **macOS** 14+ | Native app, Apple Silicon and Intel | Recording, MP3 export and the full command line only here |
+| **macOS** 14+ | Native app, Apple Silicon and Intel | Recording of the system audio, MP3 export and the full command line only here |
 | **iPhone, iPad** | [Web app](https://ingen63.github.io/Woodshed-Player/app/), installable to the home screen | Works offline, lock-screen controls, microphone recording |
 | **Android and everything else** | [Web app](https://ingen63.github.io/Woodshed-Player/app/) in the browser | No installation, no account, microphone recording |
-| **Windows** 10 (1803)+ and 11, x64 | Native app | Command line for playback, sync through Google Drive; no recording yet (in the web app) |
+| **Windows** 10 (1803)+ and 11, x64 | Native app | Microphone recording with **Armed**, command line for playback, sync through Google Drive |
 | **Linux**, x64 | Native app with GTK 3 | As on Windows |
 
 ## Installation

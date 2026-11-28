@@ -875,6 +875,29 @@ class PseudoLocalizations extends AppLocalizationsEn {
   String get helpWebBody => pseudo(super.helpWebBody);
   @override
   String get helpShortcutsBody => pseudo(super.helpShortcutsBody);
+  @override
+  String get recordingErrorAccessDenied =>
+      pseudo(super.recordingErrorAccessDenied);
+  @override
+  String get recordingMicrophoneDeniedWindows =>
+      pseudo(super.recordingMicrophoneDeniedWindows);
+  @override
+  String get recordingMicrophoneDeniedLinux =>
+      pseudo(super.recordingMicrophoneDeniedLinux);
+  @override
+  String get recordingMicrophoneSilentWindows =>
+      pseudo(super.recordingMicrophoneSilentWindows);
+  @override
+  String get recordingMicrophoneSilentLinux =>
+      pseudo(super.recordingMicrophoneSilentLinux);
+  @override
+  String get armedMicrophoneDeniedWindows =>
+      pseudo(super.armedMicrophoneDeniedWindows);
+  @override
+  String get armedMicrophoneDeniedLinux =>
+      pseudo(super.armedMicrophoneDeniedLinux);
+  @override
+  String get helpRecordingBodyDesktop => pseudo(super.helpRecordingBodyDesktop);
 }
 
 /// Loads [PseudoLocalizations] for any locale.

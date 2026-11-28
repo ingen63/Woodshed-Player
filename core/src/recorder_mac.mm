@@ -37,7 +37,8 @@ struct Recorder {
   dispatch_queue_t queue = nullptr;
 
   wp::rec::Capture capture; // ring buffer, writer thread, file, level
-  wp::rec::MicInput mic;    // #113: only open while recording from the microphone
+  wp::rec::MicSource mic;   // #113: only open while recording from the microphone; #162: or the
+                            // artificial input of the tests
 };
 
 Recorder &rec() {
@@ -119,13 +120,19 @@ int openCapture(Recorder &r, const char *path, const wp::rec::GateConfig *gate) 
 }
 
 int startMic(Recorder &r, const char *path, const wp::rec::GateConfig *gate) {
-  if (!r.mic.open())
+  const int input = r.mic.open();
+  if (input == WP_REC_ERR_ACCESS_DENIED)
+    return fail(r, input, "The system refuses access to the microphone");
+  if (input != 0)
     return fail(r, WP_REC_ERR_NO_INPUT, "No input device could be opened");
   r.sampleRate = r.mic.sampleRate();
   const int opened = openCapture(r, path, gate);
   if (opened != 0)
     return opened;
-  if (!r.mic.start(r.capture))
+  const int started = r.mic.start(r.capture);
+  if (started == WP_REC_ERR_ACCESS_DENIED)
+    return fail(r, started, "The system refuses access to the microphone");
+  if (started != 0)
     return fail(r, WP_REC_ERR_START, "Microphone could not be started");
   return 0;
 }
@@ -230,8 +237,9 @@ int startTap(Recorder &r, const char *path, const wp::rec::GateConfig *gate)
 extern "C" {
 
 int wp_rec_source_available(int source) {
+  // The Mac asks for no input device (as before #162); only the test inputs can take it away.
   if (source == WP_REC_SOURCE_MIC)
-    return 1;
+    return rec().mic.input() == WP_REC_INPUT_DEVICE || rec().mic.available() ? 1 : 0;
   if (source == WP_REC_SOURCE_SYSTEM) {
     if (@available(macOS 14.2, *))
       return 1;
@@ -240,7 +248,11 @@ int wp_rec_source_available(int source) {
 }
 
 // The microphone records on every supported macOS.
-int wp_rec_available(void) { return wp_rec_source_available(WP_REC_SOURCE_MIC); }
+int wp_rec_available(void) {
+  return wp_rec_source_available(WP_REC_SOURCE_MIC) || wp_rec_source_available(WP_REC_SOURCE_SYSTEM)
+             ? 1
+             : 0;
+}
 
 } // extern "C"
 
@@ -325,5 +337,9 @@ int wp_rec_only_silence(void) { return rec().capture.meter().onlySilence() ? 1 :
 int wp_rec_os_status(void) { return static_cast<int>(rec().osStatus); }
 
 const char *wp_rec_error(void) { return rec().error.c_str(); }
+
+int wp_rec_set_input(int input) {
+  return rec().mic.setInput(input) ? 0 : WP_REC_ERR_INVALID_ARGUMENT;
+}
 
 } // extern "C"

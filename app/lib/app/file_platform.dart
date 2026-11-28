@@ -134,7 +134,7 @@ abstract class FilePlatform {
   /// *Application Support* der App.
   Future<String?> supportDir();
 
-  /// Ablage für Aufnahmen (nur macOS).
+  /// Folder for recordings (macOS; #162: Windows and Linux; #157: the browser's storage).
   Future<String?> recordingsDir();
 
   /// #113/AK4: whether the app may use the microphone. Asks the user the first time (system dialog);

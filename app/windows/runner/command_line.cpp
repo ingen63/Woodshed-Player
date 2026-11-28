@@ -74,6 +74,14 @@ bool IsCommand(const wchar_t* arg) {
 
 std::string SupportDir() { return Utf8(LocalAppData()); }
 
+std::string RecordingsDir() {
+  const std::wstring app = LocalAppData() + L"\\WoodshedPlayer";
+  const std::wstring dir = app + L"\\Recordings";
+  ::CreateDirectoryW(app.c_str(), nullptr);
+  ::CreateDirectoryW(dir.c_str(), nullptr);
+  return Utf8(dir);
+}
+
 std::string CommandSocketPath() {
   std::wstring dir = LocalAppData() + L"\\WoodshedPlayer";
   ::CreateDirectoryW(dir.c_str(), nullptr);

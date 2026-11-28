@@ -21,7 +21,8 @@
 #   since the last successful nightly run (#11); a not detected mutant fails the job.
 # - windows: core with MSVC and its tests, the Dart tests, `flutter build windows` and smoke tests of
 #   the built app and its command line (#60). linux: `flutter build linux` and the same smoke tests in
-#   xvfb (#60); core and Dart tests run on Linux in «checks». Both: smoke test of the Google sign-in with
+#   xvfb (#60); core and Dart tests run on Linux in «checks». Both: smoke test of the recording with the
+#   core's artificial input (#162), smoke test of the Google sign-in with
 #   the token store of the system (#161).
 # By hand (workflow_dispatch): the push jobs; with nightly=true also every nightly job, gate or not;
 # with desktop=true only the jobs windows and linux (#60).
@@ -696,6 +697,11 @@ jobs:
         # simulated Google on 127.0.0.1, the token in the Credential Manager, removed on sign-out
         if: ${{ !cancelled() }}
         run: tools/smoke_app.sh app/build/windows/x64/runner/Release/WoodshedPlayer.exe google
+      - name: Smoke test of the recording with the artificial input (#162/AK2-AK4, AK6)
+        # no microphone on the runner: the core's artificial input; one recording, «Armed» with three
+        # play phases, a refused microphone, each take FLAC with 24 bit
+        if: ${{ !cancelled() }}
+        run: tools/smoke_app.sh app/build/windows/x64/runner/Release/WoodshedPlayer.exe record
       - name: Pack like the release (#60, tools/package.sh)
         # with the latest tag when the app has its version (between a version change and its tag: skipped)
         run: |
@@ -747,6 +753,9 @@ jobs:
           dbus-run-session -- sh -c '
             printf smoke | gnome-keyring-daemon --unlock --components=secrets >/dev/null
             xvfb-run -a tools/smoke_app.sh app/build/linux/x64/release/bundle/woodshed-player google'
+      - name: Smoke test of the recording with the artificial input in xvfb (#162/AK2-AK4, AK6)
+        # the core and its recording tests (recorder_desktop_tests) run on Linux in «checks»
+        run: xvfb-run -a tools/smoke_app.sh app/build/linux/x64/release/bundle/woodshed-player record
       - name: Pack like the release (#60, tools/package.sh)
         # with the latest tag when the app has its version (between a version change and its tag: skipped)
         run: |

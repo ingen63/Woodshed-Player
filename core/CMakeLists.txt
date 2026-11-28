@@ -243,10 +243,13 @@ wp_mutate(wp_mp3)
 endif()
 
 # Kern mit C-API (wp_core.h)
+# #162: Windows and Linux record the microphone (recorder_desktop.cpp), iOS nothing.
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(WP_RECORDER src/recorder_mac.mm)
-else()
+elseif(APPLE)
   set(WP_RECORDER src/recorder_stub.cpp)
+else()
+  set(WP_RECORDER src/recorder_desktop.cpp)
 endif()
 if(WIN32)
   set(WP_MP3_API src/mp3_api_stub.cpp)
@@ -259,7 +262,7 @@ target_link_libraries(wp_core PRIVATE wp_playercore wp_trim)
 if(NOT WIN32)
   target_link_libraries(wp_core PRIVATE wp_mp3)
 endif()
-if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   target_link_libraries(wp_core PRIVATE wp_reccore)
 endif()
 set_target_properties(wp_core PROPERTIES CXX_VISIBILITY_PRESET hidden)
@@ -306,7 +309,7 @@ add_test(NAME player_tests COMMAND player_tests)
 
 # #68: recording without an audio device (ring buffer, WAV file, level, tap layouts); #113: FLAC
 # file loaded again by the core (wp_playercore), microphone on the null backend
-# #60: POSIX only (sys/resource.h); the Windows app records nothing yet (#162)
+# #60: POSIX only (sys/resource.h); #162 tests the recording of Windows in recorder_desktop_tests
 if(NOT WIN32)
   add_executable(recorder_tests tests/recorder_tests.cpp)
   target_link_libraries(recorder_tests PRIVATE wp_reccore wp_playercore)
@@ -325,6 +328,17 @@ if(NOT WIN32)
   wp_strict_warnings(mp3_export_tests)
   add_test(NAME mp3_export_tests COMMAND mp3_export_tests)
 endif()
+
+# #162: the recording of Windows and Linux through its C API with the artificial input; on every
+# desktop, also with MSVC
+add_library(wp_recdesktop STATIC src/recorder_desktop.cpp)
+target_link_libraries(wp_recdesktop PUBLIC wp_reccore)
+wp_strict_warnings(wp_recdesktop)
+wp_mutate(wp_recdesktop)
+add_executable(recorder_desktop_tests tests/recorder_desktop_tests.cpp)
+target_link_libraries(recorder_desktop_tests PRIVATE wp_recdesktop)
+wp_strict_warnings(recorder_desktop_tests)
+add_test(NAME recorder_desktop_tests COMMAND recorder_desktop_tests)
 
 add_executable(sound_gate_tests tests/sound_gate_tests.cpp)
 target_link_libraries(sound_gate_tests PRIVATE wp_reccore wp_playercore)

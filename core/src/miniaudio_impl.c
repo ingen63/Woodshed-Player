@@ -57,3 +57,16 @@ ma_result wp_vfs_open_and_read_file(ma_vfs *vfs, const char *path, void **data, 
 #endif
   return ma_vfs_open_and_read_file(vfs, path, data, size, NULL);
 }
+
+ma_result wp_encoder_init_file(const char *path, const ma_encoder_config *config,
+                               ma_encoder *encoder) {
+#ifdef _WIN32
+  wchar_t *wide = wp_wide(path);
+  if (wide != NULL) {
+    const ma_result result = ma_encoder_init_file_w(wide, config, encoder);
+    ma_free(wide, NULL);
+    return result;
+  }
+#endif
+  return ma_encoder_init_file(path, config, encoder);
+}

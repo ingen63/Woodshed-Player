@@ -336,6 +336,15 @@ class RecordingController extends ChangeNotifier {
         }
       } on WpRecordingException catch (e) {
         debugPrint(e.toString());
+        // #162/AK3: nothing of the failed start stays behind
+        if (recorder.exists(path)) recorder.delete(path);
+        // #162/AK3: the system refused the microphone (Windows privacy setting): the same hint as
+        // a refused permission
+        if (e.code == WpRecCode.accessDenied) {
+          _micDenied = owner == null;
+          notifyListeners();
+          return const RecordingMicrophoneDenied();
+        }
         _error = e;
         notifyListeners();
         return RecordingFailed(e);

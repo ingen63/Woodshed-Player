@@ -76,7 +76,7 @@ bool WavFile::open(const char *path, uint32_t sampleRate) {
   close();
   const ma_encoder_config config =
       ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, kChannels, sampleRate);
-  open_ = ma_encoder_init_file(path, &config, &encoder_) == MA_SUCCESS;
+  open_ = wp_encoder_init_file(path, &config, &encoder_) == MA_SUCCESS;
   return open_;
 }
 
@@ -180,6 +180,33 @@ void Capture::push(const TapBuffer *buffers, uint32_t count, const TapFormat &fo
   meter_.add(peak, total);
 }
 
+int micOpenError(ma_result result) {
+  return result == MA_ACCESS_DENIED ? WP_REC_ERR_ACCESS_DENIED : WP_REC_ERR_NO_INPUT;
+}
+
+int micStartError(ma_result result) {
+  return result == MA_ACCESS_DENIED ? WP_REC_ERR_ACCESS_DENIED : WP_REC_ERR_START;
+}
+
+bool hasInputDeviceOn(ma_context *context) {
+  ma_device_info *playback = nullptr;
+  ma_device_info *capture = nullptr;
+  ma_uint32 playbackCount = 0;
+  ma_uint32 captureCount = 0;
+  return ma_context_get_devices(context, &playback, &playbackCount, &capture, &captureCount) ==
+             MA_SUCCESS &&
+         captureCount != 0;
+}
+
+bool hasInputDevice(const ma_backend *backends, ma_uint32 backendCount) {
+  ma_context own;
+  if (ma_context_init(backends, backendCount, nullptr, &own) != MA_SUCCESS)
+    return false;
+  const bool found = hasInputDeviceOn(&own);
+  ma_context_uninit(&own);
+  return found;
+}
+
 MicInput::~MicInput() { close(); }
 
 bool MicInput::open(ma_context *context) {
@@ -191,7 +218,8 @@ bool MicInput::open(ma_context *context) {
   config.sampleRate = 0; // the device's own rate, no resampling
   config.dataCallback = onData;
   config.pUserData = this;
-  open_ = ma_device_init(context, &config, &device_) == MA_SUCCESS;
+  result_ = ma_device_init(context, &config, &device_);
+  open_ = result_ == MA_SUCCESS;
   return open_;
 }
 
@@ -201,7 +229,8 @@ bool MicInput::start(Capture &capture) {
   if (!open_)
     return false;
   capture_ = &capture;
-  return ma_device_start(&device_) == MA_SUCCESS;
+  result_ = ma_device_start(&device_);
+  return result_ == MA_SUCCESS;
 }
 
 void MicInput::close() {
@@ -221,6 +250,106 @@ void MicInput::onData(ma_device *device, void * /*output*/, const void *input, m
   auto *self = static_cast<MicInput *>(device->pUserData);
   if (self->capture_ && input)
     deliver(*self->capture_, static_cast<const float *>(input), frames);
+}
+
+SimulatedInput::~SimulatedInput() { close(); }
+
+void SimulatedInput::render(float *out, uint32_t frames, uint64_t position, bool tone) {
+  for (uint32_t i = 0; i < frames; ++i) {
+    float v = 0.0f;
+    if (tone) {
+      // The phase from the frame number modulo one second: exact over any length.
+      const auto frame = static_cast<double>((position + i) % static_cast<uint64_t>(kSampleRate));
+      constexpr double kTwoPi = 6.283185307179586;
+      v = kToneAmplitude * static_cast<float>(std::sin(kTwoPi * kToneHz * frame / kSampleRate));
+    }
+    out[static_cast<size_t>(i) * kChannels] = v;
+    out[static_cast<size_t>(i) * kChannels + 1] = v;
+  }
+}
+
+void SimulatedInput::start(Capture &capture) {
+  close();
+  run_.store(true);
+  thread_ = std::thread([this, &capture] { loop(capture); });
+}
+
+void SimulatedInput::close() {
+  run_.store(false);
+  if (thread_.joinable())
+    thread_.join();
+}
+
+void SimulatedInput::loop(Capture &capture) {
+  using Clock = std::chrono::steady_clock;
+  float block[kBlockFrames * kChannels];
+  const auto begin = Clock::now();
+  uint64_t position = 0;
+  while (run_.load()) {
+    render(block, kBlockFrames, position, tone_.load());
+    MicInput::deliver(capture, block, kBlockFrames);
+    position += kBlockFrames;
+    // Real-time pace: the next block is due when the frames so far have played.
+    const auto due = std::chrono::duration<double>(static_cast<double>(position) / kSampleRate);
+    std::this_thread::sleep_until(begin + std::chrono::duration_cast<Clock::duration>(due));
+  }
+}
+
+bool MicSource::setInput(int input) {
+  if (input < WP_REC_INPUT_DEVICE || input > WP_REC_INPUT_NONE)
+    return false;
+  input_.store(input);
+  sim_.setTone(input == WP_REC_INPUT_TONE);
+  return true;
+}
+
+bool MicSource::available() {
+  switch (input_.load()) {
+  case WP_REC_INPUT_DEVICE:
+    if (device_ < 0)
+      device_ = (context_ ? hasInputDeviceOn(context_) : hasInputDevice()) ? 1 : 0;
+    return device_ == 1;
+  case WP_REC_INPUT_NONE:
+    return false;
+  default:
+    return true;
+  }
+}
+
+int MicSource::open() {
+  close();
+  switch (input_.load()) {
+  case WP_REC_INPUT_SILENCE:
+  case WP_REC_INPUT_TONE:
+    simOpen_ = true;
+    return 0;
+  case WP_REC_INPUT_DENIED:
+    return micOpenError(MA_ACCESS_DENIED);
+  case WP_REC_INPUT_NONE:
+    return micOpenError(MA_NO_DEVICE);
+  default:
+    return mic_.open(context_) ? 0 : micOpenError(mic_.result());
+  }
+}
+
+double MicSource::sampleRate() const {
+  return simOpen_ ? SimulatedInput::kSampleRate : mic_.sampleRate();
+}
+
+int MicSource::start(Capture &capture) {
+  if (simOpen_) {
+    sim_.start(capture);
+    return 0;
+  }
+  if (mic_.start(capture))
+    return 0;
+  return micStartError(mic_.result());
+}
+
+void MicSource::close() {
+  sim_.close();
+  simOpen_ = false;
+  mic_.close();
 }
 
 } // namespace wp::rec

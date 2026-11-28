@@ -12,14 +12,19 @@
 # app/lib/sync/providers/google_smoke.dart): sign-in in the «browser» of a simulated Google on 127.0.0.1,
 # the token in the token store of the system (Credential Manager, libsecret, keychain), found again,
 # removed on sign-out. Only loopback connections; on Linux it needs a running Secret Service.
+# #162: [mode] «record» runs the smoke test of the recording instead (WP_SMOKE=record,
+# app/lib/app/recording_smoke.dart): the core's artificial input in place of a microphone, one
+# recording, «Armed» with three play phases (three takes in Recordings › date), a refused
+# microphone; every take FLAC with 24 bit. For Windows and Linux (macOS would ask for the
+# microphone permission).
 # Usage: tools/smoke_app.sh [app [mode]]
 set -u
 cd "$(dirname "$0")/.." || exit 2
 app=${1:-"app/build/macos/Build/Products/Release/Woodshed Player.app"}
 mode=${2:-1}
 case "$mode" in
-  1 | google) ;;
-  *) echo "smoke_app: unknown mode $mode (google)"; exit 2 ;;
+  1 | google | record) ;;
+  *) echo "smoke_app: unknown mode $mode (google, record)"; exit 2 ;;
 esac
 case "$app" in
   *.app | *.app/) bin="$app/Contents/MacOS/Woodshed Player" ;;

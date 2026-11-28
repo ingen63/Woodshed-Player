@@ -1,5 +1,6 @@
-// Dienste der App auf Desktop und Handy (#34 trennt sie vom Web): Bibliothek im App-Ordner, Audio-Kern
-// über FFI mit eigenem Audiogerät, Aufnahme auf macOS. Gegenstück im Browser: platform_web.dart.
+// Services of the app on desktop and phone (#34 separates them from the web): library in the app folder,
+// audio core over FFI with its own audio device, recording on macOS (#162: the microphone also on
+// Windows and Linux). Counterpart in the browser: platform_web.dart.
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
@@ -34,19 +35,23 @@ import 'practice_arming.dart';
 import 'core_recorder.dart';
 import 'practice_recording.dart';
 import 'recording_controller.dart';
+import 'recording_smoke.dart';
 import 'smoke.dart';
 import 'web_auth_channel.dart';
 import 'test_host.dart';
 
 /// App services. [baseDir] replaces the app folder (library, metronome settings), e.g. in the smoke
 /// test, so the real library is never touched. [tapTempo] lets UI tests set the tap clock (#13).
+/// #162: [files] replaces the platform channel's services (the smoke test of the recording keeps its
+/// recordings in its own folder).
 Future<AppController> createAppController({
   Directory? baseDir,
   TapTempo? tapTempo,
+  ChannelFilePlatform? files,
 }) async {
-  final files = ChannelFilePlatform();
+  final platform = files ?? ChannelFilePlatform();
   final support =
-      baseDir?.path ?? await files.supportDir() ?? Directory.systemTemp.path;
+      baseDir?.path ?? await platform.supportDir() ?? Directory.systemTemp.path;
   final player = WpPlayer();
   final library = Library(
     IoFileStore(Directory('$support/WoodshedPlayer')),
@@ -63,7 +68,7 @@ Future<AppController> createAppController({
       library,
       legacy: FileSettingsStore(File('$support/metronome.json')),
     ),
-    onRunningChanged: files.keepAwake,
+    onRunningChanged: platform.keepAwake,
   );
   await metronome.restore();
   final playerService = PlayerService(WpAudioCore(player));
@@ -86,7 +91,7 @@ Future<AppController> createAppController({
             return google.openGoogle(
               library: library,
               secrets: secrets,
-              openUrl: files.openUrl,
+              openUrl: platform.openUrl,
               systemSignIn: Platform.isMacOS ? WebAuthChannel() : null,
               playing: () => playerService.isPlaying,
             );
@@ -97,7 +102,7 @@ Future<AppController> createAppController({
     player: playerService,
     cloud: cloud,
     metronome: metronome,
-    files: files,
+    files: platform,
     // #116: FLAC is encoded again, so the cut runs off the UI isolate
     trimmer: (bytes, start, end) =>
         Isolate.run(() => wpTrim(bytes, start, end)),
@@ -131,6 +136,9 @@ bool get googleOnThisPlatform =>
 bool get commandLineOnThisPlatform =>
     Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 
+/// #162: `record` of the command line stays on the Mac; Windows and Linux record in the app only.
+bool get commandLineRecords => Platform.isMacOS;
+
 /// #141: LAME inside the app: `Woodshed Player.app/Contents/Frameworks/libmp3lame.dylib`.
 String bundledLamePath() =>
     '${File(Platform.resolvedExecutable).parent.parent.path}/Frameworks/libmp3lame.dylib';
@@ -145,7 +153,8 @@ RecordingController? recordingFor(AppController controller) =>
       )
     : null;
 
-/// #147: the armed practice recording of [controller], where the microphone records (macOS).
+/// #147: the armed practice recording of [controller], where the microphone records (macOS, #162:
+/// Windows and Linux).
 final _practice = Expando<PracticeRecording>();
 PracticeRecording? practiceRecordingFor(AppController controller) {
   final recording = recordingFor(controller);
@@ -167,7 +176,7 @@ ArmedSwitchSlot? armedSwitchFor(AppController controller) {
       : (arming: practice, widget: ArmedSwitch(practice: practice));
 }
 
-/// Aufnahme-Knopf, wenn der Kern Aufnahme kann (macOS 14.2+).
+/// The record button where the core records (macOS; #162: Windows and Linux with an input device).
 Widget? recordingButtonFor(AppController controller) => WpRecorder.available
     ? RecordingButton(
         controller: controller,
@@ -182,7 +191,7 @@ Future<Object?> startCommandLine(AppController controller) async {
   if (path == null) return null;
   final handler = CommandHandler(
     app: controller,
-    recording: recordingFor(controller),
+    recording: commandLineRecords ? recordingFor(controller) : null,
     texts: systemTexts,
   );
   return Platform.isWindows
@@ -198,6 +207,37 @@ AppLocalizations systemTexts() {
     }
   }
   return lookupAppLocalizations(const Locale('en'));
+}
+
+/// #162: the smoke test of the recording: the folder the platform names for recordings must exist;
+/// the takes go to the smoke test's own folder.
+Future<String?> _smokeRecording(AppController c, _SmokeFiles files) async {
+  final platformDir = await files.platformRecordingsDir();
+  if (platformDir == null || !Directory(platformDir).existsSync()) {
+    return 'no folder for recordings: $platformDir';
+  }
+  final recording = recordingFor(c);
+  final practice = practiceRecordingFor(c);
+  if (recording == null || practice == null) return 'no recording here';
+  return smokeRecording(
+    c,
+    recording: recording,
+    practice: practice,
+    setInput: WpRecorder.setInput,
+    l: lookupAppLocalizations(const Locale('en')),
+  );
+}
+
+/// #162: the platform's services, with the recordings in the smoke test's folder [recordings].
+class _SmokeFiles extends ChannelFilePlatform {
+  _SmokeFiles(this.recordings);
+  final Directory recordings;
+
+  @override
+  Future<String?> recordingsDir() async => recordings.path;
+
+  /// The folder the platform itself names for recordings.
+  Future<String?> platformRecordingsDir() => super.recordingsDir();
 }
 
 /// The page language exists only in the browser (#144/AK3); macOS and iOS take the system language.
@@ -259,9 +299,11 @@ class _PlayerMetronome implements MetronomeBackend {
 bool get swiftTestHost => isSwiftTestHost(Platform.environment);
 
 /// #13/AK5: WP_SMOKE=1 starts the smoke test of the built app (smoke.dart, tools/smoke_app.sh); #161:
-/// WP_SMOKE=google the smoke test of the Google sign-in with the token store of the system.
+/// WP_SMOKE=google the smoke test of the Google sign-in with the token store of the system; #162:
+/// WP_SMOKE=record the smoke test of the recording with the core's artificial input
+/// (recording_smoke.dart).
 bool get smokeRequested =>
-    const {'1', 'google'}.contains(Platform.environment['WP_SMOKE']);
+    const {'1', 'google', 'record'}.contains(Platform.environment['WP_SMOKE']);
 
 /// Runs the smoke test in a temporary folder with a generated sine file, shows the app built by [app]
 /// and ends the process with 0 (passed) or 1 (failed, reason on stdout).
@@ -270,11 +312,22 @@ Future<Never> runSmokeApp(Widget Function(AppController c) app) async {
   var failure = 'not started';
   try {
     final wav = File('${dir.path}/Smoke sine.wav')..writeAsBytesSync(sineWav());
-    final c = await createAppController(baseDir: Directory('${dir.path}/app'));
+    final mode = Platform.environment['WP_SMOKE'];
+    final files = mode == 'record'
+        ? _SmokeFiles(Directory('${dir.path}/Recordings')..createSync())
+        : null;
+    // #162: the artificial input before the app asks whether the microphone records
+    if (mode == 'record') WpRecorder.setInput(WpRecInput.silence);
+    final c = await createAppController(
+      baseDir: Directory('${dir.path}/app'),
+      files: files,
+    );
     runApp(app(c));
-    if (Platform.environment['WP_SMOKE'] == 'google') {
+    if (mode == 'google') {
       await google_smoke.loadLibrary();
       failure = await google_smoke.smokeGoogleSignIn(KeychainStore()) ?? '';
+    } else if (files != null) {
+      failure = await _smokeRecording(c, files) ?? '';
     } else {
       failure = await smokeRun(c, wav.path) ?? '';
     }

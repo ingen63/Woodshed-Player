@@ -2557,6 +2557,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Most functions have a keyboard shortcut. The overview lists them all, grouped by area; the key ? opens it at any time, except while you type in a text field. Shortcuts with ⌘ use Ctrl outside Apple.'**
   String get helpShortcutsBody;
+
+  /// #162
+  ///
+  /// In en, this message translates to:
+  /// **'The system does not allow the microphone.'**
+  String get recordingErrorAccessDenied;
+
+  /// #162
+  ///
+  /// In en, this message translates to:
+  /// **'Windows does not let Woodshed Player use the microphone. Switch on “Microphone access” and “Let desktop apps access your microphone” in Settings › Privacy & security › Microphone, then start the recording again.'**
+  String get recordingMicrophoneDeniedWindows;
+
+  /// #162
+  ///
+  /// In en, this message translates to:
+  /// **'The system does not let Woodshed Player use the microphone. Check in the sound settings of the system that the input device may be used, then start the recording again.'**
+  String get recordingMicrophoneDeniedLinux;
+
+  /// #162
+  ///
+  /// In en, this message translates to:
+  /// **'Only silence is coming from the microphone. Check the input device in Settings › System › Sound › Input.'**
+  String get recordingMicrophoneSilentWindows;
+
+  /// #162
+  ///
+  /// In en, this message translates to:
+  /// **'Only silence is coming from the microphone. Check the input device and its volume in the sound settings of the system.'**
+  String get recordingMicrophoneSilentLinux;
+
+  /// #162
+  ///
+  /// In en, this message translates to:
+  /// **'Windows does not let Woodshed Player use the microphone, so «Armed» is off again. Switch on “Microphone access” and “Let desktop apps access your microphone” in Settings › Privacy & security › Microphone, then switch it on again.'**
+  String get armedMicrophoneDeniedWindows;
+
+  /// #162
+  ///
+  /// In en, this message translates to:
+  /// **'The system does not let Woodshed Player use the microphone, so «Armed» is off again. Check in the sound settings of the system that the input device may be used, then switch it on again.'**
+  String get armedMicrophoneDeniedLinux;
+
+  /// #162
+  ///
+  /// In en, this message translates to:
+  /// **'“Record” at the top right starts and stops a recording through the microphone (the default input device of the system). The recording is saved losslessly as FLAC and appears in the library as a new track, named after date and time. Without an input device there is no “Record”. If Windows does not allow the microphone, switch it on in Settings › Privacy & security › Microphone, also for desktop apps.\n\nArmed: in Practice and Metronome, the switch “Armed” records from the microphone by itself. As soon as the level rises above the threshold, a recording starts, 1 second early; after a pause of the set length it ends. Space plays or pauses as usual and also ends a running recording. Then “Armed” goes off; to keep it armed for the next recording, switch off “Switch off after a recording” in its settings. Each recording lands in the library in the folder Recordings › date. The arrow beside the switch sets threshold, pause and whether it goes off after a recording. While “Armed” is on, “Record” is locked.'**
+  String get helpRecordingBodyDesktop;
 }
 
 class _AppLocalizationsDelegate

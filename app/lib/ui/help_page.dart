@@ -1,7 +1,6 @@
 // #148: the help of the app, offline and in the UI language: a page of its own with the contents on the
 // left and the section on the right (on the phone a list that opens a section), and the keyboard
 // shortcuts in a dialog of their own. All texts come from the ARB files; nothing is loaded.
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -91,9 +90,13 @@ String helpSectionBody(AppLocalizations l, HelpSection s) => switch (s) {
   HelpSection.metronome => l.helpMetronomeBody,
   HelpSection.sync => l.helpSyncBody,
   HelpSection.appearance => l.helpAppearanceBody,
-  // #157/AK10: in the browser the microphone only, the permission of the website
-  HelpSection.recording =>
-    kIsWeb ? l.helpRecordingBodyBrowser : l.helpRecordingBody,
+  // #157/AK10: in the browser the microphone only, the permission of the website; #162: on Windows
+  // and Linux the microphone only
+  HelpSection.recording => switch (micSystem) {
+    MicSystem.browser => l.helpRecordingBodyBrowser,
+    MicSystem.windows || MicSystem.linux => l.helpRecordingBodyDesktop,
+    MicSystem.mac => l.helpRecordingBody,
+  },
   HelpSection.export => l.helpExportBody,
   HelpSection.commandLine => l.helpCommandLineBody,
   HelpSection.web => l.helpWebBody,

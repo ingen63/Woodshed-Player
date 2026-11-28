@@ -862,6 +862,8 @@ void recordingUnavailableOffline() {
   CHECK(wp_rec_only_silence() == 1);
   CHECK(wp_rec_os_status() == 0);
   CHECK(std::strlen(wp_rec_error()) > 0);
+  // #162: no microphone to point at an artificial input either.
+  CHECK(wp_rec_set_input(WP_REC_INPUT_TONE) == WP_REC_ERR_UNSUPPORTED);
 }
 
 // A 16-bit mono WAV in memory: `frames` samples of a 440 Hz sine with amplitude 0.5.

@@ -3,6 +3,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <string>
+
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
 
 namespace wp {
 
@@ -14,6 +23,21 @@ constexpr uint32_t kMinMemoryBits = 4;
 constexpr uint32_t kMaxMemoryBits = 32;
 // Compression level of the flac tool's default: fast enough for live recording, small files.
 constexpr uint32_t kCompression = 5;
+
+// #162: creates the file at the UTF-8 path `path` for writing and rewriting (libFLAC goes back to
+// the stream info when it closes). On Windows a narrow path means the ANSI code page, so names with
+// umlauts would fail there; the path goes in as UTF-16.
+FILE *createFile(const char *path) {
+#ifdef _WIN32
+  const int n = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, nullptr, 0);
+  if (n > 0) {
+    std::wstring wide(static_cast<size_t>(n), L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wide.data(), n);
+    return _wfopen(wide.c_str(), L"w+b");
+  }
+#endif
+  return std::fopen(path, "w+b"); // NOLINT(cppcoreguidelines-owning-memory): libFLAC closes it
+}
 } // namespace
 
 FlacWriter::~FlacWriter() { close(); }
@@ -73,8 +97,16 @@ bool FlacWriter::start(uint32_t sampleRate, uint32_t channels, uint32_t bitsPerS
   FLAC__stream_encoder_set_compression_level(e, kCompression);
   // Rates outside the streamable subset (e.g. 192 kHz with large blocks) are still valid FLAC.
   FLAC__stream_encoder_set_streamable_subset(e, false);
+  FILE *file = path ? createFile(path) : nullptr;
+  if (path && !file) {
+    FLAC__stream_encoder_delete(e);
+    return false;
+  }
+  // With a file libFLAC owns it from here and closes it when the encoder finishes or is deleted
+  // (also after a failed init), which the analyzer cannot see through the C library.
+  // NOLINTNEXTLINE(clang-analyzer-unix.Stream)
   const FLAC__StreamEncoderInitStatus status =
-      path ? FLAC__stream_encoder_init_file(e, path, nullptr, nullptr)
+      file ? FLAC__stream_encoder_init_FILE(e, file, nullptr, nullptr)
            : FLAC__stream_encoder_init_stream(e, sink_ ? writeSink : writeMemory, seekMemory,
                                               tellMemory, nullptr, this);
   if (status != FLAC__STREAM_ENCODER_INIT_STATUS_OK) {

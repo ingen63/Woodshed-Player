@@ -50,6 +50,8 @@ List<(String, List<String>)> coreTestPrograms(String core) => [
   ('sound_gate_tests', []),
   // #157: recording in the browser
   ('stream_recorder_tests', []),
+  // #162: recording of Windows and Linux with the artificial input
+  ('recorder_desktop_tests', []),
   // #140: command line
   ('cli_tests', []),
   // #141: MP3 export (LAME from local/lame)

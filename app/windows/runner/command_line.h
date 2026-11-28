@@ -15,6 +15,10 @@ std::string CommandSocketPath();
 // The app's data folder (%LOCALAPPDATA%) in UTF-8; Dart adds «WoodshedPlayer».
 std::string SupportDir();
 
+// #162: the folder for recordings, %LOCALAPPDATA%\WoodshedPlayer\Recordings in UTF-8, created if
+// missing.
+std::string RecordingsDir();
+
 // The exit code of the command in the arguments of this process, or -1 if they hold none (start
 // the app).
 int RunCommandLine();

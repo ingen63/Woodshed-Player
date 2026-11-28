@@ -134,7 +134,7 @@ zugeordnet.
 | Wechsel der Unterteilung an der Schlaggrenze überspringt keinen Schlag | vorhanden: `metronome_tests.cpp` (`subdivisionChangeKeepsBeat`, #3/AK10, gefunden mit #9) | – |
 | Taktart und Unterteilung wechseln gleichzeitig mitten im Schlag (#70): Liegt der laufende Schlag ausserhalb der neuen Taktart, klingt er aus (seine restlichen Klicks in der neuen Unterteilung, als Unterteilung dieses Schlags), der nächste Schlag ist die betonte Eins eines neuen Takts. Liegt er innerhalb, zählt der Takt weiter (#3/AK10). Die Taktart setzt den Zähler nur an einer Schlaggrenze zurück | vorhanden: `reference_tests.cpp` (#70/AK2, #70/AK3, nativ und WASM), `metronome_tests.cpp` (`meterAndSubdivisionChangeMidBeat`, Takt und Schlag) | #70 |
 
-### Aufnahme (nur Mac)
+### Aufnahme (Mac; Mikrofon auch Windows und Linux)
 
 | Regel / Fall | Abgleich | Issue |
 |---|---|---|
@@ -145,6 +145,7 @@ zugeordnet.
 | Scharfe Aufnahme (#140): Ringpuffer für 1 s Vorlauf, Start 1 s vor dem ersten Ton über -50 dBFS, Ende 2 s nach dem letzten Ton, Stopp nach 5 s Stille, kürzere Pausen bleiben, `--silence`/`--threshold`, jede Blockgrösse gleich, FLAC-Datei der scharfen Aufnahme | vorhanden: `sound_gate_tests.cpp` (erzeugter Sinus und Stille, `sound_gate.cpp` ohne Audiogerät) | #140 |
 | Kommandozeile (#140): Argumente, Hilfe, Anfrage als JSON, Gespräch mit der App über einen echten Unix-Socket, `stop` bei Ctrl-C, Start der geschlossenen App; in der App Suche des Titels, scharfe Aufnahme mit Ctrl-C, Quelle, Schwelle und Pause, Berechtigungen, Socket-Server; Knopf «Scharf»; Netzwerk-Prüfung erlaubt nur markierte AF_UNIX-Zeilen | vorhanden: `cli_tests.cpp`, `command_line_test.dart`, `command_line_script_test.dart`, `recording_test.dart` (#140/AK5), `network_free_test.dart` (#140/AK19), `RunnerTests` (`CommandLineToolTests`); von Hand: echte App per Skript starten und steuern, Systemton und Mikrofon | #140 |
 | Systemton-Aufnahme im Kern (`recorder_mac.mm`: Core Audio Process Tap, Aggregate-Device, IOProc) | Lücke: braucht echten Systemton, kein automatischer Test | #51 |
+| Windows und Linux (#162): Mikrofon über `recorder_desktop.cpp` mit künstlichem Eingang (Sinus oder Stille in Echtzeit) statt Gerät: FLAC mit 24 bit, Pfade mit Umlauten (UTF-16 unter Windows), «Scharf» mit drei Spielphasen, kein Eingabegerät, verweigerter Zugriff (nachgebildeter Gerätefehler), nur Mikrofon; in der App Hinweise mit den Einstellungen von Windows und Linux; die gebaute App mit `tools/smoke_app.sh <app> record` (eine Aufnahme, «Scharf» mit drei Spielphasen, verweigertes Mikrofon) | vorhanden: `recorder_desktop_tests.cpp` (Kern unter macOS, Linux und Windows), `recording_desktop_test.dart`, Jobs `windows` und `linux` in `test-quality.yml`; Lücke: echtes Mikrofon und die Datenschutz-Einstellung von Windows nur von Hand | #162 |
 
 ### Web/WASM
 

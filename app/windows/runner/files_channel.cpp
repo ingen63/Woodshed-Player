@@ -87,6 +87,33 @@ EncodableValue PickFolder(HWND window, const std::string* prompt) {
   return path.empty() ? EncodableValue() : EncodableValue(path);
 }
 
+// #162/AK3: whether Windows lets desktop apps use the microphone. The privacy settings
+// (Settings › Privacy & security › Microphone) keep their switches in the consent store: for the
+// device (HKLM), for this user and for desktop apps (NonPackaged). «Deny» in any of them refuses
+// the microphone; a missing value counts as allowed (older Windows). The core reports a refusal it
+// meets anyway (WP_REC_ERR_ACCESS_DENIED).
+bool MicrophoneAllowed() {
+  const wchar_t* store =
+      L"Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\"
+      L"microphone";
+  const std::wstring desktop = std::wstring(store) + L"\\NonPackaged";
+  const struct {
+    HKEY root;
+    const wchar_t* key;
+  } switches[] = {{HKEY_LOCAL_MACHINE, store}, {HKEY_CURRENT_USER, store},
+                  {HKEY_CURRENT_USER, desktop.c_str()}};
+  for (const auto& s : switches) {
+    wchar_t value[16] = {};
+    DWORD size = sizeof value;
+    if (::RegGetValueW(s.root, s.key, L"Value", RRF_RT_REG_SZ, nullptr, value, &size) ==
+            ERROR_SUCCESS &&
+        std::wstring(value) == L"Deny") {
+      return false;
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
 std::unique_ptr<flutter::MethodChannel<EncodableValue>> CreateFilesChannel(
@@ -105,7 +132,9 @@ std::unique_ptr<flutter::MethodChannel<EncodableValue>> CreateFilesChannel(
     } else if (method == "commandSocket") {
       result->Success(EncodableValue(CommandSocketPath()));
     } else if (method == "microphoneAccess") {
-      result->Success(EncodableValue(false));  // #162: no recording on Windows yet
+      result->Success(EncodableValue(MicrophoneAllowed()));  // #162/AK3
+    } else if (method == "recordingsDir") {
+      result->Success(EncodableValue(RecordingsDir()));  // #162/AK2
     } else if (method == "openUrl") {
       // #50/AK6: links of the About dialog open in the default browser; only https.
       if (text != nullptr && text->rfind("https://", 0) == 0) {
@@ -118,8 +147,8 @@ std::unique_ptr<flutter::MethodChannel<EncodableValue>> CreateFilesChannel(
           {EncodableValue("tag"), EncodableValue(std::string(WP_GIT_TAG))},
           {EncodableValue("date"), EncodableValue(std::string(WP_BUILD_DATE))},
       }));
-    } else if (method == "keepAwake" || method == "recordingsDir" ||
-               method == "windowAppearance" || method == "localizeMenuBar") {
+    } else if (method == "keepAwake" || method == "windowAppearance" ||
+               method == "localizeMenuBar") {
       result->Success();
     } else {
       result->NotImplemented();

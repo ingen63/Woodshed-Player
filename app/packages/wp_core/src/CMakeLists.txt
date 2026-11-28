@@ -1,8 +1,8 @@
 # #60: the audio core (core/) as the library of the Flutter plugin on Windows and Linux. Built from
 # the sources in core/src like the podspecs of macOS and iOS, without tests and tools; the core's
 # own build with its tests is core/CMakeLists.txt. Windows: wp_core.dll (miniaudio plays through
-# WASAPI), Linux: libwp_core.so (PulseAudio or ALSA, loaded by miniaudio at run time). No recording
-# (#162) and no MP3 export there: the C API answers with the stubs.
+# WASAPI), Linux: libwp_core.so (PulseAudio or ALSA, loaded by miniaudio at run time). #162: the
+# recording of the microphone (recorder_desktop.cpp); no MP3 export there: its C API is the stub.
 cmake_minimum_required(VERSION 3.14)
 project(wp_core_library LANGUAGES C CXX)
 
@@ -33,7 +33,7 @@ set(WP_CORE_SOURCES
   ${WP_SRC}/player.cpp ${WP_SRC}/player_core.cpp ${WP_SRC}/engine.cpp ${WP_SRC}/metronome.cpp
   ${WP_SRC}/waveform.cpp ${WP_SRC}/miniaudio_impl.c ${WP_SRC}/trim.cpp ${WP_SRC}/trim_mp4.cpp
   ${WP_SRC}/trim_api.cpp ${WP_SRC}/flac_writer.cpp ${WP_SRC}/mp3_api_stub.cpp
-  ${WP_SRC}/recorder_stub.cpp)
+  ${WP_SRC}/recorder_desktop.cpp ${WP_SRC}/recorder_core.cpp ${WP_SRC}/sound_gate.cpp)
 if(NOT WIN32)
   # #140: the command line of the app's program (wp_cli_main), loaded by the Linux runner. Windows
   # has its own console program for it (app/windows/runner).

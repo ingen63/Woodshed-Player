@@ -66,7 +66,7 @@ Jedes Stück langsamer abspielen, ohne dass sich die Tonhöhe ändert, die schwe
 
 ### 🎙️ Aufnahme
 
-- **Aufnehmen, was Du spielst.** Mikrofon am Mac und in der Web-App, Systemton am Mac, verlustfrei als FLAC mit 24 Bit. Jede Aufnahme landet direkt in der Bibliothek, bereit für den Loop.
+- **Aufnehmen, was Du spielst.** Mikrofon am Mac, unter Windows, unter Linux und in der Web-App, Systemton am Mac, verlustfrei als FLAC mit 24 Bit. Jede Aufnahme landet direkt in der Bibliothek, bereit für den Loop.
 - **Scharf.** In *Üben* oder *Metronom* einschalten und einfach spielen: Der erste Ton startet eine Aufnahme mit einer Sekunde Vorlauf, eine Pause beendet sie, abgelegt unter `Recordings › Datum`. Bleibt der Schalter scharf, wird jede Spielphase zu einer eigenen Aufnahme.
 
 ### 📚 Bibliothek
@@ -106,10 +106,10 @@ Die vollständige Liste steht in den [Release Notes](CHANGELOG.md).
 
 | | Wie | |
 | --- | --- | --- |
-| **macOS** 14+ | Native App, Apple Silicon und Intel | Aufnahme, MP3-Export und die volle Kommandozeile nur hier |
+| **macOS** 14+ | Native App, Apple Silicon und Intel | Aufnahme des Systemtons, MP3-Export und die volle Kommandozeile nur hier |
 | **iPhone, iPad** | [Web-App](https://ingen63.github.io/Woodshed-Player/app/), auf den Home-Bildschirm installierbar | Läuft offline, Steuerung auf dem Sperrbildschirm, Aufnahme über das Mikrofon |
 | **Android und alles andere** | [Web-App](https://ingen63.github.io/Woodshed-Player/app/) im Browser | Ohne Installation, ohne Konto, Aufnahme über das Mikrofon |
-| **Windows** 10 (1803)+ und 11, x64 | Native App | Kommandozeile zum Abspielen, Abgleich über Google Drive; noch keine Aufnahme (in der Web-App) |
+| **Windows** 10 (1803)+ und 11, x64 | Native App | Aufnahme über das Mikrofon mit **Scharf**, Kommandozeile zum Abspielen, Abgleich über Google Drive |
 | **Linux**, x64 | Native App mit GTK 3 | Wie unter Windows |
 
 ## Installation

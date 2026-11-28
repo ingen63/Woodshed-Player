@@ -1,4 +1,5 @@
-// Aufnahme auf Plattformen ohne Umsetzung (iOS, Android; Windows/Linux folgen in Phase 7).
+// Recording on platforms without one (iOS, the offline and browser cores; #162: Windows and Linux
+// have recorder_desktop.cpp).
 #include "wp_core.h"
 
 extern "C" {
@@ -19,4 +20,5 @@ float wp_rec_level(void) { return 0.0f; }
 int wp_rec_only_silence(void) { return 1; }
 int wp_rec_os_status(void) { return 0; }
 const char *wp_rec_error(void) { return "Recording is not available on this platform"; }
+int wp_rec_set_input(int) { return WP_REC_ERR_UNSUPPORTED; }
 }

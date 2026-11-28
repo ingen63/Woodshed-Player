@@ -64,6 +64,9 @@ abstract final class WpRecCode {
   /// #140: threshold or pause of an armed recording out of range.
   static const invalidArgument = -12;
 
+  /// #162: the system refuses access to the microphone (the privacy setting of Windows).
+  static const accessDenied = -13;
+
   static const all = [
     invalidPath,
     unsupported,
@@ -76,7 +79,8 @@ abstract final class WpRecCode {
     ioProc,
     start,
     noInput,
-    invalidArgument, //
+    invalidArgument,
+    accessDenied, //
   ];
 }
 
@@ -138,6 +142,28 @@ enum WpRecSource {
     }
     return null;
   }
+}
+
+/// #162: what the microphone source reads, the values of `WP_REC_INPUT_*` in wp_core.h. Besides the
+/// device, artificial inputs for tests and the smoke tests on machines without a microphone.
+enum WpRecInput {
+  /// The default input device of the system (the normal case).
+  device(0),
+
+  /// Artificial: silence at 48 kHz in real time.
+  silence(1),
+
+  /// Artificial: a 440 Hz sine at about -12 dBFS.
+  tone(2),
+
+  /// A device that refuses access ([WpRecCode.accessDenied]).
+  denied(3),
+
+  /// No input device: the microphone is not available.
+  none(4);
+
+  const WpRecInput(this.code);
+  final int code;
 }
 
 /// Recording could not start (#44): [code] is a [WpRecCode], [osStatus] the OSStatus or 0,

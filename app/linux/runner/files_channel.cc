@@ -15,6 +15,14 @@ std::string support_dir() {
   return dir;
 }
 
+// #162/AK2: the folder for recordings, ~/.local/share/WoodshedPlayer/Recordings, created if missing.
+std::string recordings_dir() {
+  g_autofree gchar* dir =
+      g_build_filename(g_get_user_data_dir(), "WoodshedPlayer", "Recordings", nullptr);
+  g_mkdir_with_parents(dir, 0700);
+  return dir;
+}
+
 // The file types the app imports (#22), as in the Mac's open panel.
 void add_audio_filter(GtkFileChooser* chooser) {
   GtkFileFilter* filter = gtk_file_filter_new();
@@ -80,9 +88,14 @@ FlMethodResponse* handle(FlMethodCall* call) {
     return FL_METHOD_RESPONSE(fl_method_success_response_new(path));
   }
   if (strcmp(method, "microphoneAccess") == 0) {
-    // #162: no recording on Linux yet
-    g_autoptr(FlValue) no = fl_value_new_bool(FALSE);
-    return FL_METHOD_RESPONSE(fl_method_success_response_new(no));
+    // #162: Linux has no permission for the microphone; a device that refuses access is reported
+    // by the core (WP_REC_ERR_ACCESS_DENIED).
+    g_autoptr(FlValue) yes = fl_value_new_bool(TRUE);
+    return FL_METHOD_RESPONSE(fl_method_success_response_new(yes));
+  }
+  if (strcmp(method, "recordingsDir") == 0) {
+    g_autoptr(FlValue) dir = fl_value_new_string(recordings_dir().c_str());
+    return FL_METHOD_RESPONSE(fl_method_success_response_new(dir));
   }
   if (strcmp(method, "openUrl") == 0) {
     // #50/AK6: links of the About dialog open in the default browser; only https.
@@ -98,8 +111,8 @@ FlMethodResponse* handle(FlMethodCall* call) {
     fl_value_set_string_take(info, "date", fl_value_new_string(WP_BUILD_DATE));
     return FL_METHOD_RESPONSE(fl_method_success_response_new(info));
   }
-  if (strcmp(method, "keepAwake") == 0 || strcmp(method, "recordingsDir") == 0 ||
-      strcmp(method, "windowAppearance") == 0 || strcmp(method, "localizeMenuBar") == 0) {
+  if (strcmp(method, "keepAwake") == 0 || strcmp(method, "windowAppearance") == 0 ||
+      strcmp(method, "localizeMenuBar") == 0) {
     return FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   }
   return FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());

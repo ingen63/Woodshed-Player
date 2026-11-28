@@ -155,7 +155,8 @@ WP_API int wp_mp3_available(const char *lame_path);
 WP_API int wp_mp3_export(const char *lame_path, const char *in_path, const char *out_path, int kbps,
                          int *cancel, double *progress);
 
-/* ---- Recording: system audio (macOS 14.2+) or microphone (macOS, #113); elsewhere < 0 ---- */
+/* ---- Recording: system audio (macOS 14.2+) or microphone (macOS #113, Windows and Linux #162);
+ * elsewhere < 0 ---- */
 /* Error codes of wp_rec_start (#44); the UI maps each one to its own localized text. */
 #define WP_REC_ERR_INVALID_PATH -1  /* no file path */
 #define WP_REC_ERR_UNSUPPORTED -2   /* platform without recording or macOS older than 14.2 */
@@ -170,6 +171,8 @@ WP_API int wp_mp3_export(const char *lame_path, const char *in_path, const char 
 #define WP_REC_ERR_NO_INPUT -11     /* no input device (microphone) or it could not be opened */
 /* #140: threshold or pause of an armed recording out of range */
 #define WP_REC_ERR_INVALID_ARGUMENT -12
+/* #162: the system refuses access to the microphone (e.g. the privacy setting of Windows) */
+#define WP_REC_ERR_ACCESS_DENIED -13
 /* Sources of wp_rec_start_source (#113). */
 #define WP_REC_SOURCE_SYSTEM 0 /* system audio without Woodshed Player's own sound, as FLAC */
 #define WP_REC_SOURCE_MIC 1    /* default input device of the system, as FLAC */
@@ -217,6 +220,18 @@ WP_API int wp_rec_only_silence(void);
 WP_API int wp_rec_os_status(void);
 /* English description of the last error, for logs only; the UI uses the code (#44). Never NULL. */
 WP_API const char *wp_rec_error(void);
+/* #162: inputs of the microphone source (wp_rec_set_input). The artificial ones serve tests and the
+ * smoke tests on machines without a microphone (CI runners). */
+#define WP_REC_INPUT_DEVICE 0  /* the default input device of the system (the normal case) */
+#define WP_REC_INPUT_SILENCE 1 /* artificial: silence at 48 kHz, in real time */
+#define WP_REC_INPUT_TONE 2    /* artificial: a 440 Hz sine at about -12 dBFS, 48 kHz, real time */
+#define WP_REC_INPUT_DENIED 3  /* a device that refuses access (WP_REC_ERR_ACCESS_DENIED) */
+#define WP_REC_INPUT_NONE 4    /* no input device: the microphone is not available */
+/* #162: what the microphone source reads from now on. Between WP_REC_INPUT_SILENCE and
+ * WP_REC_INPUT_TONE a running recording switches at once; other changes apply to the next start.
+ * 0 = ok, WP_REC_ERR_INVALID_ARGUMENT for an unknown input, WP_REC_ERR_UNSUPPORTED where the
+ * microphone does not record. */
+WP_API int wp_rec_set_input(int input);
 
 #ifdef __cplusplus
 }
