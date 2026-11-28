@@ -80,6 +80,8 @@ void main() {
 
   group('#163 smokeDrop', () {
     late TestApp a;
+    // every app of a test: its imports end before the folder goes (Windows keeps open files)
+    final apps = <TestApp>[];
     late DropSmokeFiles files;
     late List<FileDragEvent> seen;
     late Timer loads;
@@ -87,6 +89,7 @@ void main() {
 
     setUp(() async {
       a = TestApp(Directory('${tmp.path}/lib'));
+      apps.add(a);
       await a.library.load();
       files = dropSmokeFiles(Directory('${tmp.path}/src'), windows: false);
       seen = [];
@@ -97,7 +100,18 @@ void main() {
         (_) => a.finishLoads(),
       );
     });
-    tearDown(() => loads.cancel());
+    tearDown(() async {
+      await eventually(
+        () => apps.every((x) => !x.library.isImporting),
+        'imports finished',
+      );
+      // a last save after the writes before it, so no file is open any more
+      for (final x in apps) {
+        await x.library.save();
+      }
+      loads.cancel();
+      apps.clear();
+    });
 
     Offset? find(FileDropTarget t) {
       shown = t;
@@ -178,6 +192,7 @@ void main() {
       );
       seen.clear();
       a = TestApp(Directory('${tmp.path}/lib2'));
+      apps.add(a);
       await a.library.load();
       a.controller.dropTargetAt = (p) => p == at ? shown : null;
       expect(
@@ -224,6 +239,7 @@ void main() {
       n = 0;
       seen.clear();
       a = TestApp(Directory('${tmp.path}/lib3'));
+      apps.add(a);
       await a.library.load();
       a.controller.dropTargetAt = (p) => p == at ? shown : null;
       expect(
