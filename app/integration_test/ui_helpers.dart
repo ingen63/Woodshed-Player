@@ -53,7 +53,10 @@ void keepAppInFront(WidgetTester tester) {
   );
 }
 
-/// Steps to [AppLifecycleState.resumed] through the states between, as the engine does.
+/// Steps to [AppLifecycleState.resumed] through the states between, as the engine does. #165: without a
+/// state yet it goes straight to resumed, as Flutter does for a first lifecycle message. macOS has no
+/// initial lifecycle state (`initialLifecycleState` is empty) and the engine reports one only when the
+/// window becomes active or hidden; a test app that never comes to the front has none.
 void _resume(WidgetsBinding binding) {
   const path = [
     AppLifecycleState.paused,
@@ -61,7 +64,12 @@ void _resume(WidgetsBinding binding) {
     AppLifecycleState.inactive,
     AppLifecycleState.resumed,
   ];
-  for (final state in path.skip(path.indexOf(binding.lifecycleState!) + 1)) {
+  final current = binding.lifecycleState;
+  if (current == null) {
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    return;
+  }
+  for (final state in path.skip(path.indexOf(current) + 1)) {
     binding.handleAppLifecycleStateChanged(state);
   }
 }
