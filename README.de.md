@@ -97,7 +97,7 @@ Version 1.0 ist die erste stabile Version der neuen App: eine Oberfläche in Flu
 - **Unterordner,** Hilfe-Seiten für jeden Bereich und eine Übersicht der Tastenkürzel.
 - **Dunkel als Standard,** mit einer Titelleiste am Mac, die zur App passt.
 - **Auf dem iPhone auch im Stumm-Modus hörbar,** wie eine Musik-App.
-- **Native Apps für Windows und Linux** (x64), mit der Kommandozeile zum Abspielen.
+- **Native Apps für Windows und Linux** (x64), mit Aufnahme über das Mikrofon, **Scharf**, Abgleich, Ziehen und Ablegen und der Kommandozeile zum Abspielen.
 - **MP3-Export und Kommandozeile** am Mac.
 
 Die vollständige Liste steht in den [Release Notes](CHANGELOG.md).

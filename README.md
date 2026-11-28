@@ -97,7 +97,7 @@ Version 1.0 is the first stable release of the new app: a Flutter interface on a
 - **Subfolders,** help pages for every area and a shortcut overview.
 - **Dark by default,** with a Mac title bar that matches the app.
 - **Audible on the iPhone in silent mode,** like a music app.
-- **Native apps for Windows and Linux** (x64), with the command line for playback.
+- **Native apps for Windows and Linux** (x64), with microphone recording, **Armed**, sync, drag and drop and the command line for playback.
 - **MP3 export and a command line** on the Mac.
 
 The full list is in the [release notes](CHANGELOG.en.md).

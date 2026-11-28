@@ -12,9 +12,9 @@ Die erste stabile Version von Woodshed Player: eine neue App in Flutter mit eine
 - **Bibliothek:** Ordner mit beliebig tiefen Unterordnern, Playlists, Mehrfachauswahl, Dateien von aussen hineinziehen, Sortierung, Anfang und Ende abschneiden; robust gegen gleichnamige Einträge, ungültige Loops und beschädigte Tags (#114, #121, #122, #123, #124, #135, #136, #137, #143, #146).
 - **Aufnahme:** Mikrofon und Systemton am Mac als FLAC mit 24 Bit, Mikrofon auch unter Windows, Linux und in der Web-App; der Schalter «Scharf» macht jedes Spielen zu einer eigenen Aufnahme unter `Recordings › Datum` und geht auf Wunsch danach aus (#113, #116, #118, #120, #147, #156, #157, #162).
 - **Mac:** MP3-Export mit Jahr, Kommandozeile `woodshed` zum Abspielen und für scharfe Aufnahmen, Menüleiste in der Systemsprache, Fenster mit verstellbarer Seitenleiste und gemerkter Grösse, Titelleiste passend zur Darstellung (#129, #130, #140, #141, #144, #152).
-- **Windows und Linux:** Native Apps für x64 als `.zip` bzw. `.tar.gz`, mit Dateiauswahl, Wiedergabe über WASAPI bzw. PulseAudio/ALSA der Kommandozeile `play` und der Aufnahme über das Mikrofon mit «Scharf»; Abgleich über Google Drive dort noch nicht (#60, #162).
+- **Windows und Linux:** Native Apps für x64 als `.zip` bzw. `.tar.gz`, mit Dateiauswahl und Hineinziehen von Dateien, Wiedergabe über WASAPI bzw. PulseAudio/ALSA, Aufnahme über das Mikrofon mit «Scharf», Abgleich über Google Drive und Kommandozeile `play` mit eigener Hilfe; die Google-Anmeldung in diesen Paketen ist noch nicht mit einem echten Konto geprüft (#60, #161, #162, #163, #164, #166).
 - **Web-App:** Startet offline, Steuerung auf dem Sperrbildschirm, Audio-Cache, Hinweis zum Installieren, Bildschirm bleibt beim Üben an, auf dem iPhone auch im Stumm-Modus hörbar (#39, #71, #72, #82, #109, #110, #158).
-- **Abgleich über Google Drive:** Anmeldung am Mac und in der Web-App, eine Datei pro Gerät, Rückfrage vor verlorenen Änderungen, Schutz vor wieder auftauchenden gelöschten Einträgen; OneDrive, Dropbox und die alte Reparatur entfernt (#53, #54, #55, #65, #84, #90, #98, #104, #107, #111, #131).
+- **Abgleich über Google Drive:** Anmeldung am Mac, unter Windows und Linux und in der Web-App, eine Datei pro Gerät, Rückfrage vor verlorenen Änderungen, Schutz vor wieder auftauchenden gelöschten Einträgen; OneDrive, Dropbox und die alte Reparatur entfernt (#53, #54, #55, #65, #84, #90, #98, #104, #107, #111, #131).
 - **Bedienung:** Hilfe-Seite für alle Bereiche und Übersicht der Tastenkürzel, dunkle Darstellung als Standard, Lizenztexte in der App (#119, #148, #149).
 - **Wiedergabe und Dateien:** richtige Position nach dem Springen, Metronom bei gleichzeitigem Wechsel von Takt und Unterteilung, lange Titel mit weniger Speicher, Grenzen der Abtastrate, kein Abbruch bei vollem Speicher im WASM-Kern (#70, #73, #75, #76, #81, #91, #93, #96, #97, #105, #106).
 
@@ -22,7 +22,7 @@ Die erste stabile Version von Woodshed Player: eine neue App in Flutter mit eine
 
 - Teststrategie mit Abdeckung pro Teil, Referenzfällen, Zufallstests, Fuzzing, Golden Files, Oberflächentests und Rauchtests auf dem iOS-Simulator (#7, #8, #9, #10, #12, #13, #99).
 - Sanitizer, Echtzeit-Sicherheit, Netzwerkfreiheit, Last- und Mutationstests; gleiches Verhalten von nativem und WASM-Kern (#11, #57, #58, #59, #63, #77, #101, #138, #142).
-- Stabilere Tests ohne feste Pausen und mit Zeitgrenzen (#62, #78, #92, #95, #112, #128, #150, #155, #159).
+- Stabilere Tests ohne feste Pausen und mit Zeitgrenzen (#62, #78, #92, #95, #112, #128, #150, #155, #159, #165).
 - Nächtliche Builds, Tests und Rauchtests unter Windows und Linux, Windows-Pfade mit Laufwerk, UNC und Umlauten (#60).
 - Release-Workflow mit Paketen für macOS, Windows, Linux und die Web-App und zweisprachigen Release Notes; englische README mit deutscher Fassung (#41, #139, #145, #160).
 
